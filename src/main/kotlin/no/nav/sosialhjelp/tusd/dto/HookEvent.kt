@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class HookEvent(
-    val upload: FileInfo,
-    val httpRequest: HTTPRequest,
+    val Upload: FileInfo,
+    val HTTPRequest: HTTPRequest,
 )

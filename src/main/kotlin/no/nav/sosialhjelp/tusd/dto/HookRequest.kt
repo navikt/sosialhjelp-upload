@@ -1,9 +1,10 @@
 package no.nav.sosialhjelp.tusd.dto
 
+import HookType
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class HookRequest(
-    val type: HookType,
-    val event: HookEvent,
+    val Type: HookType,
+    val Event: HookEvent,
 )

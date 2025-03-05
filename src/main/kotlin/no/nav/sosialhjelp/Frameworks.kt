@@ -1,7 +1,7 @@
 package no.nav.sosialhjelp
 
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.HelloService
+import no.nav.sosialhjelp.tusd.TusService
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
@@ -11,6 +11,7 @@ fun Application.configureFrameworks() {
         slf4jLogger()
         modules(
             module {
+                single<TusService> { TusService() }
                 single<HelloService> {
                     HelloService {
                         println(environment.log.info("Hello, World!"))

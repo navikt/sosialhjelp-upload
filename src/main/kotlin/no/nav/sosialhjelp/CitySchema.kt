@@ -1,3 +1,5 @@
+package no.nav.sosialhjelp
+
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import java.sql.Connection

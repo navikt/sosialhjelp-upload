@@ -1,7 +1,5 @@
 package no.nav.sosialhjelp
 
-import City
-import CityService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*

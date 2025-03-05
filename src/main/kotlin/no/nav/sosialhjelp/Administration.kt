@@ -1,4 +1,4 @@
-// package no.nav.sosialhjelp
+package no.nav.sosialhjelp // package no.nav.sosialhjelp
 //
 // import com.mongodb.kotlin.client.coroutine.MongoClient
 // import io.github.flaxoos.ktor.server.plugins.taskscheduling.TaskScheduling

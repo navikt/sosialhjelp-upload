@@ -1,0 +1,16 @@
+services:
+  tusd:
+    image: tusproject/tusd:latest
+    container_name: tusd_server
+    ports:
+      - "8084:8084"
+    volumes:
+      - "./tusd-data:/data"
+    entrypoint: ["tusd"]
+    command:
+      - "-host=0.0.0.0"
+      - "-port=8084"
+      - "-hooks-http=http://host.docker.internal:3007/tus-hooks"
+      - "-hooks-enabled-events=pre-create,post-create,post-finish"
+      - "-upload-dir=/data"
+

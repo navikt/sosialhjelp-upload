@@ -9,7 +9,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
 import kotlinx.serialization.Serializable
-import tusd.configureTusRoutes
+import no.nav.sosialhjelp.tusd.configureTusRoutes
 
 fun Application.configureRouting() {
     install(Resources)
@@ -28,6 +28,9 @@ fun Application.configureRouting() {
             authenticate {
                 get {
                     call.respond(Foo("Hello World!"))
+                }
+                get("/token-check") {
+                    call.respondText("Token is OK")
                 }
             }
             sse("/hello") {

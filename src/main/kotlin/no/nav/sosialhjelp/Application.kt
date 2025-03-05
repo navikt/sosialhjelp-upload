@@ -14,6 +14,7 @@ fun Application.module() {
     configureDatabases()
     configureFrameworks()
     configureSerialization()
+    configureStatusPages()
 //    configureAdministration()
     configureRouting()
 }
