@@ -10,8 +10,8 @@ fun Application.configureFrameworks() {
     install(Koin) {
         slf4jLogger()
         modules(
-            module {
-                single<TusService> { TusService() }
+            module(createdAtStart = true) {
+                single { TusService(environment) }
             },
         )
     }

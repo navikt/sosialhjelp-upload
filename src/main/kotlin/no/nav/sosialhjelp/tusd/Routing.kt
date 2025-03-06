@@ -6,19 +6,21 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
-import org.koin.ktor.ext.inject
 
 fun Route.configureTusRoutes() {
-    val whatever by inject<TusService>()
-
+//    val tusService by inject<TusService>()
+    val tusService = TusService(environment)
     post {
         val request = call.receive<HookRequest>()
-
-        when (request.Type) {
-            HookType.PRE_CREATE -> HookResponse()
-            else -> HookResponse()
-        }
-
-        call.respond(HookResponse())
+        call.application.environment.log
+            .info("Received hook request type ${request.Type}")
+        call.respond(
+            when (request.Type) {
+                HookType.PreCreate -> tusService.preCreate(request)
+                HookType.PostCreate -> tusService.postCreate(request)
+                HookType.PostFinish -> tusService.postFinish(request)
+                else -> HookResponse()
+            },
+        )
     }
 }

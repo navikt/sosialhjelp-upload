@@ -4,23 +4,23 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class HookType {
     @SerialName("post-finish")
-    POST_FINISH,
+    PostFinish,
 
     @SerialName("post-terminate")
-    POST_TERMINATE,
+    PostTerminate,
 
     @SerialName("post-receive")
-    POST_RECEIVE,
+    PostReceive,
 
     @SerialName("post-create")
-    POST_CREATE,
+    PostCreate,
 
     @SerialName("pre-create")
-    PRE_CREATE,
+    PreCreate,
 
     @SerialName("pre-finish")
-    PRE_FINISH,
+    PreFinish,
 
     @SerialName("pre-terminate")
-    PRE_TERMINATE,
+    PreTerminate,
 }

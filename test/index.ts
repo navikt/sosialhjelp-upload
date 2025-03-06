@@ -16,6 +16,7 @@ const fileName = path.basename(filePath);
 const uploadOptions: UploadOptions = {
   endpoint: 'http://localhost:8084/files/',
   retryDelays: [0, 1000, 3000, 5000],
+  chunkSize: 1000,
   metadata: { filename: fileName },
   uploadSize: fileData.length,
   onError: (error: any) => console.error('Upload failed:', error),

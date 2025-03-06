@@ -29,9 +29,6 @@ fun Application.configureRouting() {
                 get {
                     call.respond(Foo("Hello World!"))
                 }
-                get("/token-check") {
-                    call.respondText("Token is OK")
-                }
             }
             sse("/hello") {
                 send(ServerSentEvent("world"))
