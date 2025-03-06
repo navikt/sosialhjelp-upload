@@ -3,7 +3,7 @@ package no.nav.sosialhjelp.tusd
 import HookType
 import io.ktor.client.statement.*
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.lol.UploadTable
+import no.nav.sosialhjelp.schema.UploadTable
 import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
@@ -21,14 +21,15 @@ class TusService(
     fun preCreate(request: HookRequest): HookResponse {
         require(request.Type == HookType.PreCreate)
         println("request: $request")
+        val originalFilename = request.Event.Upload.MetaData.filename
 
-        environment.log.info("Creating a new upload, id: ${request.Event.Upload.ID}")
         val foo =
             transaction {
                 UploadTable.insertAndGetId {
-                    it[originalFilename] = request.Event.Upload.MetaData.filename
+                    it[UploadTable.originalFilename] = originalFilename
                 }
             }
+        environment.log.info("Creating a new upload, file: $ id: $foo")
         return HookResponse(changeFileInfo = FileInfoChanges(id = foo.toString()))
     }
 

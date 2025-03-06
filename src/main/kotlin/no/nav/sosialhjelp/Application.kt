@@ -1,9 +1,9 @@
 package no.nav.sosialhjelp
 
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.lol.MainPdfTable
-import no.nav.sosialhjelp.lol.ThumbnailTable
-import no.nav.sosialhjelp.lol.UploadTable
+import no.nav.sosialhjelp.schema.MainPdfTable
+import no.nav.sosialhjelp.schema.ThumbnailTable
+import no.nav.sosialhjelp.schema.UploadTable
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
