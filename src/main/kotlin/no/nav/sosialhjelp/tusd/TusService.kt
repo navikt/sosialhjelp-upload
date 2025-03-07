@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.tusd
 import HookType
 import io.ktor.client.statement.*
 import io.ktor.server.application.*
+import no.nav.sosialhjelp.PdfThumbnailService
 import no.nav.sosialhjelp.schema.UploadTable
 import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.tusd.dto.HookRequest
@@ -17,20 +18,21 @@ class TusService(
     val environment: ApplicationEnvironment,
 ) {
     val pdfConversionService = PdfConversionService()
+    val pdfThumbnailService = PdfThumbnailService(environment)
 
     fun preCreate(request: HookRequest): HookResponse {
         require(request.Type == HookType.PreCreate)
         println("request: $request")
         val originalFilename = request.Event.Upload.MetaData.filename
 
-        val foo =
+        val uploadId =
             transaction {
                 UploadTable.insertAndGetId {
                     it[UploadTable.originalFilename] = originalFilename
                 }
             }
-        environment.log.info("Creating a new upload, file: $ id: $foo")
-        return HookResponse(changeFileInfo = FileInfoChanges(id = foo.toString()))
+        environment.log.info("Creating a new upload, ID: $uploadId")
+        return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))
     }
 
     fun postCreate(request: HookRequest) {
@@ -48,9 +50,16 @@ class TusService(
                     .single()
             }.let { it[UploadTable.id] to it[UploadTable.originalFilename] }
 
-        File(
-            "./tus-data/$uploadId.pdf",
-        ).writeBytes(pdfConversionService.convertToPdf(FinishedUpload(File("./tus-data/$uploadId"), originalFilename)).readRawBytes())
+        val originalFiletype = File(originalFilename).extension
+
+        val converted =
+            pdfConversionService
+                .convertToPdf(FinishedUpload(File("./tusd-data/$uploadId"), originalFiletype))
+                .readRawBytes()
+
+        val pdf = File("./tusd-data/$uploadId.pdf")
+        pdf.writeBytes(converted)
+        pdfThumbnailService.makeThumbnails(pdf)
     }
 }
 

@@ -34,7 +34,6 @@ fun Application.module() {
     configureMonitoring()
 //    configureDatabases()
     configureFrameworks()
-    configureSerialization()
     configureStatusPages()
 //    configureAdministration()
     configureRouting()

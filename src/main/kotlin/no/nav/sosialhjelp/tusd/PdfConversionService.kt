@@ -16,9 +16,11 @@ class PdfConversionService {
             }
         }
 
-    suspend fun convertToPdf(upload: FinishedUpload): HttpResponse {
-        val file = upload.file.readBytes()
-        val headers = Headers.Companion.build { append(HttpHeaders.ContentDisposition, """filename="${upload.originalFilename}"""") }
-        return gotenbergClient.submitFormWithBinaryData(formData { append("file", file, headers) })
-    }
+    private fun buildHeaders(originalFiletype: String): Headers =
+        Headers.Companion.build { append(HttpHeaders.ContentDisposition, """filename="file.$originalFiletype"""") }
+
+    suspend fun convertToPdf(upload: FinishedUpload): HttpResponse =
+        gotenbergClient.submitFormWithBinaryData(
+            formData { append("file", upload.file.readBytes(), buildHeaders(upload.originalFiletype)) },
+        )
 }
