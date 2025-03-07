@@ -21,6 +21,6 @@ class PdfConversionService {
 
     suspend fun convertToPdf(upload: FinishedUpload): HttpResponse =
         gotenbergClient.submitFormWithBinaryData(
-            formData { append("file", upload.file.readBytes(), buildHeaders(upload.originalFiletype)) },
+            formData { append("file", upload.file.readBytes(), buildHeaders(upload.originalFileExtension)) },
         )
 }

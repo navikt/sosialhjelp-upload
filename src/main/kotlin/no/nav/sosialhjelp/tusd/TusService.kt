@@ -50,11 +50,11 @@ class TusService(
                     .single()
             }.let { it[UploadTable.id] to it[UploadTable.originalFilename] }
 
-        val originalFiletype = File(originalFilename).extension
+        val originalFileExtension = File(originalFilename).extension
 
         val converted =
             pdfConversionService
-                .convertToPdf(FinishedUpload(File("./tusd-data/$uploadId"), originalFiletype))
+                .convertToPdf(FinishedUpload(File("./tusd-data/$uploadId"), originalFileExtension))
                 .readRawBytes()
 
         val pdf = File("./tusd-data/$uploadId.pdf")

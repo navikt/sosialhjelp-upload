@@ -4,5 +4,5 @@ import java.io.File
 
 data class FinishedUpload(
     val file: File,
-    val originalFiletype: String,
+    val originalFileExtension: String,
 )
