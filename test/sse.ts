@@ -1,6 +1,8 @@
+import { randomUUID } from "crypto";
 import { EventSource } from "eventsource";
 
-const url = "http://localhost:3007/sosialhjelp/upload/hello";
+const uuid = randomUUID()
+const url = `http://localhost:3007/sosialhjelp/upload/status/${uuid}`;
 
 async function connectSSE() {
   const eventSource = new EventSource(url);

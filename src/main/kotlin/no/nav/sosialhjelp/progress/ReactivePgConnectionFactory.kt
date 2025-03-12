@@ -1,11 +1,13 @@
 package no.nav.sosialhjelp.progress
 
 import io.ktor.server.application.*
+import io.r2dbc.postgresql.api.PostgresqlConnection
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
+import reactor.core.publisher.Mono
 
-class ReactiveConnectionFactory(
+class ReactivePgConnectionFactory(
     environment: ApplicationEnvironment,
 ) {
     private val connectionFactory: ConnectionFactory =
@@ -26,5 +28,9 @@ class ReactiveConnectionFactory(
                 ).build(),
         )
 
-    fun createConnection() = connectionFactory.create()
+    fun createConnection() =
+        Mono
+            .from(connectionFactory.create())
+            .cast(PostgresqlConnection::class.java)
+            .block() ?: error("could not connect to database")
 }
