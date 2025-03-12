@@ -56,6 +56,8 @@ dependencies {
     implementation("io.github.flaxoos:ktor-server-task-scheduling-redis:2.1.2")
     implementation("io.github.flaxoos:ktor-server-task-scheduling-mongodb:2.1.2")
     implementation("io.github.flaxoos:ktor-server-task-scheduling-jdbc:2.1.2")
+    implementation("org.postgresql:r2dbc-postgresql:1.0.7.RELEASE")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.10.1")
     implementation("io.ktor:ktor-server-netty")
     implementation("ch.qos.logback:logback-classic:$logback_version")
     implementation("io.ktor:ktor-server-config-yaml")

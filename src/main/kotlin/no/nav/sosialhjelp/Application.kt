@@ -14,10 +14,23 @@ fun main(args: Array<String>) {
 }
 
 object DatabaseFactory {
-    fun init() {
+    fun init(environment: ApplicationEnvironment) {
+        val dbname = environment.config.property("database.name").getString()
+        val user = environment.config.property("database.user").getString()
+        val password = environment.config.property("database.password").getString()
+        val host = environment.config.property("database.host").getString()
+        val port =
+            environment.config
+                .property("database.port")
+                .getString()
+                .toInt()
+
+        val dbUrl = "jdbc:postgresql://$host:$port/$dbname"
         Database.connect(
-            "jdbc:h2:file:./testdb;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE",
-            driver = "org.h2.Driver",
+            dbUrl,
+            driver = "org.postgresql.Driver",
+            user = user,
+            password = password,
         )
         transaction {
             SchemaUtils.create(UploadTable)
@@ -28,7 +41,7 @@ object DatabaseFactory {
 }
 
 fun Application.module() {
-    DatabaseFactory.init()
+    DatabaseFactory.init(environment)
     configureSecurity()
     configureHTTP()
     configureMonitoring()

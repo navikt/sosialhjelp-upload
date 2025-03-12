@@ -21,8 +21,9 @@ class PdfThumbnailService(
             val outputFileName = inputPdf.nameWithoutExtension
             val pageNumber = String.format("%04d", page + 1)
             val outputFile = File("$outputDir/$outputFileName-$pageNumber.jpg")
+
             ImageIO.write(pdfRenderer.renderImageWithDPI(page, 300f, ImageType.RGB), "JPEG", outputFile)
-            environment.log.info("Wrote page $page/${document.numberOfPages} to $outputFileName")
+            environment.log.info("Wrote page ${page + 1}/${document.numberOfPages} to $outputFileName")
         }
     }
 }

@@ -7,7 +7,9 @@ ktor:
 jwt:
   audience: "$IDPORTEN_CLIENT_ID:default"
   issuer: "$IDPORTEN_ISSUER:http://localhost:8888/default"
-postgres:
-  url: "jdbc:postgresql://localhost/default"
-  user: username
-  password: password
+database:
+  user: postgres
+  password: postgres
+  host: localhost
+  port: 54322
+  name: sosialhjelp-upload
