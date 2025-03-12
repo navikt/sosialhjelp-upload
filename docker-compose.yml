@@ -14,3 +14,21 @@ services:
       - "-hooks-enabled-events=pre-create,post-create,post-finish"
       - "-upload-dir=/tusd-data"
 
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: gotenberg
+    ports:
+      - "3010:3000"
+    volumes:
+      - "/tmp:/dockerVolume"
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: sosialhjelp-upload
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "54322:5432"
