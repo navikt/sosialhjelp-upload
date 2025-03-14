@@ -4,35 +4,38 @@ import io.ktor.server.plugins.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import no.nav.sosialhjelp.schema.*
-import no.nav.sosialhjelp.schema.DocumentTable.soknadId
-import no.nav.sosialhjelp.schema.DocumentTable.vedleggType
-import org.jetbrains.exposed.dao.id.CompositeID
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.transactions.transaction
 
 fun getDocumentStatus(documentIdent: DocumentIdent): DocumentStatusResponse {
-    val documentId =
-        CompositeID {
-            it[soknadId] = documentIdent.soknadId
-            it[vedleggType] = documentIdent.vedleggType
-        }
-
-    DocumentEntity.findById(documentId) ?: throw NotFoundException("Document does not exist")
-
-    val uploadIds = UploadEntity.find { UploadTable.documentId eq documentId }.map { it.id }
-
     val uploadsWithPages =
-        PageEntity
-            .find { PageTable.uploadId inList uploadIds }
-            .sortedBy { PageTable.pageNumber }
-            .groupBy { it.uploadId.value }
+        transaction {
+            val document =
+                DocumentEntity
+                    .find {
+                        (DocumentTable.soknadId eq documentIdent.soknadId) and (DocumentTable.vedleggType eq documentIdent.vedleggType)
+                    }.firstOrNull()
+                    ?: throw NotFoundException("Document does not exist")
+
+            val uploadIds =
+                UploadEntity
+                    .find { UploadTable.document eq document.id }
+                    .map { it.id }
+
+            PageEntity
+                .find { PageTable.upload inList uploadIds }
+                .sortedBy { PageTable.pageNumber }
+                .groupBy { PageTable.upload }
+        }
 
     return DocumentStatusResponse(
         soknadId = documentIdent.soknadId.toString(),
         vedleggType = documentIdent.vedleggType,
         uploads =
-            uploadIds.map { uploadId ->
+            uploadsWithPages.map { (uploadId, pages) ->
                 UploadStatusResponse(
                     id = uploadId.toString(),
-                    pages = uploadsWithPages[uploadId].orEmpty().map { page -> PageStatusResponse.fromPage(page) },
+                    pages = pages.map { page -> PageStatusResponse.fromPageEntity(page) },
                 )
             },
     )

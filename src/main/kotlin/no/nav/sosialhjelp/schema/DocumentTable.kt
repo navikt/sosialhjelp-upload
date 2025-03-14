@@ -1,11 +1,12 @@
 package no.nav.sosialhjelp.schema
 
-import no.nav.sosialhjelp.schema.UploadTable.documentId
-import org.jetbrains.exposed.dao.id.CompositeIdTable
+import org.jetbrains.exposed.dao.id.UUIDTable
 
-object DocumentTable : CompositeIdTable() {
-    val vedleggType = varchar("vedleggType", 255).entityId()
-    val soknadId = uuid("soknadId").entityId()
+object DocumentTable : UUIDTable() {
+    val vedleggType = varchar("vedleggType", 255)
+    val soknadId = uuid("soknadId")
 
-    override val primaryKey = PrimaryKey(documentId, vedleggType)
+    init {
+        uniqueIndex(soknadId, vedleggType)
+    }
 }

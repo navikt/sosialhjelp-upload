@@ -13,3 +13,5 @@ database:
   host: localhost
   port: 54322
   name: sosialhjelp-upload
+thumbnailer:
+  outputDir: "./tusd-data"

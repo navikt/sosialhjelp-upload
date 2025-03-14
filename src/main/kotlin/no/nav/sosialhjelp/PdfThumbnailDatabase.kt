@@ -1,5 +1,7 @@
 package no.nav.sosialhjelp
 
+import no.nav.sosialhjelp.schema.PageEntity
+import no.nav.sosialhjelp.schema.UploadEntity
 import no.nav.sosialhjelp.schema.UploadTable
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -10,15 +12,29 @@ class PdfThumbnailDatabase {
     fun setPageCount(
         uploadId: UUID,
         numPages: Int,
-    ) = transaction {
-        UploadTable.update({ UploadTable.id eq uploadId }) { it[UploadTable.numPages] = numPages }
-        notifyChange(uploadId)
+    ): Int {
+        transaction {
+            for (i in 0..numPages - 1) {
+                PageEntity.new {
+                    upload = UploadEntity[uploadId]
+                    pageNumber = i
+                }
+            }
+        }
+        return transaction {
+            UploadTable.update({ UploadTable.id eq uploadId }) { it[UploadTable.numPages] = numPages }
+            val document = UploadEntity.get(uploadId).document
+            println("NOTIFY \"${document.soknadId}::${document.vedleggType}\"")
+            notifyChange(document.soknadId, document.vedleggType)
+        }
     }
 
-    private fun notifyChange(uploadId: UUID) =
-        TransactionManager.Companion
-            .current()
-            .connection
-            .prepareStatement("NOTIFY $uploadId", false)
-            .executeUpdate()
+    fun notifyChange(
+        soknadId: UUID,
+        vedleggType: String,
+    ) = TransactionManager.Companion
+        .current()
+        .connection
+        .prepareStatement("NOTIFY \"$soknadId::${vedleggType}\"", false)
+        .executeUpdate()
 }

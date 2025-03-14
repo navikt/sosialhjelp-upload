@@ -9,6 +9,6 @@ data class PageStatusResponse(
     val thumbnail: String? = null,
 ) {
     companion object {
-        fun fromPage(page: PageEntity) = PageStatusResponse(page.pageNumber.value, page.filename)
+        fun fromPageEntity(page: PageEntity) = PageStatusResponse(page.pageNumber, page.filename)
     }
 }
