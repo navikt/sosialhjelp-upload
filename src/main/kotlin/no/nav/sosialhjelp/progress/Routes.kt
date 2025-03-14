@@ -1,67 +1,56 @@
 package no.nav.sosialhjelp.progress
 
+import io.ktor.server.plugins.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
-import io.ktor.sse.*
-import io.r2dbc.postgresql.api.PostgresqlResult
-import kotlinx.coroutines.*
-import kotlinx.coroutines.reactive.*
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
-import java.util.*
+import no.nav.sosialhjelp.schema.*
+import no.nav.sosialhjelp.schema.DocumentTable.soknadId
+import no.nav.sosialhjelp.schema.DocumentTable.vedleggType
+import org.jetbrains.exposed.dao.id.CompositeID
 
-const val HEARTBEAT_MS = 1000L
-
-@Serializable
-data class UploadStatus(
-    val id: String,
-    val error: String? = null,
-    val isConverted: Boolean = false,
-    val pages: List<Page>? = null,
-)
-
-@Serializable
-data class Page(
-    val number: Int,
-    val thumbnails: List<String>,
-)
-
-fun getUploadStatus(id: String): UploadStatus = UploadStatus(id)
-
-fun getChannelName(uploadId: UUID): String = "status-" + uploadId.toString().replace("-", "")
-
-fun Route.configureProgressRoutes() {
-    val dbFactory = ReactivePgConnectionFactory(environment)
-
-    sse("/status/{uploadId}", serialize = { typeInfo, it ->
-        val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
-        Json.encodeToString(serializer, it)
-    }) {
-        val uploadId = UUID.fromString(call.parameters.get("uploadId") ?: error("uploadId is required"))
-        val db = dbFactory.createConnection()
-        val channelName = getChannelName(uploadId)
-
-        send(ServerSentEvent("hello"))
-
-        // keepalive
-        launch {
-            runCatching {
-                while (call.isActive) {
-                    delay(HEARTBEAT_MS)
-                    send(ServerSentEvent("world"))
-                }
-            }
+fun getDocumentStatus(documentIdent: DocumentIdent): DocumentStatusResponse {
+    val documentId =
+        CompositeID {
+            it[soknadId] = documentIdent.soknadId
+            it[vedleggType] = documentIdent.vedleggType
         }
 
-        db
-            .createStatement("LISTEN \"$channelName\"")
-            .execute()
-            .flatMap(PostgresqlResult::getRowsUpdated)
-            .thenMany(db.notifications)
-            .asFlow()
-            .collect {
-                runCatching { send(getUploadStatus("foo")) }
-            }
+    DocumentEntity.findById(documentId) ?: throw NotFoundException("Document does not exist")
+
+    val uploadIds = UploadEntity.find { UploadTable.documentId eq documentId }.map { it.id }
+
+    val uploadsWithPages =
+        PageEntity
+            .find { PageTable.uploadId inList uploadIds }
+            .sortedBy { PageTable.pageNumber }
+            .groupBy { it.uploadId.value }
+
+    return DocumentStatusResponse(
+        soknadId = documentIdent.soknadId.toString(),
+        vedleggType = documentIdent.vedleggType,
+        uploads =
+            uploadIds.map { uploadId ->
+                UploadStatusResponse(
+                    id = uploadId.toString(),
+                    pages = uploadsWithPages[uploadId].orEmpty().map { page -> PageStatusResponse.fromPage(page) },
+                )
+            },
+    )
+}
+
+fun Route.configureProgressRoutes() {
+    val statusChannelFactory = DocumentStatusChannelFactory(environment)
+
+    sse("/status/{soknadId}/{vedleggType}", serialize = JsonSerializer) {
+        val documentId = DocumentIdent.fromParameters(call.parameters)
+        val channel = statusChannelFactory.create(documentId)
+
+        send(getDocumentStatus(documentId))
+
+        heartbeat()
+
+        channel
+            .getUpdatesAsFlow()
+            .collect { send(getDocumentStatus(documentId)) }
     }
 }

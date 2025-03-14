@@ -4,7 +4,7 @@ import HookType
 import io.ktor.client.statement.*
 import io.ktor.server.application.*
 import no.nav.sosialhjelp.PdfThumbnailService
-import no.nav.sosialhjelp.schema.UploadTable
+import no.nav.sosialhjelp.schema.DocumentTable
 import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
@@ -27,8 +27,8 @@ class TusService(
 
         val uploadId =
             transaction {
-                UploadTable.insertAndGetId {
-                    it[UploadTable.originalFilename] = originalFilename
+                DocumentTable.insertAndGetId {
+                    it[DocumentTable.originalFilename] = originalFilename
                 }
             }
         environment.log.info("Creating a new upload, ID: $uploadId")
@@ -44,11 +44,11 @@ class TusService(
 
         val (uploadId, originalFilename) =
             transaction {
-                UploadTable
-                    .select(UploadTable.id, UploadTable.originalFilename)
-                    .where { UploadTable.id eq UUID.fromString(request.Event.Upload.ID) }
+                DocumentTable
+                    .select(DocumentTable.id, DocumentTable.originalFilename)
+                    .where { DocumentTable.id eq UUID.fromString(request.Event.Upload.ID) }
                     .single()
-            }.let { it[UploadTable.id] to it[UploadTable.originalFilename] }
+            }.let { it[DocumentTable.id] to it[DocumentTable.originalFilename] }
 
         val originalFileExtension = File(originalFilename).extension
 
@@ -59,7 +59,7 @@ class TusService(
 
         val pdf = File("./tusd-data/$uploadId.pdf")
         pdf.writeBytes(converted)
-        pdfThumbnailService.makeThumbnails(pdf)
+        pdfThumbnailService.makeThumbnails(uploadId.value, pdf)
     }
 }
 

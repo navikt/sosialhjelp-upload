@@ -1,8 +1,8 @@
 package no.nav.sosialhjelp
 
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.schema.MainPdfTable
-import no.nav.sosialhjelp.schema.ThumbnailTable
+import no.nav.sosialhjelp.schema.DocumentTable
+import no.nav.sosialhjelp.schema.PageTable
 import no.nav.sosialhjelp.schema.UploadTable
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -33,9 +33,9 @@ object DatabaseFactory {
             password = password,
         )
         transaction {
+            SchemaUtils.create(DocumentTable)
+            SchemaUtils.create(PageTable)
             SchemaUtils.create(UploadTable)
-            SchemaUtils.create(ThumbnailTable)
-            SchemaUtils.create(MainPdfTable)
         }
     }
 }

@@ -1,29 +1,54 @@
 package no.nav.sosialhjelp
+
 import io.ktor.server.application.*
 import org.apache.pdfbox.Loader
+import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.rendering.ImageType
 import org.apache.pdfbox.rendering.PDFRenderer
+import java.awt.image.BufferedImage
 import java.io.File
+import java.util.*
 import javax.imageio.ImageIO
 
 class PdfThumbnailService(
-    val environment: ApplicationEnvironment,
+    environment: ApplicationEnvironment,
 ) {
-    fun makeThumbnails(inputPdf: File) {
-        val outputDir = "./tusd-data" // Output directory
+    val database = PdfThumbnailDatabase()
+    val outputDir = environment.config.property("thumbnailer.outputDir").getString()
 
-        check(File(outputDir).exists())
+    fun makeThumbnails(
+        uploadId: UUID,
+        inputPdf: File,
+    ) {
+        val inputDocument = Loader.loadPDF(inputPdf)
+        database.setPageCount(uploadId, inputDocument.numberOfPages)
+        renderThumbnails(inputDocument, inputPdf.nameWithoutExtension)
+    }
 
-        val document = Loader.loadPDF(inputPdf)
-        val pdfRenderer = PDFRenderer(document)
-
-        for (page in 0 until document.numberOfPages) {
-            val outputFileName = inputPdf.nameWithoutExtension
-            val pageNumber = String.format("%04d", page + 1)
-            val outputFile = File("$outputDir/$outputFileName-$pageNumber.jpg")
-
-            ImageIO.write(pdfRenderer.renderImageWithDPI(page, 300f, ImageType.RGB), "JPEG", outputFile)
-            environment.log.info("Wrote page ${page + 1}/${document.numberOfPages} to $outputFileName")
+    private fun renderThumbnails(
+        document: PDDocument,
+        originalFilename: String,
+    ) = PDFRenderer(document).let { pdfRenderer ->
+        for (pageIndex in 0 until document.numberOfPages) {
+            writeThumbnail(
+                image = renderPage(pdfRenderer, pageIndex),
+                file = makeOutputFile(originalFilename, pageIndex),
+            )
         }
     }
+
+    private fun renderPage(
+        pdfRenderer: PDFRenderer,
+        page: Int,
+    ): BufferedImage = pdfRenderer.renderImageWithDPI(page, 300f, ImageType.RGB)
+
+    private fun writeThumbnail(
+        image: BufferedImage,
+        file: File,
+    ) = ImageIO.write(image, "JPEG", file)
+
+    private fun makeOutputFile(
+        inputFilename: String,
+        pageIndex: Int,
+    ) = File(outputDir, String.format("%s-%04d", inputFilename, pageIndex + 1))
 }
