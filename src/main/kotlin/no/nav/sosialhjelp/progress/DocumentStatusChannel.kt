@@ -1,8 +1,10 @@
 package no.nav.sosialhjelp.progress
 
+import io.r2dbc.postgresql.api.Notification
 import io.r2dbc.postgresql.api.PostgresqlConnection
 import io.r2dbc.postgresql.api.PostgresqlResult
 import org.jetbrains.exposed.dao.id.EntityID
+import reactor.core.publisher.Flux
 import java.util.*
 
 class DocumentStatusChannel(
@@ -19,7 +21,7 @@ class DocumentStatusChannel(
     val listenQuery: String =
         "LISTEN \"$channel\""
 
-    fun getUpdatesAsFlux() =
+    fun getUpdatesAsFlux(): Flux<Notification> =
         postgresqlConnection
             .createStatement(listenQuery)
             .execute()
