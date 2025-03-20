@@ -26,7 +26,7 @@ class PdfThumbnailService(
         val inputDocument = Loader.loadPDF(inputPdf)
         val pdfRenderer = PDFRenderer(inputDocument)
         database.setPageCount(uploadId, inputDocument.numberOfPages)
-        for (pageIndex in 0 until inputDocument.numberOfPages) {
+        for (pageIndex in 0..inputDocument.numberOfPages) {
             val filename =
                 writeThumbnail(
                     pdfRenderer = pdfRenderer,

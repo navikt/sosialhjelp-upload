@@ -15,3 +15,5 @@ database:
   name: sosialhjelp-upload
 thumbnailer:
   outputDir: "./tusd-data"
+gotenberg:
+  url: http://localhost:3010/forms/libreoffice/convert

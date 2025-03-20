@@ -1,32 +1,28 @@
 package no.nav.sosialhjelp
 
-import no.nav.sosialhjelp.schema.PageEntity
-import no.nav.sosialhjelp.schema.UploadEntity
+import no.nav.sosialhjelp.schema.PageTable
 import no.nav.sosialhjelp.schema.UploadTable
+import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
 import java.util.*
 
 class PdfThumbnailDatabase {
+    private fun notifyChange(uploadId: UUID) =
+        transaction {
+            val documentId = UploadTable.select(UploadTable.document).where { UploadTable.id eq uploadId }.first()
+            exec("NOTIFY \"document::$documentId\"")
+        }
+
     fun setPageCount(
         uploadId: UUID,
         numPages: Int,
-    ) = transaction {
-        for (i in 0..numPages - 1) {
-            PageEntity.new {
-                upload = UploadEntity[uploadId]
-                pageNumber = i
+    ) {
+        transaction {
+            PageTable.batchInsert(0..numPages - 1, shouldReturnGeneratedValues = false) {
+                this[PageTable.upload] = uploadId
+                this[PageTable.pageNumber] = it
             }
         }
-
-        UploadTable.update({ UploadTable.id eq uploadId }) { it[UploadTable.numPages] = numPages }
-
-        val documentId =
-            UploadTable
-                .select(UploadTable.document)
-                .where { UploadTable.id eq uploadId }
-                .first()
-
-        exec("NOTIFY \"document::$documentId\"")
+        notifyChange(uploadId)
     }
 }

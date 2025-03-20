@@ -19,7 +19,7 @@ import java.util.*
 class TusService(
     val environment: ApplicationEnvironment,
 ) {
-    val pdfConversionService = PdfConversionService()
+    val gotenbergService = GotenbergService(environment)
     val pdfThumbnailService = PdfThumbnailService(environment)
 
     fun getIdent(request: HookRequest): DocumentIdent =
@@ -82,7 +82,7 @@ class TusService(
         val outputFile = File("./tusd-data/$uploadId.pdf")
 
         outputFile.writeBytes(
-            pdfConversionService
+            gotenbergService
                 .convertToPdf(FinishedUpload(File("./tusd-data/$uploadId"), originalFileExtension))
                 .readRawBytes(),
         )

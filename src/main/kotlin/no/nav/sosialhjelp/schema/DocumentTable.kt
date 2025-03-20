@@ -7,7 +7,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insertIgnoreAndGetId
 import java.util.*
 
-object DocumentTable : UUIDTable() {
+object DocumentTable : UUIDTable("document") {
     val vedleggType = varchar("vedleggType", 255)
     val soknadId = uuid("soknadId")
 
