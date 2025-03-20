@@ -2,20 +2,31 @@ package no.nav.sosialhjelp.progress
 
 import io.r2dbc.postgresql.api.PostgresqlConnection
 import io.r2dbc.postgresql.api.PostgresqlResult
-import kotlinx.coroutines.reactive.*
+import org.jetbrains.exposed.dao.id.EntityID
+import java.util.*
 
 class DocumentStatusChannel(
-    documentIdent: DocumentIdent,
+    channel: String,
     private val postgresqlConnection: PostgresqlConnection,
 ) {
-    val listenQuery: String =
-        "LISTEN \"${documentIdent.soknadId}::${documentIdent.vedleggType}\""
+    companion object {
+        fun fromDocumentId(
+            documentId: EntityID<UUID>,
+            postgresqlConnection: PostgresqlConnection,
+        ) = DocumentStatusChannel("document::$documentId", postgresqlConnection)
+    }
 
-    fun getUpdatesAsFlow() =
+    val listenQuery: String =
+        "LISTEN \"$channel\""
+
+    fun getUpdatesAsFlux() =
         postgresqlConnection
             .createStatement(listenQuery)
             .execute()
             .flatMap(PostgresqlResult::getRowsUpdated)
             .thenMany(postgresqlConnection.notifications)
-            .asFlow()
+
+    fun close() {
+        postgresqlConnection.close().block()
+    }
 }

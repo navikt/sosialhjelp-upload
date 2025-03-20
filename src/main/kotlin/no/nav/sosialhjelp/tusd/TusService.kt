@@ -4,14 +4,13 @@ import HookType
 import io.ktor.client.statement.*
 import io.ktor.server.application.*
 import no.nav.sosialhjelp.PdfThumbnailService
-import no.nav.sosialhjelp.schema.DocumentEntity
-import no.nav.sosialhjelp.schema.DocumentTable
-import no.nav.sosialhjelp.schema.UploadEntity
+import no.nav.sosialhjelp.progress.DocumentIdent
+import no.nav.sosialhjelp.schema.DocumentTable.getOrCreateDocument
 import no.nav.sosialhjelp.schema.UploadTable
 import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
-import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.File
@@ -23,50 +22,31 @@ class TusService(
     val pdfConversionService = PdfConversionService()
     val pdfThumbnailService = PdfThumbnailService(environment)
 
-    fun getOrCreateDocument(
-        soknadId: UUID,
-        vedleggType: String,
-    ): DocumentEntity =
-        transaction {
-            val document =
-                DocumentEntity
-                    .find { (DocumentTable.soknadId eq soknadId) and (DocumentTable.vedleggType eq vedleggType) }
-                    .firstOrNull()
-            return@transaction if (document != null) {
-                environment.log.info("document entity exists")
-                document
-            } else {
-                DocumentEntity
-                    .new {
-                        this.soknadId = soknadId
-                        this.vedleggType = vedleggType
-                    }.also {
-                        environment.log.info("created new document entity, ID: ${it.id}")
-                    }
-            }
-        }
+    fun getIdent(request: HookRequest): DocumentIdent =
+        DocumentIdent(
+            soknadId = UUID.fromString(request.Event.Upload.MetaData.soknadId),
+            vedleggType = request.Event.Upload.MetaData.vedleggType,
+        )
 
     fun preCreate(request: HookRequest): HookResponse {
         require(request.Type == HookType.PreCreate)
         println("request: $request")
         val originalFilename = request.Event.Upload.MetaData.filename
 
-        val document =
-            getOrCreateDocument(
-                soknadId = UUID.fromString(request.Event.Upload.MetaData.soknadId),
-                vedleggType = request.Event.Upload.MetaData.vedleggType,
-            )
-
         val uploadId =
             transaction {
                 UploadTable
                     .insertAndGetId {
                         it[UploadTable.originalFilename] = originalFilename
-                        it[UploadTable.document] = document.id
+                        it[document] = getOrCreateDocument(getIdent(request))
                     }.value
             }
 
-        environment.log.info("Creating a new upload, ID: $uploadId for document ${document.id}")
+        transaction {
+            exec("NOTIFY \"upload::$uploadId\"")
+        }
+
+        environment.log.info("Creating a new upload, ID: $uploadId for document ${getDocumentIdFromUploadId(uploadId)}")
         return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))
     }
 
@@ -74,21 +54,43 @@ class TusService(
         require(request.Type == HookType.PostCreate)
     }
 
+    fun getDocumentIdFromUploadId(uploadId: UUID): EntityID<UUID> =
+        transaction {
+            UploadTable
+                .select(UploadTable.document)
+                .where { UploadTable.id eq uploadId }
+                .map { it[UploadTable.document] }
+                .first()
+        }
+
     suspend fun postFinish(request: HookRequest) {
         require(request.Type == HookType.PostFinish)
 
-        val upload = transaction { UploadEntity.find { UploadTable.id eq UUID.fromString(request.Event.Upload.ID) }.first() }
+        val uploadId = UUID.fromString(request.Event.Upload.ID)
 
-        val originalFileExtension = File(upload.originalFilename).extension
+        val originalFilename =
+            transaction {
+                UploadTable
+                    .select(UploadTable.originalFilename)
+                    .where { UploadTable.id eq uploadId }
+                    .map { it[UploadTable.originalFilename] }
+                    .first()
+            }
 
-        val outputFile = File("./tusd-data/${upload.id}.pdf")
+        val originalFileExtension = File(originalFilename).extension
+
+        val outputFile = File("./tusd-data/$uploadId.pdf")
 
         outputFile.writeBytes(
             pdfConversionService
-                .convertToPdf(FinishedUpload(File("./tusd-data/${upload.id}"), originalFileExtension))
+                .convertToPdf(FinishedUpload(File("./tusd-data/$uploadId"), originalFileExtension))
                 .readRawBytes(),
         )
 
-        pdfThumbnailService.makeThumbnails(upload, outputFile)
+        pdfThumbnailService.makeThumbnails(uploadId, outputFile)
+        transaction {
+            exec("NOTIFY \"upload::$uploadId\"")
+            exec("NOTIFY \"document::${getDocumentIdFromUploadId(uploadId)}\"")
+        }
     }
 }

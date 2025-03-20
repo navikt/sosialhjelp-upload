@@ -1,16 +1,16 @@
 package no.nav.sosialhjelp
 
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.schema.PageEntity
 import no.nav.sosialhjelp.schema.PageTable
-import no.nav.sosialhjelp.schema.UploadEntity
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.rendering.ImageType
 import org.apache.pdfbox.rendering.PDFRenderer
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import java.awt.image.BufferedImage
 import java.io.File
+import java.util.*
 import javax.imageio.ImageIO
 
 class PdfThumbnailService(
@@ -20,22 +20,24 @@ class PdfThumbnailService(
     val outputDir = environment.config.property("thumbnailer.outputDir").getString()
 
     fun makeThumbnails(
-        upload: UploadEntity,
+        uploadId: UUID,
         inputPdf: File,
     ) {
         val inputDocument = Loader.loadPDF(inputPdf)
         val pdfRenderer = PDFRenderer(inputDocument)
-        database.setPageCount(upload.id.value, inputDocument.numberOfPages)
+        database.setPageCount(uploadId, inputDocument.numberOfPages)
         for (pageIndex in 0 until inputDocument.numberOfPages) {
-            val file = makeOutputFile(inputPdf.nameWithoutExtension, pageIndex)
-            writeThumbnail(
-                image = renderPage(pdfRenderer, pageIndex),
-                file = file,
-            )
+            val filename =
+                writeThumbnail(
+                    pdfRenderer = pdfRenderer,
+                    baseFilename = inputPdf.nameWithoutExtension,
+                    pageIndex = pageIndex,
+                )
             transaction {
-                val page = PageEntity.find { PageTable.upload eq upload.id.value and (PageTable.pageNumber eq pageIndex) }.first()
-                PageEntity.findByIdAndUpdate(page.id.value) { it.filename = file.name }
-                database.notifyChange(upload.document.soknadId, upload.document.vedleggType)
+                PageTable
+                    .update({ PageTable.upload eq uploadId and (PageTable.pageNumber eq pageIndex) }) {
+                        it[PageTable.filename] = filename
+                    }
             }
         }
     }
@@ -46,9 +48,19 @@ class PdfThumbnailService(
     ): BufferedImage = pdfRenderer.renderImageWithDPI(page, 300f, ImageType.RGB)
 
     private fun writeThumbnail(
-        image: BufferedImage,
-        file: File,
-    ) = ImageIO.write(image, "JPEG", file)
+        pdfRenderer: PDFRenderer,
+        baseFilename: String,
+        pageIndex: Int,
+    ): String {
+        val image = renderPage(pdfRenderer, pageIndex)
+        val thumbnailFile = makeOutputFile(baseFilename, pageIndex)
+
+        val status = ImageIO.write(image, "JPEG", thumbnailFile)
+        if (!status) {
+            error("Could not write image to $baseFilename")
+        }
+        return thumbnailFile.name
+    }
 
     private fun makeOutputFile(
         inputFilename: String,

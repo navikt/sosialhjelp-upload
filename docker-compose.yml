@@ -13,6 +13,7 @@ services:
       - "-hooks-http=http://host.docker.internal:3007/tus-hooks"
       - "-hooks-enabled-events=pre-create,post-create,post-finish"
       - "-upload-dir=/tusd-data"
+      - "-cors-allow-origin=http://localhost:3000"
 
   gotenberg:
     image: gotenberg/gotenberg:8
