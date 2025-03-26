@@ -16,4 +16,4 @@ database:
 thumbnailer:
   outputDir: "./tusd-data"
 gotenberg:
-  url: http://localhost:3010/forms/libreoffice/convert
+  url: "http://localhost:3010/forms/libreoffice/convert"

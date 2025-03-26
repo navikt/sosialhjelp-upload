@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.tusd
 import HookType
 import io.ktor.client.statement.*
 import io.ktor.server.application.*
+import no.nav.sosialhjelp.PdfThumbnailDatabase
 import no.nav.sosialhjelp.PdfThumbnailService
 import no.nav.sosialhjelp.progress.DocumentIdent
 import no.nav.sosialhjelp.schema.DocumentTable.getOrCreateDocument
@@ -10,17 +11,31 @@ import no.nav.sosialhjelp.schema.UploadTable
 import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
+import org.apache.pdfbox.Loader
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.File
 import java.util.*
 
+class UploadRepository(
+    private val environment: ApplicationEnvironment,
+) {
+    fun getDocumentIdFromUploadId(uploadId: UUID): EntityID<UUID> =
+        UploadTable
+            .select(UploadTable.document)
+            .where { UploadTable.id eq uploadId }
+            .map { it[UploadTable.document] }
+            .first()
+}
+
 class TusService(
     val environment: ApplicationEnvironment,
 ) {
     val gotenbergService = GotenbergService(environment)
     val pdfThumbnailService = PdfThumbnailService(environment)
+    val uploadRepository = UploadRepository(environment)
+    val database = PdfThumbnailDatabase()
 
     fun getIdent(request: HookRequest): DocumentIdent =
         DocumentIdent(
@@ -79,18 +94,18 @@ class TusService(
 
         val originalFileExtension = File(originalFilename).extension
 
-        val outputFile = File("./tusd-data/$uploadId.pdf")
+        val uploadPdf = File("./tusd-data/$uploadId.pdf")
 
-        outputFile.writeBytes(
+        uploadPdf.writeBytes(
             gotenbergService
                 .convertToPdf(FinishedUpload(File("./tusd-data/$uploadId"), originalFileExtension))
                 .readRawBytes(),
         )
 
-        pdfThumbnailService.makeThumbnails(uploadId, outputFile)
-        transaction {
-            exec("NOTIFY \"upload::$uploadId\"")
-            exec("NOTIFY \"document::${getDocumentIdFromUploadId(uploadId)}\"")
-        }
+        val inputDocument = Loader.loadPDF(uploadPdf)
+        database.setPageCount(uploadId, inputDocument.numberOfPages)
+        pdfThumbnailService.renderAndSaveThumbnails(uploadId, inputDocument, uploadPdf.nameWithoutExtension)
+
+        transaction { exec("NOTIFY \"document::${getDocumentIdFromUploadId(uploadId)}\"") }
     }
 }
