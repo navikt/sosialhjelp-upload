@@ -17,3 +17,5 @@ thumbnailer:
   outputDir: "./tusd-data"
 gotenberg:
   url: "http://localhost:3010/forms/libreoffice/convert"
+storage:
+  basePath: "./tusd-data"

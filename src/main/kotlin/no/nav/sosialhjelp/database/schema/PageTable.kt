@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.schema
+package no.nav.sosialhjelp.database.schema
 
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.ReferenceOption

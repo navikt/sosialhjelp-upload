@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.progress
+package no.nav.sosialhjelp.status
 
 import io.ktor.http.*
 import io.ktor.server.routing.*
@@ -7,12 +7,13 @@ import io.ktor.sse.*
 import io.ktor.util.reflect.*
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
-import no.nav.sosialhjelp.schema.DocumentTable
+import no.nav.sosialhjelp.database.schema.DocumentTable
+import no.nav.sosialhjelp.status.db.DocumentStatusChannelFactory
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
-fun Route.configureProgressRoutes() {
+fun Route.configureStatusRoutes() {
     val statusChannelFactory = DocumentStatusChannelFactory(environment)
 
     fun fromParameters(parameters: Parameters) =

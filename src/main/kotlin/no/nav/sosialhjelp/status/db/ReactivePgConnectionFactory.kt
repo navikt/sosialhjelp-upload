@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.progress
+package no.nav.sosialhjelp.status.db
 
 import io.ktor.server.application.*
 import io.r2dbc.postgresql.api.PostgresqlConnection

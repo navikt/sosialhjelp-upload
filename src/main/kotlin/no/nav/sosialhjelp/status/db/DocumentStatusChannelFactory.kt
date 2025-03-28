@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.progress
+package no.nav.sosialhjelp.status.db
 
 import io.ktor.server.application.*
 import org.jetbrains.exposed.dao.id.EntityID

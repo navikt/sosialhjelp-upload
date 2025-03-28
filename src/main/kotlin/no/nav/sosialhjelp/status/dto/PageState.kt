@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.progress.dto
+package no.nav.sosialhjelp.status.dto
 
 import kotlinx.serialization.Serializable
 

@@ -1,14 +1,15 @@
-package no.nav.sosialhjelp.progress
+package no.nav.sosialhjelp.status
 
 import io.ktor.utils.io.core.*
 import io.r2dbc.postgresql.api.Notification
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.*
-import no.nav.sosialhjelp.progress.dto.DocumentState
-import no.nav.sosialhjelp.progress.dto.PageState
-import no.nav.sosialhjelp.progress.dto.UploadSuccessState
-import no.nav.sosialhjelp.schema.PageTable
-import no.nav.sosialhjelp.schema.UploadTable
+import no.nav.sosialhjelp.database.schema.PageTable
+import no.nav.sosialhjelp.database.schema.UploadTable
+import no.nav.sosialhjelp.status.db.DocumentStatusChannelFactory
+import no.nav.sosialhjelp.status.dto.DocumentState
+import no.nav.sosialhjelp.status.dto.PageState
+import no.nav.sosialhjelp.status.dto.UploadSuccessState
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.*

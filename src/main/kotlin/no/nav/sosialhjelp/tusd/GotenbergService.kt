@@ -12,29 +12,40 @@ import java.io.File
 class GotenbergService(
     environment: ApplicationEnvironment,
 ) {
-    val gotenbergClient =
+    private val gotenbergClient =
         HttpClient(CIO) {
             expectSuccess = false
-            defaultRequest {
-                url(environment.config.property("gotenberg.url").getString())
-            }
+            defaultRequest { url(environment.config.property("gotenberg.url").getString()) }
         }
 
     private fun buildHeaders(originalFiletype: String): Headers =
         Headers.Companion.build { append(HttpHeaders.ContentDisposition, """filename="file.$originalFiletype"""") }
 
-    suspend fun convertToPdf(upload: FinishedUpload): HttpResponse =
-        gotenbergClient.submitFormWithBinaryData(
-            formData { append("file", upload.file.readBytes(), buildHeaders(upload.originalFileExtension)) },
-        )
+    suspend fun convertToPdf(upload: FinishedUpload): ByteArray {
+        val res =
+            gotenbergClient
+                .submitFormWithBinaryData(
+                    formData { append("file", upload.file.readBytes(), buildHeaders(upload.originalFileExtension)) },
+                )
 
-    suspend fun merge(pdfs: List<File>): HttpResponse =
-        gotenbergClient.submitFormWithBinaryData(
-            formData {
-                pdfs.forEachIndexed { index, pdf -> append("file", pdf.readBytes(), buildHeaders("$index.pdf")) }
-                append("merge", "true")
-                append("pdfa", "PDF/A-3b")
-                append("pdfua", "true")
-            },
-        )
+        check(res.status.isSuccess()) { "Failed to convert to PDF: ${res.status}" }
+
+        return res.readRawBytes()
+    }
+
+    suspend fun merge(pdfs: List<File>): ByteArray {
+        val res =
+            gotenbergClient.submitFormWithBinaryData(
+                formData {
+                    pdfs.forEachIndexed { index, pdf -> append("file", pdf.readBytes(), buildHeaders("$index.pdf")) }
+                    append("merge", "true")
+                    //                append("pdfa", "PDF/A-3b")
+                    //                append("pdfua", "true")
+                },
+            )
+
+        check(res.status.isSuccess()) { "Failed to merge ${res.status}" }
+
+        return res.readRawBytes()
+    }
 }
