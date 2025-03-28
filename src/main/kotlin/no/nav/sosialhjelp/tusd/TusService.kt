@@ -2,11 +2,13 @@ package no.nav.sosialhjelp.tusd
 
 import HookType
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.PdfThumbnailService
+import no.nav.sosialhjelp.common.DocumentIdent
+import no.nav.sosialhjelp.common.UploadedFileSpec
 import no.nav.sosialhjelp.database.PageRepository
 import no.nav.sosialhjelp.database.UploadRepository
 import no.nav.sosialhjelp.database.schema.DocumentTable.getOrCreateDocument
-import no.nav.sosialhjelp.status.DocumentIdent
+import no.nav.sosialhjelp.pdf.GotenbergService
+import no.nav.sosialhjelp.pdf.PdfThumbnailService
 import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
@@ -41,26 +43,21 @@ class TusService(
         require(request.Type == HookType.PostFinish)
         val uploadId = UUID.fromString(request.Event.Upload.ID)
 
-        val originalFilename = transaction { uploadRepository.getFilenameById(uploadId) }
-        val originalFileExtension = File(originalFilename).extension
-
-        val uploadPdf =
-            fileFactory.uploadMainFile(uploadId).also {
-                it.writeBytes(
-                    gotenbergService.convertToPdf(
-                        FinishedUpload(
-                            fileFactory.uploadSourceFile(uploadId),
-                            originalFileExtension,
-                        ),
-                    ),
-                )
-            }
-
-        Loader
-            .loadPDF(uploadPdf)
-            .also { pageRepository.setPageCount(uploadId, it.numberOfPages) }
-            .also { pdfThumbnailService.renderAndSaveThumbnails(uploadId, it, uploadPdf.nameWithoutExtension) }
+        convertUploadToPdf(uploadId).let { uploadPdf ->
+            Loader
+                .loadPDF(uploadPdf)
+                .also { pageRepository.setPageCount(uploadId, it.numberOfPages) }
+                .also { pdfThumbnailService.renderAndSaveThumbnails(uploadId, it, uploadPdf.nameWithoutExtension) }
+        }
 
         uploadRepository.notifyChange(uploadId)
     }
+
+    private suspend fun convertUploadToPdf(uploadId: UUID): File =
+        fileFactory.uploadMainFile(uploadId).also {
+            FinishedUpload(
+                fileFactory.uploadSourceFile(uploadId),
+                transaction { UploadedFileSpec.fromFilename(uploadRepository.getFilenameById(uploadId)).extension },
+            ).also { upload -> it.writeBytes(gotenbergService.convertToPdf(upload)) }
+        }
 }

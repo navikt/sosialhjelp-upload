@@ -1,7 +1,7 @@
 package no.nav.sosialhjelp.database
 
+import no.nav.sosialhjelp.common.UploadedFileSpec
 import no.nav.sosialhjelp.database.schema.UploadTable
-import no.nav.sosialhjelp.tusd.UploadedFileSpec
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.insertAndGetId

@@ -4,9 +4,9 @@ import io.ktor.utils.io.core.*
 import io.r2dbc.postgresql.api.Notification
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.*
+import no.nav.sosialhjelp.database.reactive.DocumentStatusChannelFactory
 import no.nav.sosialhjelp.database.schema.PageTable
 import no.nav.sosialhjelp.database.schema.UploadTable
-import no.nav.sosialhjelp.status.db.DocumentStatusChannelFactory
 import no.nav.sosialhjelp.status.dto.DocumentState
 import no.nav.sosialhjelp.status.dto.PageState
 import no.nav.sosialhjelp.status.dto.UploadSuccessState

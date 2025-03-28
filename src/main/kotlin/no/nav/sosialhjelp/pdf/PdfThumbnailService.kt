@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp
+package no.nav.sosialhjelp.pdf
 
 import io.ktor.server.application.*
 import no.nav.sosialhjelp.database.PageRepository

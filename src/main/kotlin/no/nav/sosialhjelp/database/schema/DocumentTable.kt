@@ -1,6 +1,6 @@
 package no.nav.sosialhjelp.database.schema
 
-import no.nav.sosialhjelp.status.DocumentIdent
+import no.nav.sosialhjelp.common.DocumentIdent
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.and

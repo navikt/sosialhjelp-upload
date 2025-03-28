@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.status.db
+package no.nav.sosialhjelp.database.reactive
 
 import io.r2dbc.postgresql.api.Notification
 import io.r2dbc.postgresql.api.PostgresqlConnection

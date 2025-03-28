@@ -2,10 +2,10 @@
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import no.nav.sosialhjelp.common.DocumentIdent
 import no.nav.sosialhjelp.database.schema.DocumentTable
 import no.nav.sosialhjelp.database.schema.UploadTable
-import no.nav.sosialhjelp.status.DocumentIdent
-import no.nav.sosialhjelp.tusd.GotenbergService
+import no.nav.sosialhjelp.pdf.GotenbergService
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.File
 import java.util.*

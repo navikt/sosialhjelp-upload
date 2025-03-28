@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.tusd
+package no.nav.sosialhjelp.pdf
 
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -7,6 +7,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import no.nav.sosialhjelp.tusd.FinishedUpload
 import java.io.File
 
 class GotenbergService(

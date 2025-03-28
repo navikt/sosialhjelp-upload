@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.status.db
+package no.nav.sosialhjelp.database.reactive
 
 import io.ktor.server.application.*
 import org.jetbrains.exposed.dao.id.EntityID

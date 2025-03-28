@@ -7,8 +7,9 @@ import io.ktor.sse.*
 import io.ktor.util.reflect.*
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
+import no.nav.sosialhjelp.common.DocumentIdent
+import no.nav.sosialhjelp.database.reactive.DocumentStatusChannelFactory
 import no.nav.sosialhjelp.database.schema.DocumentTable
-import no.nav.sosialhjelp.status.db.DocumentStatusChannelFactory
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.*
 import kotlin.time.Duration.Companion.seconds

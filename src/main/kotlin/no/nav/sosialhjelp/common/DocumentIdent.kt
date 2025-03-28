@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.status
+package no.nav.sosialhjelp.common
 
 import no.nav.sosialhjelp.tusd.dto.FileMetaData
 import java.util.*
