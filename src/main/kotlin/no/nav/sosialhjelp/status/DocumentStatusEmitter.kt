@@ -18,7 +18,7 @@ class DocumentStatusEmitter(
     channelFactory: DocumentStatusChannelFactory,
     private val documentId: EntityID<UUID>,
 ) : Closeable {
-    private val channel = channelFactory.create(documentId)
+    private val channel = channelFactory.create(documentId.value)
 
     fun getDocumentStatus(): DocumentState =
         transaction {

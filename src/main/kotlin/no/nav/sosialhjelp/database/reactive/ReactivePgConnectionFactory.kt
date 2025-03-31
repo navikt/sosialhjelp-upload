@@ -7,6 +7,13 @@ import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
 import reactor.core.publisher.Mono
 
+/**
+ * It might seem a little odd to have two different database libraries in the same project.
+ * The reason for this is that Exposed is a blocking library, and we want to use a reactive
+ * library for listening to database events for the event return channel.
+ *
+ * Minste motstands vei ¯\_(ツ)_/¯
+ */
 class ReactivePgConnectionFactory(
     environment: ApplicationEnvironment,
 ) {

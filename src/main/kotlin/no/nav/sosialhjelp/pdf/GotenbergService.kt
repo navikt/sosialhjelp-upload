@@ -7,7 +7,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.tusd.FinishedUpload
+import no.nav.sosialhjelp.common.FinishedUpload
 import java.io.File
 
 class GotenbergService(

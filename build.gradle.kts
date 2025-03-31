@@ -6,6 +6,7 @@ val postgres_version: String by project
 val prometheus_version: String by project
 val exposed_version: String by project
 val pdfbox_version: String by project
+val checker_version: String by project
 
 plugins {
     kotlin("jvm") version "2.1.10"
@@ -29,6 +30,7 @@ repositories {
 }
 
 dependencies {
+    implementation("org.checkerframework:checker-qual:$checker_version")
     implementation("io.ktor:ktor-client-core")
     implementation("io.ktor:ktor-client-cio")
     implementation("io.ktor:ktor-server-core")

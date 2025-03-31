@@ -1,7 +1,6 @@
 package no.nav.sosialhjelp.database.reactive
 
 import io.ktor.server.application.*
-import org.jetbrains.exposed.dao.id.EntityID
 import java.util.*
 
 class DocumentStatusChannelFactory(
@@ -9,6 +8,5 @@ class DocumentStatusChannelFactory(
 ) {
     private val dbFactory = ReactivePgConnectionFactory(environment)
 
-    fun create(documentId: EntityID<UUID>): DocumentStatusChannel =
-        DocumentStatusChannel.fromDocumentId(documentId, dbFactory.createConnection())
+    fun create(documentId: UUID): DocumentStatusChannel = DocumentStatusChannel(documentId, dbFactory.createConnection())
 }

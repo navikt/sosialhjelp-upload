@@ -3,7 +3,6 @@ package no.nav.sosialhjelp.database
 import no.nav.sosialhjelp.common.UploadedFileSpec
 import no.nav.sosialhjelp.database.schema.UploadTable
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.*
@@ -34,12 +33,15 @@ class UploadRepository {
             .map { it[UploadTable.originalFilename] }
             .first()
 
-    fun exists(uploadId: UUID): Boolean =
-        UploadTable
-            .select(UploadTable.id.count())
-            .where {
-                UploadTable.id eq uploadId
-            }.first()[UploadTable.id.count()] == 1L
+    fun getUploadsByDocumentId(documentId: EntityID<UUID>): List<EntityID<UUID>> =
+        UploadTable.select(UploadTable.id).where { UploadTable.document eq documentId }.map { it[UploadTable.id] }
+
+//    fun exists(uploadId: UUID): Boolean =
+//        UploadTable
+//            .select(UploadTable.id.count())
+//            .where {
+//                UploadTable.id eq uploadId
+//            }.first()[UploadTable.id.count()] == 1L
 
     fun notifyChange(uploadId: UUID) = transaction { exec("NOTIFY \"document::${getDocumentIdFromUploadId(uploadId)}\"") }
 }

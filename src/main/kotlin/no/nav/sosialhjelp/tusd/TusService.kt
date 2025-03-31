@@ -1,12 +1,14 @@
 package no.nav.sosialhjelp.tusd
 
+import DocumentRepository
 import HookType
 import io.ktor.server.application.*
 import no.nav.sosialhjelp.common.DocumentIdent
+import no.nav.sosialhjelp.common.FileFactory
+import no.nav.sosialhjelp.common.FinishedUpload
 import no.nav.sosialhjelp.common.UploadedFileSpec
 import no.nav.sosialhjelp.database.PageRepository
 import no.nav.sosialhjelp.database.UploadRepository
-import no.nav.sosialhjelp.database.schema.DocumentTable.getOrCreateDocument
 import no.nav.sosialhjelp.pdf.GotenbergService
 import no.nav.sosialhjelp.pdf.PdfThumbnailService
 import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
@@ -23,13 +25,14 @@ class TusService(
     val gotenbergService = GotenbergService(environment)
     val pdfThumbnailService = PdfThumbnailService(environment)
     val uploadRepository = UploadRepository()
+    val documentRepository = DocumentRepository()
     val pageRepository = PageRepository()
     val fileFactory = FileFactory(environment)
 
     fun preCreate(request: HookRequest): HookResponse {
         require(request.Type == HookType.PreCreate)
         val uploadFileSpec = UploadedFileSpec.fromFilename(request.Event.Upload.MetaData.filename)
-        val documentId = transaction { getOrCreateDocument(DocumentIdent.fromRequest(request.Event.Upload.MetaData)) }
+        val documentId = transaction { documentRepository.getOrCreateDocument(DocumentIdent.fromRequest(request.Event.Upload.MetaData)) }
         val uploadId = transaction { uploadRepository.create(documentId, uploadFileSpec) }
         environment.log.info("Creating a new upload, ID: $uploadId for document ${documentId.value}")
         return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))
@@ -54,7 +57,7 @@ class TusService(
     }
 
     private suspend fun convertUploadToPdf(uploadId: UUID): File =
-        fileFactory.uploadMainFile(uploadId).also {
+        fileFactory.uploadPdfFile(uploadId).also {
             FinishedUpload(
                 fileFactory.uploadSourceFile(uploadId),
                 transaction { UploadedFileSpec.fromFilename(uploadRepository.getFilenameById(uploadId)).extension },
