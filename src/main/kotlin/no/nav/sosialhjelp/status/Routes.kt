@@ -30,14 +30,14 @@ fun Route.configureStatusRoutes() {
         val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)
         Default.encodeToString(serializer, value)
     }) {
-        val principal = call.principal<JWTPrincipal>()
+        val personident = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
 
         heartbeat {
             period = 10.seconds
-            event = ServerSentEvent("ドキドキ")
+            event = ServerSentEvent("""{"heartbeat": "ドキドキ"}""")
         }
 
-        val documentId = transaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters)) }
+        val documentId = transaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
 
         DocumentStatusEmitter(statusChannelFactory, documentId).use { emitter ->
             send(emitter.getDocumentStatus())

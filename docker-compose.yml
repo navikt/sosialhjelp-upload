@@ -11,9 +11,10 @@ services:
       - "-host=0.0.0.0"
       - "-port=8084"
       - "-hooks-http=http://host.docker.internal:3007/tus-hooks"
+      - "-hooks-http-forward-headers=Authorization"
       - "-hooks-enabled-events=pre-create,post-create,post-finish"
       - "-upload-dir=/tusd-data"
-      - "-cors-allow-origin=http://localhost:3000"
+      - "-behind-proxy"
 
   gotenberg:
     image: gotenberg/gotenberg:8

@@ -18,13 +18,13 @@ fun Application.configureRouting() {
     routing {
         route("/sosialhjelp/upload") {
             authenticate {
+                configureStatusRoutes()
+                configureActionRoutes()
+                // todo: user permission check for files
+                staticFiles("/thumbnails", File("./tusd-data"))
             }
-            configureStatusRoutes()
-            configureActionRoutes()
-            // todo: user permission check for files
-            staticFiles("/thumbnails", File("./tusd-data"))
         }
 
-        route("/tus-hooks") { configureTusRoutes() }
+        route("/tus-hooks") { authenticate { configureTusRoutes() } }
     }
 }
