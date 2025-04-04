@@ -1,4 +1,5 @@
 
+import DocumentRepository.DocumentOwnedByAnotherUserException
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
@@ -7,13 +8,14 @@ import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.nav.sosialhjelp.action.DocumentSubmitInput
 import no.nav.sosialhjelp.common.DocumentIdent
 import no.nav.sosialhjelp.common.FileFactory
 import no.nav.sosialhjelp.database.UploadRepository
 import no.nav.sosialhjelp.pdf.GotenbergService
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.util.*
 
 fun Route.configureActionRoutes() {
@@ -53,11 +55,19 @@ fun Route.configureActionRoutes() {
         }
     }
 
-    get("/document/{soknadId}/{vedleggType}/submit") {
+    post("/document/{soknadId}/{vedleggType}/submit") {
         val personident = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
         val requestBody = call.receive<DocumentSubmitInput>()
-        val documentId = transaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
-        val files = transaction { uploadRepository.getUploadsByDocumentId(documentId) }.map { fileFactory.uploadPdfFile(it.value) }
+        val documentId =
+            try {
+                newSuspendedTransaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
+            } catch (_: DocumentOwnedByAnotherUserException) {
+                call.respondText("Access denied", status = HttpStatusCode.Forbidden)
+                return@post
+            }
+
+        val uploads = newSuspendedTransaction { uploadRepository.getUploadsByDocumentId(documentId) }
+        val files = uploads.map { fileFactory.uploadConvertedPdf(it.value) }
         uploadClient.upload(requestBody.targetUrl, gotenbergService.merge(files), "$documentId.pdf")
     }
 

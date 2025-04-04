@@ -16,5 +16,8 @@ class FileFactory(
 
     fun uploadSourceFile(uploadId: UUID): File = File("$basePath/$uploadId")
 
-    fun uploadPdfFile(uploadId: UUID): File = File("$basePath/$uploadId.pdf")
+    /**
+     * Returns a java.io.file object for the PDF conversion of the upload.
+     */
+    fun uploadConvertedPdf(uploadId: UUID): File = File("$basePath/$uploadId.pdf")
 }

@@ -1,43 +1,39 @@
 package no.nav.sosialhjelp.pdf
 
 import io.ktor.server.application.*
+import no.nav.sosialhjelp.database.DocumentChangeNotifier
 import no.nav.sosialhjelp.database.PageRepository
+import no.nav.sosialhjelp.database.UploadRepository
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.rendering.ImageType
 import org.apache.pdfbox.rendering.PDFRenderer
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.io.File
 import java.util.*
 import javax.imageio.ImageIO
 
-class PdfThumbnailService(
-    private val environment: ApplicationEnvironment,
+class ThumbnailService(
+    environment: ApplicationEnvironment,
 ) {
     val outputDir = environment.config.property("thumbnailer.outputDir").getString()
     val pageRepository = PageRepository()
+    val uploadRepository = UploadRepository()
 
-    fun renderAndSaveThumbnails(
+    suspend fun makeThumbnails(
         uploadId: UUID,
         inputDocument: PDDocument,
         baseFilename: String,
     ) {
+        newSuspendedTransaction {
+            for (pageIndex in 0..inputDocument.numberOfPages - 1) pageRepository.createEmptyPage(uploadId, pageIndex)
+            DocumentChangeNotifier.notifyChange(uploadRepository.getDocumentIdFromUploadId(uploadId).value)
+        }
+
         val pdfRenderer = PDFRenderer(inputDocument)
 
-        for (pageIndex in 0..inputDocument.numberOfPages) {
-            val thumbnail =
-                try {
-                    writeThumbnail(pdfRenderer, baseFilename, pageIndex)
-                } catch (e: Exception) {
-                    environment.log.error("failed to write thumbnail", e)
-                    throw e
-                }
-
-            try {
-                transaction { pageRepository.setFilename(uploadId, pageIndex, thumbnail) }
-            } catch (e: Exception) {
-                environment.log.error("failed to update thumbnail filename in database", e)
-                throw e
-            }
+        for (pageIndex in 0..inputDocument.numberOfPages - 1) {
+            val thumbnail = writeThumbnail(pdfRenderer, baseFilename, pageIndex)
+            newSuspendedTransaction { pageRepository.setFilename(uploadId, pageIndex, thumbnail) }
         }
     }
 

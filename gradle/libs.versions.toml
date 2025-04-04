@@ -12,6 +12,9 @@ checker = "3.49.1"
 mockk = "1.13.17"
 coroutines = "1.10.1"
 r2dbc = "1.0.7.RELEASE"
+ktor-task-scheduling = "2.1.2"
+junit = "5.12.1"
+testcontainers = "1.20.6"
 
 [libraries]
 checker = { group = "org.checkerframework", name = "checker-qual", version.ref = "checker" }
@@ -21,7 +24,13 @@ exposed-jdbc = { group = "org.jetbrains.exposed", name = "exposed-jdbc", version
 h2database = { group = "com.h2database", name = "h2", version.ref = "h2" }
 koin-ktor = { group = "io.insert-koin", name = "koin-ktor", version.ref = "koin" }
 koin-logger-slf4j = { group = "io.insert-koin", name = "koin-logger-slf4j", version.ref = "koin" }
-kotlin-test-junit = { group = "org.jetbrains.kotlin", name = "kotlin-test-junit", version.ref = "kotlin" }
+
+junit-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
+junit-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
+junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
+
+
 kotlinx-coroutines-reactive = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-reactive", version.ref = "coroutines" }
 ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
@@ -42,10 +51,12 @@ ktor-server-resources = { group = "io.ktor", name = "ktor-server-resources", ver
 ktor-server-sse = { group = "io.ktor", name = "ktor-server-sse", version.ref = "ktor" }
 ktor-server-status-pages = { group = "io.ktor", name = "ktor-server-status-pages", version.ref = "ktor" }
 ktor-server-swagger = { group = "io.ktor", name = "ktor-server-swagger", version.ref = "ktor" }
-ktor-server-task-scheduling-core = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-core", version = "2.1.2" }
-ktor-server-task-scheduling-jdbc = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-jdbc", version = "2.1.2" }
-ktor-server-task-scheduling-mongodb = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-mongodb", version = "2.1.2" }
-ktor-server-task-scheduling-redis = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-redis", version = "2.1.2" }
+
+ktor-server-task-scheduling-core = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-core", version.ref = "ktor-task-scheduling" }
+ktor-server-task-scheduling-jdbc = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-jdbc", version.ref = "ktor-task-scheduling" }
+ktor-server-task-scheduling-mongodb = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-mongodb", version.ref = "ktor-task-scheduling" }
+ktor-server-task-scheduling-redis = { group = "io.github.flaxoos", name = "ktor-server-task-scheduling-redis", version.ref = "ktor-task-scheduling" }
+
 ktor-server-test-host = { group = "io.ktor", name = "ktor-server-test-host", version.ref = "ktor" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 micrometer-registry-prometheus = { group = "io.micrometer", name = "micrometer-registry-prometheus", version.ref = "prometheus" }
@@ -53,6 +64,11 @@ mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 pdfbox-app = { group = "org.apache.pdfbox", name = "pdfbox-app", version.ref = "pdfbox" }
 postgresql = { group = "org.postgresql", name = "postgresql", version.ref = "postgres" }
 r2dbc-postgresql = { group = "org.postgresql", name = "r2dbc-postgresql", version.ref = "r2dbc" }
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+
+testcontainers-core = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
+testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
+testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -60,6 +76,7 @@ ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
 [bundles]
+
 ktor = [
     "ktor-client-core",
     "ktor-client-cio",
@@ -83,7 +100,9 @@ ktor = [
     "ktor-server-test-host"
 ]
 
-taskScheduling = [
+junit = ["junit-api", "junit-engine", "junit-jupiter"]
+
+ktor-task-scheduling = [
     "ktor-server-task-scheduling-core",
     "ktor-server-task-scheduling-redis",
     "ktor-server-task-scheduling-mongodb",
@@ -94,4 +113,10 @@ exposed = [
     "exposed-core",
     "exposed-jdbc",
     "exposed-dao"
+]
+
+testcontainers = [
+    "testcontainers-core",
+    "testcontainers-junit-jupiter",
+    "testcontainers-postgresql"
 ]

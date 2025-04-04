@@ -7,6 +7,9 @@ import org.checkerframework.checker.tainting.qual.Untainted
 import reactor.core.publisher.Flux
 import java.util.*
 
+/**
+ * A class that listens for updates for a given documentId on a PostgreSQL database.
+ */
 class DocumentStatusChannel(
     // We can safely mark as untainted because no valid java.util.UUID can contain SQL injection
     private val documentId: @Untainted UUID,

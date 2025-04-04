@@ -8,6 +8,7 @@ import io.r2dbc.spi.ConnectionFactoryOptions
 import reactor.core.publisher.Mono
 
 /**
+ * Factory for creating a reactive PostgreSQL connection.
  * It might seem a little odd to have two different database libraries in the same project.
  * The reason for this is that Exposed is a blocking library, and we want to use a reactive
  * library for listening to database events for the event return channel.

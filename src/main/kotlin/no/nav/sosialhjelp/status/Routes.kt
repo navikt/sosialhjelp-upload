@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.common.DocumentIdent
 import no.nav.sosialhjelp.database.reactive.DocumentStatusChannelFactory
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -37,7 +37,8 @@ fun Route.configureStatusRoutes() {
             event = ServerSentEvent("""{"heartbeat": "ドキドキ"}""")
         }
 
-        val documentId = transaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
+        val documentId =
+            newSuspendedTransaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
 
         DocumentStatusEmitter(statusChannelFactory, documentId).use { emitter ->
             send(emitter.getDocumentStatus())

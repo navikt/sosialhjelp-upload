@@ -4,7 +4,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlin.test.Test
-import kotlin.test.requireEquals
+import kotlin.test.assertEquals
 
 class ApplicationTest {
     @Test
@@ -14,7 +14,7 @@ class ApplicationTest {
 //                module()
 //            }
             client.get("/").apply {
-                requireEquals(HttpStatusCode.OK, status)
+                assertEquals(HttpStatusCode.OK, status)
             }
         }
 }

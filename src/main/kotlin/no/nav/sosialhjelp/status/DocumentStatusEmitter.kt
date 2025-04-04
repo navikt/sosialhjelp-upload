@@ -11,7 +11,7 @@ import no.nav.sosialhjelp.status.dto.DocumentState
 import no.nav.sosialhjelp.status.dto.PageState
 import no.nav.sosialhjelp.status.dto.UploadSuccessState
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.util.*
 
 class DocumentStatusEmitter(
@@ -20,8 +20,8 @@ class DocumentStatusEmitter(
 ) : Closeable {
     private val channel = channelFactory.create(documentId.value)
 
-    fun getDocumentStatus(): DocumentState =
-        transaction {
+    suspend fun getDocumentStatus(): DocumentState =
+        newSuspendedTransaction {
             val uploads =
                 UploadTable
                     .select(UploadTable.id, UploadTable.originalFilename)
@@ -31,7 +31,7 @@ class DocumentStatusEmitter(
             val pages =
                 uploads.associate { (uploadId, _) ->
                     Pair(
-                        uploadId,
+                        uploadId.value,
                         PageTable
                             .select(PageTable.pageNumber, PageTable.filename)
                             .where { PageTable.upload eq uploadId }
@@ -44,11 +44,12 @@ class DocumentStatusEmitter(
                     )
                 }
 
+            println(pages)
             DocumentState(
                 documentId = documentId.toString(),
                 uploads =
                     uploads.associate { (upload, originalFilename) ->
-                        Pair(upload.toString(), UploadSuccessState(originalFilename, pages[upload]))
+                        Pair(upload.toString(), UploadSuccessState(originalFilename, pages[upload.value]))
                     },
             )
         }

@@ -40,7 +40,7 @@ dependencies {
     implementation(libs.pdfbox.app)
 
     // Task scheduling grouped dependencies
-    implementation(libs.bundles.taskScheduling)
+    implementation(libs.bundles.ktor.task.scheduling)
 
     // Other dependencies
     implementation(libs.kotlinx.coroutines.reactive)
@@ -53,7 +53,14 @@ dependencies {
 
     // Test dependencies (added separately)
     testImplementation(libs.ktor.server.test.host)
-    testImplementation(libs.kotlin.test.junit)
+
     testImplementation(libs.mockk)
-    testImplementation(kotlin("test"))
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.bundles.junit)
+    testImplementation(libs.bundles.testcontainers)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
