@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.database
 
 import no.nav.sosialhjelp.database.schema.PageTable
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.update
@@ -23,4 +24,9 @@ class PageRepository {
         it[upload] = uploadId
         it[pageNumber] = pageIndex
     }
+
+    fun getPagesForUpload(uploadId: EntityID<UUID>) =
+        PageTable
+            .select(PageTable.pageNumber, PageTable.filename)
+            .where { PageTable.upload eq uploadId }
 }

@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.testutils
 
 import no.nav.sosialhjelp.database.schema.DocumentTable
+import no.nav.sosialhjelp.database.schema.PageTable
 import no.nav.sosialhjelp.database.schema.UploadTable
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -27,7 +28,7 @@ object PostgresTestContainer {
             )
 
         transaction {
-            SchemaUtils.create(DocumentTable, UploadTable)
+            SchemaUtils.create(DocumentTable, UploadTable, PageTable)
         }
 
         return db

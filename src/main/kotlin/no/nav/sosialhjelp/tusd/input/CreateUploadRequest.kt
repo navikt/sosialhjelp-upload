@@ -10,10 +10,10 @@ data class CreateUploadRequest(
 ) {
     companion object {
         fun fromRequest(request: HookRequest): CreateUploadRequest =
-            require(request.Type == HookType.PreCreate).let {
+            require(request.type == HookType.PreCreate).let {
                 CreateUploadRequest(
-                    documentIdent = DocumentIdent.Companion.fromRequest(request.Event.Upload.MetaData),
-                    filename = request.Event.Upload.MetaData.filename,
+                    documentIdent = DocumentIdent.Companion.fromRequest(request.event.upload.metadata),
+                    filename = request.event.upload.metadata.filename,
                 )
             }
     }

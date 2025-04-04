@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor.plugin)
     alias(libs.plugins.kotlinx.serialization)
+    id("jacoco")
+    id("org.sonarqube") version "3.5.0.2730"
 }
 
 group = "no.nav.sosialhjelp"
@@ -63,4 +65,29 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test) // Tests must run before report
+
+    reports {
+        xml.required.set(true) // Useful for CI tools like SonarQube
+        html.required.set(true) // Easy to browse
+    }
+
+    // Optional: Filter out generated or unnecessary classes
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude("**/ApplicationKt.class") // e.g., exclude main Ktor entry point
+                }
+            },
+        ),
+    )
 }

@@ -1,10 +1,14 @@
 package no.nav.sosialhjelp.tusd.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class LocalStorage(
-    val InfoPath: String,
-    val Path: String,
-    val Type: String,
+    @SerialName("InfoPath")
+    val infoPath: String,
+    @SerialName("Path")
+    val path: String,
+    @SerialName("Type")
+    val type: String,
 )

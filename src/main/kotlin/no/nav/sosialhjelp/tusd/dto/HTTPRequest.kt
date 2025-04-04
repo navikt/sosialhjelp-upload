@@ -1,11 +1,16 @@
 package no.nav.sosialhjelp.tusd.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class HTTPRequest(
-    val Method: String,
-    val URI: String,
-    val RemoteAddr: String,
-    val Header: Map<String, List<String>>,
+    @SerialName("Method")
+    val method: String,
+    @SerialName("URI")
+    val uri: String,
+    @SerialName("RemoteAddr")
+    val remoteAddr: String,
+    @SerialName("Header")
+    val header: Map<String, List<String>>,
 )

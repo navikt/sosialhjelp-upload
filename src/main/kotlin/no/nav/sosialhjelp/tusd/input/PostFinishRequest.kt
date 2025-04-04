@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.tusd
+package no.nav.sosialhjelp.tusd.input
 
 import HookType
 import no.nav.sosialhjelp.tusd.dto.HookRequest
@@ -10,10 +10,10 @@ data class PostFinishRequest(
 ) {
     companion object {
         fun fromRequest(request: HookRequest): PostFinishRequest =
-            require(request.Type == HookType.PostFinish).let {
+            require(request.type == HookType.PostFinish).let {
                 PostFinishRequest(
-                    uploadId = UUID.fromString(request.Event.Upload.ID),
-                    filename = request.Event.Upload.MetaData.filename,
+                    uploadId = UUID.fromString(request.event.upload.id),
+                    filename = request.event.upload.metadata.filename,
                 )
             }
     }

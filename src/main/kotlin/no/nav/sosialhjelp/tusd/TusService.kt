@@ -1,9 +1,8 @@
 package no.nav.sosialhjelp.tusd
 
 import DocumentRepository
-import HookType
 import io.ktor.server.application.*
-import no.nav.sosialhjelp.common.FileFactory
+import no.nav.sosialhjelp.common.FilePathFactory
 import no.nav.sosialhjelp.common.FinishedUpload
 import no.nav.sosialhjelp.database.UploadRepository
 import no.nav.sosialhjelp.pdf.GotenbergService
@@ -12,6 +11,7 @@ import no.nav.sosialhjelp.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
 import no.nav.sosialhjelp.tusd.input.CreateUploadRequest
+import no.nav.sosialhjelp.tusd.input.PostFinishRequest
 import org.apache.pdfbox.Loader
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.io.File
@@ -24,7 +24,7 @@ class TusService(
     val thumbnailService = ThumbnailService(environment)
     val uploadRepository = UploadRepository()
     val documentRepository = DocumentRepository()
-    val fileFactory = FileFactory(environment)
+    val filePathFactory = FilePathFactory.fromEnvironment(environment)
 
     suspend fun preCreate(
         request: HookRequest,
@@ -43,10 +43,6 @@ class TusService(
         return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))
     }
 
-    fun postCreate(request: HookRequest) {
-        require(request.Type == HookType.PostCreate)
-    }
-
     suspend fun postFinish(request: HookRequest) {
         val request = PostFinishRequest.fromRequest(request)
         val uploadPdf = convertUploadToPdf(request.uploadId, request.filename)
@@ -57,18 +53,15 @@ class TusService(
     private suspend fun convertUploadToPdf(
         uploadId: UUID,
         filename: String,
-    ): File {
-        val file = fileFactory.uploadConvertedPdf(uploadId)
-
-        file.writeBytes(
-            gotenbergService.convertToPdf(
-                FinishedUpload(
-                    file = fileFactory.uploadSourceFile(uploadId),
-                    originalFileExtension = File(filename).extension,
+    ): File =
+        File(filePathFactory.getConvertedPdfPath(uploadId).name).also { file ->
+            file.writeBytes(
+                gotenbergService.convertToPdf(
+                    FinishedUpload(
+                        file = File(filePathFactory.getOriginalUploadPath(uploadId).name),
+                        originalFileExtension = File(filename).extension,
+                    ),
                 ),
-            ),
-        )
-
-        return file
-    }
+            )
+        }
 }

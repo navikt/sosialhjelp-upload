@@ -1,16 +1,26 @@
 package no.nav.sosialhjelp.status.dto
 
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.dao.id.EntityID
+import java.util.*
 
 @Serializable
-@OptIn(ExperimentalSerializationApi::class)
-data class DocumentState
-    constructor(
-        val documentId: String,
-        val error: String? = null,
-        val uploads: Map<String, UploadSuccessState> = emptyMap(),
-        @EncodeDefault
-        val eventType: String = "document-state",
-    )
+data class DocumentState(
+    val documentId: String,
+    val uploads: Map<String, UploadSuccessState> = emptyMap(),
+    val error: String? = null,
+) {
+    companion object {
+        fun from(
+            documentId: String,
+            uploads: Map<EntityID<UUID>, UploadSuccessState> = emptyMap(),
+        ): DocumentState =
+            DocumentState(
+                documentId.toString(),
+                uploads
+                    .map { (uploadId, state) -> uploadId.toString() to state }
+                    .toMap(),
+                null,
+            )
+    }
+}

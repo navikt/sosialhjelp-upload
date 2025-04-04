@@ -40,8 +40,8 @@ class GotenbergService(
                 formData {
                     pdfs.forEachIndexed { index, pdf -> append("file", pdf.readBytes(), buildHeaders("$index.pdf")) }
                     append("merge", "true")
-                    //                append("pdfa", "PDF/A-3b")
-                    //                append("pdfua", "true")
+                    append("pdfa", "PDF/A-3b")
+                    append("pdfua", "true")
                 },
             )
 

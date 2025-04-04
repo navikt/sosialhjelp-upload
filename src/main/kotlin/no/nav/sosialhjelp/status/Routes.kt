@@ -19,6 +19,7 @@ import kotlin.time.Duration.Companion.seconds
 fun Route.configureStatusRoutes() {
     val statusChannelFactory = DocumentStatusChannelFactory(environment)
     val documentRepository = DocumentRepository()
+    val documentStatusService = DocumentStatusService()
 
     fun fromParameters(parameters: Parameters) =
         DocumentIdent(
@@ -40,12 +41,12 @@ fun Route.configureStatusRoutes() {
         val documentId =
             newSuspendedTransaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
 
-        DocumentStatusEmitter(statusChannelFactory, documentId).use { emitter ->
-            send(emitter.getDocumentStatus())
+        DocumentNotificationListener(statusChannelFactory, documentId.value).use { emitter ->
+            send(documentStatusService.getDocumentStatus(documentId))
 
             emitter
                 .getDocumentUpdateFlow()
-                .collect { send(emitter.getDocumentStatus()) }
+                .collect { send(documentStatusService.getDocumentStatus(documentId)) }
         }
     }
 }

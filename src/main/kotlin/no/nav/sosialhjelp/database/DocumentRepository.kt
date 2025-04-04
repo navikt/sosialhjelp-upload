@@ -17,26 +17,30 @@ class DocumentRepository {
     fun getOrCreateDocument(
         documentIdent: DocumentIdent,
         personIdent: String,
-    ): EntityID<UUID> {
-        DocumentTable
-            .insertIgnoreAndGetId {
-                it[soknadId] = documentIdent.soknadId
-                it[vedleggType] = documentIdent.vedleggType
-                it[ownerIdent] = personIdent
-            }?.let { return it }
+    ): EntityID<UUID> =
+        if (isNotOwnedByUser(documentIdent, personIdent)) {
+            throw DocumentOwnedByAnotherUserException()
+        } else {
+            DocumentTable
+                .insertIgnoreAndGetId {
+                    it[soknadId] = documentIdent.soknadId
+                    it[vedleggType] = documentIdent.vedleggType
+                    it[ownerIdent] = personIdent
+                } ?: DocumentTable
+                .select(DocumentTable.id)
+                .where(documentMatch(documentIdent) and ownerMatch(personIdent))
+                .single()
+                .let { it[DocumentTable.id] }
+        }
 
+    private fun isNotOwnedByUser(
+        documentIdent: DocumentIdent,
+        personIdent: String,
+    ): Boolean =
         DocumentTable
             .select(DocumentTable.id)
             .where(documentMatch(documentIdent) and not(ownerMatch(personIdent)))
-            .singleOrNull()
-            ?.let { throw DocumentOwnedByAnotherUserException() }
-
-        return DocumentTable
-            .select(DocumentTable.id)
-            .where(documentMatch(documentIdent) and ownerMatch(personIdent))
-            .single()
-            .let { it[DocumentTable.id] }
-    }
+            .count() != 0L
 
     companion object {
         fun documentMatch(documentIdent: DocumentIdent) =

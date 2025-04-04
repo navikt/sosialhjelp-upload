@@ -27,4 +27,10 @@ class UploadRepository {
             .where { UploadTable.id eq uploadId }
             .map { it[UploadTable.document] }
             .single()
+
+    fun getUploadsWithFilenames(documentId: EntityID<UUID>) =
+        UploadTable
+            .select(UploadTable.id, UploadTable.originalFilename)
+            .where { UploadTable.document eq documentId }
+            .map { Pair(it[UploadTable.id], it[UploadTable.originalFilename]) }
 }
