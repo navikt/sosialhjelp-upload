@@ -2,7 +2,7 @@ package no.nav.sosialhjelp.status
 
 import DocumentRepository
 import kotlinx.coroutines.*
-import no.nav.sosialhjelp.common.DocumentIdent
+import no.nav.sosialhjelp.common.TestUtils.createMockDocument
 import no.nav.sosialhjelp.database.schema.PageTable
 import no.nav.sosialhjelp.database.schema.UploadTable
 import no.nav.sosialhjelp.status.dto.DocumentState
@@ -15,7 +15,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -46,7 +45,7 @@ class DocumentStatusServiceTest {
     @Test
     fun `getDocumentStatus returns empty state when no uploads exist`() =
         runBlocking {
-            val documentId = createMockDocument()
+            val documentId = createMockDocument(documentRepository)
             val service = DocumentStatusService()
 
             // When: retrieving document status
@@ -57,11 +56,6 @@ class DocumentStatusServiceTest {
             assertTrue(result.uploads.isEmpty())
         }
 
-    private fun createMockDocument() =
-        transaction {
-            documentRepository.getOrCreateDocument(DocumentIdent(UUID.randomUUID(), "bar"), "12345678901")
-        }
-
     /**
      * Test that when one upload exists (with no pages), the returned DocumentState correctly
      * contains that upload with an empty page list.
@@ -70,7 +64,7 @@ class DocumentStatusServiceTest {
     fun `getDocumentStatus returns upload with empty pages list when upload exists but no pages`() =
         runBlocking {
             // Given
-            val documentId = createMockDocument()
+            val documentId = createMockDocument(documentRepository)
             // Insert one upload row associated with the document.
             val uploadId =
                 transaction {
@@ -101,7 +95,7 @@ class DocumentStatusServiceTest {
     fun `getDocumentStatus returns upload with pages when pages exist`() =
         runBlocking {
             // Given
-            val documentId = createMockDocument()
+            val documentId = createMockDocument(documentRepository)
             val uploadId =
                 transaction {
                     UploadTable.insert {
@@ -151,7 +145,7 @@ class DocumentStatusServiceTest {
     fun `getDocumentStatus returns multiple uploads each with their corresponding pages`() =
         runBlocking {
             // Given
-            val documentId = createMockDocument()
+            val documentId = createMockDocument(documentRepository)
 
             val uploadId1 =
                 transaction {
