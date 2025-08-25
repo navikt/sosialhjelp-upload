@@ -43,7 +43,7 @@ fun Route.configureActionRoutes() {
 
         val uploads = newSuspendedTransaction { uploadRepository.getUploadsByDocumentId(documentId) }
         val files = uploads.map { File(filePathFactory.getConvertedPdfPath(it.value).name) }
-        downstreamUploadService.upload(requestBody.targetUrl, gotenbergService.merge(files), "$documentId.pdf")
+        downstreamUploadService.upload(requestBody.targetUrl, if (files.size > 1) gotenbergService.merge(files) else files.first().readBytes(), "$documentId.pdf")
     }
 
     delete("/document/{soknadId}/{vedleggType}") {
