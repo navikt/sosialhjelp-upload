@@ -17,7 +17,7 @@ class FilePathFactory(
     /**
      * Returns a java.io.file object for the PDF conversion of the upload.
      */
-    fun getConvertedPdfPath(uploadId: UUID): Path = Path(basePath, "$basePath/$uploadId.pdf")
+    fun getConvertedPdfPath(uploadId: UUID): Path = Path(basePath, "$uploadId.pdf")
 
     companion object {
         fun fromEnvironment(environment: ApplicationEnvironment): FilePathFactory =

@@ -8,11 +8,12 @@ import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
 import io.ktor.util.reflect.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.common.DocumentIdent
 import no.nav.sosialhjelp.database.reactive.DocumentStatusChannelFactory
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -39,7 +40,7 @@ fun Route.configureStatusRoutes() {
         }
 
         val documentId =
-            newSuspendedTransaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
+            suspendTransaction(Dispatchers.IO) { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personident) }
 
         DocumentNotificationListener(statusChannelFactory, documentId.value).use { emitter ->
             send(documentStatusService.getDocumentStatus(documentId))

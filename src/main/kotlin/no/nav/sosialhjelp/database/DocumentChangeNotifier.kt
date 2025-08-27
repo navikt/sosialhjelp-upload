@@ -1,8 +1,9 @@
 package no.nav.sosialhjelp.database
 
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import java.util.*
 
 object DocumentChangeNotifier {
-    suspend fun notifyChange(documentId: UUID) = newSuspendedTransaction { exec("NOTIFY \"document::$documentId\"") }
+    suspend fun notifyChange(documentId: UUID) = suspendTransaction(Dispatchers.IO) { exec("NOTIFY \"document::$documentId\"") }
 }

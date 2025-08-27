@@ -1,7 +1,8 @@
 package no.nav.sosialhjelp.database.schema
 
-import org.jetbrains.exposed.dao.id.UUIDTable
-import org.jetbrains.exposed.sql.ReferenceOption
+import org.jetbrains.exposed.v1.core.ReferenceOption
+import org.jetbrains.exposed.v1.core.dao.id.UUIDTable
+
 
 object PageTable : UUIDTable("pages") {
     val upload = reference("upload", UploadTable, onDelete = ReferenceOption.CASCADE)

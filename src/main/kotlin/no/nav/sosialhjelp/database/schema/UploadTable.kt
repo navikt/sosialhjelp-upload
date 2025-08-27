@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.database.schema
 
-import org.jetbrains.exposed.dao.id.UUIDTable
+import org.jetbrains.exposed.v1.core.dao.id.UUIDTable
+
 
 object UploadTable : UUIDTable("uploads") {
     val originalFilename = varchar("original_filename", 255)

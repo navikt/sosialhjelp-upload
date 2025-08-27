@@ -1,20 +1,21 @@
-
+import kotlinx.coroutines.flow.single
 import no.nav.sosialhjelp.common.DocumentIdent
 import no.nav.sosialhjelp.database.schema.DocumentTable
 import no.nav.sosialhjelp.database.schema.DocumentTable.ownerIdent
 import no.nav.sosialhjelp.database.schema.DocumentTable.soknadId
 import no.nav.sosialhjelp.database.schema.DocumentTable.vedleggType
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insertIgnoreAndGetId
-import org.jetbrains.exposed.sql.not
+import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.not
+import org.jetbrains.exposed.v1.r2dbc.insertIgnoreAndGetId
+import org.jetbrains.exposed.v1.r2dbc.select
 import java.util.*
 
 class DocumentRepository {
     class DocumentOwnedByAnotherUserException : RuntimeException()
 
-    fun getOrCreateDocument(
+    suspend fun getOrCreateDocument(
         documentIdent: DocumentIdent,
         personIdent: String,
     ): EntityID<UUID> =
@@ -33,7 +34,7 @@ class DocumentRepository {
                 .let { it[DocumentTable.id] }
         }
 
-    private fun isNotOwnedByUser(
+    private suspend fun isNotOwnedByUser(
         documentIdent: DocumentIdent,
         personIdent: String,
     ): Boolean =

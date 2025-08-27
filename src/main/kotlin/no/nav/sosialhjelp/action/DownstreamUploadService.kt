@@ -5,6 +5,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 
 class DownstreamUploadService {
     val client =
@@ -18,12 +19,13 @@ class DownstreamUploadService {
         filename: String,
     ) = client.request {
         url(url)
-        method = HttpMethod.Companion.Post
+        method = HttpMethod.Post
+
         formData {
             append(
                 "file",
                 bytes,
-                Headers.Companion.build {
+                Headers.build {
                     append(HttpHeaders.ContentType, ContentType.Application.Pdf.toString())
                     append(HttpHeaders.ContentDisposition, "attachment; filename=$filename")
                 },

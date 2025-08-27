@@ -7,6 +7,10 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.util.cio.readChannel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import no.nav.sosialhjelp.common.FinishedUpload
 import java.io.File
 
@@ -20,7 +24,7 @@ class GotenbergService(
         }
 
     private fun buildHeaders(originalFiletype: String): Headers =
-        Headers.Companion.build { append(HttpHeaders.ContentDisposition, """filename="file.$originalFiletype"""") }
+        Headers.build { append(HttpHeaders.ContentDisposition, """filename="file.$originalFiletype"""") }
 
     suspend fun convertToPdf(upload: FinishedUpload): ByteArray {
         val res =
@@ -34,15 +38,16 @@ class GotenbergService(
         return res.readRawBytes()
     }
 
-    suspend fun merge(pdfs: List<File>): ByteArray {
+    suspend fun merge(pdfs: Flow<File>): ByteArray {
+        val byteReadChannels = pdfs.map { it.readChannel() }.toList()
         val res =
             gotenbergClient.submitFormWithBinaryData(
                 formData {
-                    pdfs.forEachIndexed { index, pdf -> append("file", pdf.readBytes(), buildHeaders("$index.pdf")) }
+                    byteReadChannels.forEachIndexed { index, pdf -> append("file", ChannelProvider { pdf }, headers = buildHeaders("$index.pdf")) }
                     append("merge", "true")
                     append("pdfa", "PDF/A-3b")
                     append("pdfua", "true")
-                },
+                }
             )
 
         check(res.status.isSuccess()) { "Failed to merge ${res.status}" }

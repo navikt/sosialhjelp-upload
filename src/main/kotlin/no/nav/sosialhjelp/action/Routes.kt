@@ -8,12 +8,14 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
 import kotlinx.io.files.Path
 import no.nav.sosialhjelp.common.DocumentIdent
 import no.nav.sosialhjelp.common.FilePathFactory
 import no.nav.sosialhjelp.database.UploadRepository
 import no.nav.sosialhjelp.pdf.GotenbergService
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import java.io.File
 import java.util.*
 
@@ -32,18 +34,20 @@ fun Route.configureActionRoutes() {
 
     post("/document/{soknadId}/{vedleggType}/submit") {
         val personIdent = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
-        val requestBody = call.receive<DocumentSubmitInput>()
+        val documentIdent = fromParameters(call.parameters)
+        val (soknadId, vedleggType) = documentIdent
         val documentId =
             try {
-                newSuspendedTransaction { documentRepository.getOrCreateDocument(fromParameters(call.parameters), personIdent) }
+                suspendTransaction(Dispatchers.IO) { documentRepository.getOrCreateDocument(documentIdent, personIdent) }
             } catch (_: DocumentOwnedByAnotherUserException) {
                 call.respondText("Access denied", status = HttpStatusCode.Forbidden)
                 return@post
             }
 
-        val uploads = newSuspendedTransaction { uploadRepository.getUploadsByDocumentId(documentId) }
-        val files = uploads.map { File(filePathFactory.getConvertedPdfPath(it.value).name) }
-        downstreamUploadService.upload(requestBody.targetUrl, if (files.size > 1) gotenbergService.merge(files) else files.first().readBytes(), "$documentId.pdf")
+        val uploads = suspendTransaction(Dispatchers.IO) { uploadRepository.getUploadsByDocumentId(documentId) }
+        val files = uploads.map { File(filePathFactory.getConvertedPdfPath(it.value).toString()) }
+        val response = downstreamUploadService.upload(Url("http://localhost:8181/sosialhjelp/soknad-api/dokument/${soknadId}/${vedleggType}"), gotenbergService.merge(files), "$documentId.pdf")
+        println(response.status)
     }
 
     delete("/document/{soknadId}/{vedleggType}") {

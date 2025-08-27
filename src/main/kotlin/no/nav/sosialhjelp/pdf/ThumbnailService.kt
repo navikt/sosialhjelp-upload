@@ -1,13 +1,14 @@
 package no.nav.sosialhjelp.pdf
 
 import io.ktor.server.application.*
+import kotlinx.coroutines.Dispatchers
 import no.nav.sosialhjelp.database.DocumentChangeNotifier
 import no.nav.sosialhjelp.database.PageRepository
 import no.nav.sosialhjelp.database.UploadRepository
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.rendering.ImageType
 import org.apache.pdfbox.rendering.PDFRenderer
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import java.io.File
 import java.util.*
 import javax.imageio.ImageIO
@@ -24,16 +25,16 @@ class ThumbnailService(
         inputDocument: PDDocument,
         baseFilename: String,
     ) {
-        newSuspendedTransaction {
-            for (pageIndex in 0..inputDocument.numberOfPages - 1) pageRepository.createEmptyPage(uploadId, pageIndex)
+        suspendTransaction(Dispatchers.IO) {
+            for (pageIndex in 0..<inputDocument.numberOfPages) pageRepository.createEmptyPage(uploadId, pageIndex)
             DocumentChangeNotifier.notifyChange(uploadRepository.getDocumentIdFromUploadId(uploadId).value)
         }
 
         val pdfRenderer = PDFRenderer(inputDocument)
 
-        for (pageIndex in 0..inputDocument.numberOfPages - 1) {
+        for (pageIndex in 0..<inputDocument.numberOfPages) {
             val thumbnail = writeThumbnail(pdfRenderer, baseFilename, pageIndex)
-            newSuspendedTransaction { pageRepository.setFilename(uploadId, pageIndex, thumbnail) }
+            suspendTransaction(Dispatchers.IO) { pageRepository.setFilename(uploadId, pageIndex, thumbnail) }
         }
     }
 

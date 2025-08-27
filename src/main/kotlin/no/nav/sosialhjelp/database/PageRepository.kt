@@ -1,15 +1,16 @@
 package no.nav.sosialhjelp.database
 
 import no.nav.sosialhjelp.database.schema.PageTable
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.r2dbc.insert
+import org.jetbrains.exposed.v1.r2dbc.select
+import org.jetbrains.exposed.v1.r2dbc.update
 import java.io.File
 import java.util.*
 
 class PageRepository {
-    fun setFilename(
+    suspend fun setFilename(
         uploadId: UUID,
         pageIndex: Int,
         thumbnailFile: File,
@@ -17,7 +18,7 @@ class PageRepository {
         it[filename] = thumbnailFile.name
     }
 
-    fun createEmptyPage(
+    suspend fun createEmptyPage(
         uploadId: UUID,
         pageIndex: Int,
     ) = PageTable.insert {

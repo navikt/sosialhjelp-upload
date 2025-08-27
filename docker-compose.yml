@@ -14,7 +14,7 @@ services:
       - "-port=8084"
       - "-hooks-http=http://host.docker.internal:3007/tus-hooks"
       - "-hooks-http-forward-headers=Authorization"
-      - "-base-path=/sosialhjelp/upload/files"
+      - "-base-path=/sosialhjelp/tusd"
       - "-hooks-enabled-events=pre-create,post-create,post-finish"
       - "-upload-dir=/tusd-data"
       - "-behind-proxy"

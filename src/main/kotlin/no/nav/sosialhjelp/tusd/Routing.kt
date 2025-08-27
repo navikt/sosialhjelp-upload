@@ -4,15 +4,15 @@ import HookType
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
+import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.nav.sosialhjelp.tusd.dto.HookRequest
 import no.nav.sosialhjelp.tusd.dto.HookResponse
-import org.koin.ktor.ext.inject
 
 fun Route.configureTusRoutes() {
-    val tusService by inject<TusService>()
+    val tusService: TusService by this.application.dependencies
 
     post {
         val request = call.receive<HookRequest>()

@@ -33,12 +33,9 @@ dependencies {
 
     // Database drivers
     implementation(libs.postgresql)
-    implementation(libs.h2database)
     implementation(libs.r2dbc.postgresql)
 
     // Dependency Injection and PDF generation
-    implementation(libs.koin.ktor)
-    implementation(libs.koin.logger.slf4j)
     implementation(libs.pdfbox.app)
 
     // Task scheduling grouped dependencies
@@ -52,6 +49,7 @@ dependencies {
 
     // Exposed grouped dependencies
     implementation(libs.bundles.exposed)
+    implementation("io.ktor:ktor-client-cio-jvm:3.2.3")
 
     // Test dependencies (added separately)
     testImplementation(libs.ktor.server.test.host)

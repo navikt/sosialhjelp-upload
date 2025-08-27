@@ -1,12 +1,17 @@
 package no.nav.sosialhjelp
 
 import io.ktor.server.application.*
+import io.ktor.server.plugins.di.dependencies
+import io.r2dbc.spi.ConnectionFactoryOptions
+import kotlinx.coroutines.Dispatchers
 import no.nav.sosialhjelp.database.schema.DocumentTable
 import no.nav.sosialhjelp.database.schema.PageTable
 import no.nav.sosialhjelp.database.schema.UploadTable
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
+
+import no.nav.sosialhjelp.tusd.TusService
+import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
+import org.jetbrains.exposed.v1.r2dbc.SchemaUtils
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 
 fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain
@@ -14,7 +19,7 @@ fun main(args: Array<String>) {
 }
 
 object DatabaseFactory {
-    fun init(environment: ApplicationEnvironment) {
+    suspend fun init(environment: ApplicationEnvironment) {
         val dbname = environment.config.property("database.name").getString()
         val user = environment.config.property("database.user").getString()
         val password = environment.config.property("database.password").getString()
@@ -25,14 +30,19 @@ object DatabaseFactory {
                 .getString()
                 .toInt()
 
-        val dbUrl = "jdbc:postgresql://$host:$port/$dbname"
-        Database.connect(
+        val dbUrl = "r2dbc:postgresql://$host:$port/$dbname"
+        R2dbcDatabase.connect(
             dbUrl,
-            driver = "org.postgresql.Driver",
-            user = user,
-            password = password,
+            databaseConfig = {
+                useNestedTransactions = true
+                defaultMaxAttempts = 1
+                connectionFactoryOptions {
+                    option(ConnectionFactoryOptions.USER, user)
+                    option(ConnectionFactoryOptions.PASSWORD, password)
+                }
+            },
         )
-        transaction {
+        suspendTransaction(Dispatchers.IO) {
             SchemaUtils.create(DocumentTable)
             SchemaUtils.create(PageTable)
             SchemaUtils.create(UploadTable)
@@ -40,13 +50,15 @@ object DatabaseFactory {
     }
 }
 
-fun Application.module() {
+suspend fun Application.module() {
     DatabaseFactory.init(environment)
+    dependencies {
+        provide { TusService(this@module.environment) }
+    }
     configureSecurity()
     configureHTTP()
     configureMonitoring()
 //    configureDatabases()
-    configureFrameworks()
     configureStatusPages()
 //    configureAdministration()
     configureRouting()
