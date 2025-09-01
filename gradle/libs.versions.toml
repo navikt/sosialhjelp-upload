@@ -1,10 +1,12 @@
 [versions]
+h2 = "2.3.232"
+koin = "3.5.6"
 kotlin = "2.1.10"
-ktor = "3.2.3"
+ktor = "3.1.1"
 logback = "1.4.14"
 postgres = "42.7.5"
 prometheus = "1.6.13"
-exposed = "1.0.0-beta-5"
+exposed = "0.60.0"
 pdfbox = "3.0.4"
 checker = "3.49.1"
 mockk = "1.13.17"
@@ -18,8 +20,10 @@ testcontainers = "1.20.6"
 checker = { group = "org.checkerframework", name = "checker-qual", version.ref = "checker" }
 exposed-core = { group = "org.jetbrains.exposed", name = "exposed-core", version.ref = "exposed" }
 exposed-dao = { group = "org.jetbrains.exposed", name = "exposed-dao", version.ref = "exposed" }
-exposed-r2dbc = { group = "org.jetbrains.exposed", name = "exposed-r2dbc", version.ref = "exposed" }
-
+exposed-jdbc = { group = "org.jetbrains.exposed", name = "exposed-jdbc", version.ref = "exposed" }
+h2database = { group = "com.h2database", name = "h2", version.ref = "h2" }
+koin-ktor = { group = "io.insert-koin", name = "koin-ktor", version.ref = "koin" }
+koin-logger-slf4j = { group = "io.insert-koin", name = "koin-logger-slf4j", version.ref = "koin" }
 
 junit-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
 junit-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
@@ -31,7 +35,6 @@ kotlinx-coroutines-reactive = { group = "org.jetbrains.kotlinx", name = "kotlinx
 ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
-ktor-server-di = { group = "io.ktor", name = "ktor-server-di", version.ref = "ktor" }
 ktor-server-auth = { group = "io.ktor", name = "ktor-server-auth", version.ref = "ktor" }
 ktor-server-auth-jwt = { group = "io.ktor", name = "ktor-server-auth-jwt", version.ref = "ktor" }
 ktor-server-call-logging = { group = "io.ktor", name = "ktor-server-call-logging", version.ref = "ktor" }
@@ -79,7 +82,6 @@ ktor = [
     "ktor-client-cio",
     "ktor-server-core",
     "ktor-server-auth",
-    "ktor-server-di",
     "ktor-server-auth-jwt",
     "ktor-server-resources",
     "ktor-server-request-validation",
@@ -109,7 +111,7 @@ ktor-task-scheduling = [
 
 exposed = [
     "exposed-core",
-    "exposed-r2dbc",
+    "exposed-jdbc",
     "exposed-dao"
 ]
 

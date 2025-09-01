@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor.plugin)
     alias(libs.plugins.kotlinx.serialization)
+    id("nl.littlerobots.version-catalog-update") version "1.0.0"
     id("jacoco")
     id("org.sonarqube") version "3.5.0.2730"
 }
