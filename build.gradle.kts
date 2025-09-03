@@ -1,8 +1,11 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor.plugin)
     alias(libs.plugins.kotlinx.serialization)
     id("nl.littlerobots.version-catalog-update") version "1.0.0"
+    id("org.jooq.jooq-codegen-gradle") version "3.20.6"
     id("jacoco")
     id("org.sonarqube") version "3.5.0.2730"
 }
@@ -39,9 +42,6 @@ dependencies {
     // Dependency Injection and PDF generation
     implementation(libs.pdfbox.app)
 
-    // Task scheduling grouped dependencies
-    implementation(libs.bundles.ktor.task.scheduling)
-
     // Other dependencies
     implementation(libs.kotlinx.coroutines.reactive)
     implementation(libs.ktor.server.netty)
@@ -49,9 +49,12 @@ dependencies {
     implementation(libs.ktor.server.config.yaml)
 
     // Exposed grouped dependencies
-    implementation(libs.bundles.exposed)
+    implementation(libs.bundles.jooq)
     implementation("io.ktor:ktor-client-cio-jvm:3.2.3")
 
+    // For build time codegen
+    jooqCodegen(libs.jooq.meta)
+    jooqCodegen(libs.postgresql)
     // Test dependencies (added separately)
     testImplementation(libs.ktor.server.test.host)
 
@@ -62,10 +65,18 @@ dependencies {
     testImplementation(libs.bundles.testcontainers)
 }
 
+
 tasks.test {
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
 }
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_21
+    }
+}
+
 
 jacoco {
     toolVersion = "0.8.13"
@@ -89,4 +100,35 @@ tasks.jacocoTestReport {
             },
         ),
     )
+}
+
+jooq {
+    configuration {
+        jdbc {
+            driver = "org.postgresql.Driver"
+            url = "jdbc:postgresql://localhost:54322/sosialhjelp-upload"
+            user = "postgres"
+            password = "postgres"
+        }
+        generator {
+            name = "org.jooq.codegen.KotlinGenerator"
+            database {
+                inputSchema = "public"
+                includeTables = true
+                includeIndexes = false
+                includeUniqueKeys = false
+                includeForeignKeys = false
+                includePrimaryKeys = false
+                includeXMLSchemaCollections = false
+            }
+            generate {
+                isDefaultSchema = false
+                isDefaultCatalog = false
+            }
+            target {
+                packageName = "no.nav.sosialhjelp.upload.database.generated"
+                directory = "src/main/kotlin"
+            }
+        }
+    }
 }

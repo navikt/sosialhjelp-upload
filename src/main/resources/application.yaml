@@ -1,7 +1,7 @@
 ktor:
   application:
     modules:
-      - no.nav.sosialhjelp.ApplicationKt.module
+      - no.nav.sosialhjelp.upload.ApplicationKt.module
   deployment:
     port: 3007
 jwt:

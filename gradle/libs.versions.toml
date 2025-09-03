@@ -1,12 +1,9 @@
 [versions]
 checker = "3.50.0"
 coroutines = "1.10.2"
-exposed = "1.0.0-beta-5"
-h2 = "2.3.232"
 junit = "5.13.4"
 kotlin = "2.2.10"
 ktor = "3.2.3"
-ktor-task-scheduling = "2.2.1"
 logback = "1.5.18"
 mockk = "1.14.5"
 pdfbox = "3.0.5"
@@ -16,10 +13,11 @@ r2dbc = "1.0.7.RELEASE"
 testcontainers = "1.21.3"
 
 [libraries]
+jooq = { module = "org.jooq:jooq", version = "3.20.6" }
+jooq-meta = { module = "org.jooq:jooq-meta", version = "3.20.6" }
+jooq-kotlin = { module = "org.jooq:jooq-kotlin", version = "3.20.6" }
+jooq-kotlin-coroutines = { module = "org.jooq:jooq-kotlin-coroutines", version = "3.20.6" }
 checker = { module = "org.checkerframework:checker-qual", version.ref = "checker" }
-exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
-exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
-exposed-r2dbc = { group = "org.jetbrains.exposed", name = "exposed-r2dbc", version.ref = "exposed" }
 junit-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
@@ -46,10 +44,6 @@ ktor-server-resources = { module = "io.ktor:ktor-server-resources", version.ref 
 ktor-server-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor" }
 ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
 ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
-ktor-server-task-scheduling-core = { module = "io.github.flaxoos:ktor-server-task-scheduling-core", version.ref = "ktor-task-scheduling" }
-ktor-server-task-scheduling-jdbc = { module = "io.github.flaxoos:ktor-server-task-scheduling-jdbc", version.ref = "ktor-task-scheduling" }
-ktor-server-task-scheduling-mongodb = { module = "io.github.flaxoos:ktor-server-task-scheduling-mongodb", version.ref = "ktor-task-scheduling" }
-ktor-server-task-scheduling-redis = { module = "io.github.flaxoos:ktor-server-task-scheduling-redis", version.ref = "ktor-task-scheduling" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "prometheus" }
@@ -67,10 +61,10 @@ kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", vers
 ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 
 [bundles]
-exposed = [
-    "exposed-core",
-    "exposed-dao",
-    "exposed-r2dbc",
+jooq = [
+    "jooq",
+    "jooq-kotlin",
+    "jooq-kotlin-coroutines",
 ]
 junit = [
     "junit-api",
@@ -99,12 +93,6 @@ ktor = [
     "ktor-server-status-pages",
     "ktor-server-swagger",
     "ktor-server-test-host",
-]
-ktor-task-scheduling = [
-    "ktor-server-task-scheduling-core",
-    "ktor-server-task-scheduling-jdbc",
-    "ktor-server-task-scheduling-mongodb",
-    "ktor-server-task-scheduling-redis",
 ]
 testcontainers = [
     "testcontainers-core",
