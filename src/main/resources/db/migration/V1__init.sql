@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS document
+(
+    id uuid PRIMARY KEY,
+    external_id VARCHAR(255) NOT NULL UNIQUE,
+    owner_ident char(11)     NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS upload (
+    id          uuid PRIMARY KEY,
+    document_id uuid references document(id),
+    original_filename varchar(255) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS page
+(
+    id     uuid PRIMARY KEY,
+    upload uuid references upload(id),
+    page_number int NOT NULL,
+    filename varchar(100)
+);
+

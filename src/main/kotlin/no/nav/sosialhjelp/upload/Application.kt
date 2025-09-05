@@ -25,6 +25,7 @@ import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.pdf.ThumbnailService
 import no.nav.sosialhjelp.upload.status.DocumentStatusService
 import org.jooq.impl.DefaultConfiguration
+import org.flywaydb.core.Flyway
 
 fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain.main(args)
@@ -40,6 +41,19 @@ object DatabaseFactory {
         val password = environment.config.property("database.password").getString()
         val host = environment.config.property("database.host").getString()
         val port = environment.config.property("database.port").getString().toInt()
+
+        // Run Flyway migrations using JDBC
+        val jdbcUrl = "jdbc:postgresql://$host:$port/$dbname"
+        val load = Flyway.configure()
+            .dataSource(jdbcUrl, user, password)
+            .locations("classpath:db/migration")
+            // TODO: FJERN FØR PRODSETTING
+            .cleanDisabled(false)
+            .load()
+        load
+            .clean()
+        load.migrate()
+
 
         val options = ConnectionFactoryOptions.builder()
             .option(DRIVER, "postgresql")

@@ -48,7 +48,11 @@ dependencies {
     implementation(libs.logback.classic)
     implementation(libs.ktor.server.config.yaml)
 
-    // Exposed grouped dependencies
+    implementation(libs.flyway.core)
+    implementation(libs.flyway.postgresql)
+    // For flyway
+    implementation(libs.jdbc.postgresql)
+
     implementation(libs.bundles.jooq)
     implementation("io.ktor:ktor-client-cio-jvm:3.2.3")
 
@@ -120,6 +124,7 @@ jooq {
                 includeForeignKeys = false
                 includePrimaryKeys = false
                 includeXMLSchemaCollections = false
+                excludes = "flyway_schema_history"
             }
             generate {
                 isDefaultSchema = false

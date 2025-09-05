@@ -5,23 +5,23 @@
 package no.nav.sosialhjelp.upload.database.generated.tables.references
 
 
-import no.nav.sosialhjelp.upload.database.generated.tables.Documents
-import no.nav.sosialhjelp.upload.database.generated.tables.Pages
-import no.nav.sosialhjelp.upload.database.generated.tables.Uploads
+import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Page
+import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
 
 
 /**
- * The table <code>public.documents</code>.
+ * The table <code>public.document</code>.
  */
-val DOCUMENTS: Documents = Documents.DOCUMENTS
+val DOCUMENT: Document = Document.DOCUMENT
 
 /**
- * The table <code>public.pages</code>.
+ * The table <code>public.page</code>.
  */
-val PAGES: Pages = Pages.PAGES
+val PAGE: Page = Page.PAGE
 
 /**
- * The table <code>public.uploads</code>.
+ * The table <code>public.upload</code>.
  */
-val UPLOADS: Uploads = Uploads.UPLOADS
+val UPLOAD: Upload = Upload.UPLOAD

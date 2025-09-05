@@ -20,8 +20,8 @@ fun Application.configureRouting() {
                 configureStatusRoutes()
                 configureActionRoutes()
                 // todo: user permission check for files
-                staticFiles("/thumbnails", File("./tusd-data"))
             }
+            staticFiles("/thumbnails", File("./tusd-data"))
         }
 
         route("/tus-hooks") { authenticate { configureTusRoutes() } }

@@ -6,9 +6,9 @@ package no.nav.sosialhjelp.upload.database.generated
 
 import kotlin.collections.List
 
-import no.nav.sosialhjelp.upload.database.generated.tables.Documents
-import no.nav.sosialhjelp.upload.database.generated.tables.Pages
-import no.nav.sosialhjelp.upload.database.generated.tables.Uploads
+import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Page
+import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
 import org.jooq.Table
 import org.jooq.impl.DSL
@@ -29,23 +29,23 @@ open class Public : SchemaImpl(DSL.name("public"), null, DSL.comment("standard p
     }
 
     /**
-     * The table <code>public.documents</code>.
+     * The table <code>public.document</code>.
      */
-    val DOCUMENTS: Documents get() = Documents.DOCUMENTS
+    val DOCUMENT: Document get() = Document.DOCUMENT
 
     /**
-     * The table <code>public.pages</code>.
+     * The table <code>public.page</code>.
      */
-    val PAGES: Pages get() = Pages.PAGES
+    val PAGE: Page get() = Page.PAGE
 
     /**
-     * The table <code>public.uploads</code>.
+     * The table <code>public.upload</code>.
      */
-    val UPLOADS: Uploads get() = Uploads.UPLOADS
+    val UPLOAD: Upload get() = Upload.UPLOAD
 
     override fun getTables(): List<Table<*>> = listOf(
-        Documents.DOCUMENTS,
-        Pages.PAGES,
-        Uploads.UPLOADS
+        Document.DOCUMENT,
+        Page.PAGE,
+        Upload.UPLOAD
     )
 }

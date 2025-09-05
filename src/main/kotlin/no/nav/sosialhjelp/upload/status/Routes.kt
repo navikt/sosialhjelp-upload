@@ -1,6 +1,5 @@
 package no.nav.sosialhjelp.upload.status
 
-import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.di.dependencies
@@ -11,12 +10,10 @@ import io.ktor.util.reflect.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
-import no.nav.sosialhjelp.upload.common.SoknadDocumentIdent
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.reactive.DocumentStatusChannelFactory
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
-import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
 fun Route.configureStatusRoutes() {
@@ -25,13 +22,7 @@ fun Route.configureStatusRoutes() {
     val documentRepository: DocumentRepository by application.dependencies
     val documentStatusService: DocumentStatusService by application.dependencies
 
-    fun fromParameters(parameters: Parameters) =
-        SoknadDocumentIdent(
-            soknadId = UUID.fromString(parameters["soknadId"] ?: error("uploadId is required")),
-            vedleggType = parameters["vedleggType"] ?: error("vedleggType is required"),
-        )
-
-    sse("/status/{soknadId}/{vedleggType}", serialize = { typeInfo: TypeInfo, value: Any ->
+    sse("/status/{id}", serialize = { typeInfo: TypeInfo, value: Any ->
         val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)
         Default.encodeToString(serializer, value)
     }) {
@@ -43,7 +34,9 @@ fun Route.configureStatusRoutes() {
         }
 
         val documentId =
-            dsl.transactionCoroutine(Dispatchers.IO) { documentRepository.getOrCreateDocument(it, fromParameters(call.parameters), personident) }
+            dsl.transactionCoroutine(Dispatchers.IO) {
+                documentRepository.getOrCreateDocument(it, call.parameters["id"] ?: "", personident)
+            }
 
         DocumentNotificationListener(statusChannelFactory, documentId).use { emitter ->
             send(documentStatusService.getDocumentStatus(documentId))
