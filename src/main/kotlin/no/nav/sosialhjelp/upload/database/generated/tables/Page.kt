@@ -86,7 +86,7 @@ open class Page(
     /**
      * The column <code>public.page.filename</code>.
      */
-    val FILENAME: TableField<PageRecord, String?> = createField(DSL.name("filename"), SQLDataType.VARCHAR(100).nullable(false), this, "")
+    val FILENAME: TableField<PageRecord, String?> = createField(DSL.name("filename"), SQLDataType.VARCHAR(100), this, "")
 
     private constructor(alias: Name, aliased: Table<PageRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<PageRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

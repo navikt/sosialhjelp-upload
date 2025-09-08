@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS document
 CREATE TABLE IF NOT EXISTS upload (
     id          uuid PRIMARY KEY,
     document_id uuid references document(id),
-    original_filename varchar(255) NOT NULL
+    original_filename varchar(255) NOT NULL,
+    converted_filename varchar(255)
 );
 
 CREATE TABLE IF NOT EXISTS page

@@ -83,6 +83,11 @@ open class Upload(
      */
     val ORIGINAL_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("original_filename"), SQLDataType.VARCHAR(255).nullable(false), this, "")
 
+    /**
+     * The column <code>public.upload.converted_filename</code>.
+     */
+    val CONVERTED_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("converted_filename"), SQLDataType.VARCHAR(255), this, "")
+
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, where: Condition?): this(alias, null, null, null, aliased, null, where)

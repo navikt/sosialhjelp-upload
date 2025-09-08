@@ -32,6 +32,7 @@ class GotenbergService(
                     formData { append("file", upload.file.readBytes(), buildHeaders(upload.originalFileExtension)) },
                 )
 
+        println(res.status)
         check(res.status.isSuccess()) { "Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}" }
 
         return res.readRawBytes()

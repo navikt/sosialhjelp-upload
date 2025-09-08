@@ -5,5 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class UploadSuccessState(
     val originalFilename: String,
+    val convertedFilename: String?,
     val pages: List<PageState>? = null,
 )

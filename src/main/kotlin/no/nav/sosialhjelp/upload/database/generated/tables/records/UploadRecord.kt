@@ -29,13 +29,18 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(2, value)
         get(): String? = get(2) as String?
 
+    open var convertedFilename: String?
+        set(value): Unit = set(3, value)
+        get(): String? = get(3) as String?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null): this() {
+    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, convertedFilename: String? = null): this() {
         this.id = id
         this.documentId = documentId
         this.originalFilename = originalFilename
+        this.convertedFilename = convertedFilename
         resetTouchedOnNotNull()
     }
 }

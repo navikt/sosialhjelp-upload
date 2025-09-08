@@ -1,8 +1,10 @@
 package no.nav.sosialhjelp.upload.tusd
 
+import io.ktor.server.plugins.di.annotations.Property
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import io.ktor.util.logging.Logger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.io.files.Path
 import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.UploadRepository
@@ -13,7 +15,6 @@ import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import no.nav.sosialhjelp.upload.tusd.dto.HookResponse
 import no.nav.sosialhjelp.upload.tusd.input.CreateUploadRequest
 import no.nav.sosialhjelp.upload.tusd.input.PostFinishRequest
-import org.apache.pdfbox.Loader
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
 import java.io.File
@@ -27,6 +28,7 @@ class TusService(
     val documentRepository: DocumentRepository,
     val filePathFactory: FilePathFactory,
     val dsl: DSLContext,
+    @Property("storage.basePath") val basePath: String,
 ) {
 
     suspend fun preCreate(
@@ -48,8 +50,23 @@ class TusService(
 
     suspend fun postFinish(request: HookRequest) {
         val request = PostFinishRequest.fromRequest(request)
-        val uploadPdf = convertUploadToPdf(request.uploadId, request.filename)
-        thumbnailService.makeThumbnails(request.uploadId, Loader.loadPDF(uploadPdf), request.filename)
+        // Ikke konverter det som fagsystemene godkjenner (pdf, jpg/jpeg, png)
+        val extension = File(request.filename).extension
+        println(extension)
+        if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
+            convertUploadToPdf(request.uploadId, request.filename).also { uploadPdf ->
+                dsl.transactionCoroutine(Dispatchers.IO) {
+                    uploadRepository.updateConvertedFilename(it, uploadPdf.name, request.uploadId)
+                }
+                // TODO: Tror ikke vi trenger dette?
+                // thumbnailService.makeThumbnails(request.uploadId, Loader.loadPDF(uploadPdf), request.filename)
+            }
+        } else {
+            // If we don't convert, we just need to copy the file to the original filename
+            val originalPath = filePathFactory.getOriginalUploadPath(request.uploadId)
+            val convertedPath = Path(basePath, request.filename)
+            File(originalPath.toString()).copyTo(File(convertedPath.toString()), overwrite = true)
+        }
         dsl.transactionCoroutine(Dispatchers.IO) { uploadRepository.notifyChange(it, request.uploadId) }
     }
 

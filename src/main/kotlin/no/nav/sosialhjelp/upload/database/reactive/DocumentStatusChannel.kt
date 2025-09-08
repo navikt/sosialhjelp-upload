@@ -3,6 +3,8 @@ package no.nav.sosialhjelp.upload.database.reactive
 import io.r2dbc.postgresql.api.Notification
 import io.r2dbc.postgresql.api.PostgresqlConnection
 import io.r2dbc.postgresql.api.PostgresqlResult
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.reactive.asFlow
 import org.checkerframework.checker.tainting.qual.Untainted
 import reactor.core.publisher.Flux
 import java.util.*
