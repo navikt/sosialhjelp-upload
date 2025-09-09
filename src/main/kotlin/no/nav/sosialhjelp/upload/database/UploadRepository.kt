@@ -6,8 +6,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.reactive.awaitSingle
+import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import org.jooq.Configuration
+import org.jooq.RowCountQuery
 import java.util.*
 
 data class UploadWithFilename(
@@ -62,5 +64,10 @@ class UploadRepository {
 
     suspend fun updateConvertedFilename(tx: Configuration, name: String, uploadId: UUID) {
         tx.dsl().update(UPLOAD).set(UPLOAD.CONVERTED_FILENAME, name).where(UPLOAD.ID.eq(uploadId)).awaitSingle()
+    }
+
+    suspend fun deleteUpload(tx: Configuration, uploadId: UUID): Int {
+        val documentId = getDocumentIdFromUploadId(tx, uploadId) ?: error("No documentid for upload")
+        return tx.dsl().delete(UPLOAD).where(UPLOAD.ID.eq(uploadId)).awaitSingle().also { DocumentChangeNotifier.notifyChange(documentId) }
     }
 }

@@ -15,8 +15,7 @@ CREATE TABLE IF NOT EXISTS upload (
 CREATE TABLE IF NOT EXISTS page
 (
     id     uuid PRIMARY KEY,
-    upload uuid references upload(id),
+    upload uuid references upload(id) ON DELETE CASCADE,
     page_number int NOT NULL,
     filename varchar(100)
 );
-

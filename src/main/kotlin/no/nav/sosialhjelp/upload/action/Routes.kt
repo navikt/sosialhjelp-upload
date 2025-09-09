@@ -45,7 +45,23 @@ fun Route.configureActionRoutes() {
         println(body)
     }
 
-    delete("/document/{soknadId}/{vedleggType}") {
+    delete("/document/{uploadId}") {
+        val personIdent = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
+        val uploadId = call.parameters["uploadId"]?.let { UUID.fromString(it) } ?: error("uploadId is required")
+        try {
+            val deletedCount = dsl.transactionCoroutine(Dispatchers.IO) { uploadRepository.deleteUpload(it, uploadId) }
+            // TODO: Flytt det her til et annet sted
+            File(filePathFactory.getConvertedPdfPath(uploadId).toString()).delete()
+            File(filePathFactory.getOriginalUploadPath(uploadId).toString()).delete()
+
+            if (deletedCount > 0) {
+                call.respond(HttpStatusCode.OK)
+            } else {
+                call.respondText("Not found", status = HttpStatusCode.NotFound)
+            }
+        } catch (e: DocumentOwnedByAnotherUserException) {
+            call.respondText("Access denied", status = HttpStatusCode.Forbidden)
+        }
     }
 }
 
