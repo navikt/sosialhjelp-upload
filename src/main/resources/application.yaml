@@ -19,3 +19,4 @@ gotenberg:
   url: "http://localhost:3010/forms/libreoffice/convert"
 storage:
   basePath: "./tusd-data"
+fiksBaseUrl: "http://localhost:8989/sosialhjelp/mock-alt-api/fiks"

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS document
 
 CREATE TABLE IF NOT EXISTS upload (
     id          uuid PRIMARY KEY,
-    document_id uuid references document(id),
+    document_id uuid references document(id) ON DELETE CASCADE,
     original_filename varchar(255) NOT NULL,
     converted_filename varchar(255)
 );

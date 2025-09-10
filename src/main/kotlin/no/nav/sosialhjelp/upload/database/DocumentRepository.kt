@@ -74,4 +74,8 @@ class DocumentRepository(private val dsl: DSLContext) {
             .awaitSingle()?.value1()
         return count != 0
     }
+
+    suspend fun cleanup(tx: Configuration, documentId: UUID): Int {
+        return tx.dsl().deleteFrom(DOCUMENT).where(DOCUMENT.ID.eq(documentId)).awaitSingle()
+    }
 }

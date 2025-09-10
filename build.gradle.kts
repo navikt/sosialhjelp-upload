@@ -19,14 +19,26 @@ application {
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
+val githubUser: String by project
+val githubPassword: String by project
+
 repositories {
     mavenCentral()
     maven { url = uri("https://packages.confluent.io/maven/") }
+    maven {
+        url = uri("https://maven.pkg.github.com/navikt/*")
+        credentials {
+            username = githubUser
+            password = githubPassword
+        }
+    }
 }
 
 dependencies {
     // Common utilities
     implementation(libs.checker)
+
+    implementation(libs.sosialhjelp.common.api)
 
     // Ktor production dependencies from the bundle, excluding test-only module
     implementation(libs.bundles.ktor) {
@@ -55,6 +67,8 @@ dependencies {
 
     implementation(libs.bundles.jooq)
     implementation("io.ktor:ktor-client-cio-jvm:3.2.3")
+    implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
+    implementation("io.ktor:ktor-serialization-jackson:3.2.3")
 
     // For build time codegen
     jooqCodegen(libs.jooq.meta)

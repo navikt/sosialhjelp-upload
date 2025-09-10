@@ -27,6 +27,8 @@ fun Route.configureTusRoutes() {
 
         call.respond(
             when (request.type) {
+                HookType.PreTerminate -> tusService.preTerminate(request, personIdent)
+                HookType.PostTerminate -> tusService.postTerminate(request, personIdent)
                 HookType.PreCreate -> tusService.preCreate(request, personIdent)
                 HookType.PostFinish -> tusService.postFinish(request)
                 else -> {

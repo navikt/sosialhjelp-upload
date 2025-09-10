@@ -7,22 +7,38 @@ import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.database.UploadRepository
-import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
 import java.io.File
 import java.util.*
 
+@Serializable
+data class Metadata(
+    val type: String,
+    val tilleggsinfo: String? = null,
+    val innsendelsesfrist: String? = null,
+    val hendelsetype: String? = null,
+    val hendelsereferanse: String? = null,
+)
+
+@Serializable
+data class SubmitInput(
+    val fiksDigisosId: String? = null,
+    val metadata: Metadata,
+    val mellomlagring: Boolean,
+)
+
 fun Route.configureActionRoutes() {
-    val gotenbergService: GotenbergService by application.dependencies
     val uploadRepository: UploadRepository by application.dependencies
     val documentRepository: DocumentRepository by application.dependencies
     val filePathFactory: FilePathFactory by application.dependencies
@@ -34,36 +50,24 @@ fun Route.configureActionRoutes() {
         val documentId = call.parameters["documentId"]?.let { UUID.fromString(it) } ?: error("documentId is required")
         val input = call.receive<SubmitInput>()
         if (!documentRepository.isOwnedByUser(documentId, personIdent)) {
-            call.respondText("Access denied", status = HttpStatusCode.Forbidden)
-            return@post
+            return@post call.respondText("Access denied", status = HttpStatusCode.Forbidden)
         }
 
         val uploads = dsl.transactionCoroutine(Dispatchers.IO) { uploadRepository.getUploadsByDocumentId(it, documentId) }
         val files = uploads.map { File(filePathFactory.getConvertedPdfPath(it).toString()) }
-        val response = downstreamUploadService.upload(input.targetUrl, gotenbergService.merge(files), "$documentId.pdf")
+        val response = downstreamUploadService.upload2(
+            input.metadata,
+            fiksDigisosId = input.fiksDigisosId!!,
+            files = files.map { FileBoio(it.readBytes(), it.name, ContentType.defaultForFile(it)) }.toList(),
+            call.request.header("Authorization")!!.removePrefix("Bearer "),
+        )
+        if (response.status.isSuccess()) {
+            dsl.transactionCoroutine(Dispatchers.IO) { tx -> documentRepository.cleanup(tx, documentId) }
+        }
         val body = response.bodyAsText()
         println(body)
     }
-
-    delete("/document/{uploadId}") {
-        val personIdent = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
-        val uploadId = call.parameters["uploadId"]?.let { UUID.fromString(it) } ?: error("uploadId is required")
-        try {
-            val deletedCount = dsl.transactionCoroutine(Dispatchers.IO) { uploadRepository.deleteUpload(it, uploadId) }
-            // TODO: Flytt det her til et annet sted
-            File(filePathFactory.getConvertedPdfPath(uploadId).toString()).delete()
-            File(filePathFactory.getOriginalUploadPath(uploadId).toString()).delete()
-
-            if (deletedCount > 0) {
-                call.respond(HttpStatusCode.OK)
-            } else {
-                call.respondText("Not found", status = HttpStatusCode.NotFound)
-            }
-        } catch (e: DocumentOwnedByAnotherUserException) {
-            call.respondText("Access denied", status = HttpStatusCode.Forbidden)
-        }
-    }
 }
 
-@Serializable
-data class SubmitInput(val targetUrl: String)
+//@Serializable
+//data class SubmitInput(val targetUrl: String)

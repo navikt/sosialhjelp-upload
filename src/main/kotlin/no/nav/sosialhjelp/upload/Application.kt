@@ -12,6 +12,7 @@ import io.r2dbc.spi.ConnectionFactoryOptions.USER
 import io.r2dbc.spi.ConnectionFactoryOptions.DATABASE
 import kotlinx.io.files.Path
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.tusd.TusService
 import org.jooq.DSLContext
@@ -75,6 +76,7 @@ fun Application.module() {
     dependencies {
         provide { DatabaseFactory.dsl }
         provide { this@module.environment.log }
+        provide(FiksClient::class)
         provide(TusService::class)
         provide(UploadRepository::class)
         provide(PageRepository::class)
@@ -83,7 +85,7 @@ fun Application.module() {
         provide(DocumentStatusService::class)
         provide(GotenbergService::class)
         provide(FilePathFactory::class)
-        provide { DownstreamUploadService() }
+        provide(DownstreamUploadService::class)
     }
     configureSecurity()
     configureHTTP()

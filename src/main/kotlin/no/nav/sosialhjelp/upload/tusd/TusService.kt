@@ -7,10 +7,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.io.files.Path
 import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.common.FinishedUpload
+import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.pdf.ThumbnailService
 import no.nav.sosialhjelp.upload.tusd.dto.FileInfoChanges
+import no.nav.sosialhjelp.upload.tusd.dto.HTTPResponse
 import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import no.nav.sosialhjelp.upload.tusd.dto.HookResponse
 import no.nav.sosialhjelp.upload.tusd.input.CreateUploadRequest
@@ -38,11 +40,15 @@ class TusService(
         val uploadRequest = CreateUploadRequest.fromRequest(request)
 
         val uploadId =
-            dsl.transactionCoroutine(Dispatchers.IO) {
-                val documentId = documentRepository.getOrCreateDocument(it, uploadRequest.externalId, personident)
-                val uploadId = uploadRepository.create(it, documentId, uploadRequest.filename)
-                logger.info("Creating a new upload, ID: $uploadId for document $documentId")
-                uploadId
+            try {
+                dsl.transactionCoroutine(Dispatchers.IO) {
+                    val documentId = documentRepository.getOrCreateDocument(it, uploadRequest.externalId, personident)
+                    val uploadId = uploadRepository.create(it, documentId, uploadRequest.filename)
+                    logger.info("Creating a new upload, ID: $uploadId for document $documentId")
+                    uploadId
+                }
+            } catch (e: DocumentOwnedByAnotherUserException) {
+                return HookResponse(HTTPResponse(403, mapOf("Content-Type" to listOf("application/json")), """"message": "Not yours""""), rejectUpload = true)
             }
 
         return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))
@@ -52,7 +58,6 @@ class TusService(
         val request = PostFinishRequest.fromRequest(request)
         // Ikke konverter det som fagsystemene godkjenner (pdf, jpg/jpeg, png)
         val extension = File(request.filename).extension
-        println(extension)
         if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
             convertUploadToPdf(request.uploadId, request.filename).also { uploadPdf ->
                 dsl.transactionCoroutine(Dispatchers.IO) {
@@ -84,4 +89,27 @@ class TusService(
                 ),
             )
         }
+
+    suspend fun preTerminate(request: HookRequest, personIdent: String): HookResponse {
+        return dsl.transactionCoroutine { tx ->
+            val correctOwner = uploadRepository.isOwnedByUser(tx, UUID.fromString(request.event.upload.id), personIdent)
+            if (!correctOwner) {
+                HookResponse(HTTPResponse(403), rejectTermination = true)
+            } else {
+                HookResponse()
+            }
+        }
+    }
+
+    suspend fun postTerminate(request: HookRequest, personIdent: String): HookResponse {
+        return dsl.transactionCoroutine { tx ->
+            val uploadId = UUID.fromString(request.event.upload.id)
+            val correctOwner = uploadRepository.isOwnedByUser(tx, uploadId, personIdent)
+            if (!correctOwner) {
+                HookResponse(HTTPResponse(403), rejectTermination = true)
+            }
+            uploadRepository.deleteUpload(tx, uploadId)
+            HookResponse(HTTPResponse(204))
+        }
+    }
 }

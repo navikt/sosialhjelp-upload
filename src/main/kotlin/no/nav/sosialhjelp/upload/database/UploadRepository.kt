@@ -9,7 +9,7 @@ import kotlinx.coroutines.reactive.awaitSingle
 import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import org.jooq.Configuration
-import org.jooq.RowCountQuery
+import org.jooq.impl.QOM
 import java.util.*
 
 data class UploadWithFilename(
@@ -41,6 +41,17 @@ class UploadRepository {
             .filterNotNull()
 
     suspend fun notifyChange(tx: Configuration, uploadId: UUID) = DocumentChangeNotifier.notifyChange(getDocumentIdFromUploadId(tx, uploadId)!!)
+
+    suspend fun isOwnedByUser(tx: Configuration, uploadId: UUID, ownerIdent: String): Boolean {
+        return tx.dsl()
+            .selectCount()
+            .from(UPLOAD)
+            .join(DOCUMENT)
+            .on(DOCUMENT.ID.eq(UPLOAD.DOCUMENT_ID))
+            .where(UPLOAD.ID.eq(uploadId))
+            .and(DOCUMENT.OWNER_IDENT.eq(ownerIdent))
+            .awaitSingle().value1() > 0
+    }
 
     suspend fun getDocumentIdFromUploadId(tx: Configuration, uploadId: UUID): UUID? =
         tx.dsl().select(UPLOAD.DOCUMENT_ID)
