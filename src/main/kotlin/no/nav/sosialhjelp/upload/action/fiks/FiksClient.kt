@@ -1,25 +1,21 @@
 package no.nav.sosialhjelp.upload.action.fiks
 
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.forms.formData
-import io.ktor.client.request.forms.submitFormWithBinaryData
-import io.ktor.client.request.request
-import io.ktor.client.statement.HttpResponse
-import io.ktor.http.ContentDisposition
-import io.ktor.http.ContentType
-import io.ktor.http.Headers
-import io.ktor.http.HttpHeaders
-import io.ktor.http.append
-import io.ktor.serialization.jackson.jackson
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.plugins.di.annotations.Property
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.jackson.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.plugins.di.annotations.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
-import no.nav.sosialhjelp.upload.action.FileBoio
+import no.nav.sosialhjelp.upload.action.Upload
 import no.nav.sosialhjelp.upload.action.Metadata
 import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
 
@@ -42,6 +38,10 @@ class FiksClient(@Property("fiksBaseUrl") val fiksBaseUrl: String) {
     private val client by lazy {
         HttpClient(CIO) {
             expectSuccess = false
+            install(Logging) {
+                logger = Logger.DEFAULT
+                level = LogLevel.BODY
+            }
             install(ContentNegotiation) {
                 json()
             }
@@ -52,31 +52,48 @@ class FiksClient(@Property("fiksBaseUrl") val fiksBaseUrl: String) {
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-        files: List<FileBoio>,
+        files: List<Upload>,
         metadata: Metadata,
         token: String,
     ): HttpResponse = client.submitFormWithBinaryData(ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId), formData {
+        val vedleggJson = VedleggSpesifikasjon(
+            type = metadata.type,
+            tilleggsinfo = metadata.tilleggsinfo,
+            innsendelsesfrist = metadata.innsendelsesfrist,
+            hendelsetype = metadata.hendelsetype,
+            hendelsereferanse = metadata.hendelsereferanse,
+        )
+        append("vedlegg.json", Json.encodeToString(vedleggJson), Headers.build {
+            append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
+        })
         files.forEachIndexed { index, file ->
-            val spesifikasjon = VedleggSpesifikasjon(
-                type = metadata.type,
-                tilleggsinfo = metadata.tilleggsinfo,
-                innsendelsesfrist = metadata.innsendelsesfrist,
-                hendelsetype = metadata.hendelsetype,
-                hendelsereferanse = metadata.hendelsereferanse,
+            val vedleggMetadata = VedleggMetadata(
+                filnavn = file.filename,
+                mimetype = file.fileType,
+                storrelse = file.file.size.toLong(),
             )
-            append("vedleggSpesifikasjon:$index", Json.encodeToString(spesifikasjon), Headers.build {
-                append(HttpHeaders.ContentType, ContentType.Application.Json)
-                append(HttpHeaders.ContentDisposition, ContentDisposition.parse("form-data").withParameter("name", "vedleggSpesifikasjon:$index"))
+            append("vedleggSpesifikasjon:$index", Json.encodeToString(vedleggMetadata), Headers.build {
+                append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
             })
             append("dokument:$index", file.file, Headers.build {
-                append(HttpHeaders.ContentType, file.contentType)
-                append(HttpHeaders.ContentDisposition, ContentDisposition.parse("form-data").withParameter("filename", file.filename))
+                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)
+                append(HttpHeaders.ContentDisposition, "filename=\"${file.filename}\"")
             })
         }
     }) {
+
+        // TODO: Legg på integrasjonsid/-passord i header
         bearerAuth(token)
+        contentType(ContentType.MultiPart.FormData)
     }
 
 
     suspend fun getSak(id: String): DigisosSak = jacksonClient.request(digisosSakUrl(id)).body()
 }
+
+@Serializable
+private data class VedleggMetadata(
+    val filnavn: String?,
+    val mimetype: String?,
+    val storrelse: Long,
+)

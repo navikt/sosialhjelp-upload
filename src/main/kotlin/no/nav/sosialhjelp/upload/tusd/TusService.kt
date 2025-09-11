@@ -9,6 +9,7 @@ import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.database.UploadWithFilename
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.pdf.ThumbnailService
 import no.nav.sosialhjelp.upload.tusd.dto.FileInfoChanges
@@ -17,6 +18,7 @@ import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import no.nav.sosialhjelp.upload.tusd.dto.HookResponse
 import no.nav.sosialhjelp.upload.tusd.input.CreateUploadRequest
 import no.nav.sosialhjelp.upload.tusd.input.PostFinishRequest
+import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
 import java.io.File
@@ -111,5 +113,15 @@ class TusService(
             uploadRepository.deleteUpload(tx, uploadId)
             HookResponse(HTTPResponse(204))
         }
+    }
+
+    suspend fun validateUpload(request: HookRequest, personIdent: String): HookResponse {
+        val uploadId = request.event.upload.id
+
+        val upload: UploadWithFilename = dsl.transactionCoroutine(Dispatchers.IO) {
+            uploadRepository.getUpload(it, UUID.fromString(uploadId), personIdent)
+        }
+        val validation = UploadValidator().validate(upload, request)
+
     }
 }

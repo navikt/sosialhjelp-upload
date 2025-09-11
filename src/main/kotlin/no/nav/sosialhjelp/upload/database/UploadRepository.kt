@@ -3,12 +3,14 @@ package no.nav.sosialhjelp.upload.database
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.reactive.awaitSingle
 import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import org.jooq.Configuration
+import org.jooq.Record3
 import org.jooq.impl.QOM
 import java.util.*
 
@@ -31,14 +33,6 @@ class UploadRepository {
             .returning(UPLOAD.ID)
             .awaitFirstOrNull()
             ?.get(UPLOAD.ID)
-
-    fun getUploadsByDocumentId(tx: Configuration, documentId: UUID): Flow<UUID> =
-        tx.dsl().select(UPLOAD.ID)
-            .from(UPLOAD)
-            .where(UPLOAD.DOCUMENT_ID.eq(documentId))
-            .asFlow()
-            .map { it[UPLOAD.ID] }
-            .filterNotNull()
 
     suspend fun notifyChange(tx: Configuration, uploadId: UUID) = DocumentChangeNotifier.notifyChange(getDocumentIdFromUploadId(tx, uploadId)!!)
 
@@ -80,5 +74,10 @@ class UploadRepository {
     suspend fun deleteUpload(tx: Configuration, uploadId: UUID): Int {
         val documentId = getDocumentIdFromUploadId(tx, uploadId) ?: error("No documentid for upload")
         return tx.dsl().delete(UPLOAD).where(UPLOAD.ID.eq(uploadId)).awaitSingle().also { DocumentChangeNotifier.notifyChange(documentId) }
+    }
+
+    suspend fun getUpload(tx: Configuration, id: UUID, personIdent: String): UploadWithFilename {
+        return tx.dsl().select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(id)).awaitSingle()
+            .map { record -> UploadWithFilename(record.get(UPLOAD.ID), record.get(UPLOAD.ORIGINAL_FILENAME), record.get(UPLOAD.CONVERTED_FILENAME)) }
     }
 }

@@ -15,6 +15,7 @@ class FilePathFactory(
 ) {
     fun getOriginalUploadPath(uploadId: UUID): Path = Path(basePath, uploadId.toString())
 
+    fun getOriginalCopyPoth(originalFilename: String): Path = Path(basePath, originalFilename)
     /**
      * Returns a java.io.file object for the PDF conversion of the upload.
      */

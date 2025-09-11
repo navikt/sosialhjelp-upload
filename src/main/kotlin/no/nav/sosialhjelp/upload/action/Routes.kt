@@ -1,8 +1,6 @@
 package no.nav.sosialhjelp.upload.action
 
 import no.nav.sosialhjelp.upload.database.DocumentRepository
-import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -12,10 +10,10 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.upload.common.FilePathFactory
+import no.nav.sosialhjelp.upload.database.DocumentChangeNotifier
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
@@ -53,19 +51,27 @@ fun Route.configureActionRoutes() {
             return@post call.respondText("Access denied", status = HttpStatusCode.Forbidden)
         }
 
-        val uploads = dsl.transactionCoroutine(Dispatchers.IO) { uploadRepository.getUploadsByDocumentId(it, documentId) }
-        val files = uploads.map { File(filePathFactory.getConvertedPdfPath(it).toString()) }
-        val response = downstreamUploadService.upload2(
+        val uploads = dsl.transactionCoroutine(Dispatchers.IO) { tx ->
+            uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
+        }
+
+        val response = downstreamUploadService.upload(
             input.metadata,
             fiksDigisosId = input.fiksDigisosId!!,
-            files = files.map { FileBoio(it.readBytes(), it.name, ContentType.defaultForFile(it)) }.toList(),
+            files = uploads.map { upload ->
+                val file =
+                    File(upload.convertedFilename?.let { filePathFactory.getConvertedPdfPath(upload.id!!).toString() } ?: filePathFactory.getOriginalCopyPoth(upload.originalFilename!!).toString())
+                Upload(file.readBytes(), upload.originalFilename!!, file.extension)
+            },
             call.request.header("Authorization")!!.removePrefix("Bearer "),
         )
         if (response.status.isSuccess()) {
-            dsl.transactionCoroutine(Dispatchers.IO) { tx -> documentRepository.cleanup(tx, documentId) }
+            dsl.transactionCoroutine(Dispatchers.IO) { tx ->
+                documentRepository.cleanup(tx, documentId)
+                DocumentChangeNotifier.notifyChange(documentId)
+            }
+            call.respond(HttpStatusCode.Created)
         }
-        val body = response.bodyAsText()
-        println(body)
     }
 }
 
