@@ -1,0 +1,34 @@
+package no.nav.sosialhjelp.upload.validation
+
+
+enum class ValidationCode {
+    FILE_TOO_LARGE,
+    INVALID_FILENAME,
+    POSSIBLY_INFECTED,
+    FILETYPE_NOT_SUPPORTED,
+}
+
+interface Validation {
+    val message: String
+    val code: ValidationCode
+}
+
+class FileSizeValidation() : Validation {
+    override val message: String = "File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes."
+    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE
+}
+
+class FilenameValidation() : Validation {
+    override val message: String = "Filename contains illegal characters."
+    override val code: ValidationCode = ValidationCode.INVALID_FILENAME
+}
+
+class VirusValidation() : Validation {
+    override val message: String = "File may contain virus."
+    override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED
+}
+
+class FileTypeValidation: Validation {
+    override val message: String = "File type is not supported."
+    override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED
+}

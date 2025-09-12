@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.tusd
 
+import io.ktor.client.utils.HttpResponseReceived
 import io.ktor.server.plugins.di.annotations.Property
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import io.ktor.util.logging.Logger
@@ -32,6 +33,7 @@ class TusService(
     val documentRepository: DocumentRepository,
     val filePathFactory: FilePathFactory,
     val dsl: DSLContext,
+    val validator: UploadValidator,
     @Property("storage.basePath") val basePath: String,
 ) {
 
@@ -116,12 +118,12 @@ class TusService(
     }
 
     suspend fun validateUpload(request: HookRequest, personIdent: String): HookResponse {
-        val uploadId = request.event.upload.id
-
-        val upload: UploadWithFilename = dsl.transactionCoroutine(Dispatchers.IO) {
-            uploadRepository.getUpload(it, UUID.fromString(uploadId), personIdent)
-        }
-        val validation = UploadValidator().validate(upload, request)
-
+        // TODO: Trenger vi å validere person?
+        val validations = validator.validate(request)
+        val response = if (validations.isNotEmpty()) {
+            // TODO: Litt penere serialisering please
+            HTTPResponse(400, mapOf("Content-Type" to listOf("application/json")), """{"errors": [${validations.joinToString(",") { """{"code": "${it.code}", "message": "${it.message}"}""" }}]}""")
+        } else HTTPResponse()
+        return HookResponse(response)
     }
 }

@@ -2,9 +2,13 @@
 
 package no.nav.sosialhjelp.upload.validation
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.database.UploadWithFilename
 import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
+import org.apache.tika.Tika
 import java.io.File
 import java.text.Normalizer
 import java.util.UUID
@@ -12,36 +16,43 @@ import java.util.UUID
 // 10 MB
 const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
-enum class ValidationCode {
-    FILE_TOO_LARGE,
-    INVALID_FILENAME,
-    VIRUS,
-}
-
-interface Validation {
-    val message: String
-    val code: ValidationCode
-}
-
-class FileSizeValidation() : Validation {
-    override val message: String = "File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes."
-    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE
-}
-
-class FilenameValidation() : Validation {
-    override val message: String = "Filename contains illegal characters."
-    override val code: ValidationCode = ValidationCode.INVALID_FILENAME
-}
-
-class VirusValidation() : Validation {
-    override val message: String = "File may contain virus."
-    override val code: ValidationCode = ValidationCode.VIRUS
-}
+val SUPPORTED_MIME_TYPES = setOf(
+    "text/plain",
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/tiff",
+    "image/bmp",
+    "image/gif",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.oasis.opendocument.text",
+)
 
 class UploadValidator(val virusScanner: VirusScanner, val filePathFactory: FilePathFactory) {
-    suspend fun validate(upload: UploadWithFilename, request: HookRequest) {
+    suspend fun validate(request: HookRequest): List<Validation> {
+        // TODO: Ikke ByteArray (og bucket)
         val file = File(filePathFactory.getOriginalUploadPath(UUID.fromString(request.event.upload.id)).toString())
-        val validations = listOf(validateFileSize(request.event.upload.size), validateFilename(Filename(request.event.upload.metadata.filename)), runVirusScan(file.readBytes()))
+
+        val validations = coroutineScope {
+            val virusScanValidation = async(Dispatchers.IO) { runVirusScan(file.readBytes()) }
+
+            listOf(
+                validateFileSize(request.event.upload.size),
+                validateFilename(Filename(request.event.upload.metadata.filename)),
+                validateFileType(file),
+                virusScanValidation.await(),
+            )
+        }
+        return validations.filterNotNull()
+    }
+
+    private fun validateFileType(file: File): Validation? {
+        val mimeType = Tika().detect(file)
+        if (mimeType !in SUPPORTED_MIME_TYPES) {
+            return FileTypeValidation()
+        }
+        return null;
     }
 
     private suspend fun runVirusScan(file: ByteArray): Validation? = when (virusScanner.scan(file)) {
@@ -65,6 +76,7 @@ class UploadValidator(val virusScanner: VirusScanner, val filePathFactory: FileP
     }
 
 }
+
 
 @JvmInline
 private value class Filename(

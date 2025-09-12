@@ -37,6 +37,7 @@ repositories {
 dependencies {
     // Common utilities
     implementation(libs.checker)
+    implementation(libs.apache.tika)
 
     implementation(libs.sosialhjelp.common.api)
 

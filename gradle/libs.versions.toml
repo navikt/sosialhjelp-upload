@@ -14,6 +14,7 @@ r2dbc = "1.0.7.RELEASE"
 jdbc = "42.7.7"
 testcontainers = "1.21.3"
 sosialhjelp_common = "1.20250120.1009-d88048d"
+tika = "3.2.2"
 
 [libraries]
 jooq = { module = "org.jooq:jooq", version = "3.20.6" }
@@ -62,6 +63,7 @@ testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 sosialhjelp-common-api = { module = "no.nav.sosialhjelp:sosialhjelp-common-api", version.ref = "sosialhjelp_common" }
+apache-tika = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

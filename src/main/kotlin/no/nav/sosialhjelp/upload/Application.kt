@@ -25,6 +25,8 @@ import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.pdf.ThumbnailService
 import no.nav.sosialhjelp.upload.status.DocumentStatusService
+import no.nav.sosialhjelp.upload.validation.UploadValidator
+import no.nav.sosialhjelp.upload.validation.VirusScanner
 import org.jooq.impl.DefaultConfiguration
 import org.flywaydb.core.Flyway
 
@@ -76,6 +78,8 @@ fun Application.module() {
     dependencies {
         provide { DatabaseFactory.dsl }
         provide { this@module.environment.log }
+        provide(VirusScanner::class)
+        provide(UploadValidator::class)
         provide(FiksClient::class)
         provide(TusService::class)
         provide(UploadRepository::class)
