@@ -6,6 +6,7 @@ package no.nav.sosialhjelp.upload.database.generated.tables.references
 
 
 import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Error
 import no.nav.sosialhjelp.upload.database.generated.tables.Page
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
@@ -15,6 +16,11 @@ import no.nav.sosialhjelp.upload.database.generated.tables.Upload
  * The table <code>public.document</code>.
  */
 val DOCUMENT: Document = Document.DOCUMENT
+
+/**
+ * The table <code>public.error</code>.
+ */
+val ERROR: Error = Error.ERROR
 
 /**
  * The table <code>public.page</code>.

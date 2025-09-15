@@ -58,7 +58,7 @@ fun Route.configureActionRoutes() {
         val response = downstreamUploadService.upload(
             input.metadata,
             fiksDigisosId = input.fiksDigisosId!!,
-            files = uploads.map { upload ->
+            files = uploads.filter { it.errors.isNotEmpty() }.map { upload ->
                 val file =
                     File(upload.convertedFilename?.let { filePathFactory.getConvertedPdfPath(upload.id!!).toString() } ?: filePathFactory.getOriginalCopyPoth(upload.originalFilename!!).toString())
                 Upload(file.readBytes(), upload.originalFilename!!, file.extension)

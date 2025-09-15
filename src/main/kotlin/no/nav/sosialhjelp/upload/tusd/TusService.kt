@@ -1,16 +1,16 @@
 package no.nav.sosialhjelp.upload.tusd
 
-import io.ktor.client.utils.HttpResponseReceived
 import io.ktor.server.plugins.di.annotations.Property
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import io.ktor.util.logging.Logger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
 import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
-import no.nav.sosialhjelp.upload.database.UploadWithFilename
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.pdf.ThumbnailService
 import no.nav.sosialhjelp.upload.tusd.dto.FileInfoChanges
@@ -52,7 +52,7 @@ class TusService(
                     uploadId
                 }
             } catch (e: DocumentOwnedByAnotherUserException) {
-                return HookResponse(HTTPResponse(403, mapOf("Content-Type" to listOf("application/json")), """"message": "Not yours""""), rejectUpload = true)
+                return HookResponse(HTTPResponse(403, mapOf("Content-Type" to "application/json"), """"message": "Not yours""""), rejectUpload = true)
             }
 
         return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))
@@ -71,7 +71,7 @@ class TusService(
                 // thumbnailService.makeThumbnails(request.uploadId, Loader.loadPDF(uploadPdf), request.filename)
             }
         } else {
-            // If we don't convert, we just need to copy the file to the original filename
+            // If we don't convert, we just need to copy the file to the original file name
             val originalPath = filePathFactory.getOriginalUploadPath(request.uploadId)
             val convertedPath = Path(basePath, request.filename)
             File(originalPath.toString()).copyTo(File(convertedPath.toString()), overwrite = true)
@@ -121,8 +121,11 @@ class TusService(
         // TODO: Trenger vi å validere person?
         val validations = validator.validate(request)
         val response = if (validations.isNotEmpty()) {
+            dsl.transactionCoroutine(Dispatchers.IO) {
+                uploadRepository.addErrors(it, UUID.fromString(request.event.upload.id), validations)
+            }
             // TODO: Litt penere serialisering please
-            HTTPResponse(400, mapOf("Content-Type" to listOf("application/json")), """{"errors": [${validations.joinToString(",") { """{"code": "${it.code}", "message": "${it.message}"}""" }}]}""")
+            HTTPResponse(400, mapOf("Content-Type" to "application/json"), """{"errors": [${validations.joinToString(",") { """{"code": "${it.code}", "message": "${it.message}"}""" }}]}""")
         } else HTTPResponse()
         return HookResponse(response)
     }

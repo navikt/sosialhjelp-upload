@@ -1,23 +1,27 @@
 package no.nav.sosialhjelp.upload.database
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.reactive.awaitSingle
 import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
+import no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.validation.Validation
+import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.Configuration
-import org.jooq.Record3
-import org.jooq.impl.QOM
 import java.util.*
 
 data class UploadWithFilename(
     val id: UUID?,
     val originalFilename: String?,
     val convertedFilename: String?,
+    val errors: List<ValidationCode>,
 )
 
 class UploadRepository {
@@ -55,15 +59,17 @@ class UploadRepository {
             ?.get(UPLOAD.DOCUMENT_ID)
 
     fun getUploadsWithFilenames(tx: Configuration, documentId: UUID): Flow<UploadWithFilename> =
-        (tx.dsl().select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME)
+        (tx.dsl().select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, ERROR.CODE)
             .from(UPLOAD)
+            .leftJoin(ERROR).on(ERROR.UPLOAD.eq(UPLOAD.ID))
             .where(UPLOAD.DOCUMENT_ID.eq(documentId)))
             .asFlow()
             .map { record ->
                 UploadWithFilename(
                     id = record.get(UPLOAD.ID),
                     originalFilename = record.get(UPLOAD.ORIGINAL_FILENAME),
-                    convertedFilename = record.get(UPLOAD.CONVERTED_FILENAME)
+                    convertedFilename = record.get(UPLOAD.CONVERTED_FILENAME),
+                    errors = listOfNotNull(record.get(ERROR.CODE)).map { ValidationCode.valueOf(it) },
                 )
             }
 
@@ -76,8 +82,18 @@ class UploadRepository {
         return tx.dsl().delete(UPLOAD).where(UPLOAD.ID.eq(uploadId)).awaitSingle().also { DocumentChangeNotifier.notifyChange(documentId) }
     }
 
-    suspend fun getUpload(tx: Configuration, id: UUID, personIdent: String): UploadWithFilename {
-        return tx.dsl().select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(id)).awaitSingle()
-            .map { record -> UploadWithFilename(record.get(UPLOAD.ID), record.get(UPLOAD.ORIGINAL_FILENAME), record.get(UPLOAD.CONVERTED_FILENAME)) }
+//    suspend fun getUpload(tx: Configuration, id: UUID, personIdent: String): UploadWithFilename {
+//        return tx.dsl().select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(id)).awaitSingle()
+//            .map { record -> UploadWithFilename(record.get(UPLOAD.ID), record.get(UPLOAD.ORIGINAL_FILENAME), record.get(UPLOAD.CONVERTED_FILENAME)) }
+//    }
+
+    suspend fun addErrors(tx: Configuration, uploadId: UUID, validations: List<Validation>) {
+        coroutineScope {
+            validations.map {
+                launch(Dispatchers.IO) {
+                    tx.dsl().insertInto(ERROR).set(ERROR.UPLOAD, uploadId).set(ERROR.CODE, it.code.name).set(ERROR.ID, UUID.randomUUID()).awaitSingle()
+                }
+            }.joinAll()
+        }
     }
 }

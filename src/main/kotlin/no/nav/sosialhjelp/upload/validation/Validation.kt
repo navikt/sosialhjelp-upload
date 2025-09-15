@@ -6,6 +6,8 @@ enum class ValidationCode {
     INVALID_FILENAME,
     POSSIBLY_INFECTED,
     FILETYPE_NOT_SUPPORTED,
+    ENCRYPTED_PDF,
+    INVALID_PDF,
 }
 
 interface Validation {
@@ -31,4 +33,14 @@ class VirusValidation() : Validation {
 class FileTypeValidation: Validation {
     override val message: String = "File type is not supported."
     override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED
+}
+
+class EncryptedPdfValidation: Validation {
+    override val message: String = "PDF is encrypted."
+    override val code: ValidationCode = ValidationCode.ENCRYPTED_PDF
+}
+
+class InvalidPdfValidation: Validation {
+    override val message: String = "Could not load PDF document."
+    override val code: ValidationCode = ValidationCode.INVALID_PDF
 }

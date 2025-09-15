@@ -20,4 +20,6 @@ gotenberg:
 storage:
   basePath: "./tusd-data"
 fiksBaseUrl: "http://localhost:8989/sosialhjelp/mock-alt-api/fiks"
-virus.scanner.url: ""
+virus:
+  scanner:
+    url: ""

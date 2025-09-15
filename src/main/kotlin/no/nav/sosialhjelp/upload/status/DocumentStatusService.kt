@@ -23,7 +23,16 @@ class DocumentStatusService(
             val filenamesByUpload = uploadRepository.getUploadsWithFilenames(tx, documentId)
             val uploads = filenamesByUpload.map { upload ->
                 upload.id?.let { pageRepository.getPagesForUpload(tx, it) }
-                    ?.let { UploadSuccessState(upload.id, upload.originalFilename ?: "Ukjent fil", upload.convertedFilename, it.map { page -> PageState(page.pageNumber ?: 0, page.filename) }.toList()) }
+                    ?.let {
+                        println(upload.errors)
+                        UploadSuccessState(
+                            upload.id,
+                            upload.originalFilename ?: "Ukjent fil",
+                            upload.convertedFilename,
+                            it.map { page -> PageState(page.pageNumber ?: 0, page.filename) }.toList(),
+                            upload.errors
+                        )
+                    }
             }.filterNotNull()
 
             DocumentState(

@@ -53,8 +53,7 @@ object DatabaseFactory {
             // TODO: FJERN FØR PRODSETTING
             .cleanDisabled(false)
             .load()
-        load
-            .clean()
+        load.clean()
         load.migrate()
 
 

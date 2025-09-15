@@ -1,0 +1,70 @@
+apiVersion: "nais.io/v1alpha1"
+kind: "Application"
+metadata:
+  name: sosialhjelp-upload-dev
+  namespace: teamdigisos
+  labels:
+    team: teamdigisos
+spec:
+  image: {{image}}
+  port: 8080
+  liveness:
+    path: /sosialhjelp/upload/internal/isAlive
+    initialDelay: 60
+    timeout: 1
+    periodSeconds: 10
+    failureThreshold: 10
+  readiness:
+    path: /sosialhjelp/innsyn-api/internal/isReady
+    initialDelay: 60
+    timeout: 1
+  prometheus:
+    enabled: true
+    path: /metrics-micrometer
+  replicas:
+    min: 1
+    max: 1
+  tokenx:
+    enabled: true
+  observability:
+    autoInstrumentation:
+      enabled: true
+      runtime: java
+    logging:
+      enabled: true
+  accessPolicy:
+    outbound:
+      external:
+        - host: api.fiks.test.ks.no
+        - host: minside.fiks.test.ks.no
+        - host: test.idporten.no
+      rules:
+        - application: clamav
+          namespace: nais-system
+        - application: norg2
+          namespace: org
+    inbound:
+      rules:
+        - application: sosialhjelp-innsyn-dev
+  gcp:
+    buckets:
+        - name: sosialhjelp-upload-dev
+          retentionPeriodDays: 1
+  resources:
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 10m
+      memory: 512Mi
+  envFrom:
+    - secret: fiks-integrasjon-secret
+    - secret: fiks-kommune-integrasjon-secret
+    - secret: sosialhjelp-innsyn-api-unleash-api-token
+    - secret: idporten-sosialhjelp
+  env:
+    - name: FIKS_DIGISOS_ENDPOINT_URL
+      value: "https://api.fiks.test.ks.no"
+    - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
+      value: "https://minside.fiks.test.ks.no"
+    - name: CLAMAV_URL
+      value: "http://clamav.nais-system/scan"

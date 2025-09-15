@@ -7,6 +7,7 @@ package no.nav.sosialhjelp.upload.database.generated
 import kotlin.collections.List
 
 import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Error
 import no.nav.sosialhjelp.upload.database.generated.tables.Page
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
@@ -34,6 +35,11 @@ open class Public : SchemaImpl(DSL.name("public"), null, DSL.comment("standard p
     val DOCUMENT: Document get() = Document.DOCUMENT
 
     /**
+     * The table <code>public.error</code>.
+     */
+    val ERROR: Error get() = Error.ERROR
+
+    /**
      * The table <code>public.page</code>.
      */
     val PAGE: Page get() = Page.PAGE
@@ -45,6 +51,7 @@ open class Public : SchemaImpl(DSL.name("public"), null, DSL.comment("standard p
 
     override fun getTables(): List<Table<*>> = listOf(
         Document.DOCUMENT,
+        Error.ERROR,
         Page.PAGE,
         Upload.UPLOAD
     )

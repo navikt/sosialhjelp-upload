@@ -19,3 +19,10 @@ CREATE TABLE IF NOT EXISTS page
     page_number int NOT NULL,
     filename varchar(100)
 );
+
+CREATE TABLE IF NOT EXISTS error
+(
+    id     uuid PRIMARY KEY,
+    upload uuid references upload(id) ON DELETE CASCADE,
+    code   text NOT NULL
+);
