@@ -54,3 +54,23 @@ If the server starts successfully, you'll see the following output:
 2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
 ```
 
+
+### Flyt
+```mermaid
+flowchart
+    fs[File storage]
+    db[(Database)]
+    Browser -- (1) POST /sosialhjelp/soknad/tusd/files --> Soknad
+    Soknad -- (2) POST /files --> Tusd
+    Tusd -- (3) POST /pre-create --> UploadApi
+    UploadApi -- (4) Authorize --> UploadApi
+    UploadApi -- (5) Save document --> db
+    Tusd -- (6) Save to files --> fs
+    Tusd -- (7) POST /post-finish --> UploadApi
+    UploadApi -- (8) POST /convert --> Gotenberg
+    UploadApi -- (9) MakeThumbnail --> UploadApi
+    UploadApi -. (10) Notify change .-> db
+    db -. (11) Notify change .-> UploadApi
+    UploadApi -. (12) SSE update .-> Soknad
+    UploadApi -. (12) SSE update .-> Soknad
+```

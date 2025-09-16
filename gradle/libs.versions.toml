@@ -1,42 +1,42 @@
 [versions]
 checker = "3.50.0"
 coroutines = "1.10.2"
-exposed = "0.61.0"
-h2 = "2.3.232"
 junit = "5.13.4"
-koin = "4.1.0"
 kotlin = "2.2.10"
 ktor = "3.2.3"
-ktor-task-scheduling = "2.2.1"
+flyway = "11.12.0"
 logback = "1.5.18"
 mockk = "1.14.5"
 pdfbox = "3.0.5"
 postgres = "42.7.7"
 prometheus = "1.15.3"
 r2dbc = "1.0.7.RELEASE"
+jdbc = "42.7.7"
 testcontainers = "1.21.3"
+sosialhjelp_common = "1.20250120.1009-d88048d"
+tika = "3.2.2"
 
 [libraries]
+jooq = { module = "org.jooq:jooq", version = "3.20.6" }
+jooq-meta = { module = "org.jooq:jooq-meta", version = "3.20.6" }
+jooq-kotlin = { module = "org.jooq:jooq-kotlin", version = "3.20.6" }
+jooq-kotlin-coroutines = { module = "org.jooq:jooq-kotlin-coroutines", version = "3.20.6" }
 checker = { module = "org.checkerframework:checker-qual", version.ref = "checker" }
-exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
-exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
-exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
-h2database = { module = "com.h2database:h2", version.ref = "h2" }
 junit-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
-koin-ktor = { module = "io.insert-koin:koin-ktor", version.ref = "koin" }
-koin-logger-slf4j = { module = "io.insert-koin:koin-logger-slf4j", version.ref = "koin" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "coroutines" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
 ktor-server-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
 ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
 ktor-server-config-yaml = { module = "io.ktor:ktor-server-config-yaml", version.ref = "ktor" }
+ktor-server-di = { group = "io.ktor", name = "ktor-server-di", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-default-headers = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
@@ -49,20 +49,21 @@ ktor-server-resources = { module = "io.ktor:ktor-server-resources", version.ref 
 ktor-server-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor" }
 ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
 ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
-ktor-server-task-scheduling-core = { module = "io.github.flaxoos:ktor-server-task-scheduling-core", version.ref = "ktor-task-scheduling" }
-ktor-server-task-scheduling-jdbc = { module = "io.github.flaxoos:ktor-server-task-scheduling-jdbc", version.ref = "ktor-task-scheduling" }
-ktor-server-task-scheduling-mongodb = { module = "io.github.flaxoos:ktor-server-task-scheduling-mongodb", version.ref = "ktor-task-scheduling" }
-ktor-server-task-scheduling-redis = { module = "io.github.flaxoos:ktor-server-task-scheduling-redis", version.ref = "ktor-task-scheduling" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "prometheus" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 pdfbox-app = { module = "org.apache.pdfbox:pdfbox-app", version.ref = "pdfbox" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgres" }
+jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version.ref = "r2dbc" }
 testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+sosialhjelp-common-api = { module = "no.nav.sosialhjelp:sosialhjelp-common-api", version.ref = "sosialhjelp_common" }
+apache-tika = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -70,10 +71,10 @@ kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", vers
 ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 
 [bundles]
-exposed = [
-    "exposed-core",
-    "exposed-dao",
-    "exposed-jdbc",
+jooq = [
+    "jooq",
+    "jooq-kotlin",
+    "jooq-kotlin-coroutines",
 ]
 junit = [
     "junit-api",
@@ -84,12 +85,21 @@ ktor = [
     "ktor-client-cio",
     "ktor-client-core",
     "ktor-serialization-kotlinx-json",
+    "ktor-client-cio",
+    "ktor-client-core",
+    "ktor-client-logging",
+    "ktor-serialization-kotlinx-json",
     "ktor-server-auth",
     "ktor-server-auth-jwt",
     "ktor-server-call-logging",
     "ktor-server-config-yaml",
     "ktor-server-content-negotiation",
     "ktor-server-core",
+    "ktor-server-call-logging",
+    "ktor-server-config-yaml",
+    "ktor-server-content-negotiation",
+    "ktor-server-core",
+    "ktor-server-di",
     "ktor-server-default-headers",
     "ktor-server-forwarded-header",
     "ktor-server-metrics-micrometer",
@@ -101,12 +111,6 @@ ktor = [
     "ktor-server-status-pages",
     "ktor-server-swagger",
     "ktor-server-test-host",
-]
-ktor-task-scheduling = [
-    "ktor-server-task-scheduling-core",
-    "ktor-server-task-scheduling-jdbc",
-    "ktor-server-task-scheduling-mongodb",
-    "ktor-server-task-scheduling-redis",
 ]
 testcontainers = [
     "testcontainers-core",

@@ -1,21 +1,25 @@
 ktor:
   application:
     modules:
-      - no.nav.sosialhjelp.ApplicationKt.module
+      - no.nav.sosialhjelp.upload.ApplicationKt.module
   deployment:
     port: 3007
 jwt:
   audience: "$IDPORTEN_CLIENT_ID:default"
   issuer: "$IDPORTEN_ISSUER:http://localhost:8888/default"
 database:
-  user: postgres
-  password: postgres
-  host: localhost
-  port: 54322
-  name: sosialhjelp-upload
+  user: "$POSTGRES_USERNAME:postgres"
+  password: "$POSTGRES_PASSWORD:postgres"
+  host: "$POSTGRES_HOST:localhost"
+  port: "$POSTGRES_PORT:54322"
+  name: "$POSTGRES_DATABASE:sosialhjelp-upload"
 thumbnailer:
   outputDir: "./tusd-data"
 gotenberg:
-  url: "http://localhost:3010/forms/libreoffice/convert"
+  url: "$GOTENBERG_URL:http://localhost:3010/forms/libreoffice/convert"
 storage:
   basePath: "./tusd-data"
+fiksBaseUrl: "$FIKS_URL:http://localhost:8989/sosialhjelp/mock-alt-api/fiks"
+virus:
+  scanner:
+    url: "$CLAMAV_URL:"

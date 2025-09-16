@@ -1,0 +1,103 @@
+apiVersion: "nais.io/v1alpha1"
+kind: "Application"
+metadata:
+  name: sosialhjelp-innsyn-api
+  namespace: teamdigisos
+  labels:
+    team: teamdigisos
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "150M"
+    texas.nais.io/enabled: "true"
+spec:
+  image: {{image}}
+  port: 8080
+  liveness:
+    path: /sosialhjelp/innsyn-api/internal/isAlive
+    initialDelay: 45
+    timeout: 1
+    periodSeconds: 10
+    failureThreshold: 10
+  readiness:
+    path: /sosialhjelp/innsyn-api/internal/isReady
+    initialDelay: 20
+    timeout: 1
+  prometheus:
+    enabled: true
+    path: /sosialhjelp/innsyn-api/internal/prometheus
+  replicas:
+    min: 2
+    max: 5
+  tokenx:
+    enabled: true
+  observability:
+    autoInstrumentation:
+      enabled: true
+      runtime: java
+    logging:
+      destinations:
+        - id: loki
+        - id: elastic
+  maskinporten:
+    enabled: true
+    scopes:
+      consumes:
+        - name: "ks:fiks"
+  accessPolicy:
+    outbound:
+      external:
+        - host: api.fiks.ks.no
+        - host: minside.kommune.no
+        - host: pdl-api.prod-fss-pub.nais.io
+        - host: unleash.nais.io
+        - host: teamdigisos-unleash-api.nav.cloud.nais.io
+        - host: idporten.no
+      rules:
+        - application: clamav
+          namespace: nais-system
+        - application: norg2
+          namespace: org
+    inbound:
+      rules:
+        - application: sosialhjelp-innsyn
+  resources:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1480Mi
+  valkey:
+    - instance: cache
+      access: readwrite
+  envFrom:
+    - secret: fiks-integrasjon-secret
+    - secret: sosialhjelp-innsyn-api-unleash-api-token
+    - secret: idporten-sosialhjelp
+  env:
+    - name: SPRING_PROFILES_ACTIVE
+      value: "log-kibana,prodgcp"
+    - name: FIKS_DIGISOS_ENDPOINT_URL
+      value: "https://api.fiks.ks.no"
+    - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
+      value: "https://minside.kommune.no"
+    - name: FIKS_SVAR_UT_ENDPOINT_URL
+      value: "https://svarut.ks.no"
+    - name: NORG_URL
+      value: "http://norg2.org/norg2/api/v1"
+    - name: CACHE_TIME_TO_LIVE_SECONDS
+      value: "10"
+    - name: DOKUMENT_CACHE_TIME_TO_LIVE_SECONDS
+      value: "3600"
+    - name: PDL_ENDPOINT_URL
+      value: "https://pdl-api.prod-fss-pub.nais.io/graphql"
+    - name: PDL_AUDIENCE
+      value: "prod-fss:pdl:pdl-api"
+    - name: UNLEASH_INSTANCE_ID
+      value: "sosialhjelp-innsyn-api"
+    - name: UNLEASH_ENV
+      value: "prod-gcp"
+    - name: SWAGGER_ENABLED
+      value: "true"
+    - name: CLAMAV_URL
+      value: "http://clamav.nais-system/scan"
+    - name: VILKAR_DOKKRAV_FAGSYSTEM_VERSJONER
+      value: "Socio;10.1.16,mock-alt;1.0-MOCKVERSJON"
