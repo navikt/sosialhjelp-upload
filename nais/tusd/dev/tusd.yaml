@@ -1,0 +1,34 @@
+apiVersion: "nais.io/v1alpha1"
+kind: "Application"
+metadata:
+  name: sosialhjelp-tusd-dev
+  namespace: teamdigisos
+  labels:
+    team: teamdigisos
+spec:
+  image: europe-north1-docker.pkg.dev/nais-management-233d/teamdigisos/tusd:latest
+  port: 8080
+  prometheus:
+    enabled: true
+    path: /metrics
+  gcp:
+    buckets:
+      - name: sosialhjelp-upload-dev
+        retentionPeriodDays: 1
+  accessPolicy:
+    outbound:
+      rules:
+        - application: sosialhjelp-upload-dev
+    inbound:
+      rules:
+        - application: wonderwall-tusd-dev
+  command:
+    - "tusd"
+    - "-host=0.0.0.0"
+    - "-port=8080"
+    - "-hooks-http=http://sosialhjelp-upload-dev/tus-hooks"
+    - "-hooks-http-forward-headers=Authorization"
+    - "-base-path=/sosialhjelp/tusd"
+    - "-hooks-enabled-events=pre-create,post-create,post-finish,pre-terminate,post-terminate,pre-finish"
+    - "-gcs-bucket=sosialhjelp-upload-dev"
+    - "-behind-proxy"

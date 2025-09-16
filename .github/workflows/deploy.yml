@@ -1,0 +1,27 @@
+name: Deploy to Development
+run-name: Deploy '${{ github.ref_name }}' to '${{ github.event.inputs.config-file-name }}'
+on:
+  workflow_dispatch:
+    inputs:
+      config-file-name:
+        description: 'Deploy til mock, dev eller preprod?'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - 'mock'
+          - 'dev'
+          - 'preprod'
+
+jobs:
+  deploy-to-dev:
+    name: 'Deploy to Development'
+    permissions:
+      id-token: write
+      contents: write
+    uses: navikt/sosialhjelp-ci/.github/workflows/deploy_app.yml@v10
+    with:
+      cluster-name: dev-gcp
+      resource-name: ${{ inputs.config-file-name }}
+      resource-folder: 'dev'
+    secrets: inherit

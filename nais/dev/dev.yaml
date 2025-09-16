@@ -7,16 +7,16 @@ metadata:
     team: teamdigisos
 spec:
   image: {{image}}
-  port: 8080
+  port: 3007
   liveness:
     path: /sosialhjelp/upload/internal/isAlive
-    initialDelay: 60
+    initialDelay: 10
     timeout: 1
     periodSeconds: 10
     failureThreshold: 10
   readiness:
-    path: /sosialhjelp/innsyn-api/internal/isReady
-    initialDelay: 60
+    path: /sosialhjelp/upload/internal/isAlive
+    initialDelay: 10
     timeout: 1
   prometheus:
     enabled: true
@@ -24,14 +24,10 @@ spec:
   replicas:
     min: 1
     max: 1
-  tokenx:
-    enabled: true
   observability:
     autoInstrumentation:
       enabled: true
       runtime: java
-    logging:
-      enabled: true
   accessPolicy:
     outbound:
       external:
@@ -41,15 +37,18 @@ spec:
       rules:
         - application: clamav
           namespace: nais-system
-        - application: norg2
-          namespace: org
+        - application: sosialhjelp-konvertering-til-pdf
     inbound:
       rules:
         - application: sosialhjelp-innsyn-dev
+        - application: sosialhjelp-tusd-dev
   gcp:
-    buckets:
-        - name: sosialhjelp-upload-dev
-          retentionPeriodDays: 1
+    sqlInstances:
+      - type: POSTGRES_16
+        tier: db-f1-micro
+        databases:
+          - name: sosialhjelp-upload
+            envVarPrefix: POSTGRES
   resources:
     limits:
       memory: 2Gi
@@ -58,13 +57,13 @@ spec:
       memory: 512Mi
   envFrom:
     - secret: fiks-integrasjon-secret
-    - secret: fiks-kommune-integrasjon-secret
-    - secret: sosialhjelp-innsyn-api-unleash-api-token
     - secret: idporten-sosialhjelp
   env:
-    - name: FIKS_DIGISOS_ENDPOINT_URL
+    - name: FIKS_URL
       value: "https://api.fiks.test.ks.no"
     - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
       value: "https://minside.fiks.test.ks.no"
     - name: CLAMAV_URL
       value: "http://clamav.nais-system/scan"
+    - name: GOTENBERG_URL
+      value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
