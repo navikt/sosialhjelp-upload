@@ -1,10 +1,10 @@
 [versions]
 checker = "3.50.0"
 coroutines = "1.10.2"
-flyway = "11.12.0"
 junit = "5.13.4"
 kotlin = "2.2.10"
 ktor = "3.2.3"
+flyway = "11.12.0"
 logback = "1.5.18"
 mockk = "1.14.5"
 pdfbox = "3.0.5"
@@ -55,8 +55,8 @@ micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-p
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 pdfbox-app = { module = "org.apache.pdfbox:pdfbox-app", version.ref = "pdfbox" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgres" }
-r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version.ref = "r2dbc" }
 jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
+r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version.ref = "r2dbc" }
 testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
@@ -84,10 +84,17 @@ junit = [
 ktor = [
     "ktor-client-cio",
     "ktor-client-core",
+    "ktor-serialization-kotlinx-json",
+    "ktor-client-cio",
+    "ktor-client-core",
     "ktor-client-logging",
     "ktor-serialization-kotlinx-json",
     "ktor-server-auth",
     "ktor-server-auth-jwt",
+    "ktor-server-call-logging",
+    "ktor-server-config-yaml",
+    "ktor-server-content-negotiation",
+    "ktor-server-core",
     "ktor-server-call-logging",
     "ktor-server-config-yaml",
     "ktor-server-content-negotiation",
