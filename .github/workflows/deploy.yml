@@ -1,5 +1,8 @@
 name: Deploy to Development
 run-name: Deploy '${{ github.ref_name }}' to '${{ github.event.inputs.config-file-name }}'
+env:
+  ORG_GRADLE_PROJECT_githubUser: x-access-token
+  ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
 on:
   workflow_dispatch:
     inputs:
@@ -19,9 +22,6 @@ jobs:
     permissions:
       id-token: write
       contents: write
-    env:
-      ORG_GRADLE_PROJECT_githubUser: x-access-token
-      ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
     uses: navikt/sosialhjelp-ci/.github/workflows/deploy_app.yml@v10
     with:
       cluster-name: dev-gcp
