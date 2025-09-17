@@ -13,6 +13,7 @@ database:
   host: "$POSTGRES_HOST:localhost"
   port: "$POSTGRES_PORT:54322"
   name: "$POSTGRES_DATABASE:sosialhjelp-upload"
+  jdbcUrl: "$POSTGRES_JDBC_URL:jdbc:postgresql://localhost:54322/sosialhjelp-upload"
 thumbnailer:
   outputDir: "./tusd-data"
 gotenberg:

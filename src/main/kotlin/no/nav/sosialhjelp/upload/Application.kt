@@ -2,6 +2,7 @@ package no.nav.sosialhjelp.upload
 
 import io.ktor.server.application.*
 import io.ktor.server.plugins.di.dependencies
+import io.r2dbc.postgresql.client.SSLMode
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactoryOptions
 import io.r2dbc.spi.ConnectionFactoryOptions.DRIVER
@@ -45,9 +46,9 @@ object DatabaseFactory {
         val password = environment.config.property("database.password").getString()
         val host = environment.config.property("database.host").getString()
         val port = environment.config.property("database.port").getString().toInt()
+        val jdbcUrl = environment.config.property("database.jdbcUrl").getString()
 
         // Run Flyway migrations using JDBC
-        val jdbcUrl = "jdbc:postgresql://$host:$port/$dbname"
         val load = Flyway.configure()
             .dataSource(jdbcUrl, user, password)
             .locations("classpath:db/migration")
