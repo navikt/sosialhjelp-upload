@@ -10,6 +10,7 @@ import io.r2dbc.spi.ConnectionFactoryOptions.PASSWORD
 import io.r2dbc.spi.ConnectionFactoryOptions.PORT
 import io.r2dbc.spi.ConnectionFactoryOptions.USER
 import io.r2dbc.spi.ConnectionFactoryOptions.DATABASE
+import io.r2dbc.spi.ConnectionFactoryOptions.SSL
 import kotlinx.io.files.Path
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -35,48 +36,49 @@ fun main(args: Array&lt;String&gt;) {
 }
 
 object DatabaseFactory {
-<span class="nc" id="L38">    lateinit var dsl: DSLContext</span>
+<span class="nc" id="L39">    lateinit var dsl: DSLContext</span>
         private set
 
     fun init(environment: ApplicationEnvironment) {
-<span class="nc" id="L42">        val dbname = environment.config.property(&quot;database.name&quot;).getString()</span>
-<span class="nc" id="L43">        val user = environment.config.property(&quot;database.user&quot;).getString()</span>
-<span class="nc" id="L44">        val password = environment.config.property(&quot;database.password&quot;).getString()</span>
-<span class="nc" id="L45">        val host = environment.config.property(&quot;database.host&quot;).getString()</span>
-<span class="nc" id="L46">        val port = environment.config.property(&quot;database.port&quot;).getString().toInt()</span>
+<span class="nc" id="L43">        val dbname = environment.config.property(&quot;database.name&quot;).getString()</span>
+<span class="nc" id="L44">        val user = environment.config.property(&quot;database.user&quot;).getString()</span>
+<span class="nc" id="L45">        val password = environment.config.property(&quot;database.password&quot;).getString()</span>
+<span class="nc" id="L46">        val host = environment.config.property(&quot;database.host&quot;).getString()</span>
+<span class="nc" id="L47">        val port = environment.config.property(&quot;database.port&quot;).getString().toInt()</span>
 
         // Run Flyway migrations using JDBC
-<span class="nc" id="L49">        val jdbcUrl = &quot;jdbc:postgresql://$host:$port/$dbname&quot;</span>
-<span class="nc" id="L50">        val load = Flyway.configure()</span>
-<span class="nc" id="L51">            .dataSource(jdbcUrl, user, password)</span>
-<span class="nc" id="L52">            .locations(&quot;classpath:db/migration&quot;)</span>
+<span class="nc" id="L50">        val jdbcUrl = &quot;jdbc:postgresql://$host:$port/$dbname&quot;</span>
+<span class="nc" id="L51">        val load = Flyway.configure()</span>
+<span class="nc" id="L52">            .dataSource(jdbcUrl, user, password)</span>
+<span class="nc" id="L53">            .locations(&quot;classpath:db/migration&quot;)</span>
             // TODO: FJERN FØR PRODSETTING
-<span class="nc" id="L54">            .cleanDisabled(false)</span>
-<span class="nc" id="L55">            .load()</span>
-<span class="nc" id="L56">        load.clean()</span>
-<span class="nc" id="L57">        load.migrate()</span>
+<span class="nc" id="L55">            .cleanDisabled(false)</span>
+<span class="nc" id="L56">            .load()</span>
+<span class="nc" id="L57">        load.clean()</span>
+<span class="nc" id="L58">        load.migrate()</span>
 
 
-<span class="nc" id="L60">        val options = ConnectionFactoryOptions.builder()</span>
-<span class="nc" id="L61">            .option(DRIVER, &quot;postgresql&quot;)</span>
-<span class="nc" id="L62">            .option(HOST, host)</span>
-<span class="nc" id="L63">            .option(PORT, port)</span>
-<span class="nc" id="L64">            .option(USER, user)</span>
-<span class="nc" id="L65">            .option(PASSWORD, password)</span>
-<span class="nc" id="L66">            .option(DATABASE, dbname)</span>
-<span class="nc" id="L67">            .build()</span>
-<span class="nc" id="L68">        val connectionFactory = ConnectionFactories.get(options)</span>
-<span class="nc" id="L69">        val config = DefaultConfiguration().derive(connectionFactory).derive(SQLDialect.POSTGRES)</span>
-<span class="nc" id="L70">        dsl = DSL.using(config)</span>
-<span class="nc" id="L71">        DocumentChangeNotifier.dsl = dsl</span>
-<span class="nc" id="L72">    }</span>
+<span class="nc" id="L61">        val options = ConnectionFactoryOptions.builder()</span>
+<span class="nc" id="L62">            .option(DRIVER, &quot;postgresql&quot;)</span>
+<span class="nc" id="L63">            .option(HOST, host)</span>
+<span class="nc" id="L64">            .option(PORT, port)</span>
+<span class="nc" id="L65">            .option(USER, user)</span>
+<span class="nc" id="L66">            .option(PASSWORD, password)</span>
+<span class="nc" id="L67">            .option(DATABASE, dbname)</span>
+<span class="nc" id="L68">            .option(SSL, true)</span>
+<span class="nc" id="L69">            .build()</span>
+<span class="nc" id="L70">        val connectionFactory = ConnectionFactories.get(options)</span>
+<span class="nc" id="L71">        val config = DefaultConfiguration().derive(connectionFactory).derive(SQLDialect.POSTGRES)</span>
+<span class="nc" id="L72">        dsl = DSL.using(config)</span>
+<span class="nc" id="L73">        DocumentChangeNotifier.dsl = dsl</span>
+<span class="nc" id="L74">    }</span>
 }
 
 fun Application.module() {
     DatabaseFactory.init(environment)
     dependencies {
-<span class="nc" id="L78">        provide { DatabaseFactory.dsl }</span>
-<span class="nc" id="L79">        provide { this@module.environment.log }</span>
+<span class="nc" id="L80">        provide { DatabaseFactory.dsl }</span>
+<span class="nc" id="L81">        provide { this@module.environment.log }</span>
         provide(VirusScanner::class)
         provide(UploadValidator::class)
         provide(FiksClient::class)
