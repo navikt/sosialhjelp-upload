@@ -48,7 +48,6 @@ ktor-server-request-validation = { module = "io.ktor:ktor-server-request-validat
 ktor-server-resources = { module = "io.ktor:ktor-server-resources", version.ref = "ktor" }
 ktor-server-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor" }
 ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
-ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "prometheus" }
@@ -109,7 +108,6 @@ ktor = [
     "ktor-server-resources",
     "ktor-server-sse",
     "ktor-server-status-pages",
-    "ktor-server-swagger",
     "ktor-server-test-host",
 ]
 testcontainers = [
