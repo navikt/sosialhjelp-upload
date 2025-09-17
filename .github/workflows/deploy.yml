@@ -19,9 +19,13 @@ jobs:
     permissions:
       id-token: write
       contents: write
+    env:
+      ORG_GRADLE_PROJECT_githubUser: x-access-token
+      ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
     uses: navikt/sosialhjelp-ci/.github/workflows/deploy_app.yml@v10
     with:
       cluster-name: dev-gcp
       resource-name: ${{ inputs.config-file-name }}
       resource-folder: 'dev'
     secrets: inherit
+
