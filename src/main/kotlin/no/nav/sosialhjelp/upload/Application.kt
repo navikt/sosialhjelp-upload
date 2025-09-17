@@ -10,6 +10,7 @@ import io.r2dbc.spi.ConnectionFactoryOptions.PASSWORD
 import io.r2dbc.spi.ConnectionFactoryOptions.PORT
 import io.r2dbc.spi.ConnectionFactoryOptions.USER
 import io.r2dbc.spi.ConnectionFactoryOptions.DATABASE
+import io.r2dbc.spi.ConnectionFactoryOptions.SSL
 import kotlinx.io.files.Path
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -64,6 +65,7 @@ object DatabaseFactory {
             .option(USER, user)
             .option(PASSWORD, password)
             .option(DATABASE, dbname)
+            .option(SSL, true)
             .build()
         val connectionFactory = ConnectionFactories.get(options)
         val config = DefaultConfiguration().derive(connectionFactory).derive(SQLDialect.POSTGRES)
