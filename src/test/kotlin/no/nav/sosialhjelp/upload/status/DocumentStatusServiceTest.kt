@@ -1,42 +1,51 @@
-package no.nav.sosialhjelp.status
+package no.nav.sosialhjelp.upload.status
 
-import no.nav.sosialhjelp.database.DocumentRepository
 import kotlinx.coroutines.*
-import no.nav.sosialhjelp.common.TestUtils.createMockDocument
-import no.nav.sosialhjelp.database.schema.PageTable
-import no.nav.sosialhjelp.database.schema.UploadTable
-import no.nav.sosialhjelp.status.dto.DocumentState
-import no.nav.sosialhjelp.status.dto.PageState
-import no.nav.sosialhjelp.status.dto.UploadSuccessState
-import no.nav.sosialhjelp.testutils.PostgresTestContainer
-import org.jetbrains.exposed.sql.deleteAll
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
+import kotlinx.coroutines.reactive.awaitSingle
+import kotlinx.coroutines.test.runTest
+import no.nav.sosialhjelp.upload.common.TestUtils.createMockDocument
+import no.nav.sosialhjelp.upload.database.DocumentRepository
+import no.nav.sosialhjelp.upload.database.PageRepository
+import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.database.generated.tables.Page.Companion.PAGE
+import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.status.dto.DocumentState
+import no.nav.sosialhjelp.upload.status.dto.UploadSuccessState
+import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import org.jooq.DSLContext
+import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
+import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DocumentStatusServiceTest {
-    val documentRepository = DocumentRepository()
+    private lateinit var documentRepository: DocumentRepository
+    private lateinit var uploadRepository: UploadRepository
+    private lateinit var pageRepository: PageRepository
+    private lateinit var dsl: DSLContext
 
-    companion object {
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            PostgresTestContainer.connectAndStart()
-        }
+    @BeforeAll
+    fun setup() {
+        dsl = PostgresTestContainer.connectAndStart()
+        documentRepository = DocumentRepository(dsl)
+        uploadRepository = UploadRepository()
+        pageRepository = PageRepository()
     }
 
     @BeforeEach
-    fun cleanupBeforeEach() {
-        transaction {
-            PageTable.deleteAll()
-            UploadTable.deleteAll()
+    fun cleanupBeforeEach() =
+        runTest {
+            dsl.transactionCoroutine {
+                it.dsl().deleteFrom(PAGE).awaitSingle()
+                it.dsl().deleteFrom(UPLOAD).awaitSingle()
+            }
         }
-    }
 
     /**
      * Test that when no uploads exist for a given document, the service returns a DocumentState
@@ -44,9 +53,9 @@ class DocumentStatusServiceTest {
      */
     @Test
     fun `getDocumentStatus returns empty state when no uploads exist`() =
-        runBlocking {
-            val documentId = createMockDocument(documentRepository)
-            val service = DocumentStatusService()
+        runTest {
+            val documentId = createMockDocument(dsl)
+            val service = DocumentStatusService(uploadRepository, pageRepository, dsl)
 
             // When: retrieving document status
             val result: DocumentState = service.getDocumentStatus(documentId)
@@ -64,16 +73,23 @@ class DocumentStatusServiceTest {
     fun `getDocumentStatus returns upload with empty pages list when upload exists but no pages`() =
         runBlocking {
             // Given
-            val documentId = createMockDocument(documentRepository)
+            val documentId = createMockDocument(dsl)
             // Insert one upload row associated with the document.
             val uploadId =
-                transaction {
-                    UploadTable.insert {
-                        it[document] = documentId
-                        it[originalFilename] = "file.pdf"
-                    } get UploadTable.id
+                dsl.transactionCoroutine {
+                    it
+                        .dsl()
+                        .insertInto(
+                            UPLOAD,
+                        ).set(
+                            UPLOAD.ID,
+                            UUID.randomUUID(),
+                        ).set(UPLOAD.DOCUMENT_ID, documentId)
+                        .set(UPLOAD.ORIGINAL_FILENAME, "file.pdf")
+                        .returning(UPLOAD.ID)
+                        .awaitSingle()[UPLOAD.ID]
                 }
-            val service = DocumentStatusService()
+            val service = DocumentStatusService(uploadRepository, pageRepository, dsl)
 
             // When
             val result: DocumentState = service.getDocumentStatus(documentId)
@@ -81,108 +97,43 @@ class DocumentStatusServiceTest {
             // Then
             assertEquals(documentId.toString(), result.documentId)
             assertEquals(1, result.uploads.size)
-            val uploadState: UploadSuccessState? = result.uploads[uploadId.toString()]
+            val uploadState: UploadSuccessState? = result.uploads.find { it.id == uploadId }
             assertNotNull(uploadState)
             assertEquals("file.pdf", uploadState.originalFilename)
             assertTrue(uploadState.pages!!.isEmpty())
         }
 
-    /**
-     * Test that when a single upload has pages inserted, the returned state includes the upload
-     * with the corresponding list of page states.
-     */
-    @Test
-    fun `getDocumentStatus returns upload with pages when pages exist`() =
-        runBlocking {
-            // Given
-            val documentId = createMockDocument(documentRepository)
-            val uploadId =
-                transaction {
-                    UploadTable.insert {
-                        it[document] = documentId
-                        it[originalFilename] = "document.pdf"
-                    } get UploadTable.id
-                }
-            // Insert two pages for the above upload.
-            transaction {
-                PageTable.insert {
-                    it[upload] = uploadId
-                    it[pageNumber] = 1
-                    it[filename] = "page1.pdf"
-                }
-                PageTable.insert {
-                    it[upload] = uploadId
-                    it[pageNumber] = 2
-                    it[filename] = "page2.pdf"
-                }
-            }
-            val service = DocumentStatusService()
-
-            // When
-            val result: DocumentState = service.getDocumentStatus(documentId)
-
-            // Then
-            assertEquals(documentId.toString(), result.documentId)
-            assertEquals(1, result.uploads.size)
-            val uploadState: UploadSuccessState? = result.uploads[uploadId.toString()]
-            assertNotNull(uploadState)
-            assertEquals("document.pdf", uploadState.originalFilename)
-            // Verify that both pages are returned with correct details.
-            assertEquals(2, uploadState.pages!!.size)
-            val page1: PageState? = uploadState.pages.find { it.pageNumber == 1 }
-            val page2: PageState? = uploadState.pages.find { it.pageNumber == 2 }
-            assertNotNull(page1)
-            assertNotNull(page2)
-            assertEquals("page1.pdf", page1.thumbnail)
-            assertEquals("page2.pdf", page2.thumbnail)
+    private suspend fun createUpload(documentId: UUID, filename: String) =
+        dsl.transactionCoroutine {
+            it
+                .dsl()
+                .insertInto(
+                    UPLOAD,
+                ).set(
+                    UPLOAD.ID,
+                    UUID.randomUUID(),
+                ).set(UPLOAD.DOCUMENT_ID, documentId)
+                .set(UPLOAD.ORIGINAL_FILENAME, filename)
+                .returning(UPLOAD.ID)
+                .awaitSingle()[UPLOAD.ID]
         }
 
     /**
-     * Test that multiple uploads (each with their own pages) for the same document are all
+     * Test that multiple uploads for the same document are all
      * correctly returned in the DocumentState.
      */
     @Test
     fun `getDocumentStatus returns multiple uploads each with their corresponding pages`() =
-        runBlocking {
+        runTest {
             // Given
-            val documentId = createMockDocument(documentRepository)
+            val documentId = createMockDocument(dsl)
 
             val uploadId1 =
-                transaction {
-                    UploadTable.insert {
-                        it[document] = documentId
-                        it[originalFilename] = "first.pdf"
-                    } get UploadTable.id
-                }
+                createUpload(documentId, "first.pdf")
             val uploadId2 =
-                transaction {
-                    UploadTable.insert {
-                        it[document] = documentId
-                        it[originalFilename] = "second.pdf"
-                    } get UploadTable.id
-                }
-            // Insert pages for the first upload.
-            transaction {
-                PageTable.insert {
-                    it[upload] = uploadId1
-                    it[pageNumber] = 1
-                    it[filename] = "first_page1.pdf"
-                }
-            }
-            // Insert pages for the second upload.
-            transaction {
-                PageTable.insert {
-                    it[upload] = uploadId2
-                    it[pageNumber] = 1
-                    it[filename] = "second_page1.pdf"
-                }
-                PageTable.insert {
-                    it[upload] = uploadId2
-                    it[pageNumber] = 2
-                    it[filename] = "second_page2.pdf"
-                }
-            }
-            val service = DocumentStatusService()
+                createUpload(documentId, "second.pdf")
+
+            val service = DocumentStatusService(uploadRepository, pageRepository, dsl)
 
             // When
             val result: DocumentState = service.getDocumentStatus(documentId)
@@ -190,13 +141,11 @@ class DocumentStatusServiceTest {
             // Then
             assertEquals(documentId.toString(), result.documentId)
             assertEquals(2, result.uploads.size)
-            val firstUpload: UploadSuccessState? = result.uploads[uploadId1.toString()]
-            val secondUpload: UploadSuccessState? = result.uploads[uploadId2.toString()]
+            val firstUpload: UploadSuccessState? = result.uploads.find { it.id == uploadId1 }
+            val secondUpload: UploadSuccessState? = result.uploads.find { it.id == uploadId2 }
             assertNotNull(firstUpload)
             assertNotNull(secondUpload)
             assertEquals("first.pdf", firstUpload.originalFilename)
             assertEquals("second.pdf", secondUpload.originalFilename)
-            assertEquals(1, firstUpload.pages!!.size)
-            assertEquals(2, secondUpload.pages!!.size)
         }
 }

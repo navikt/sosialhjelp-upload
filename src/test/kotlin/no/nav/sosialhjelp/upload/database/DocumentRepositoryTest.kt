@@ -1,75 +1,67 @@
-package no.nav.sosialhjelp.database
+package no.nav.sosialhjelp.upload.database
 
-import no.nav.sosialhjelp.common.SoknadDocumentIdent
-import no.nav.sosialhjelp.database.schema.DocumentTable
-import no.nav.sosialhjelp.testutils.PostgresTestContainer
-import org.jetbrains.exposed.sql.deleteAll
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import kotlinx.coroutines.reactive.awaitSingle
+import kotlinx.coroutines.test.runTest
+import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
+import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import org.jooq.DSLContext
+import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
-import java.util.*
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DocumentRepositoryTest {
-    private val repository = DocumentRepository()
+    private lateinit var repository: DocumentRepository
+    private lateinit var dsl: DSLContext
 
     @BeforeAll
     fun setup() {
-        PostgresTestContainer.connectAndStart()
+        dsl = PostgresTestContainer.connectAndStart()
+        repository = DocumentRepository(dsl)
     }
 
     @BeforeEach
-    fun cleanup() {
-        transaction { DocumentTable.deleteAll() }
+    fun cleanup() = runTest {
+        dsl.transactionCoroutine { it.dsl().deleteFrom(DOCUMENT).awaitSingle() }
     }
 
-    private fun newIdent(
-        soknadId: UUID = UUID.randomUUID(),
-        vedleggType: String = "SKANNET_DOKUMENT",
-    ) = SoknadDocumentIdent(soknadId = soknadId, vedleggType = vedleggType)
-
     @Test
-    fun `creates a new document if none exists`() {
-        val ident = newIdent()
+    fun `creates a new document if none exists`() = runTest {
         val owner = "12345678910"
 
-        val documentId = transaction { repository.getOrCreateDocument(ident, owner) }
+        val documentId = dsl.transactionCoroutine { repository.getOrCreateDocument(it, "whatever", owner) }
 
-        transaction {
-            val found = DocumentTable.selectAll().single()
-            assertEquals(documentId, found[DocumentTable.id])
-            assertEquals(owner, found[DocumentTable.ownerIdent])
-            assertEquals(ident.soknadId, found[DocumentTable.soknadId])
-            assertEquals(ident.vedleggType, found[DocumentTable.vedleggType])
+        dsl.transactionCoroutine {
+            val found = it.dsl().selectFrom(DOCUMENT).where(DOCUMENT.ID.eq(documentId)).awaitSingle()
+            assertEquals(documentId, found[DOCUMENT.ID])
+            assertEquals(owner, found[DOCUMENT.OWNER_IDENT])
+            assertEquals("whatever", found[DOCUMENT.EXTERNAL_ID])
         }
     }
 
     @Test
-    fun `returns existing document for same ident and same user`() {
-        val ident = newIdent()
+    fun `returns existing document for same external id and same user`() = runTest {
         val owner = "12345678910"
 
-        val first = transaction { repository.getOrCreateDocument(ident, owner) }
-        val second = transaction { repository.getOrCreateDocument(ident, owner) }
+        val first = dsl.transactionCoroutine { repository.getOrCreateDocument(it, "whatever", owner) }
+        val second = dsl.transactionCoroutine { repository.getOrCreateDocument(it, "whatever", owner) }
 
         assertEquals(first, second)
     }
 
     @Test
-    fun `throws exception when document is owned by another user`() {
-        val ident = newIdent()
+    fun `throws exception when document is owned by another user`() = runTest {
         val owner1 = "user1"
         val owner2 = "user2"
 
-        transaction {
-            repository.getOrCreateDocument(ident, owner1)
+        dsl.transactionCoroutine {
+            repository.getOrCreateDocument(it, "whatever", owner1)
         }
 
         val ex =
             assertThrows<DocumentRepository.DocumentOwnedByAnotherUserException> {
-                transaction {
-                    repository.getOrCreateDocument(ident, owner2)
+                dsl.transactionCoroutine {
+                    repository.getOrCreateDocument(it, "whatever", owner2)
                 }
             }
 
