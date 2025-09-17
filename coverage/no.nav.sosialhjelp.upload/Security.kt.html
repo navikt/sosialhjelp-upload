@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Security.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload</a> &gt; <span class="el_source">Security.kt</span></div><h1>Security.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload
+
+import com.auth0.jwk.JwkProviderBuilder
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
+import java.net.URI
+import java.util.concurrent.TimeUnit
+
+fun Application.configureSecurity() {
+<span class="nc" id="L11">    val jwtIssuer = environment.config.property(&quot;jwt.issuer&quot;).getString()</span>
+
+<span class="nc" id="L13">    val jwtAudience = environment.config.property(&quot;jwt.audience&quot;).getString()</span>
+
+<span class="nc" id="L15">    val jwkProvider =</span>
+<span class="nc" id="L16">        JwkProviderBuilder(URI(&quot;$jwtIssuer/jwks&quot;).toURL())</span>
+<span class="nc" id="L17">            .cached(10, 24, TimeUnit.HOURS)</span>
+<span class="nc" id="L18">            .rateLimited(10, 1, TimeUnit.MINUTES)</span>
+<span class="nc" id="L19">            .build()</span>
+
+<span class="nc" id="L21">    authentication {</span>
+<span class="nc" id="L22">        jwt {</span>
+<span class="nc" id="L23">            verifier(jwkProvider, jwtIssuer)</span>
+<span class="nc bnc" id="L24" title="All 4 branches missed.">            validate { credential -&gt; if (credential.payload.audience.contains(jwtAudience)) JWTPrincipal(credential.payload) else null }</span>
+<span class="nc" id="L25">        }</span>
+<span class="nc" id="L26">    }</span>
+<span class="nc" id="L27">}</span>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

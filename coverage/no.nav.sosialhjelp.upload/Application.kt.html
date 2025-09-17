@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Application.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload</a> &gt; <span class="el_source">Application.kt</span></div><h1>Application.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload
+
+import io.ktor.server.application.*
+import io.ktor.server.plugins.di.dependencies
+import io.r2dbc.spi.ConnectionFactories
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.ConnectionFactoryOptions.DRIVER
+import io.r2dbc.spi.ConnectionFactoryOptions.HOST
+import io.r2dbc.spi.ConnectionFactoryOptions.PASSWORD
+import io.r2dbc.spi.ConnectionFactoryOptions.PORT
+import io.r2dbc.spi.ConnectionFactoryOptions.USER
+import io.r2dbc.spi.ConnectionFactoryOptions.DATABASE
+import kotlinx.io.files.Path
+import no.nav.sosialhjelp.upload.action.DownstreamUploadService
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import no.nav.sosialhjelp.upload.common.FilePathFactory
+import no.nav.sosialhjelp.upload.tusd.TusService
+import org.jooq.DSLContext
+import org.jooq.SQLDialect
+import org.jooq.impl.DSL
+import no.nav.sosialhjelp.upload.database.DocumentChangeNotifier
+import no.nav.sosialhjelp.upload.database.DocumentRepository
+import no.nav.sosialhjelp.upload.database.PageRepository
+import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.pdf.GotenbergService
+import no.nav.sosialhjelp.upload.pdf.ThumbnailService
+import no.nav.sosialhjelp.upload.status.DocumentStatusService
+import no.nav.sosialhjelp.upload.validation.UploadValidator
+import no.nav.sosialhjelp.upload.validation.VirusScanner
+import org.jooq.impl.DefaultConfiguration
+import org.flywaydb.core.Flyway
+
+fun main(args: Array&lt;String&gt;) {
+    io.ktor.server.netty.EngineMain.main(args)
+}
+
+object DatabaseFactory {
+<span class="nc" id="L38">    lateinit var dsl: DSLContext</span>
+        private set
+
+    fun init(environment: ApplicationEnvironment) {
+<span class="nc" id="L42">        val dbname = environment.config.property(&quot;database.name&quot;).getString()</span>
+<span class="nc" id="L43">        val user = environment.config.property(&quot;database.user&quot;).getString()</span>
+<span class="nc" id="L44">        val password = environment.config.property(&quot;database.password&quot;).getString()</span>
+<span class="nc" id="L45">        val host = environment.config.property(&quot;database.host&quot;).getString()</span>
+<span class="nc" id="L46">        val port = environment.config.property(&quot;database.port&quot;).getString().toInt()</span>
+
+        // Run Flyway migrations using JDBC
+<span class="nc" id="L49">        val jdbcUrl = &quot;jdbc:postgresql://$host:$port/$dbname&quot;</span>
+<span class="nc" id="L50">        val load = Flyway.configure()</span>
+<span class="nc" id="L51">            .dataSource(jdbcUrl, user, password)</span>
+<span class="nc" id="L52">            .locations(&quot;classpath:db/migration&quot;)</span>
+            // TODO: FJERN FØR PRODSETTING
+<span class="nc" id="L54">            .cleanDisabled(false)</span>
+<span class="nc" id="L55">            .load()</span>
+<span class="nc" id="L56">        load.clean()</span>
+<span class="nc" id="L57">        load.migrate()</span>
+
+
+<span class="nc" id="L60">        val options = ConnectionFactoryOptions.builder()</span>
+<span class="nc" id="L61">            .option(DRIVER, &quot;postgresql&quot;)</span>
+<span class="nc" id="L62">            .option(HOST, host)</span>
+<span class="nc" id="L63">            .option(PORT, port)</span>
+<span class="nc" id="L64">            .option(USER, user)</span>
+<span class="nc" id="L65">            .option(PASSWORD, password)</span>
+<span class="nc" id="L66">            .option(DATABASE, dbname)</span>
+<span class="nc" id="L67">            .build()</span>
+<span class="nc" id="L68">        val connectionFactory = ConnectionFactories.get(options)</span>
+<span class="nc" id="L69">        val config = DefaultConfiguration().derive(connectionFactory).derive(SQLDialect.POSTGRES)</span>
+<span class="nc" id="L70">        dsl = DSL.using(config)</span>
+<span class="nc" id="L71">        DocumentChangeNotifier.dsl = dsl</span>
+<span class="nc" id="L72">    }</span>
+}
+
+fun Application.module() {
+    DatabaseFactory.init(environment)
+    dependencies {
+<span class="nc" id="L78">        provide { DatabaseFactory.dsl }</span>
+<span class="nc" id="L79">        provide { this@module.environment.log }</span>
+        provide(VirusScanner::class)
+        provide(UploadValidator::class)
+        provide(FiksClient::class)
+        provide(TusService::class)
+        provide(UploadRepository::class)
+        provide(PageRepository::class)
+        provide(DocumentRepository::class)
+        provide(ThumbnailService::class)
+        provide(DocumentStatusService::class)
+        provide(GotenbergService::class)
+        provide(FilePathFactory::class)
+        provide(DownstreamUploadService::class)
+    }
+    configureSecurity()
+    configureHTTP()
+    configureMonitoring()
+    configureStatusPages()
+    configureRouting()
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

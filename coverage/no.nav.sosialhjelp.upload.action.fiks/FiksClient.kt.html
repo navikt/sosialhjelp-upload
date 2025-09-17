@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FiksClient.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.action.fiks</a> &gt; <span class="el_source">FiksClient.kt</span></div><h1>FiksClient.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.action.fiks
+
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.jackson.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.plugins.di.annotations.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import no.nav.sosialhjelp.api.fiks.DigisosSak
+import no.nav.sosialhjelp.upload.action.Upload
+import no.nav.sosialhjelp.upload.action.Metadata
+import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
+
+<span class="nc" id="L22">class FiksClient(@Property(&quot;fiksBaseUrl&quot;) val fiksBaseUrl: String) {</span>
+    private fun ettersendelseUrl(fiksDigisosId: String, kommunenummer: String, navEksternRefId: String) =
+<span class="nc" id="L24">        &quot;${fiksBaseUrl}/digisos/api/v1/soknader/${kommunenummer}/${fiksDigisosId}/${navEksternRefId}&quot;</span>
+
+<span class="nc" id="L26">    private fun digisosSakUrl(fiksDigisosId: String) = &quot;${fiksBaseUrl}/digisos/api/v1/soknader/${fiksDigisosId}&quot;</span>
+
+
+<span class="nc" id="L29">    private val jacksonClient by lazy {</span>
+<span class="nc" id="L30">        HttpClient(CIO) {</span>
+<span class="nc" id="L31">            expectSuccess = false</span>
+<span class="nc" id="L32">            install(ContentNegotiation) {</span>
+<span class="nc" id="L33">                jackson()</span>
+<span class="nc" id="L34">            }</span>
+<span class="nc" id="L35">        }</span>
+    }
+
+<span class="nc" id="L38">    private val client by lazy {</span>
+<span class="nc" id="L39">        HttpClient(CIO) {</span>
+<span class="nc" id="L40">            expectSuccess = false</span>
+<span class="nc" id="L41">            install(Logging) {</span>
+<span class="nc" id="L42">                logger = Logger.DEFAULT</span>
+<span class="nc" id="L43">                level = LogLevel.BODY</span>
+<span class="nc" id="L44">            }</span>
+<span class="nc" id="L45">            install(ContentNegotiation) {</span>
+<span class="nc" id="L46">                json()</span>
+<span class="nc" id="L47">            }</span>
+<span class="nc" id="L48">        }</span>
+    }
+
+    suspend fun uploadEttersendelse(
+        fiksDigisosId: String,
+        kommunenummer: String,
+        navEksternRefId: String,
+        files: List&lt;Upload&gt;,
+        metadata: Metadata,
+        token: String,
+<span class="nc" id="L58">    ): HttpResponse = client.submitFormWithBinaryData(ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId), formData {</span>
+<span class="nc" id="L59">        val vedleggJson = VedleggSpesifikasjon(</span>
+<span class="nc" id="L60">            type = metadata.type,</span>
+<span class="nc" id="L61">            tilleggsinfo = metadata.tilleggsinfo,</span>
+<span class="nc" id="L62">            innsendelsesfrist = metadata.innsendelsesfrist,</span>
+<span class="nc" id="L63">            hendelsetype = metadata.hendelsetype,</span>
+<span class="nc" id="L64">            hendelsereferanse = metadata.hendelsereferanse,</span>
+        )
+<span class="nc" id="L66">        append(&quot;vedlegg.json&quot;, Json.encodeToString(vedleggJson), Headers.build {</span>
+<span class="nc" id="L67">            append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L68">        })</span>
+<span class="nc" id="L69">        files.forEachIndexed { index, file -&gt;</span>
+<span class="nc" id="L70">            val vedleggMetadata = VedleggMetadata(</span>
+<span class="nc" id="L71">                filnavn = file.filename,</span>
+<span class="nc" id="L72">                mimetype = file.fileType,</span>
+<span class="nc" id="L73">                storrelse = file.file.size.toLong(),</span>
+            )
+<span class="nc" id="L75">            append(&quot;vedleggSpesifikasjon:$index&quot;, Json.encodeToString(vedleggMetadata), Headers.build {</span>
+<span class="nc" id="L76">                append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L77">            })</span>
+<span class="nc" id="L78">            append(&quot;dokument:$index&quot;, file.file, Headers.build {</span>
+<span class="nc" id="L79">                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)</span>
+<span class="nc" id="L80">                append(HttpHeaders.ContentDisposition, &quot;filename=\&quot;${file.filename}\&quot;&quot;)</span>
+<span class="nc" id="L81">            })</span>
+<span class="nc" id="L82">        }</span>
+<span class="nc" id="L83">    }) {</span>
+
+        // TODO: Legg på integrasjonsid/-passord i header
+<span class="nc" id="L86">        bearerAuth(token)</span>
+<span class="nc" id="L87">        contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L88">    }</span>
+
+
+<span class="nc" id="L91">    suspend fun getSak(id: String): DigisosSak = jacksonClient.request(digisosSakUrl(id)).body()</span>
+}
+
+<span class="nc bnc" id="L94" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L95">private data class VedleggMetadata(</span>
+<span class="nc" id="L96">    val filnavn: String?,</span>
+<span class="nc" id="L97">    val mimetype: String?,</span>
+<span class="nc" id="L98">    val storrelse: Long,</span>
+)
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

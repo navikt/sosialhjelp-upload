@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UploadRepository.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.database</a> &gt; <span class="el_source">UploadRepository.kt</span></div><h1>UploadRepository.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.database
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.reactive.asFlow
+import kotlinx.coroutines.reactive.awaitFirstOrNull
+import kotlinx.coroutines.reactive.awaitSingle
+import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
+import no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR
+import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.validation.Validation
+import no.nav.sosialhjelp.upload.validation.ValidationCode
+import org.jooq.Configuration
+import java.util.*
+
+<span class="fc" id="L20">data class UploadWithFilename(</span>
+<span class="fc" id="L21">    val id: UUID?,</span>
+<span class="fc" id="L22">    val originalFilename: String?,</span>
+<span class="fc" id="L23">    val convertedFilename: String?,</span>
+<span class="fc" id="L24">    val errors: List&lt;ValidationCode&gt;,</span>
+)
+
+<span class="fc" id="L27">class UploadRepository {</span>
+<span class="fc" id="L28">    suspend fun create(</span>
+        tx: Configuration,
+        documentId: UUID,
+        filename: String,
+    ): UUID? =
+<span class="fc" id="L33">        tx.dsl().insertInto(UPLOAD)</span>
+<span class="fc" id="L34">            .set(UPLOAD.ID, UUID.randomUUID())</span>
+<span class="fc" id="L35">            .set(UPLOAD.DOCUMENT_ID, documentId)</span>
+<span class="fc" id="L36">            .set(UPLOAD.ORIGINAL_FILENAME, filename)</span>
+<span class="fc" id="L37">            .returning(UPLOAD.ID)</span>
+<span class="fc" id="L38">            .awaitFirstOrNull()</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            ?.get(UPLOAD.ID)</span>
+
+<span class="fc" id="L41">    suspend fun notifyChange(tx: Configuration, uploadId: UUID) = DocumentChangeNotifier.notifyChange(getDocumentIdFromUploadId(tx, uploadId)!!)</span>
+
+    suspend fun isOwnedByUser(tx: Configuration, uploadId: UUID, ownerIdent: String): Boolean {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        return tx.dsl()</span>
+<span class="nc" id="L45">            .selectCount()</span>
+<span class="nc" id="L46">            .from(UPLOAD)</span>
+<span class="nc" id="L47">            .join(DOCUMENT)</span>
+<span class="nc" id="L48">            .on(DOCUMENT.ID.eq(UPLOAD.DOCUMENT_ID))</span>
+<span class="nc" id="L49">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="nc" id="L50">            .and(DOCUMENT.OWNER_IDENT.eq(ownerIdent))</span>
+<span class="nc" id="L51">            .awaitSingle().value1() &gt; 0</span>
+    }
+
+<span class="fc" id="L54">    suspend fun getDocumentIdFromUploadId(tx: Configuration, uploadId: UUID): UUID? =</span>
+<span class="fc" id="L55">        tx.dsl().select(UPLOAD.DOCUMENT_ID)</span>
+<span class="fc" id="L56">            .from(UPLOAD)</span>
+<span class="fc" id="L57">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L58">            .awaitFirstOrNull()</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            ?.get(UPLOAD.DOCUMENT_ID)</span>
+
+    fun getUploadsWithFilenames(tx: Configuration, documentId: UUID): Flow&lt;UploadWithFilename&gt; =
+<span class="fc" id="L62">        (tx.dsl().select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, ERROR.CODE)</span>
+<span class="fc" id="L63">            .from(UPLOAD)</span>
+<span class="fc" id="L64">            .leftJoin(ERROR).on(ERROR.UPLOAD.eq(UPLOAD.ID))</span>
+<span class="fc" id="L65">            .where(UPLOAD.DOCUMENT_ID.eq(documentId)))</span>
+<span class="fc" id="L66">            .asFlow()</span>
+<span class="fc" id="L67">            .map { record -&gt;</span>
+<span class="fc" id="L68">                UploadWithFilename(</span>
+<span class="fc" id="L69">                    id = record.get(UPLOAD.ID),</span>
+<span class="fc" id="L70">                    originalFilename = record.get(UPLOAD.ORIGINAL_FILENAME),</span>
+<span class="fc" id="L71">                    convertedFilename = record.get(UPLOAD.CONVERTED_FILENAME),</span>
+<span class="fc" id="L72">                    errors = listOfNotNull(record.get(ERROR.CODE)).map { ValidationCode.valueOf(it) },</span>
+<span class="fc" id="L73">                )</span>
+<span class="fc" id="L74">            }</span>
+
+    suspend fun updateConvertedFilename(tx: Configuration, name: String, uploadId: UUID) {
+<span class="nc" id="L77">        tx.dsl().update(UPLOAD).set(UPLOAD.CONVERTED_FILENAME, name).where(UPLOAD.ID.eq(uploadId)).awaitSingle()</span>
+<span class="nc" id="L78">    }</span>
+
+<span class="nc" id="L80">    suspend fun deleteUpload(tx: Configuration, uploadId: UUID): Int {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        val documentId = getDocumentIdFromUploadId(tx, uploadId) ?: error(&quot;No documentid for upload&quot;)</span>
+<span class="nc" id="L82">        return tx.dsl().delete(UPLOAD).where(UPLOAD.ID.eq(uploadId)).awaitSingle().also { DocumentChangeNotifier.notifyChange(documentId) }</span>
+    }
+
+//    suspend fun getUpload(tx: Configuration, id: UUID, personIdent: String): UploadWithFilename {
+//        return tx.dsl().select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(id)).awaitSingle()
+//            .map { record -&gt; UploadWithFilename(record.get(UPLOAD.ID), record.get(UPLOAD.ORIGINAL_FILENAME), record.get(UPLOAD.CONVERTED_FILENAME)) }
+//    }
+
+    suspend fun addErrors(tx: Configuration, uploadId: UUID, validations: List&lt;Validation&gt;) {
+<span class="nc bnc" id="L91" title="All 3 branches missed.">        coroutineScope {</span>
+<span class="nc" id="L92">            validations.map {</span>
+<span class="nc" id="L93">                launch(Dispatchers.IO) {</span>
+<span class="nc" id="L94">                    tx.dsl().insertInto(ERROR).set(ERROR.UPLOAD, uploadId).set(ERROR.CODE, it.code.name).set(ERROR.ID, UUID.randomUUID()).awaitSingle()</span>
+<span class="nc" id="L95">                }</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            }.joinAll()</span>
+<span class="nc" id="L97">        }</span>
+<span class="nc" id="L98">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
