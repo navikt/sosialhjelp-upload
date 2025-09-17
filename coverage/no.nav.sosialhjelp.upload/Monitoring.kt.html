@@ -19,7 +19,7 @@ fun Application.configureMonitoring() {
 <span class="nc" id="L19">    }</span>
 <span class="nc" id="L20">    install(CallLogging) {</span>
 <span class="nc" id="L21">        level = Level.INFO</span>
-<span class="nc" id="L22">        filter { call -&gt; call.request.path().startsWith(&quot;/&quot;) }</span>
+<span class="nc bnc" id="L22" title="All 2 branches missed.">        filter { call -&gt; !call.request.path().startsWith(&quot;/internal&quot;) }</span>
 <span class="nc" id="L23">    }</span>
 <span class="nc" id="L24">    routing {</span>
 <span class="nc bnc" id="L25" title="All 3 branches missed.">        get(&quot;/metrics-micrometer&quot;) {</span>
