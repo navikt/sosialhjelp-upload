@@ -23,12 +23,12 @@ fun Application.configureSecurity() {
         jwt {
             verifier(jwkProvider, jwtIssuer)
             validate { credential ->
-                if (credential.payload.audience == null) {
-                    this@configureSecurity.log.warn("Missing audience in JWT")
+                if (credential.payload.getClaim("client_id") == null) {
+                    this@configureSecurity.log.warn("Missing client_id in JWT")
                     return@validate null
                 }
                 if (
-                    credential.payload.audience.contains(jwtAudience) &&
+                    credential.payload.getClaim("client_id").asString() == jwtAudience &&
                     "idporten_loa_high" in
                     credential.payload
                         .getClaim("acr")
