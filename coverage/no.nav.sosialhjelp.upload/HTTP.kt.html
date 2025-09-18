@@ -3,26 +3,22 @@
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.forwardedheaders.*
 import kotlinx.serialization.json.Json
 
 fun Application.configureHTTP() {
-<span class="nc" id="L11">    install(ForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy</span>
-<span class="nc" id="L12">    install(XForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy</span>
+<span class="nc" id="L10">    install(ForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy</span>
+<span class="nc" id="L11">    install(XForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy</span>
 
-<span class="nc" id="L14">    install(ContentNegotiation) {</span>
-<span class="nc" id="L15">        json(</span>
-<span class="nc" id="L16">            Json {</span>
-<span class="nc" id="L17">                prettyPrint = true</span>
-<span class="nc" id="L18">                isLenient = true</span>
-<span class="nc" id="L19">                encodeDefaults = false</span>
-<span class="nc" id="L20">                ignoreUnknownKeys = true</span>
-<span class="nc" id="L21">            },</span>
+<span class="nc" id="L13">    install(ContentNegotiation) {</span>
+<span class="nc" id="L14">        json(</span>
+<span class="nc" id="L15">            Json {</span>
+<span class="nc" id="L16">                prettyPrint = true</span>
+<span class="nc" id="L17">                isLenient = true</span>
+<span class="nc" id="L18">                encodeDefaults = false</span>
+<span class="nc" id="L19">                ignoreUnknownKeys = true</span>
+<span class="nc" id="L20">            },</span>
         )
-<span class="nc" id="L23">    }</span>
-<span class="nc" id="L24">    install(DefaultHeaders) {</span>
-<span class="nc" id="L25">        header(&quot;X-Engine&quot;, &quot;Ktor&quot;) // will send this header with each response</span>
-<span class="nc" id="L26">    }</span>
-<span class="nc" id="L27">}</span>
+<span class="nc" id="L22">    }</span>
+<span class="nc" id="L23">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
