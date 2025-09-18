@@ -9,20 +9,21 @@ import java.util.concurrent.TimeUnit
 
 fun Application.configureSecurity() {
 <span class="nc" id="L11">    val jwtIssuer = environment.config.property(&quot;jwt.issuer&quot;).getString()</span>
+<span class="nc" id="L12">    val jwksUri = environment.config.property(&quot;jwt.jwks_uri&quot;).getString()</span>
 
-<span class="nc" id="L13">    val jwtAudience = environment.config.property(&quot;jwt.audience&quot;).getString()</span>
+<span class="nc" id="L14">    val jwtAudience = environment.config.property(&quot;jwt.audience&quot;).getString()</span>
 
-<span class="nc" id="L15">    val jwkProvider =</span>
-<span class="nc" id="L16">        JwkProviderBuilder(URI(&quot;$jwtIssuer/jwks&quot;).toURL())</span>
-<span class="nc" id="L17">            .cached(10, 24, TimeUnit.HOURS)</span>
-<span class="nc" id="L18">            .rateLimited(10, 1, TimeUnit.MINUTES)</span>
-<span class="nc" id="L19">            .build()</span>
+<span class="nc" id="L16">    val jwkProvider =</span>
+<span class="nc" id="L17">        JwkProviderBuilder(URI(jwksUri).toURL())</span>
+<span class="nc" id="L18">            .cached(10, 24, TimeUnit.HOURS)</span>
+<span class="nc" id="L19">            .rateLimited(10, 1, TimeUnit.MINUTES)</span>
+<span class="nc" id="L20">            .build()</span>
 
-<span class="nc" id="L21">    authentication {</span>
-<span class="nc" id="L22">        jwt {</span>
-<span class="nc" id="L23">            verifier(jwkProvider, jwtIssuer)</span>
-<span class="nc bnc" id="L24" title="All 4 branches missed.">            validate { credential -&gt; if (credential.payload.audience.contains(jwtAudience)) JWTPrincipal(credential.payload) else null }</span>
-<span class="nc" id="L25">        }</span>
-<span class="nc" id="L26">    }</span>
-<span class="nc" id="L27">}</span>
+<span class="nc" id="L22">    authentication {</span>
+<span class="nc" id="L23">        jwt {</span>
+<span class="nc" id="L24">            verifier(jwkProvider, jwtIssuer)</span>
+<span class="nc bnc" id="L25" title="All 4 branches missed.">            validate { credential -&gt; if (credential.payload.audience.contains(jwtAudience)) JWTPrincipal(credential.payload) else null }</span>
+<span class="nc" id="L26">        }</span>
+<span class="nc" id="L27">    }</span>
+<span class="nc" id="L28">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
