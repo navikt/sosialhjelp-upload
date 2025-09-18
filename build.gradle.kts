@@ -36,6 +36,7 @@ repositories {
 
 dependencies {
     // Common utilities
+    implementation(libs.bouncycastle)
     implementation(libs.checker)
     implementation(libs.apache.tika)
 

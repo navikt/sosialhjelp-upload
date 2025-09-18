@@ -15,6 +15,12 @@ database:
   port: "$POSTGRES_PORT:54322"
   name: "$POSTGRES_DATABASE:sosialhjelp-upload"
   jdbcUrl: "$POSTGRES_JDBC_URL:jdbc:postgresql://localhost:54322/sosialhjelp-upload"
+  url: "$POSTGRES_URL:postgresql://localhost:54322/sosialhjelp-upload"
+  sslCert: "$POSTGRES_SSLCERT:"
+  sslKey: "$POSTGRES_SSLKEY:"
+  sslKeyPK8: "$POSTGRES_SSLKEY_PK8:"
+  sslMode: "$POSTGRES_SSLMODE:none"
+  sslRootCert: "$POSTGRES_SSLROOTCERT:"
 thumbnailer:
   outputDir: "./tusd-data"
 gotenberg:
