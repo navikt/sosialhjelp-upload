@@ -17,7 +17,6 @@ fun Route.configureTusRoutes() {
     val log: Logger by application.dependencies
 
     post {
-        log.info(call.request.header("Authorization") ?: "no auth header")
         val request = call.receive<HookRequest>()
         val personIdent = call.principal<JWTPrincipal>()?.subject
 
