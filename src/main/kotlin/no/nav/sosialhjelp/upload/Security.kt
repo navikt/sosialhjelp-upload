@@ -22,7 +22,20 @@ fun Application.configureSecurity() {
     authentication {
         jwt {
             verifier(jwkProvider, jwtIssuer)
-            validate { credential -> if (credential.payload.audience.contains(jwtAudience)) JWTPrincipal(credential.payload) else null }
+            validate { credential ->
+                if (
+                    credential.payload.audience.contains(jwtAudience) &&
+                    "idporten_loa_high" in
+                    credential.payload
+                        .getClaim("acr")
+                        .asString()
+                        .lowercase()
+                ) {
+                    JWTPrincipal(credential.payload)
+                } else {
+                    null
+                }
+            }
         }
     }
 }
