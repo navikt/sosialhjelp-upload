@@ -22,8 +22,21 @@ fun Application.configureSecurity() {
 <span class="nc" id="L22">    authentication {</span>
 <span class="nc" id="L23">        jwt {</span>
 <span class="nc" id="L24">            verifier(jwkProvider, jwtIssuer)</span>
-<span class="nc bnc" id="L25" title="All 4 branches missed.">            validate { credential -&gt; if (credential.payload.audience.contains(jwtAudience)) JWTPrincipal(credential.payload) else null }</span>
-<span class="nc" id="L26">        }</span>
-<span class="nc" id="L27">    }</span>
-<span class="nc" id="L28">}</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">            validate { credential -&gt;</span>
+                if (
+<span class="nc bnc" id="L27" title="All 2 branches missed.">                    credential.payload.audience.contains(jwtAudience) &amp;&amp;</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">                    &quot;idporten_loa_high&quot; in</span>
+<span class="nc" id="L29">                    credential.payload</span>
+<span class="nc" id="L30">                        .getClaim(&quot;acr&quot;)</span>
+<span class="nc" id="L31">                        .asString()</span>
+<span class="nc" id="L32">                        .lowercase()</span>
+                ) {
+<span class="nc" id="L34">                    JWTPrincipal(credential.payload)</span>
+                } else {
+<span class="nc" id="L36">                    null</span>
+<span class="nc" id="L37">                }</span>
+            }
+<span class="nc" id="L39">        }</span>
+<span class="nc" id="L40">    }</span>
+<span class="nc" id="L41">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
