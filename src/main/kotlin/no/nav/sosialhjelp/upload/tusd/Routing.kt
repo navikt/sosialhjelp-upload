@@ -8,13 +8,16 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.logging.Logger
 import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import no.nav.sosialhjelp.upload.tusd.dto.HookResponse
 
 fun Route.configureTusRoutes() {
     val tusService: TusService by application.dependencies
+    val log: Logger by application.dependencies
 
     post {
+        log.info(call.request.header("Authorization") ?: "no auth header")
         val request = call.receive<HookRequest>()
         val personIdent = call.principal<JWTPrincipal>()?.subject
 

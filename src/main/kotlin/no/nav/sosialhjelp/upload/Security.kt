@@ -21,11 +21,12 @@ fun Application.configureSecurity() {
 
     authentication {
         jwt {
-            verifier(jwkProvider, jwtIssuer) {
-
-            }
+            verifier(jwkProvider, jwtIssuer)
             validate { credential ->
-                this@configureSecurity.log.info(credential.payload.toString())
+                if (credential.payload.audience == null) {
+                    this@configureSecurity.log.warn("Missing audience in JWT")
+                    return@validate null
+                }
                 if (
                     credential.payload.audience.contains(jwtAudience) &&
                     "idporten_loa_high" in
