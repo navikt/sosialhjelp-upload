@@ -7,6 +7,7 @@ ktor:
 jwt:
   audience: "$IDPORTEN_CLIENT_ID:default"
   issuer: "$IDPORTEN_ISSUER:http://localhost:8888/default"
+  jwks_uri: "$IDPORTEN_JWKS_URI:http://localhost:8888/default/jwks"
 database:
   user: "$POSTGRES_USERNAME:postgres"
   password: "$POSTGRES_PASSWORD:postgres"

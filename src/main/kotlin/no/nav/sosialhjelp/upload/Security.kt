@@ -9,11 +9,12 @@ import java.util.concurrent.TimeUnit
 
 fun Application.configureSecurity() {
     val jwtIssuer = environment.config.property("jwt.issuer").getString()
+    val jwksUri = environment.config.property("jwt.jwks_uri").getString()
 
     val jwtAudience = environment.config.property("jwt.audience").getString()
 
     val jwkProvider =
-        JwkProviderBuilder(URI("$jwtIssuer/jwks").toURL())
+        JwkProviderBuilder(URI(jwksUri).toURL())
             .cached(10, 24, TimeUnit.HOURS)
             .rateLimited(10, 1, TimeUnit.MINUTES)
             .build()
