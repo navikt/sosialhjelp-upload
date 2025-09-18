@@ -74,6 +74,3 @@ fun Route.configureActionRoutes() {
         }
     }
 }
-
-//@Serializable
-//data class SubmitInput(val targetUrl: String)

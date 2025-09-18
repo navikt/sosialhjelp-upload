@@ -33,7 +33,9 @@ fun Application.configureRouting() {
         }
 
         route("/tus-hooks") {
-            authenticate { configureTusRoutes() }
+            authenticate {
+                configureTusRoutes()
+            }
         }
     }
 }
