@@ -19,7 +19,7 @@ fun Application.configureMonitoring() {
     }
     install(CallLogging) {
         level = Level.INFO
-        filter { call -> !call.request.path().startsWith("/internal") }
+        filter { call -> !call.request.path().contains("/internal") && !call.request.path().contains("/metrics") }
     }
     routing {
         get("/metrics-micrometer") {
