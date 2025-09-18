@@ -39,7 +39,6 @@ ktor-server-config-yaml = { module = "io.ktor:ktor-server-config-yaml", version.
 ktor-server-di = { group = "io.ktor", name = "ktor-server-di", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
-ktor-server-default-headers = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
 ktor-server-forwarded-header = { module = "io.ktor:ktor-server-forwarded-header", version.ref = "ktor" }
 ktor-server-metrics-micrometer = { module = "io.ktor:ktor-server-metrics-micrometer", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
@@ -98,7 +97,6 @@ ktor = [
     "ktor-server-content-negotiation",
     "ktor-server-core",
     "ktor-server-di",
-    "ktor-server-default-headers",
     "ktor-server-forwarded-header",
     "ktor-server-metrics-micrometer",
     "ktor-server-netty",
