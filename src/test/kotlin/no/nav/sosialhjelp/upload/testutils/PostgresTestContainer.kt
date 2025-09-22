@@ -28,26 +28,17 @@ object PostgresTestContainer {
 
     fun connectAndStart(): DSLContext {
         val jdbcUrl = instance.jdbcUrl
-        val load = Flyway.configure()
-            .dataSource(jdbcUrl, instance.username, instance.password)
-            .locations("classpath:db/migration")
-            // TODO: FJERN FØR PRODSETTING
-            .cleanDisabled(false)
-            .load()
+        val load =
+            Flyway
+                .configure()
+                .dataSource(jdbcUrl, instance.username, instance.password)
+                .locations("classpath:db/migration")
+                // TODO: FJERN FØR PRODSETTING
+                .cleanDisabled(false)
+                .load()
         load.clean()
         load.migrate()
-        println(instance.password)
-        val options = ConnectionFactoryOptions.builder()
-            .option(DRIVER, "postgresql")
-            .option(HOST, instance.host)
-            .option(PORT, instance.firstMappedPort)
-            .option(USER, instance.username)
-            .option(PASSWORD, instance.password)
-            .option(DATABASE, instance.databaseName)
-            .build()
-        val connectionFactory = ConnectionFactories.get(options)
-        val config = DefaultConfiguration().derive(connectionFactory).derive(SQLDialect.POSTGRES)
-        val dsl = DSL.using(config)
+        val dsl = DSL.using(jdbcUrl, instance.username, instance.password)
         DocumentChangeNotifier.dsl = dsl
 
         return dsl

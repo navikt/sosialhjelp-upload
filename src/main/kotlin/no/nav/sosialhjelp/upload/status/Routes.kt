@@ -7,17 +7,15 @@ import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
 import io.ktor.util.reflect.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.DocumentRepository
-import no.nav.sosialhjelp.upload.database.reactive.DocumentStatusChannelFactory
+import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import kotlin.time.Duration.Companion.seconds
 
 fun Route.configureStatusRoutes() {
-    val statusChannelFactory = DocumentStatusChannelFactory(environment)
+    val statusChannelFactory: DocumentNotificationService by application.dependencies
     val dsl: DSLContext by application.dependencies
     val documentRepository: DocumentRepository by application.dependencies
     val documentStatusService: DocumentStatusService by application.dependencies
@@ -34,16 +32,14 @@ fun Route.configureStatusRoutes() {
         }
 
         val documentId =
-            dsl.transactionCoroutine(Dispatchers.IO) {
-                documentRepository.getOrCreateDocument(it, call.parameters["id"] ?: "", personident)
+            dsl.transactionResult { config ->
+                documentRepository.getOrCreateDocument(config, call.parameters["id"] ?: "", personident)
             }
 
-        DocumentNotificationListener(statusChannelFactory, documentId).use { emitter ->
-            send(documentStatusService.getDocumentStatus(documentId))
+        send(documentStatusService.getDocumentStatus(documentId))
 
-            emitter
-                .getDocumentUpdateFlow()
-                .collect { send(documentStatusService.getDocumentStatus(documentId)) }
+        statusChannelFactory.getDocumentFlow(documentId).collect {
+            send(documentStatusService.getDocumentStatus(documentId))
         }
     }
 }

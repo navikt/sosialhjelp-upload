@@ -1,7 +1,5 @@
 package no.nav.sosialhjelp.upload.status
 
-import kotlinx.coroutines.*
-import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockDocument
 import no.nav.sosialhjelp.upload.database.DocumentRepository
@@ -13,7 +11,6 @@ import no.nav.sosialhjelp.upload.status.dto.DocumentState
 import no.nav.sosialhjelp.upload.status.dto.UploadSuccessState
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -40,11 +37,9 @@ class DocumentStatusServiceTest {
 
     @BeforeEach
     fun cleanupBeforeEach() =
-        runTest {
-            dsl.transactionCoroutine {
-                it.dsl().deleteFrom(PAGE).awaitSingle()
-                it.dsl().deleteFrom(UPLOAD).awaitSingle()
-            }
+        dsl.transaction { config ->
+            config.dsl().deleteFrom(PAGE).execute()
+            config.dsl().deleteFrom(UPLOAD).execute()
         }
 
     /**
@@ -52,18 +47,17 @@ class DocumentStatusServiceTest {
      * with an empty uploads map.
      */
     @Test
-    fun `getDocumentStatus returns empty state when no uploads exist`() =
-        runTest {
-            val documentId = createMockDocument(dsl)
-            val service = DocumentStatusService(uploadRepository, pageRepository, dsl)
+    fun `getDocumentStatus returns empty state when no uploads exist`() {
+        val documentId = createMockDocument(dsl)
+        val service = DocumentStatusService(uploadRepository, pageRepository, dsl)
 
-            // When: retrieving document status
-            val result: DocumentState = service.getDocumentStatus(documentId)
+        // When: retrieving document status
+        val result: DocumentState = service.getDocumentStatus(documentId)
 
-            // Then: the returned state should have the matching documentId and no uploads.
-            assertEquals(documentId.toString(), result.documentId)
-            assertTrue(result.uploads.isEmpty())
-        }
+        // Then: the returned state should have the matching documentId and no uploads.
+        assertEquals(documentId.toString(), result.documentId)
+        assertTrue(result.uploads.isEmpty())
+    }
 
     /**
      * Test that when one upload exists (with no pages), the returned DocumentState correctly
@@ -71,12 +65,12 @@ class DocumentStatusServiceTest {
      */
     @Test
     fun `getDocumentStatus returns upload with empty pages list when upload exists but no pages`() =
-        runBlocking {
+        runTest {
             // Given
             val documentId = createMockDocument(dsl)
             // Insert one upload row associated with the document.
             val uploadId =
-                dsl.transactionCoroutine {
+                dsl.transaction { it ->
                     it
                         .dsl()
                         .insertInto(
@@ -87,7 +81,7 @@ class DocumentStatusServiceTest {
                         ).set(UPLOAD.DOCUMENT_ID, documentId)
                         .set(UPLOAD.ORIGINAL_FILENAME, "file.pdf")
                         .returning(UPLOAD.ID)
-                        .awaitSingle()[UPLOAD.ID]
+                        .fetchSingle()[UPLOAD.ID]
                 }
             val service = DocumentStatusService(uploadRepository, pageRepository, dsl)
 
@@ -103,20 +97,22 @@ class DocumentStatusServiceTest {
             assertTrue(uploadState.pages!!.isEmpty())
         }
 
-    private suspend fun createUpload(documentId: UUID, filename: String) =
-        dsl.transactionCoroutine {
-            it
-                .dsl()
-                .insertInto(
-                    UPLOAD,
-                ).set(
-                    UPLOAD.ID,
-                    UUID.randomUUID(),
-                ).set(UPLOAD.DOCUMENT_ID, documentId)
-                .set(UPLOAD.ORIGINAL_FILENAME, filename)
-                .returning(UPLOAD.ID)
-                .awaitSingle()[UPLOAD.ID]
-        }
+    private fun createUpload(
+        documentId: UUID,
+        filename: String,
+    ) = dsl.transaction { it ->
+        it
+            .dsl()
+            .insertInto(
+                UPLOAD,
+            ).set(
+                UPLOAD.ID,
+                UUID.randomUUID(),
+            ).set(UPLOAD.DOCUMENT_ID, documentId)
+            .set(UPLOAD.ORIGINAL_FILENAME, filename)
+            .returning(UPLOAD.ID)
+            .fetchSingle()[UPLOAD.ID]
+    }
 
     /**
      * Test that multiple uploads for the same document are all

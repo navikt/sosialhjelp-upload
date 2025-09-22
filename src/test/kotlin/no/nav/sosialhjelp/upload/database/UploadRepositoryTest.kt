@@ -1,19 +1,15 @@
 package no.nav.sosialhjelp.upload.database
 
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.mockkObject
+import io.mockk.every
+import io.mockk.mockk
 import io.mockk.unmockkObject
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.reactive.awaitSingle
-import kotlinx.coroutines.test.runTest
+import io.mockk.verify
 import no.nav.sosialhjelp.upload.common.TestUtils
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
+import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -26,86 +22,81 @@ class UploadRepositoryTest {
     private lateinit var documentRepository: DocumentRepository
     private lateinit var uploadRepository: UploadRepository
     private lateinit var dsl: DSLContext
+    private lateinit var notificationServiceMock: DocumentNotificationService
 
     @BeforeAll
     fun setupDatabase() {
         dsl = PostgresTestContainer.connectAndStart()
         documentRepository = DocumentRepository(dsl)
-        uploadRepository = UploadRepository()
+        notificationServiceMock = mockk<DocumentNotificationService>()
+        uploadRepository = UploadRepository(notificationServiceMock)
     }
 
     @BeforeEach
-    fun cleanup(): Unit =
-        runBlocking {
-            dsl.transactionCoroutine(Dispatchers.IO) {
-                it.dsl().deleteFrom(DOCUMENT).awaitSingle()
-            }
+    fun cleanup() {
+        dsl.transaction { it ->
+            it.dsl().deleteFrom(DOCUMENT).execute()
         }
+    }
 
     @Test
-    fun `test create upload`() =
-        runTest {
-            val documentId = TestUtils.createMockDocument(dsl)
-            val filename = "testfile.txt"
-            val uploadId = dsl.transactionCoroutine { uploadRepository.create(it, documentId, filename) }
+    fun `test create upload`() {
+        val documentId = TestUtils.createMockDocument(dsl)
+        val filename = "testfile.txt"
+        val uploadId = dsl.transactionResult { tx -> uploadRepository.create(tx, documentId, filename) }
 
-            dsl.transactionCoroutine {
-                val upload =
-                    it
-                        .dsl()
-                        .select(
-                            UPLOAD.DOCUMENT_ID,
-                            UPLOAD.ORIGINAL_FILENAME,
-                        ).from(UPLOAD)
-                        .where(UPLOAD.ID.eq(uploadId!!))
-                        .awaitSingle()
-                assertEquals(documentId, upload[UPLOAD.DOCUMENT_ID])
-                assertEquals(filename, upload[UPLOAD.ORIGINAL_FILENAME])
-            }
+        dsl.transaction { tx ->
+            val upload =
+                tx
+                    .dsl()
+                    .select(
+                        UPLOAD.DOCUMENT_ID,
+                        UPLOAD.ORIGINAL_FILENAME,
+                    ).from(UPLOAD)
+                    .where(UPLOAD.ID.eq(uploadId!!))
+                    .fetchSingle()
+            assertEquals(documentId, upload[UPLOAD.DOCUMENT_ID])
+            assertEquals(filename, upload[UPLOAD.ORIGINAL_FILENAME])
         }
+    }
 
     @Test
-    fun `test getUploadsByDocumentId returns correct uploads`() =
-        runTest {
-            val documentId = TestUtils.createMockDocument(dsl)
-            val uploadId1 = dsl.transactionCoroutine { uploadRepository.create(it, documentId, "file1.txt") }
-            val uploadId2 = dsl.transactionCoroutine { uploadRepository.create(it, documentId, "file2.txt") }
-            // Create an upload for a different document to ensure filtering works.
-            val otherDocumentId = TestUtils.createMockDocument(dsl)
-            dsl.transactionCoroutine { uploadRepository.create(it, otherDocumentId, "otherfile.txt") }
+    fun `test getUploadsByDocumentId returns correct uploads`() {
+        val documentId = TestUtils.createMockDocument(dsl)
+        val uploadId1 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file1.txt") }
+        val uploadId2 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file2.txt") }
+        // Create an upload for a different document to ensure filtering works.
+        val otherDocumentId = TestUtils.createMockDocument(dsl)
+        dsl.transaction { it -> uploadRepository.create(it, otherDocumentId, "otherfile.txt") }
 
-            val uploads =
-                dsl
-                    .transactionCoroutine { tx ->
-                        uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
-                    }.map { it.id }
-            assertTrue(uploads.contains(uploadId1))
-            assertTrue(uploads.contains(uploadId2))
-            assertEquals(2, uploads.size)
-        }
-
-    @Test
-    fun `test getDocumentIdFromUploadId returns correct document id`() =
-        runTest {
-            val documentId = TestUtils.createMockDocument(dsl)
-            val uploadId = dsl.transactionCoroutine { uploadRepository.create(it, documentId, "file.txt") } ?: error("Ingen uploadId")
-            // Retrieve the document id using the upload id.
-            val retrievedDocumentId = dsl.transactionCoroutine { uploadRepository.getDocumentIdFromUploadId(it, uploadId) }
-            assertEquals(documentId, retrievedDocumentId)
-        }
+        val uploads =
+            dsl
+                .transactionResult { tx ->
+                    uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
+                }.map { it.id }
+        assertTrue(uploads.contains(uploadId1))
+        assertTrue(uploads.contains(uploadId2))
+        assertEquals(2, uploads.size)
+    }
 
     @Test
-    fun `test notifyChange calls DocumentRepository with correct document id`() =
-        runTest {
-            val documentId = TestUtils.createMockDocument(dsl)
-            val uploadId = dsl.transactionCoroutine { uploadRepository.create(it, documentId, "notify.txt") } ?: error("Ingen uploadId")
+    fun `test getDocumentIdFromUploadId returns correct document id`() {
+        val documentId = TestUtils.createMockDocument(dsl)
+        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file.txt") } ?: error("Ingen uploadId")
+        // Retrieve the document id using the upload id.
+        val retrievedDocumentId = dsl.transactionResult { it -> uploadRepository.getDocumentIdFromUploadId(it, uploadId) }
+        assertEquals(documentId, retrievedDocumentId)
+    }
 
-            mockkObject(DocumentChangeNotifier)
-            coEvery { DocumentChangeNotifier.notifyChange(any()) } returns Unit
+    @Test
+    fun `test notifyChange calls DocumentRepository with correct document id`() {
+        val documentId = TestUtils.createMockDocument(dsl)
+        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "notify.txt") } ?: error("Ingen uploadId")
+        every { notificationServiceMock.notifyUpdate(any()) } returns Unit
 
-            dsl.transactionCoroutine { uploadRepository.notifyChange(it, uploadId) }
+        dsl.transaction { it -> uploadRepository.notifyChange(it, uploadId) }
 
-            coVerify { DocumentChangeNotifier.notifyChange(documentId) }
-            unmockkObject(DocumentChangeNotifier)
-        }
+        verify { notificationServiceMock.notifyUpdate(documentId) }
+        unmockkObject(DocumentChangeNotifier)
+    }
 }

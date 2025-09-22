@@ -1,18 +1,14 @@
 package no.nav.sosialhjelp.upload.tusd
 
 import io.ktor.server.plugins.di.annotations.Property
-import no.nav.sosialhjelp.upload.database.DocumentRepository
 import io.ktor.util.logging.Logger
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
 import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.common.FinishedUpload
+import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
-import no.nav.sosialhjelp.upload.pdf.ThumbnailService
 import no.nav.sosialhjelp.upload.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.upload.tusd.dto.HTTPResponse
 import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
@@ -21,14 +17,12 @@ import no.nav.sosialhjelp.upload.tusd.input.CreateUploadRequest
 import no.nav.sosialhjelp.upload.tusd.input.PostFinishRequest
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import java.io.File
 import java.util.*
 
 class TusService(
     val logger: Logger,
     val uploadRepository: UploadRepository,
-    val thumbnailService: ThumbnailService,
     val gotenbergService: GotenbergService,
     val documentRepository: DocumentRepository,
     val filePathFactory: FilePathFactory,
@@ -36,8 +30,7 @@ class TusService(
     val validator: UploadValidator,
     @Property("storage.basePath") val basePath: String,
 ) {
-
-    suspend fun preCreate(
+    fun preCreate(
         request: HookRequest,
         personident: String,
     ): HookResponse {
@@ -45,14 +38,17 @@ class TusService(
 
         val uploadId =
             try {
-                dsl.transactionCoroutine(Dispatchers.IO) {
+                dsl.transactionResult { it ->
                     val documentId = documentRepository.getOrCreateDocument(it, uploadRequest.externalId, personident)
                     val uploadId = uploadRepository.create(it, documentId, uploadRequest.filename)
                     logger.info("Creating a new upload, ID: $uploadId for document $documentId")
                     uploadId
                 }
-            } catch (e: DocumentOwnedByAnotherUserException) {
-                return HookResponse(HTTPResponse(403, mapOf("Content-Type" to "application/json"), """"message": "Not yours""""), rejectUpload = true)
+            } catch (_: DocumentOwnedByAnotherUserException) {
+                return HookResponse(
+                    HTTPResponse(403, mapOf("Content-Type" to "application/json"), """"message": "Not yours""""),
+                    rejectUpload = true,
+                )
             }
 
         return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))
@@ -64,7 +60,7 @@ class TusService(
         val extension = File(request.filename).extension
         if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
             convertUploadToPdf(request.uploadId, request.filename).also { uploadPdf ->
-                dsl.transactionCoroutine(Dispatchers.IO) {
+                dsl.transactionResult { it ->
                     uploadRepository.updateConvertedFilename(it, uploadPdf.name, request.uploadId)
                 }
                 // TODO: Tror ikke vi trenger dette?
@@ -76,7 +72,7 @@ class TusService(
             val convertedPath = Path(basePath, request.filename)
             File(originalPath.toString()).copyTo(File(convertedPath.toString()), overwrite = true)
         }
-        dsl.transactionCoroutine(Dispatchers.IO) { uploadRepository.notifyChange(it, request.uploadId) }
+        dsl.transactionResult { it -> uploadRepository.notifyChange(it, request.uploadId) }
     }
 
     private suspend fun convertUploadToPdf(
@@ -94,8 +90,11 @@ class TusService(
             )
         }
 
-    suspend fun preTerminate(request: HookRequest, personIdent: String): HookResponse {
-        return dsl.transactionCoroutine { tx ->
+    fun preTerminate(
+        request: HookRequest,
+        personIdent: String,
+    ): HookResponse =
+        dsl.transactionResult { tx ->
             val correctOwner = uploadRepository.isOwnedByUser(tx, UUID.fromString(request.event.upload.id), personIdent)
             if (!correctOwner) {
                 HookResponse(HTTPResponse(403), rejectTermination = true)
@@ -103,10 +102,12 @@ class TusService(
                 HookResponse()
             }
         }
-    }
 
-    suspend fun postTerminate(request: HookRequest, personIdent: String): HookResponse {
-        return dsl.transactionCoroutine { tx ->
+    fun postTerminate(
+        request: HookRequest,
+        personIdent: String,
+    ): HookResponse =
+        dsl.transactionResult { tx ->
             val uploadId = UUID.fromString(request.event.upload.id)
             val correctOwner = uploadRepository.isOwnedByUser(tx, uploadId, personIdent)
             if (!correctOwner) {
@@ -115,18 +116,24 @@ class TusService(
             uploadRepository.deleteUpload(tx, uploadId)
             HookResponse(HTTPResponse(204))
         }
-    }
 
-    suspend fun validateUpload(request: HookRequest, personIdent: String): HookResponse {
+    suspend fun validateUpload(request: HookRequest): HookResponse {
         // TODO: Trenger vi å validere person?
         val validations = validator.validate(request)
-        val response = if (validations.isNotEmpty()) {
-            dsl.transactionCoroutine(Dispatchers.IO) {
-                uploadRepository.addErrors(it, UUID.fromString(request.event.upload.id), validations)
+        val response =
+            if (validations.isNotEmpty()) {
+                dsl.transactionResult { it ->
+                    uploadRepository.addErrors(it, UUID.fromString(request.event.upload.id), validations)
+                }
+                // TODO: Litt penere serialisering please
+                HTTPResponse(
+                    400,
+                    mapOf("Content-Type" to "application/json"),
+                    """{"errors": [${validations.joinToString(",") { """{"code": "${it.code}", "message": "${it.message}"}""" }}]}""",
+                )
+            } else {
+                HTTPResponse()
             }
-            // TODO: Litt penere serialisering please
-            HTTPResponse(400, mapOf("Content-Type" to "application/json"), """{"errors": [${validations.joinToString(",") { """{"code": "${it.code}", "message": "${it.message}"}""" }}]}""")
-        } else HTTPResponse()
         return HookResponse(response)
     }
 }

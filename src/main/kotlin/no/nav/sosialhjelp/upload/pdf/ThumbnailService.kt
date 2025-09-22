@@ -1,15 +1,13 @@
 package no.nav.sosialhjelp.upload.pdf
 
 import io.ktor.server.plugins.di.annotations.Property
-import kotlinx.coroutines.Dispatchers
-import no.nav.sosialhjelp.upload.database.DocumentChangeNotifier
 import no.nav.sosialhjelp.upload.database.PageRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.rendering.ImageType
 import org.apache.pdfbox.rendering.PDFRenderer
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import java.io.File
 import java.util.*
 import javax.imageio.ImageIO
@@ -18,25 +16,25 @@ class ThumbnailService(
     val pageRepository: PageRepository,
     val uploadRepository: UploadRepository,
     val dsl: DSLContext,
-    @Property("thumbnailer.outputDir") val outputDir: String
+    val notificationService: DocumentNotificationService,
+    @Property("thumbnailer.outputDir") val outputDir: String,
 ) {
-
-    suspend fun makeThumbnails(
+    fun makeThumbnails(
         uploadId: UUID,
         inputDocument: PDDocument,
         baseFilename: String,
     ) {
-        dsl.transactionCoroutine(Dispatchers.IO) {
+        dsl.transactionResult { it ->
             for (pageIndex in 0..<inputDocument.numberOfPages) pageRepository.createEmptyPage(it, uploadId, pageIndex)
             val documentId = uploadRepository.getDocumentIdFromUploadId(it, uploadId)
-            documentId?.let { DocumentChangeNotifier.notifyChange(documentId) }
+            documentId?.let { notificationService.notifyUpdate(documentId) }
         }
 
         val pdfRenderer = PDFRenderer(inputDocument)
 
         for (pageIndex in 0..<inputDocument.numberOfPages) {
             val thumbnail = writeThumbnail(pdfRenderer, baseFilename, pageIndex)
-            dsl.transactionCoroutine(Dispatchers.IO) { pageRepository.setFilename(it, uploadId, pageIndex, thumbnail) }
+            dsl.transactionResult { it -> pageRepository.setFilename(it, uploadId, pageIndex, thumbnail) }
         }
     }
 

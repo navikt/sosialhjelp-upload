@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.ktor.plugin)
     alias(libs.plugins.kotlinx.serialization)
     id("nl.littlerobots.version-catalog-update") version "1.0.0"
-    id("org.jooq.jooq-codegen-gradle") version "3.20.6"
+    id("org.jooq.jooq-codegen-gradle") version libs.versions.jooq
     id("jacoco")
     id("org.sonarqube") version "3.5.0.2730"
 }
@@ -64,7 +64,6 @@ dependencies {
 
     implementation(libs.flyway.core)
     implementation(libs.flyway.postgresql)
-    // For flyway
     implementation(libs.jdbc.postgresql)
 
     implementation(libs.bundles.jooq)
@@ -85,7 +84,6 @@ dependencies {
     testImplementation(libs.bundles.testcontainers)
 }
 
-
 tasks.test {
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
@@ -96,7 +94,6 @@ kotlin {
         jvmTarget = JvmTarget.JVM_21
     }
 }
-
 
 jacoco {
     toolVersion = "0.8.13"
@@ -151,5 +148,11 @@ jooq {
                 directory = "src/main/kotlin"
             }
         }
+    }
+}
+
+tasks {
+    shadowJar {
+        mergeServiceFiles()
     }
 }

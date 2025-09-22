@@ -4,7 +4,6 @@ import io.ktor.http.ContentType
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.http.content.*
-import io.ktor.server.request.header
 import io.ktor.server.resources.*
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.*

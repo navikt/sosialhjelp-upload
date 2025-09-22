@@ -16,12 +16,12 @@ testcontainers = "1.21.3"
 sosialhjelp_common = "1.20250120.1009-d88048d"
 tika = "3.2.2"
 bouncycastle = "1.82"
+jooq = "3.19.26"
 
 [libraries]
-jooq = { module = "org.jooq:jooq", version = "3.20.6" }
-jooq-meta = { module = "org.jooq:jooq-meta", version = "3.20.6" }
-jooq-kotlin = { module = "org.jooq:jooq-kotlin", version = "3.20.6" }
-jooq-kotlin-coroutines = { module = "org.jooq:jooq-kotlin-coroutines", version = "3.20.6" }
+jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
+jooq-meta = { module = "org.jooq:jooq-meta", version.ref = "jooq" }
+jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
 checker = { module = "org.checkerframework:checker-qual", version.ref = "checker" }
 junit-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -73,7 +73,6 @@ ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 jooq = [
     "jooq",
     "jooq-kotlin",
-    "jooq-kotlin-coroutines",
 ]
 junit = [
     "junit-api",

@@ -9,14 +9,11 @@ import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.upload.common.FilePathFactory
-import no.nav.sosialhjelp.upload.database.DocumentChangeNotifier
 import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import java.io.File
 import java.util.*
 
@@ -41,6 +38,7 @@ fun Route.configureActionRoutes() {
     val documentRepository: DocumentRepository by application.dependencies
     val filePathFactory: FilePathFactory by application.dependencies
     val downstreamUploadService: DownstreamUploadService by application.dependencies
+    val notificationService: DocumentNotificationService by application.dependencies
     val dsl: DSLContext by application.dependencies
 
     post("/document/{documentId}/submit") {
@@ -51,7 +49,7 @@ fun Route.configureActionRoutes() {
             return@post call.respondText("Access denied", status = HttpStatusCode.Forbidden)
         }
 
-        val uploads = dsl.transactionCoroutine(Dispatchers.IO) { tx ->
+        val uploads = dsl.transactionResult { tx ->
             uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
         }
 
@@ -66,9 +64,9 @@ fun Route.configureActionRoutes() {
             call.request.header("Authorization")!!.removePrefix("Bearer "),
         )
         if (response.status.isSuccess()) {
-            dsl.transactionCoroutine(Dispatchers.IO) { tx ->
+            dsl.transactionResult { tx ->
                 documentRepository.cleanup(tx, documentId)
-                DocumentChangeNotifier.notifyChange(documentId)
+                notificationService.notifyUpdate(documentId)
             }
             call.respond(HttpStatusCode.Created)
         }

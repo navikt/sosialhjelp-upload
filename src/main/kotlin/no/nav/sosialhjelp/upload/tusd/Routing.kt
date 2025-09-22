@@ -30,7 +30,7 @@ fun Route.configureTusRoutes() {
 
         call.respond(
             when (request.type) {
-                HookType.PreFinish -> tusService.validateUpload(request, personIdent)
+                HookType.PreFinish -> tusService.validateUpload(request)
                 HookType.PreTerminate -> tusService.preTerminate(request, personIdent)
                 HookType.PostTerminate -> tusService.postTerminate(request, personIdent)
                 HookType.PreCreate -> tusService.preCreate(request, personIdent)

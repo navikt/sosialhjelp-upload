@@ -1,7 +1,5 @@
 package no.nav.sosialhjelp.upload.database
 
-import kotlinx.coroutines.reactive.awaitFirstOrNull
-import kotlinx.coroutines.reactive.awaitSingle
 import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
 import org.jooq.Configuration
 import org.jooq.DSLContext
@@ -12,16 +10,16 @@ class DocumentRepository(
 ) {
     class DocumentOwnedByAnotherUserException : RuntimeException()
 
-    suspend fun getDocument(
+    fun getDocument(
         tx: Configuration,
         id: UUID,
     ) = tx
         .dsl()
         .selectFrom(DOCUMENT)
         .where(DOCUMENT.ID.eq(id))
-        .awaitSingle()
+        .fetchSingle()
 
-    suspend fun getOrCreateDocument(
+    fun getOrCreateDocument(
         tx: Configuration,
         externalId: String,
         personIdent: String,
@@ -39,7 +37,7 @@ class DocumentRepository(
                 .set(DOCUMENT.EXTERNAL_ID, externalId)
                 .onDuplicateKeyIgnore()
                 .returning(DOCUMENT.ID)
-                .awaitFirstOrNull()
+                .fetchOne()
                 ?.get(DOCUMENT.ID)
 
         if (insertedId != null) return insertedId
@@ -53,11 +51,11 @@ class DocumentRepository(
                 DOCUMENT.EXTERNAL_ID
                     .eq(externalId)
                     .and(DOCUMENT.OWNER_IDENT.eq(personIdent)),
-            ).awaitFirstOrNull()
+            ).fetchOne()
             ?.get(DOCUMENT.ID) ?: error("Could not find or create document")
     }
 
-    private suspend fun isOwnedByAnotherUser(
+    private fun isOwnedByAnotherUser(
         externalId: String,
         personIdent: String,
     ): Boolean {
@@ -69,12 +67,12 @@ class DocumentRepository(
                     DOCUMENT.EXTERNAL_ID
                         .eq(externalId)
                         .and(DOCUMENT.OWNER_IDENT.ne(personIdent)),
-                ).awaitSingle()
+                ).fetchSingle()
                 .value1()
         return count > 0
     }
 
-    suspend fun isOwnedByUser(
+    fun isOwnedByUser(
         id: UUID,
         personIdent: String,
     ): Boolean {
@@ -86,12 +84,12 @@ class DocumentRepository(
                     DOCUMENT.ID
                         .eq(id)
                         .and(DOCUMENT.OWNER_IDENT.eq(personIdent)),
-                ).awaitSingle()
+                ).fetchOne()
                 ?.value1()
         return count != 0
     }
 
-    suspend fun cleanup(
+    fun cleanup(
         tx: Configuration,
         documentId: UUID,
     ): Int =
@@ -99,5 +97,5 @@ class DocumentRepository(
             .dsl()
             .deleteFrom(DOCUMENT)
             .where(DOCUMENT.ID.eq(documentId))
-            .awaitSingle()
+            .execute()
 }
