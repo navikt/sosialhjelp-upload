@@ -67,3 +67,7 @@ spec:
       value: "http://clamav.nais-system/scan"
     - name: GOTENBERG_URL
       value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
+    - name: RUNTIME_ENV
+      value: "dev"
+    - name: BUCKET_NAME
+      value: "sosialhjelp-upload-dev"

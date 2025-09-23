@@ -13,7 +13,9 @@ class Upload(
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-class DownstreamUploadService(val fiksClient: FiksClient) {
+class DownstreamUploadService(
+    val fiksClient: FiksClient,
+) {
     private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
         val previousId: String =
             digisosSak.ettersendtInfoNAV
@@ -45,11 +47,17 @@ class DownstreamUploadService(val fiksClient: FiksClient) {
         val kommunenummer = sak.kommunenummer
         val navEksternRefId = lagNavEksternRefId(sak)
 
+        // TODO: Kryptering
         // TODO: Ta med ettersendelse.pdf i opplastingen
         return fiksClient.uploadEttersendelse(fiksDigisosId, kommunenummer, navEksternRefId, files, metadata, token)
     }
-
 }
 
 @Serializable
-data class VedleggSpesifikasjon(val type: String, val tilleggsinfo: String?, val innsendelsesfrist: String?, val hendelsetype: String?, val hendelsereferanse: String?)
+data class VedleggSpesifikasjon(
+    val type: String,
+    val tilleggsinfo: String?,
+    val innsendelsesfrist: String?,
+    val hendelsetype: String?,
+    val hendelsereferanse: String?,
+)

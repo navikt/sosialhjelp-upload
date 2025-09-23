@@ -14,7 +14,8 @@ spec:
   gcp:
     buckets:
       - name: sosialhjelp-upload-dev
-        retentionPeriodDays: 1
+        lifecycleCondition:
+          age: 1
   accessPolicy:
     outbound:
       rules:

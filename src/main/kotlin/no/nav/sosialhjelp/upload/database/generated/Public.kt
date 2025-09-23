@@ -8,7 +8,6 @@ import kotlin.collections.List
 
 import no.nav.sosialhjelp.upload.database.generated.tables.Document
 import no.nav.sosialhjelp.upload.database.generated.tables.Error
-import no.nav.sosialhjelp.upload.database.generated.tables.Page
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
 import org.jooq.Table
@@ -39,11 +38,6 @@ open class Public : SchemaImpl("public", null) {
     val ERROR: Error get() = Error.ERROR
 
     /**
-     * The table <code>public.page</code>.
-     */
-    val PAGE: Page get() = Page.PAGE
-
-    /**
      * The table <code>public.upload</code>.
      */
     val UPLOAD: Upload get() = Upload.UPLOAD
@@ -51,7 +45,6 @@ open class Public : SchemaImpl("public", null) {
     override fun getTables(): List<Table<*>> = listOf(
         Document.DOCUMENT,
         Error.ERROR,
-        Page.PAGE,
         Upload.UPLOAD
     )
 }

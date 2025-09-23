@@ -22,5 +22,5 @@ data class FileInfo(
     @SerialName("PartialUploads")
     val partialUploads: List<String>? = null,
     @SerialName("Storage")
-    val storage: LocalStorage? = null,
+    val storage: Storage? = null,
 )

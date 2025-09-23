@@ -1,13 +1,11 @@
 package no.nav.sosialhjelp.upload.tusd
 
-import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.util.logging.Logger
-import kotlinx.io.files.Path
-import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.fs.Storage
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.tusd.dto.FileInfoChanges
 import no.nav.sosialhjelp.upload.tusd.dto.HTTPResponse
@@ -25,10 +23,9 @@ class TusService(
     val uploadRepository: UploadRepository,
     val gotenbergService: GotenbergService,
     val documentRepository: DocumentRepository,
-    val filePathFactory: FilePathFactory,
     val dsl: DSLContext,
     val validator: UploadValidator,
-    @Property("storage.basePath") val basePath: String,
+    val storage: Storage,
 ) {
     fun preCreate(
         request: HookRequest,
@@ -59,18 +56,17 @@ class TusService(
         // Ikke konverter det som fagsystemene godkjenner (pdf, jpg/jpeg, png)
         val extension = File(request.filename).extension
         if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
-            convertUploadToPdf(request.uploadId, request.filename).also { uploadPdf ->
-                dsl.transactionResult { it ->
-                    uploadRepository.updateConvertedFilename(it, uploadPdf.name, request.uploadId)
-                }
-                // TODO: Tror ikke vi trenger dette?
-                // thumbnailService.makeThumbnails(request.uploadId, Loader.loadPDF(uploadPdf), request.filename)
+            val converted = convertUploadToPdf(request.uploadId, request.filename)
+            val pdfName = File(request.filename).nameWithoutExtension + ".pdf"
+            storage.store(pdfName, converted)
+            dsl.transactionResult { it ->
+                uploadRepository.updateConvertedFilename(it, pdfName, request.uploadId)
             }
         } else {
             // If we don't convert, we just need to copy the file to the original file name
-            val originalPath = filePathFactory.getOriginalUploadPath(request.uploadId)
-            val convertedPath = Path(basePath, request.filename)
-            File(originalPath.toString()).copyTo(File(convertedPath.toString()), overwrite = true)
+            val original = storage.retrieve(request.uploadId.toString()) ?: error("File not found")
+            val changedPath = request.filename
+            storage.store(changedPath, original)
         }
         dsl.transactionResult { it -> uploadRepository.notifyChange(it, request.uploadId) }
     }
@@ -78,17 +74,15 @@ class TusService(
     private suspend fun convertUploadToPdf(
         uploadId: UUID,
         filename: String,
-    ): File =
-        File(filePathFactory.getConvertedPdfPath(uploadId).toString()).also { file ->
-            file.writeBytes(
-                gotenbergService.convertToPdf(
-                    FinishedUpload(
-                        file = File(filePathFactory.getOriginalUploadPath(uploadId).toString()),
-                        originalFileExtension = File(filename).extension,
-                    ),
-                ),
-            )
-        }
+    ): ByteArray {
+        val file = storage.retrieve(uploadId.toString()) ?: error("File not found")
+        return gotenbergService.convertToPdf(
+            FinishedUpload(
+                file = file,
+                originalFileExtension = File(filename).extension,
+            ),
+        )
+    }
 
     fun preTerminate(
         request: HookRequest,

@@ -4,14 +4,14 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.di.*
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
-import no.nav.sosialhjelp.upload.common.FilePathFactory
 import no.nav.sosialhjelp.upload.database.DocumentChangeNotifier
 import no.nav.sosialhjelp.upload.database.DocumentRepository
-import no.nav.sosialhjelp.upload.database.PageRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
+import no.nav.sosialhjelp.upload.fs.FileSystemStorage
+import no.nav.sosialhjelp.upload.fs.GcpBucketStorage
+import no.nav.sosialhjelp.upload.fs.Storage
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
-import no.nav.sosialhjelp.upload.pdf.ThumbnailService
 import no.nav.sosialhjelp.upload.status.DocumentStatusService
 import no.nav.sosialhjelp.upload.tusd.TusService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
@@ -56,17 +56,36 @@ fun Application.module() {
     dependencies {
         provide { DatabaseFactory.dsl }
         provide { this@module.environment.log }
+        provide<Storage> {
+            val isLocal =
+                this@module
+                    .environment.config
+                    .property("runtimeEnv")
+                    .getString() == "local"
+            if (isLocal) {
+                FileSystemStorage(
+                    this@module
+                        .environment.config
+                        .property("storage.basePath")
+                        .getString(),
+                )
+            } else {
+                GcpBucketStorage(
+                    this@module
+                        .environment.config
+                        .property("storage.bucketName")
+                        .getString(),
+                )
+            }
+        }
         provide(VirusScanner::class)
         provide(UploadValidator::class)
         provide(FiksClient::class)
         provide(TusService::class)
         provide(UploadRepository::class)
-        provide(PageRepository::class)
         provide(DocumentRepository::class)
-        provide(ThumbnailService::class)
         provide(DocumentStatusService::class)
         provide(GotenbergService::class)
-        provide(FilePathFactory::class)
         provide(DownstreamUploadService::class)
         provide(DocumentNotificationService::class)
     }

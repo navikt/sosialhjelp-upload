@@ -11,6 +11,5 @@ data class UploadSuccessState(
     val id: UUID?,
     val originalFilename: String,
     val convertedFilename: String?,
-    val pages: List<PageState>? = null,
     val validations: List<ValidationCode> = emptyList(),
 )

@@ -29,7 +29,7 @@ class GotenbergService(
         val res =
             gotenbergClient
                 .submitFormWithBinaryData(
-                    formData { append("file", upload.file.readBytes(), buildHeaders(upload.originalFileExtension)) },
+                    formData { append("file", upload.file, buildHeaders(upload.originalFileExtension)) },
                 )
 
         check(res.status.isSuccess()) { "Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}" }
@@ -46,7 +46,7 @@ class GotenbergService(
                     append("merge", "true")
                     append("pdfa", "PDF/A-3b")
                     append("pdfua", "true")
-                }
+                },
             )
 
         check(res.status.isSuccess()) { "Failed to merge ${res.status}" }
