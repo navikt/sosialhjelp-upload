@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.action
 
 import io.ktor.client.statement.HttpResponse
+import io.ktor.server.plugins.di.annotations.Property
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -43,7 +44,7 @@ class DownstreamUploadService(
         files: List<Upload>,
         token: String,
     ): HttpResponse {
-        val sak = fiksClient.getSak(fiksDigisosId)
+        val sak = fiksClient.getSak(fiksDigisosId, token)
         val kommunenummer = sak.kommunenummer
         val navEksternRefId = lagNavEksternRefId(sak)
 
