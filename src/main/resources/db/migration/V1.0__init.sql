@@ -9,15 +9,8 @@ CREATE TABLE IF NOT EXISTS upload (
     id          uuid PRIMARY KEY,
     document_id uuid references document(id) ON DELETE CASCADE,
     original_filename varchar(255) NOT NULL,
+    signed_url varchar,
     converted_filename varchar(255)
-);
-
-CREATE TABLE IF NOT EXISTS page
-(
-    id     uuid PRIMARY KEY,
-    upload uuid references upload(id) ON DELETE CASCADE,
-    page_number int NOT NULL,
-    filename varchar(100)
 );
 
 CREATE TABLE IF NOT EXISTS error

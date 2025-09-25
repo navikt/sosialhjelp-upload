@@ -26,9 +26,14 @@ fun Application.configureRouting() {
             authenticate {
                 configureStatusRoutes()
                 configureActionRoutes()
-                // todo: user permission check for files
             }
-            staticFiles("/thumbnails", File("./tusd-data"))
+            if (environment.config
+                    .propertyOrNull("runtimeEnv")
+                    ?.getString()
+                    ?.toBoolean() == true
+            ) {
+                staticFiles("/thumbnails", File("./tusd-data"))
+            }
         }
 
         route("/tus-hooks") {

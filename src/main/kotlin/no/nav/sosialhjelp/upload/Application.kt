@@ -75,6 +75,10 @@ fun Application.module() {
                         .environment.config
                         .property("storage.bucketName")
                         .getString(),
+                    this@module
+                        .environment.config
+                        .property("storage.gcsCredentials")
+                        .getString(),
                 )
             }
         }

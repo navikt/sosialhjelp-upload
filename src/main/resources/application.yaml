@@ -20,6 +20,7 @@ gotenberg:
 storage:
   basePath: "./tusd-data"
   bucketName: "$BUCKET_NAME:sosialhjelp-upload-dev"
+  gcsCredentials: "$GCS_CREDENTIALS:"
 fiksBaseUrl: "$FIKS_URL:http://localhost:8989/sosialhjelp/mock-alt-api/fiks"
 virus:
   scanner:

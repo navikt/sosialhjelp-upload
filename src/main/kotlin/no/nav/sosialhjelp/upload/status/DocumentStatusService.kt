@@ -22,6 +22,7 @@ class DocumentStatusService(
                                 upload.originalFilename ?: "Ukjent fil",
                                 upload.convertedFilename,
                                 upload.errors,
+                                upload.signedUrl,
                             )
                         }
                 }

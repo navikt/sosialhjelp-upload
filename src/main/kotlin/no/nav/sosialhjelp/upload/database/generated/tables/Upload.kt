@@ -84,6 +84,11 @@ open class Upload(
     val ORIGINAL_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("original_filename"), SQLDataType.VARCHAR(255).nullable(false), this, "")
 
     /**
+     * The column <code>public.upload.signed_url</code>.
+     */
+    val SIGNED_URL: TableField<UploadRecord, String?> = createField(DSL.name("signed_url"), SQLDataType.VARCHAR(255), this, "")
+
+    /**
      * The column <code>public.upload.converted_filename</code>.
      */
     val CONVERTED_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("converted_filename"), SQLDataType.VARCHAR(255), this, "")

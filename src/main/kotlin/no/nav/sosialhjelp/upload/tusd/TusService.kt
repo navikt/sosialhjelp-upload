@@ -1,5 +1,7 @@
 package no.nav.sosialhjelp.upload.tusd
 
+import io.ktor.http.ContentType
+import io.ktor.http.defaultForFileExtension
 import io.ktor.util.logging.Logger
 import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.DocumentRepository
@@ -55,20 +57,32 @@ class TusService(
         val request = PostFinishRequest.fromRequest(request)
         // Ikke konverter det som fagsystemene godkjenner (pdf, jpg/jpeg, png)
         val extension = File(request.filename).extension
-        if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
-            val converted = convertUploadToPdf(request.uploadId, request.filename)
+        val uploadId = request.uploadId
+        val filename = if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
+            val converted = convertUploadToPdf(uploadId, request.filename)
             val pdfName = File(request.filename).nameWithoutExtension + ".pdf"
-            storage.store(pdfName, converted)
+            storage.store(pdfName, converted, "application/pdf")
             dsl.transactionResult { it ->
-                uploadRepository.updateConvertedFilename(it, pdfName, request.uploadId)
+                uploadRepository.updateConvertedFilename(it, pdfName, uploadId)
             }
+            pdfName
         } else {
             // If we don't convert, we just need to copy the file to the original file name
-            val original = storage.retrieve(request.uploadId.toString()) ?: error("File not found")
+            val original = storage.retrieve(uploadId.toString()) ?: error("File not found")
             val changedPath = request.filename
-            storage.store(changedPath, original)
+            val contentType = ContentType.defaultForFileExtension(extension)
+            storage.store(changedPath, original, contentType.contentType)
+            changedPath
         }
-        dsl.transactionResult { it -> uploadRepository.notifyChange(it, request.uploadId) }
+
+        dsl.transaction { tx ->
+            uploadRepository.setSignedUrl(
+                tx,
+                storage.createSignedUrl(filename)!!,
+                uploadId,
+            )
+            uploadRepository.notifyChange(tx, uploadId)
+        }
     }
 
     private suspend fun convertUploadToPdf(
@@ -114,10 +128,12 @@ class TusService(
     suspend fun validateUpload(request: HookRequest): HookResponse {
         // TODO: Trenger vi å validere person?
         val validations = validator.validate(request)
+        // Also filename
+        val uploadId = request.event.upload.id
         val response =
             if (validations.isNotEmpty()) {
-                dsl.transactionResult { it ->
-                    uploadRepository.addErrors(it, UUID.fromString(request.event.upload.id), validations)
+                dsl.transactionResult { tx ->
+                    uploadRepository.addErrors(tx, UUID.fromString(uploadId), validations)
                 }
                 // TODO: Litt penere serialisering please
                 HTTPResponse(

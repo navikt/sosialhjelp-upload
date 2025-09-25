@@ -1,6 +1,9 @@
 package no.nav.sosialhjelp.upload.validation
 
+import kotlinx.serialization.Serializable
 
+
+@Serializable
 enum class ValidationCode {
     FILE_TOO_LARGE,
     INVALID_FILENAME,

@@ -12,4 +12,5 @@ data class UploadSuccessState(
     val originalFilename: String,
     val convertedFilename: String?,
     val validations: List<ValidationCode> = emptyList(),
+    val signedUrl: String?,
 )
