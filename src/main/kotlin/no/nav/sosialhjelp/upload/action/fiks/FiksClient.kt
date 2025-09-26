@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.upload.action.fiks
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.cache.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -12,18 +13,26 @@ import io.ktor.http.*
 import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
 import no.nav.sosialhjelp.upload.action.Upload
 import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
+import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
+import java.io.ByteArrayInputStream
+import java.security.cert.CertificateException
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 
 class FiksClient(
-    @Property("fiks.baseUrl") val fiksBaseUrl: String,
-    @Property("fiks.integrasjonsid") val integrasjonsid: String?,
-    @Property("fiks.integrasjonspassord") val integrasjonspassord: String?,
+    @Property("fiks.baseUrl") private val fiksBaseUrl: String,
+    @Property("fiks.integrasjonsid") private val integrasjonsid: String?,
+    @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
+    private val texasClient: TexasClient,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java.name)
 
@@ -54,6 +63,46 @@ class FiksClient(
             install(ContentNegotiation) {
                 json()
             }
+        }
+    }
+
+    private val publicKeyClient by lazy {
+        HttpClient(CIO) {
+            install(Logging) {
+                logger = Logger.DEFAULT
+                level = LogLevel.BODY
+            }
+            install(ContentNegotiation) {
+                json()
+            }
+        }
+    }
+
+    suspend fun fetchPublicKey(): X509Certificate {
+        val publicKey =
+            withContext(Dispatchers.IO) {
+                client
+                    .get("$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key") {
+                        headers {
+                            integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
+                            integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+                        }
+                        bearerAuth(texasClient.getMaskinportenToken())
+                    }.apply {
+                        if (!status.isSuccess()) {
+                            logger.error("Feil ved henting av public key fra dokumentlager: $status")
+                            throw Exception("Feil ved henting av public key fra dokumentlager: $status")
+                        }
+                    }.bodyAsBytes()
+                    .also {
+                        logger.info("Hentet public key fra dokumentlager")
+                    }
+            }
+        return try {
+            val certificateFactory = CertificateFactory.getInstance("X.509")
+            (certificateFactory.generateCertificate(ByteArrayInputStream(publicKey)) as X509Certificate)
+        } catch (e: CertificateException) {
+            throw IllegalStateException(e)
         }
     }
 

@@ -64,6 +64,11 @@ spec:
     requests:
       cpu: 10m
       memory: 512Mi
+  maskinporten:
+    enabled: true
+    scopes:
+      consumes:
+        - name: "ks:fiks"
   envFrom:
     - secret: fiks-integrasjon-secret
     - secret: idporten-sosialhjelp

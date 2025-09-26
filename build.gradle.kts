@@ -35,6 +35,7 @@ repositories {
 }
 
 dependencies {
+    implementation(libs.fiks.kryptering)
     implementation(platform(libs.google.cloud.bom))
     implementation(libs.google.cloud.storage)
     implementation("com.google.cloud:google-cloud-storage")

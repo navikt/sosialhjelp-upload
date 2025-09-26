@@ -2,6 +2,7 @@ package no.nav.sosialhjelp.upload
 
 import io.ktor.server.application.*
 import io.ktor.server.plugins.di.*
+import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.database.DocumentChangeNotifier
@@ -13,6 +14,7 @@ import no.nav.sosialhjelp.upload.fs.GcpBucketStorage
 import no.nav.sosialhjelp.upload.fs.Storage
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.DocumentStatusService
+import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tusd.TusService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
@@ -82,6 +84,8 @@ fun Application.module() {
                 )
             }
         }
+        provide(TexasClient::class)
+        provide(CMSKrypteringImpl::class)
         provide(VirusScanner::class)
         provide(UploadValidator::class)
         provide(FiksClient::class)

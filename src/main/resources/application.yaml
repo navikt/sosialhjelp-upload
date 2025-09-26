@@ -28,3 +28,5 @@ fiks:
 virus:
   scanner:
     url: "$CLAMAV_URL:"
+texas:
+  url: "$NAIS_TOKEN_ENDPOINT:http://localhost:8081/api/v1/token"

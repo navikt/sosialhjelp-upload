@@ -18,8 +18,10 @@ tika = "3.2.2"
 bouncycastle = "1.82"
 jooq = "3.19.26"
 google-cloud = "26.68.0"
+fiks_kryptering = "2.0.8"
 
 [libraries]
+fiks-kryptering = { module = "no.ks.fiks:kryptering", version.ref = "fiks_kryptering" }
 google-cloud-bom = { module = "com.google.cloud:libraries-bom", version.ref = "google-cloud"}
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }

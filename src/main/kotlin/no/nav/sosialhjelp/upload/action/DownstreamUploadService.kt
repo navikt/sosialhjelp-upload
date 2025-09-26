@@ -1,12 +1,15 @@
 package no.nav.sosialhjelp.upload.action
 
 import io.ktor.client.statement.HttpResponse
-import io.ktor.server.plugins.di.annotations.Property
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import java.security.Security
 
-class Upload(
+data class Upload(
     val file: ByteArray,
     val filename: String,
     val fileType: String,
@@ -15,7 +18,8 @@ class Upload(
 private const val COUNTER_SUFFIX_LENGTH = 4
 
 class DownstreamUploadService(
-    val fiksClient: FiksClient,
+    private val fiksClient: FiksClient,
+    private val kryptering: CMSKrypteringImpl,
 ) {
     private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
         val previousId: String =
@@ -49,8 +53,15 @@ class DownstreamUploadService(
         val navEksternRefId = lagNavEksternRefId(sak)
 
         // TODO: Kryptering
+        val cert = fiksClient.fetchPublicKey()
+
+        val encrypted =
+            files.map { file ->
+                file.copy(file = kryptering.krypterData(file.file, cert, Security.getProvider("BC")))
+            }
+
         // TODO: Ta med ettersendelse.pdf i opplastingen
-        return fiksClient.uploadEttersendelse(fiksDigisosId, kommunenummer, navEksternRefId, files, metadata, token)
+        return fiksClient.uploadEttersendelse(fiksDigisosId, kommunenummer, navEksternRefId, encrypted, metadata, token)
     }
 }
 
