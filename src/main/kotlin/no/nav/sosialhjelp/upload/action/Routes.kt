@@ -59,7 +59,7 @@ fun Route.configureActionRoutes() {
                 input.metadata,
                 fiksDigisosId = input.fiksDigisosId!!,
                 files =
-                    uploads.filter { it.errors.isNotEmpty() }.map { upload ->
+                    uploads.filter { it.errors.isEmpty() }.map { upload ->
                         val file =
                             upload.convertedFilename?.let { storage.retrieve(it) } ?: storage.retrieve(upload.originalFilename!!)
                                 ?: error("File not found")
