@@ -63,8 +63,8 @@ fun Route.configureActionRoutes() {
                         val file =
                             upload.convertedFilename?.let { storage.retrieve(it) } ?: storage.retrieve(upload.originalFilename!!)
                                 ?: error("File not found")
-                        val ext = File(upload.convertedFilename ?: upload.originalFilename!!).extension
-                        Upload(file, upload.originalFilename!!, ext)
+                        val ext = ContentType.defaultForFile(File(upload.convertedFilename ?: upload.originalFilename!!))
+                        Upload(file, upload.originalFilename!!, ext.toString())
                     },
                 call.request.header("Authorization")!!.removePrefix("Bearer "),
             )

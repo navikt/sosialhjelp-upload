@@ -71,7 +71,7 @@ class TusService(
             val original = storage.retrieve(uploadId.toString()) ?: error("File not found")
             val changedPath = request.filename
             val contentType = ContentType.defaultForFileExtension(extension)
-            storage.store(changedPath, original, contentType.contentType)
+            storage.store(changedPath, original, contentType.toString())
             changedPath
         }
 
