@@ -1,6 +1,5 @@
 package no.nav.sosialhjelp.upload.status
 
-import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockDocument
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
@@ -23,13 +22,13 @@ import kotlin.test.assertTrue
 class DocumentStatusServiceTest {
     private lateinit var documentRepository: DocumentRepository
     private lateinit var uploadRepository: UploadRepository
-    private lateinit var dsl: DSLContext
+    private val dsl: DSLContext = PostgresTestContainer.dsl
     private lateinit var notificationService: DocumentNotificationService
 
     @BeforeAll
     fun setup() {
-        dsl = PostgresTestContainer.connectAndStart()
-        notificationService = DocumentNotificationService()
+        PostgresTestContainer.migrate()
+        notificationService = DocumentNotificationService(PostgresTestContainer.dataSource)
         documentRepository = DocumentRepository(dsl)
         uploadRepository = UploadRepository(notificationService)
     }

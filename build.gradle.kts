@@ -56,7 +56,6 @@ dependencies {
 
     // Database drivers
     implementation(libs.postgresql)
-    implementation(libs.r2dbc.postgresql)
 
     // Dependency Injection and PDF generation
     implementation(libs.pdfbox.app)

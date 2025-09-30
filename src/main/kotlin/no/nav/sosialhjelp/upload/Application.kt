@@ -1,11 +1,11 @@
 package no.nav.sosialhjelp.upload
 
 import io.ktor.server.application.*
+import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.plugins.di.*
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
-import no.nav.sosialhjelp.upload.database.DocumentChangeNotifier
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
@@ -20,43 +20,51 @@ import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
 import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
+import org.jooq.SQLDialect
 import org.jooq.impl.DSL
+import org.postgresql.ds.PGSimpleDataSource
+import javax.sql.DataSource
 
 fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain
         .main(args)
 }
 
-object DatabaseFactory {
-    lateinit var dsl: DSLContext
-        private set
-
-    fun init(environment: ApplicationEnvironment) {
-        val user = environment.config.property("database.user").getString()
-        val password = environment.config.property("database.password").getString()
-        val jdbcUrl = environment.config.property("database.jdbcUrl").getString()
-
-        val load =
-            Flyway
-                .configure()
-                .dataSource(jdbcUrl, user, password)
-                .locations("db/migration")
-                .validateMigrationNaming(true)
-                // TODO: FJERN FØR PRODSETTING
-                .cleanDisabled(false)
-                .load()
-        load.clean()
-        load.migrate()
-
-        dsl = DSL.using(jdbcUrl, user, password)
-        DocumentChangeNotifier.dsl = dsl
+private fun getDataSource(config: ApplicationConfig): DataSource {
+    val user = config.property("database.user").getString()
+    val password = config.property("database.password").getString()
+    val jdbcUrl = config.property("database.jdbcUrl").getString()
+    return PGSimpleDataSource().apply {
+        setUrl(jdbcUrl)
+        setUser(user)
+        setPassword(password)
     }
 }
 
+private fun migrateDatabase(dataSource: DataSource) {
+    val load =
+        Flyway
+            .configure()
+            .dataSource(dataSource)
+            .locations("db/migration")
+            .validateMigrationNaming(true)
+            // TODO: FJERN FØR PRODSETTING
+            .cleanDisabled(false)
+            .load()
+    load.clean()
+    load.migrate()
+}
+
 fun Application.module() {
-    DatabaseFactory.init(environment)
+    val dataSource = getDataSource(environment.config)
+    migrateDatabase(dataSource)
     dependencies {
-        provide { DatabaseFactory.dsl }
+        provide<DataSource> {
+            dataSource
+        }
+        provide<DSLContext> {
+            DSL.using(dataSource, SQLDialect.POSTGRES)
+        }
         provide { this@module.environment.log }
         provide<Storage> {
             val isLocal =

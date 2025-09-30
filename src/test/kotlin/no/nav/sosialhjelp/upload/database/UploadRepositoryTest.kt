@@ -2,7 +2,6 @@ package no.nav.sosialhjelp.upload.database
 
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.unmockkObject
 import io.mockk.verify
 import no.nav.sosialhjelp.upload.common.TestUtils
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
@@ -21,12 +20,12 @@ import kotlin.test.Test
 class UploadRepositoryTest {
     private lateinit var documentRepository: DocumentRepository
     private lateinit var uploadRepository: UploadRepository
-    private lateinit var dsl: DSLContext
+    private val dsl: DSLContext = PostgresTestContainer.dsl
     private lateinit var notificationServiceMock: DocumentNotificationService
 
     @BeforeAll
     fun setupDatabase() {
-        dsl = PostgresTestContainer.connectAndStart()
+        PostgresTestContainer.migrate()
         documentRepository = DocumentRepository(dsl)
         notificationServiceMock = mockk<DocumentNotificationService>()
         uploadRepository = UploadRepository(notificationServiceMock)
@@ -97,6 +96,5 @@ class UploadRepositoryTest {
         dsl.transaction { it -> uploadRepository.notifyChange(it, uploadId) }
 
         verify { notificationServiceMock.notifyUpdate(documentId) }
-        unmockkObject(DocumentChangeNotifier)
     }
 }

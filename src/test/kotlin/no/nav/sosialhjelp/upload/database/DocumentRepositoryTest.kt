@@ -10,11 +10,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DocumentRepositoryTest {
     private lateinit var repository: DocumentRepository
-    private lateinit var dsl: DSLContext
+    private val dsl: DSLContext = PostgresTestContainer.dsl
 
     @BeforeAll
     fun setup() {
-        dsl = PostgresTestContainer.connectAndStart()
+        PostgresTestContainer.migrate()
         repository = DocumentRepository(dsl)
     }
 
