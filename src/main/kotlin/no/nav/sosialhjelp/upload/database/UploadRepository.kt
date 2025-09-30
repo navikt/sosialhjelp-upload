@@ -34,6 +34,9 @@ class UploadRepository(
             .returning(UPLOAD.ID)
             .fetchOne()
             ?.get(UPLOAD.ID)
+            ?.also {
+                notifyChange(tx, it)
+            }
 
     fun notifyChange(
         tx: Configuration,
@@ -124,15 +127,16 @@ class UploadRepository(
         uploadId: UUID,
         validations: List<Validation>,
     ) {
-        validations.forEach {
-            tx
-                .dsl()
-                .insertInto(ERROR)
-                .set(ERROR.UPLOAD, uploadId)
-                .set(ERROR.CODE, it.code.name)
-                .set(ERROR.ID, UUID.randomUUID())
-                .execute()
-        }
+        validations
+            .forEach {
+                tx
+                    .dsl()
+                    .insertInto(ERROR)
+                    .set(ERROR.UPLOAD, uploadId)
+                    .set(ERROR.CODE, it.code.name)
+                    .set(ERROR.ID, UUID.randomUUID())
+                    .execute()
+            }.also { notifyChange(tx, uploadId) }
     }
 
     fun setSignedUrl(

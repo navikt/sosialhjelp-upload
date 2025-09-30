@@ -58,22 +58,23 @@ class TusService(
         // Ikke konverter det som fagsystemene godkjenner (pdf, jpg/jpeg, png)
         val extension = File(request.filename).extension
         val uploadId = request.uploadId
-        val filename = if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
-            val converted = convertUploadToPdf(uploadId, request.filename)
-            val pdfName = File(request.filename).nameWithoutExtension + ".pdf"
-            storage.store(pdfName, converted, "application/pdf")
-            dsl.transactionResult { it ->
-                uploadRepository.updateConvertedFilename(it, pdfName, uploadId)
+        val filename =
+            if (extension !in listOf("pdf", "jpeg", "jpg", "png")) {
+                val converted = convertUploadToPdf(uploadId, request.filename)
+                val pdfName = File(request.filename).nameWithoutExtension + ".pdf"
+                storage.store(pdfName, converted, "application/pdf")
+                dsl.transactionResult { it ->
+                    uploadRepository.updateConvertedFilename(it, pdfName, uploadId)
+                }
+                pdfName
+            } else {
+                // If we don't convert, we just need to copy the file to the original file name
+                val original = storage.retrieve(uploadId.toString()) ?: error("File not found")
+                val changedPath = request.filename
+                val contentType = ContentType.defaultForFileExtension(extension)
+                storage.store(changedPath, original, contentType.toString())
+                changedPath
             }
-            pdfName
-        } else {
-            // If we don't convert, we just need to copy the file to the original file name
-            val original = storage.retrieve(uploadId.toString()) ?: error("File not found")
-            val changedPath = request.filename
-            val contentType = ContentType.defaultForFileExtension(extension)
-            storage.store(changedPath, original, contentType.toString())
-            changedPath
-        }
 
         dsl.transaction { tx ->
             uploadRepository.setSignedUrl(
