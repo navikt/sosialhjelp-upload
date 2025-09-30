@@ -1,76 +1,106 @@
-# upload
+# sosialhjelp-upload
 
-This project was created using the [Ktor Project Generator](https://start.ktor.io).
+Sosialhjelp-upload er en app som har ansvar for å håndtere og koordinere filopplastinger fra teamdigisos sine publikumstjenester: sosialhjelp-innsyn og sosialhjelp-soknad.
 
-Here are some useful links to get you started:
+Tjenesten bruker [Tusd](https://tus.io/) og Google Cloud Storage (buckets) for å håndtere selve filopplastingen, og [Gotenberg](https://gotenberg.dev/) for å konvertere filer til PDF.
 
-- [Ktor Documentation](https://ktor.io/docs/home.html)
-- [Ktor GitHub page](https://github.com/ktorio/ktor)
-- The [Ktor Slack chat](https://app.slack.com/client/T09229ZC6/C0A974TJ9). You'll need
-  to [request an invite](https://surveys.jetbrains.com/s3/kotlin-slack-sign-up) to join.
+Filene tilgjengeliggjøres for brukerne ved hjelp av SignedUrl fra Google Cloud Storage, som gir midlertidig tilgang til filene uten å måtte proxye dem via api-et vårt.
 
-## Features
+## tusd
 
-Here's a list of features included in this project:
+Tusd er en open source server for resumable filopplasting basert på [tus-protokollen](https://tus.io/protocols/resumable-upload.html). I sosialhjelp-upload brukes tusd til å motta og lagre filer, og
+til å trigge hooks for å validere, konvertere og håndtere metadata. Konfigurasjon av tusd skjer via docker-compose og miljøvariabler. Tusd melder fra til denne appen underveis i opplastingen
+via [hooks](https://tus.github.io/tusd/advanced-topics/hooks/). Vi bruker følgende:
 
-| Name                                                                   | Description                                                                        |
-|------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| [Routing](https://start.ktor.io/p/routing)                             | Provides a structured routing DSL                                                  |
-| [Authentication](https://start.ktor.io/p/auth)                         | Provides extension point for handling the Authorization header                     |
-| [Authentication JWT](https://start.ktor.io/p/auth-jwt)                 | Handles JSON Web Token (JWT) bearer authentication scheme                          |
-| [Resources](https://start.ktor.io/p/resources)                         | Provides type-safe routing                                                         |
-| [Request Validation](https://start.ktor.io/p/request-validation)       | Adds validation for incoming requests                                              |
-| [Server-Sent Events (SSE)](https://start.ktor.io/p/sse)                | Support for server push events                                                     |
-| [Forwarded Headers](https://start.ktor.io/p/forwarded-header-support)  | Allows handling proxied headers (X-Forwarded-*)                                    |
-| [Default Headers](https://start.ktor.io/p/default-headers)             | Adds a default set of headers to HTTP responses                                    |
-| [OpenAPI](https://start.ktor.io/p/openapi)                             | Serves OpenAPI documentation                                                       |
-| [Swagger](https://start.ktor.io/p/swagger)                             | Serves Swagger UI for your project                                                 |
-| [Call Logging](https://start.ktor.io/p/call-logging)                   | Logs client requests                                                               |
-| [Micrometer Metrics](https://start.ktor.io/p/metrics-micrometer)       | Enables Micrometer metrics in your Ktor server application.                        |
-| [Content Negotiation](https://start.ktor.io/p/content-negotiation)     | Provides automatic content conversion according to Content-Type and Accept headers |
-| [kotlinx.serialization](https://start.ktor.io/p/kotlinx-serialization) | Handles JSON serialization using kotlinx.serialization library                     |
-| [Postgres](https://start.ktor.io/p/postgres)                           | Adds Postgres database to your application                                         |
-| [Koin](https://start.ktor.io/p/koin)                                   | Provides dependency injection                                                      |
-| [Task Scheduling](https://start.ktor.io/p/ktor-server-task-scheduling) | Manages scheduled tasks across instances of your distributed Ktor server           |
+- PreCreate - Kalles før opplastingen starter. Her opprettes en record i databasen for filen som skal lastes opp.
+- PreFinish - Kalles før opplastingen er ferdig, og er blocking. Her validerer vi filen.
+- PostFinish - Kalles etter at opplastingen er ferdig. Her konverterer vi til pdf.
+- PreTerminate - Kalles før en opplasting slettes. Her sjekker vi autorisasjon.
+- PostTerminate - Kalles etter at en opplasting er slettet. Her sletter vi i databasen.
+
+## Wonderwall
+
+Wonderwall er en autentiseringsproxy som beskytter tjenesten og sikrer at kun autoriserte brukere får tilgang til filopplasting og relaterte API-er. Wonderwall håndterer OIDC-autentisering og
+videresender gyldige tokens til sosialhjelp-upload. Konfigureres via docker compose.
+
+## Google Cloud buckets
+
+Filer lagres i Google Cloud Storage buckets. Hver opplasting får en unik ID og lagres i en bucket definert av miljøvariabler. Tilgang til bucket styres via service account og IAM-roller. Bucket-navn
+og credentials settes via miljøvariabler. Service account-en må opprettes manuelt i Google Cloud Console, og man må lage en api-nøkkel, lagre det som en secret og injecte inn i appen. Dette gjøres på følgende måte:
+
+1. Gå til [Google Cloud Console](https://console.cloud.google.com/).
+2. Velg prosjektet ditt.
+3. Naviger til "IAM & Admin" > "Service Accounts".
+4. Klikk på "Create Service Account".
+5. Gi service account-en et navn og en beskrivelse, og klikk "Create".
+6. Tildel nødvendige roller: "Storage Admin" for tilgang til buckets og "Service Account Token Creator" for å kunne generere tokens for [SignedUrl](https://cloud.google.com/storage/docs/access-control/signed-urls).
+7. Klikk "Continue" og deretter "Done".
+8. Finn service account-en i listen, klikk på de tre prikkene til høyre og velg "Manage keys".
+9. Klikk på "Add Key" > "Create new key".
+10. Velg JSON som nøkkeltype og klikk "Create". En JSON-fil lastes ned til din datamaskin.
+11. Lagre denne filen som en secret i kubernetes
+12. Inject secret-en som en fil i appen og sett miljøvariabelen `GCP_CREDENTIALS` til path-en der filen er injectet.
 
 ## Building & Running
 
-To build or run the project, use one of the following tasks:
+Appen krever database, tusd, gotenberg, wonderwall og mock-alt-api (hvis det skal sendes inn dokumenter).
 
-| Task                          | Description                                                          |
-|-------------------------------|----------------------------------------------------------------------|
-| `./gradlew test`              | Run the tests                                                        |
-| `./gradlew build`             | Build everything                                                     |
-| `buildFatJar`                 | Build an executable JAR of the server with all dependencies included |
-| `buildImage`                  | Build the docker image to use with the fat JAR                       |
-| `publishImageToLocalRegistry` | Publish the docker image locally                                     |
-| `run`                         | Run the server                                                       |
-| `runDocker`                   | Run using the local docker image                                     |
+Tusd, databasen og gotenberg kan startes ved hjelp av docker compose:
 
-If the server starts successfully, you'll see the following output:
-
-```
-2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
-2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
+```bash
+  docker compose up -d
 ```
 
+Lokalt brukes ikke GCS, men filene lagres lokalt i en mappe. Default her er ./tusd-data. Dette kan overstyres ved å sette miljøvariabelen `storage.basePath`.
 
-### Flyt
+Resterende tjenester kan startes opp ved hjelp av docker compose i [digisos-docker-compose](https://github.com/navikt/digisos-docker-compose)
+
+## Database
+Appen bruker PostgreSQL som database og JOOQ for databaseoperasjoner. For typesafe SQL-spørringer brukes JOOQ sin kodegenerator som genererer Java-klasser basert på database-skjemaet. Kommandoen for å generere JOOQ-klasser er:
+
+```bash
+./gradlew generateJooq
+```
+
+Denne kommandoen krever at databasen kjører og at `DB_URL`, `DB_USER` og `DB_PASSWORD` er satt i miljøet, samt at flyway har kjørt nødvendige migreringer.
+
+### DB-migrering
+Flyway brukes for database-migreringer. Migreringer kjøres automatisk ved oppstart av appen. Migreringsskriptene ligger i `src/main/resources/db/migration`.
+
+## Flyt
+
 ```mermaid
 flowchart
     fs[File storage]
     db[(Database)]
-    Browser -- (1) POST /sosialhjelp/soknad/tusd/files --> Soknad
-    Soknad -- (2) POST /files --> Tusd
-    Tusd -- (3) POST /pre-create --> UploadApi
-    UploadApi -- (4) Authorize --> UploadApi
-    UploadApi -- (5) Save document --> db
-    Tusd -- (6) Save to files --> fs
-    Tusd -- (7) POST /post-finish --> UploadApi
-    UploadApi -- (8) POST /convert --> Gotenberg
-    UploadApi -- (9) MakeThumbnail --> UploadApi
-    UploadApi -. (10) Notify change .-> db
-    db -. (11) Notify change .-> UploadApi
-    UploadApi -. (12) SSE update .-> Soknad
-    UploadApi -. (12) SSE update .-> Soknad
+    app[innsyn/soknad]
+    Browser -- (1) POST /sosialhjelp/soknad/tusd/files --> app
+app -- (2) POST /files --> Tusd
+Tusd -- (3) POST /pre-create --> UploadApi
+UploadApi -- (4) Save record --> db
+Tusd -- (5) Save to files --> fs
+Tusd -- (6) POST /pre-finish --> UploadApi
+UploadApi -- (7) Validate file --> UploadApi
+UploadApi -- (8) Update record --> db
+Tusd -- (9) POST /post-finish --> UploadApi
+UploadApi -- (10) POST /convert --> Gotenberg
+UploadApi -- (11) Save converted --> fs
+UploadApi -. SSE update .-> app
 ```
+
+## Environment Variables
+
+- `GCP_BUCKET_NAME`: Navn på Google Cloud Storage bucket.
+- `GCP_CREDENTIALS`: Path til service account credentials.
+- `TUSD_HOOK_URL`: URL for tusd hooks.
+- `DB_URL`: Database connection string.
+- `WONDERWALL_ISSUER`: OIDC issuer for Wonderwall.
+- Flere variabler kan være relevante, se docker-compose og kildekode for detaljer.
+
+## Contributing
+
+Pull requests og issues er velkomne! Følg NAVs retningslinjer for open source og inkluder tester for nye funksjoner.
+
+## License
+
+Se LICENSE-fil for gjeldende lisens.

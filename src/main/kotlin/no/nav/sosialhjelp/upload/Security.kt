@@ -1,8 +1,6 @@
 package no.nav.sosialhjelp.upload
 
 import com.auth0.jwk.JwkProviderBuilder
-import io.ktor.http.Url
-import io.ktor.http.toURI
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -36,7 +34,8 @@ fun Application.configureSecurity() {
                     credential.payload
                         .getClaim("acr")
                         .asString()
-                        .lowercase()) {
+                        .lowercase()
+                ) {
                     this@configureSecurity.log.warn("Wrong acr in JWT. Was ${credential.payload.getClaim("acr").asString()}")
                     return@validate null
                 }
