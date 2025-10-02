@@ -10,11 +10,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.upload.database.DocumentRepository
-import no.nav.sosialhjelp.upload.database.UploadRepository
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
-import no.nav.sosialhjelp.upload.fs.Storage
-import org.jooq.DSLContext
-import java.io.File
 import java.util.*
 
 @Serializable
@@ -34,12 +29,8 @@ data class SubmitInput(
 )
 
 fun Route.configureActionRoutes() {
-    val uploadRepository: UploadRepository by application.dependencies
     val documentRepository: DocumentRepository by application.dependencies
     val downstreamUploadService: DownstreamUploadService by application.dependencies
-    val notificationService: DocumentNotificationService by application.dependencies
-    val storage: Storage by application.dependencies
-    val dsl: DSLContext by application.dependencies
 
     post("/document/{documentId}/submit") {
         val personIdent = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
@@ -49,31 +40,15 @@ fun Route.configureActionRoutes() {
             return@post call.respondText("Access denied", status = HttpStatusCode.Forbidden)
         }
 
-        val uploads =
-            dsl.transactionResult { tx ->
-                uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
-            }
-
-        val response =
+        val result =
             downstreamUploadService.upload(
                 input.metadata,
                 fiksDigisosId = input.fiksDigisosId!!,
-                files =
-                    uploads.filter { it.errors.isEmpty() }.map { upload ->
-                        val file =
-                            upload.convertedFilename?.let { storage.retrieve(it) } ?: storage.retrieve(upload.originalFilename!!)
-                                ?: error("File not found")
-                        val ext = ContentType.defaultForFile(File(upload.convertedFilename ?: upload.originalFilename!!))
-                        Upload(file, upload.originalFilename!!, ext.toString())
-                    },
                 call.request.header("Authorization")!!.removePrefix("Bearer "),
+                documentId,
             )
-        if (response.status.isSuccess()) {
-            dsl.transactionResult { tx ->
-                documentRepository.cleanup(tx, documentId)
-                notificationService.notifyUpdate(documentId)
-            }
-            call.respond(HttpStatusCode.Created)
+        if (result) {
+            return@post call.respond(HttpStatusCode.Created)
         }
     }
 }
