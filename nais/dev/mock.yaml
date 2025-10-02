@@ -69,5 +69,4 @@ spec:
       value: "https://sosiauth2.ekstern.dev.nav.no/default"
     - name: IDPORTEN_JWKS_URI
       value: "https://sosiauth2.ekstern.dev.nav.no/default/jwks"
-    - name: NAIS_TOKEN_ENDPOINT
 
