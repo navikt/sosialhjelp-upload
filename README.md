@@ -40,6 +40,11 @@ og credentials settes via miljøvariabler. Service account-en må opprettes manu
 10. Velg JSON som nøkkeltype og klikk "Create". En JSON-fil lastes ned til din datamaskin.
 11. Lagre denne filen som en secret i kubernetes
 12. Inject secret-en som en fil i appen og sett miljøvariabelen `GCP_CREDENTIALS` til path-en der filen er injectet.
+13. Sett cors-policy på bucket-en for å tillate opplasting fra frontend. Dette kan gjøres via Google Cloud Console eller `gsutil`-verktøyet. Eksempel med `gsutil`:
+
+```bash
+gsutil cors set cors-config.json gs://your-bucket-name
+```
 
 ## Building & Running
 
