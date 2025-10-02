@@ -19,7 +19,7 @@ spec:
   accessPolicy:
     outbound:
       rules:
-        - application: sosialhjelp-upload-dev
+        - application: sosialhjelp-upload-mock
     inbound:
       rules:
         - application: wonderwall-tusd-dev

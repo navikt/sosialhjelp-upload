@@ -53,7 +53,7 @@ spec:
       cpu: 10m
       memory: 512Mi
   envFrom:
-    - secret: gcs-credentials-mock
+    - secret: gcs-credentials
   env:
     - name: FIKS_URL
       value: "http://sosialhjelp-mock-alt-api-mock/sosialhjelp/mock-alt-api/fiks"
