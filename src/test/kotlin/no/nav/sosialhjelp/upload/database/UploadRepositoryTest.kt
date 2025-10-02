@@ -42,6 +42,7 @@ class UploadRepositoryTest {
     fun `test create upload`() {
         val documentId = TestUtils.createMockDocument(dsl)
         val filename = "testfile.txt"
+        every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId = dsl.transactionResult { tx -> uploadRepository.create(tx, documentId, filename) }
 
         dsl.transaction { tx ->
@@ -62,6 +63,7 @@ class UploadRepositoryTest {
     @Test
     fun `test getUploadsByDocumentId returns correct uploads`() {
         val documentId = TestUtils.createMockDocument(dsl)
+        every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId1 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file1.txt") }
         val uploadId2 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file2.txt") }
         // Create an upload for a different document to ensure filtering works.
@@ -81,6 +83,7 @@ class UploadRepositoryTest {
     @Test
     fun `test getDocumentIdFromUploadId returns correct document id`() {
         val documentId = TestUtils.createMockDocument(dsl)
+        every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file.txt") } ?: error("Ingen uploadId")
         // Retrieve the document id using the upload id.
         val retrievedDocumentId = dsl.transactionResult { it -> uploadRepository.getDocumentIdFromUploadId(it, uploadId) }
@@ -90,8 +93,8 @@ class UploadRepositoryTest {
     @Test
     fun `test notifyChange calls DocumentRepository with correct document id`() {
         val documentId = TestUtils.createMockDocument(dsl)
-        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "notify.txt") } ?: error("Ingen uploadId")
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
+        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "notify.txt") } ?: error("Ingen uploadId")
 
         dsl.transaction { it -> uploadRepository.notifyChange(it, uploadId) }
 
