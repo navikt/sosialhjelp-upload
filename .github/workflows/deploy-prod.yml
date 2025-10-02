@@ -1,0 +1,24 @@
+name: Deploy to prod
+run-name: Deploy '${{ github.ref_name }}' to prod
+env:
+  ORG_GRADLE_PROJECT_githubUser: x-access-token
+  ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-to-prod:
+    name: 'Deploy to Prod'
+    permissions:
+      id-token: write
+      contents: write
+    uses: navikt/sosialhjelp-ci/.github/workflows/deploy_app.yml@main
+    with:
+      cluster-name: prod-gcp
+      resource-name: prod
+      resource-folder: 'prod'
+    secrets: inherit
+

@@ -47,11 +47,7 @@ private fun migrateDatabase(dataSource: DataSource) {
             .configure()
             .dataSource(dataSource)
             .locations("db/migration")
-            .validateMigrationNaming(true)
-            // TODO: FJERN FØR PRODSETTING
-            .cleanDisabled(false)
             .load()
-    load.clean()
     load.migrate()
 }
 

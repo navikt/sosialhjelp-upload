@@ -4,7 +4,6 @@ import io.ktor.http.ContentType
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.http.content.*
-import io.ktor.server.resources.*
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
@@ -14,7 +13,6 @@ import no.nav.sosialhjelp.upload.tusd.configureTusRoutes
 import java.io.File
 
 fun Application.configureRouting() {
-    install(Resources)
     install(SSE)
     routing {
         route("/sosialhjelp/upload") {
@@ -29,8 +27,7 @@ fun Application.configureRouting() {
             }
             if (environment.config
                     .propertyOrNull("runtimeEnv")
-                    ?.getString()
-                    ?.toBoolean() == true
+                    ?.getString() == "local"
             ) {
                 staticFiles("/thumbnails", File("./tusd-data"))
             }

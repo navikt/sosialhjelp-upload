@@ -1,0 +1,79 @@
+apiVersion: "nais.io/v1alpha1"
+kind: "Application"
+metadata:
+  name: sosialhjelp-upload
+  namespace: teamdigisos
+  labels:
+    team: teamdigisos
+spec:
+  image: {{image}}
+  port: 3007
+  liveness:
+    path: /sosialhjelp/upload/internal/isAlive
+    initialDelay: 10
+    timeout: 1
+    periodSeconds: 10
+    failureThreshold: 10
+  readiness:
+    path: /sosialhjelp/upload/internal/isAlive
+    initialDelay: 10
+    timeout: 1
+  prometheus:
+    enabled: true
+    path: /metrics-micrometer
+  replicas:
+    min: 2
+    max: 2
+  observability:
+    autoInstrumentation:
+      enabled: true
+      runtime: java
+  accessPolicy:
+    outbound:
+      external:
+        - host: api.fiks.ks.no
+        - host: minside.fiks.ks.no
+        - host: idporten.no
+      rules:
+        - application: clamav
+          namespace: nais-system
+        - application: sosialhjelp-konvertering-til-pdf
+    inbound:
+      rules:
+        - application: sosialhjelp-innsyn
+        - application: sosialhjelp-tusd
+  gcp:
+    sqlInstances:
+      - type: POSTGRES_17
+        tier: db-custom-1-3840
+        databases:
+          - name: sosialhjelp-upload
+            envVarPrefix: POSTGRES
+  resources:
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 10m
+      memory: 512Mi
+  maskinporten:
+    enabled: true
+    scopes:
+      consumes:
+        - name: "ks:fiks"
+  envFrom:
+    - secret: fiks-integrasjon-secret
+    - secret: idporten-sosialhjelp
+    - secret: gcs-credentials
+  env:
+    - name: FIKS_URL
+      value: "https://api.fiks.ks.no"
+    - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
+      value: "https://minside.fiks.ks.no"
+    - name: CLAMAV_URL
+      value: "http://clamav.nais-system/scan"
+    - name: GOTENBERG_URL
+      value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
+    - name: RUNTIME_ENV
+      value: "prod"
+    - name: BUCKET_NAME
+      value: "sosialhjelp-upload"
