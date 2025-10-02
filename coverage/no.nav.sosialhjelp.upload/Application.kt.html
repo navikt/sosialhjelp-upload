@@ -2,10 +2,14 @@
 
 import io.ktor.server.application.*
 import io.ktor.server.config.ApplicationConfig
+import io.ktor.server.config.property
 import io.ktor.server.plugins.di.*
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
+import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
+import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
@@ -54,39 +58,30 @@ private fun migrateDatabase(dataSource: DataSource) {
 fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource)
+    val runtimeEnv = this@module.property&lt;String&gt;(&quot;runtimeEnv&quot;)
+    val isLocal = runtimeEnv == &quot;local&quot;
+    val isMock = runtimeEnv == &quot;mock&quot;
     dependencies {
         provide&lt;DataSource&gt; {
-<span class="nc" id="L59">            dataSource</span>
+<span class="nc" id="L66">            dataSource</span>
         }
         provide&lt;DSLContext&gt; {
-<span class="nc" id="L62">            DSL.using(dataSource, SQLDialect.POSTGRES)</span>
+<span class="nc" id="L69">            DSL.using(dataSource, SQLDialect.POSTGRES)</span>
         }
-<span class="nc" id="L64">        provide { this@module.environment.log }</span>
-        provide&lt;Storage&gt; {
-<span class="nc" id="L66">            val isLocal =</span>
-<span class="nc" id="L67">                this@module</span>
-<span class="nc" id="L68">                    .environment.config</span>
-<span class="nc" id="L69">                    .property(&quot;runtimeEnv&quot;)</span>
-<span class="nc" id="L70">                    .getString() == &quot;local&quot;</span>
-<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (isLocal) {</span>
-<span class="nc" id="L72">                FileSystemStorage(</span>
-<span class="nc" id="L73">                    this@module</span>
-<span class="nc" id="L74">                        .environment.config</span>
-<span class="nc" id="L75">                        .property(&quot;storage.basePath&quot;)</span>
-<span class="nc" id="L76">                        .getString(),</span>
-                )
+<span class="nc bnc" id="L71" title="All 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">            if (isMock || isLocal) {</span>
+<span class="nc" id="L73">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L79">                GcpBucketStorage(</span>
-<span class="nc" id="L80">                    this@module</span>
-<span class="nc" id="L81">                        .environment.config</span>
-<span class="nc" id="L82">                        .property(&quot;storage.bucketName&quot;)</span>
-<span class="nc" id="L83">                        .getString(),</span>
-<span class="nc" id="L84">                    this@module</span>
-<span class="nc" id="L85">                        .environment.config</span>
-<span class="nc" id="L86">                        .property(&quot;storage.gcsCredentials&quot;)</span>
-<span class="nc" id="L87">                        .getString(),</span>
-                )
-<span class="nc" id="L89">            }</span>
+<span class="nc" id="L75">                create(EncryptionServiceImpl::class)</span>
+<span class="nc" id="L76">            }</span>
+        }
+<span class="nc" id="L78">        provide { this@module.environment.log }</span>
+<span class="nc bnc" id="L79" title="All 4 branches missed.">        provide&lt;Storage&gt; {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (isLocal) {</span>
+<span class="nc" id="L81">                create(FileSystemStorage::class)</span>
+            } else {
+<span class="nc" id="L83">                create(GcpBucketStorage::class)</span>
+<span class="nc" id="L84">            }</span>
         }
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)

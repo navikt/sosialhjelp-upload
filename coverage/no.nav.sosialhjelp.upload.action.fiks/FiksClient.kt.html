@@ -66,43 +66,31 @@ import java.security.cert.X509Certificate
 <span class="nc" id="L66">        }</span>
     }
 
-<span class="nc" id="L69">    private val publicKeyClient by lazy {</span>
-<span class="nc" id="L70">        HttpClient(CIO) {</span>
-<span class="nc" id="L71">            install(Logging) {</span>
-<span class="nc" id="L72">                logger = Logger.DEFAULT</span>
-<span class="nc" id="L73">                level = LogLevel.BODY</span>
-<span class="nc" id="L74">            }</span>
-<span class="nc" id="L75">            install(ContentNegotiation) {</span>
-<span class="nc" id="L76">                json()</span>
-<span class="nc" id="L77">            }</span>
-<span class="nc" id="L78">        }</span>
-    }
-
-<span class="nc" id="L81">    suspend fun fetchPublicKey(): X509Certificate {</span>
-<span class="nc" id="L82">        val publicKey =</span>
-<span class="nc" id="L83">            withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L84">                client</span>
-<span class="nc" id="L85">                    .get(&quot;$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key&quot;) {</span>
-<span class="nc" id="L86">                        headers {</span>
-<span class="nc bnc" id="L87" title="All 2 branches missed.">                            integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L88" title="All 2 branches missed.">                            integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L89">                        }</span>
-<span class="nc" id="L90">                        bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L91">                    }.apply {</span>
-<span class="nc bnc" id="L92" title="All 2 branches missed.">                        if (!status.isSuccess()) {</span>
-<span class="nc" id="L93">                            logger.error(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
-<span class="nc" id="L94">                            throw Exception(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
+<span class="nc" id="L69">    suspend fun fetchPublicKey(): X509Certificate {</span>
+<span class="nc" id="L70">        val publicKey =</span>
+<span class="nc" id="L71">            withContext(Dispatchers.IO) {</span>
+<span class="nc" id="L72">                client</span>
+<span class="nc" id="L73">                    .get(&quot;$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key&quot;) {</span>
+<span class="nc" id="L74">                        headers {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                            integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                            integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L77">                        }</span>
+<span class="nc" id="L78">                        bearerAuth(texasClient.getMaskinportenToken())</span>
+<span class="nc" id="L79">                    }.apply {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                        if (!status.isSuccess()) {</span>
+<span class="nc" id="L81">                            logger.error(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
+<span class="nc" id="L82">                            throw Exception(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
                         }
-<span class="nc" id="L96">                    }.bodyAsBytes()</span>
-<span class="nc" id="L97">                    .also {</span>
-<span class="nc" id="L98">                        logger.info(&quot;Hentet public key fra dokumentlager&quot;)</span>
-<span class="nc" id="L99">                    }</span>
+<span class="nc" id="L84">                    }.bodyAsBytes()</span>
+<span class="nc" id="L85">                    .also {</span>
+<span class="nc" id="L86">                        logger.info(&quot;Hentet public key fra dokumentlager&quot;)</span>
+<span class="nc" id="L87">                    }</span>
             }
-<span class="nc" id="L101">        return try {</span>
-<span class="nc" id="L102">            val certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;)</span>
-<span class="nc" id="L103">            (certificateFactory.generateCertificate(ByteArrayInputStream(publicKey)) as X509Certificate)</span>
-<span class="nc" id="L104">        } catch (e: CertificateException) {</span>
-<span class="nc" id="L105">            throw IllegalStateException(e)</span>
+<span class="nc" id="L89">        return try {</span>
+<span class="nc" id="L90">            val certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;)</span>
+<span class="nc" id="L91">            (certificateFactory.generateCertificate(ByteArrayInputStream(publicKey)) as X509Certificate)</span>
+<span class="nc" id="L92">        } catch (e: CertificateException) {</span>
+<span class="nc" id="L93">            throw IllegalStateException(e)</span>
         }
     }
 
@@ -114,79 +102,79 @@ import java.security.cert.X509Certificate
         metadata: Metadata,
         token: String,
     ): HttpResponse =
-<span class="nc" id="L117">        client.submitFormWithBinaryData(</span>
-<span class="nc" id="L118">            ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
-<span class="nc" id="L119">            formData {</span>
-<span class="nc" id="L120">                val vedleggJson =</span>
-<span class="nc" id="L121">                    VedleggSpesifikasjon(</span>
-<span class="nc" id="L122">                        type = metadata.type,</span>
-<span class="nc" id="L123">                        tilleggsinfo = metadata.tilleggsinfo,</span>
-<span class="nc" id="L124">                        innsendelsesfrist = metadata.innsendelsesfrist,</span>
-<span class="nc" id="L125">                        hendelsetype = metadata.hendelsetype,</span>
-<span class="nc" id="L126">                        hendelsereferanse = metadata.hendelsereferanse,</span>
+<span class="nc" id="L105">        client.submitFormWithBinaryData(</span>
+<span class="nc" id="L106">            ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
+<span class="nc" id="L107">            formData {</span>
+<span class="nc" id="L108">                val vedleggJson =</span>
+<span class="nc" id="L109">                    VedleggSpesifikasjon(</span>
+<span class="nc" id="L110">                        type = metadata.type,</span>
+<span class="nc" id="L111">                        tilleggsinfo = metadata.tilleggsinfo,</span>
+<span class="nc" id="L112">                        innsendelsesfrist = metadata.innsendelsesfrist,</span>
+<span class="nc" id="L113">                        hendelsetype = metadata.hendelsetype,</span>
+<span class="nc" id="L114">                        hendelsereferanse = metadata.hendelsereferanse,</span>
                     )
-<span class="nc" id="L128">                append(</span>
-<span class="nc" id="L129">                    &quot;vedlegg.json&quot;,</span>
-<span class="nc" id="L130">                    Json.encodeToString(vedleggJson),</span>
-<span class="nc" id="L131">                    Headers.build {</span>
-<span class="nc" id="L132">                        append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
-<span class="nc" id="L133">                    },</span>
+<span class="nc" id="L116">                append(</span>
+<span class="nc" id="L117">                    &quot;vedlegg.json&quot;,</span>
+<span class="nc" id="L118">                    Json.encodeToString(vedleggJson),</span>
+<span class="nc" id="L119">                    Headers.build {</span>
+<span class="nc" id="L120">                        append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L121">                    },</span>
                 )
-<span class="nc" id="L135">                files.forEachIndexed { index, file -&gt;</span>
-<span class="nc" id="L136">                    val vedleggMetadata =</span>
-<span class="nc" id="L137">                        VedleggMetadata(</span>
-<span class="nc" id="L138">                            filnavn = file.filename,</span>
-<span class="nc" id="L139">                            mimetype = file.fileType,</span>
-<span class="nc" id="L140">                            storrelse = file.file.size.toLong(),</span>
+<span class="nc" id="L123">                files.forEachIndexed { index, file -&gt;</span>
+<span class="nc" id="L124">                    val vedleggMetadata =</span>
+<span class="nc" id="L125">                        VedleggMetadata(</span>
+<span class="nc" id="L126">                            filnavn = file.filename,</span>
+<span class="nc" id="L127">                            mimetype = file.fileType,</span>
+<span class="nc" id="L128">                            storrelse = file.file.size.toLong(),</span>
                         )
-<span class="nc" id="L142">                    append(</span>
-<span class="nc" id="L143">                        &quot;vedleggSpesifikasjon:$index&quot;,</span>
-<span class="nc" id="L144">                        Json.encodeToString(vedleggMetadata),</span>
-<span class="nc" id="L145">                        Headers.build {</span>
-<span class="nc" id="L146">                            append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
-<span class="nc" id="L147">                        },</span>
+<span class="nc" id="L130">                    append(</span>
+<span class="nc" id="L131">                        &quot;vedleggSpesifikasjon:$index&quot;,</span>
+<span class="nc" id="L132">                        Json.encodeToString(vedleggMetadata),</span>
+<span class="nc" id="L133">                        Headers.build {</span>
+<span class="nc" id="L134">                            append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L135">                        },</span>
                     )
-<span class="nc" id="L149">                    append(</span>
-<span class="nc" id="L150">                        &quot;dokument:$index&quot;,</span>
-<span class="nc" id="L151">                        file.file,</span>
-<span class="nc" id="L152">                        Headers.build {</span>
-<span class="nc" id="L153">                            append(HttpHeaders.ContentType, ContentType.Application.OctetStream)</span>
-<span class="nc" id="L154">                            append(HttpHeaders.ContentDisposition, &quot;filename=\&quot;${file.filename}\&quot;&quot;)</span>
-<span class="nc" id="L155">                        },</span>
+<span class="nc" id="L137">                    append(</span>
+<span class="nc" id="L138">                        &quot;dokument:$index&quot;,</span>
+<span class="nc" id="L139">                        file.file,</span>
+<span class="nc" id="L140">                        Headers.build {</span>
+<span class="nc" id="L141">                            append(HttpHeaders.ContentType, ContentType.Application.OctetStream)</span>
+<span class="nc" id="L142">                            append(HttpHeaders.ContentDisposition, &quot;filename=\&quot;${file.filename}\&quot;&quot;)</span>
+<span class="nc" id="L143">                        },</span>
                     )
-<span class="nc" id="L157">                }</span>
-<span class="nc" id="L158">            },</span>
+<span class="nc" id="L145">                }</span>
+<span class="nc" id="L146">            },</span>
         ) {
             // TODO: Legg på integrasjonsid/-passord i header
-<span class="nc" id="L161">            headers {</span>
-<span class="nc bnc" id="L162" title="All 2 branches missed.">                integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L163" title="All 2 branches missed.">                integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L164">            }</span>
-<span class="nc" id="L165">            bearerAuth(token)</span>
-<span class="nc" id="L166">            contentType(ContentType.MultiPart.FormData)</span>
-<span class="nc" id="L167">        }</span>
+<span class="nc" id="L149">            headers {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L152">            }</span>
+<span class="nc" id="L153">            bearerAuth(token)</span>
+<span class="nc" id="L154">            contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L155">        }</span>
 
     suspend fun getSak(
         id: String,
         token: String,
     ): DigisosSak =
-<span class="nc" id="L173">        jacksonClient</span>
-<span class="nc" id="L174">            .get(digisosSakUrl(id)) {</span>
-<span class="nc" id="L175">                headers {</span>
-<span class="nc bnc" id="L176" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
-<span class="nc" id="L177">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
-<span class="nc" id="L178">                    }</span>
-<span class="nc bnc" id="L179" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L180">                }</span>
-<span class="nc" id="L181">                accept(ContentType.Application.Json)</span>
-<span class="nc" id="L182">                bearerAuth(token)</span>
-<span class="nc" id="L183">            }.body()</span>
+<span class="nc" id="L161">        jacksonClient</span>
+<span class="nc" id="L162">            .get(digisosSakUrl(id)) {</span>
+<span class="nc" id="L163">                headers {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
+<span class="nc" id="L165">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
+<span class="nc" id="L166">                    }</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L168">                }</span>
+<span class="nc" id="L169">                accept(ContentType.Application.Json)</span>
+<span class="nc" id="L170">                bearerAuth(token)</span>
+<span class="nc" id="L171">            }.body()</span>
 }
 
-<span class="nc bnc" id="L186" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L187">private data class VedleggMetadata(</span>
-<span class="nc" id="L188">    val filnavn: String?,</span>
-<span class="nc" id="L189">    val mimetype: String?,</span>
-<span class="nc" id="L190">    val storrelse: Long,</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L175">private data class VedleggMetadata(</span>
+<span class="nc" id="L176">    val filnavn: String?,</span>
+<span class="nc" id="L177">    val mimetype: String?,</span>
+<span class="nc" id="L178">    val storrelse: Long,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
