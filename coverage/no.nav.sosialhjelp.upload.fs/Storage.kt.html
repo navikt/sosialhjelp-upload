@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Storage.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.fs</a> &gt; <span class="el_source">Storage.kt</span></div><h1>Storage.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.fs
+
+import com.google.auth.oauth2.GoogleCredentials
+import com.google.cloud.storage.BlobId
+import com.google.cloud.storage.BlobInfo
+import com.google.cloud.storage.BucketInfo
+import com.google.cloud.storage.StorageOptions
+import io.ktor.server.plugins.di.annotations.Property
+import org.slf4j.LoggerFactory
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.days
+import kotlin.time.DurationUnit
+import com.google.cloud.storage.Storage as GcpStorage
+
+interface Storage {
+    fun store(
+        fileName: String,
+        content: ByteArray,
+        contentType: String,
+    )
+
+    fun retrieve(fileName: String): ByteArray?
+
+    fun delete(fileName: String)
+
+    fun createSignedUrl(fileName: String): String?
+}
+
+<span class="nc" id="L31">class FileSystemStorage(</span>
+<span class="nc" id="L32">    @Property(&quot;storage.basePath&quot;) private val basePath: String,</span>
+) : Storage {
+    override fun store(
+        fileName: String,
+        content: ByteArray,
+        contentType: String,
+    ) {
+<span class="nc" id="L39">        File(&quot;$basePath/$fileName&quot;).writeBytes(content)</span>
+<span class="nc" id="L40">    }</span>
+
+<span class="nc" id="L42">    override fun retrieve(fileName: String): ByteArray? = File(&quot;$basePath/$fileName&quot;).readBytes()</span>
+
+    override fun delete(fileName: String) {
+<span class="nc" id="L45">        File(&quot;$basePath/$fileName&quot;).delete()</span>
+<span class="nc" id="L46">    }</span>
+
+<span class="nc" id="L48">    override fun createSignedUrl(fileName: String): String = &quot;http://localhost:3000/sosialhjelp/innsyn/api/upload-api/thumbnails/$fileName&quot;</span>
+}
+
+<span class="nc" id="L51">class GcpBucketStorage(</span>
+<span class="nc" id="L52">    @Property(&quot;storage.bucketName&quot;) private val bucketName: String,</span>
+<span class="nc" id="L53">    @Property(&quot;storage.gcsCredentials&quot;) private val gcsCredentials: String,</span>
+) : Storage {
+<span class="nc" id="L55">    private val log = LoggerFactory.getLogger(this::class.java)</span>
+
+<span class="nc" id="L57">    val storage: GcpStorage =</span>
+        StorageOptions
+<span class="nc" id="L59">            .newBuilder()</span>
+<span class="nc" id="L60">            .setCredentials(</span>
+<span class="nc" id="L61">                GoogleCredentials.fromStream(gcsCredentials.byteInputStream()),</span>
+<span class="nc" id="L62">            ).build()</span>
+<span class="nc" id="L63">            .service</span>
+
+    override fun store(
+        fileName: String,
+        content: ByteArray,
+        contentType: String,
+    ) {
+<span class="nc" id="L70">        try {</span>
+<span class="nc" id="L71">            storage.create(BlobInfo.newBuilder(BucketInfo.of(bucketName), fileName).setContentType(contentType).build(), content)</span>
+<span class="nc" id="L72">        } catch (e: Exception) {</span>
+<span class="nc" id="L73">            log.error(&quot;Failed to store file in GCP bucket: ${e.message}&quot;, e)</span>
+<span class="nc" id="L74">            throw IOException(&quot;Failed to store file in GCP bucket: ${e.message}&quot;, e)</span>
+        }
+<span class="nc" id="L76">    }</span>
+
+    override fun retrieve(fileName: String): ByteArray? =
+<span class="nc" id="L79">        try {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            storage.get(BlobId.of(bucketName, fileName))?.getContent()</span>
+<span class="nc" id="L81">        } catch (e: Exception) {</span>
+<span class="nc" id="L82">            log.error(&quot;Failed to retrieve file from GCP bucket: ${e.message}&quot;, e)</span>
+<span class="nc" id="L83">            null</span>
+<span class="nc" id="L84">        }</span>
+
+    override fun delete(fileName: String) {
+<span class="nc" id="L87">        storage.delete(BlobId.of(bucketName, fileName))</span>
+<span class="nc" id="L88">    }</span>
+
+    override fun createSignedUrl(fileName: String): String? =
+<span class="nc" id="L91">        try {</span>
+<span class="nc" id="L92">            val blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, fileName)).build()</span>
+<span class="nc" id="L93">            val url = storage.signUrl(blobInfo, 1.days.toLong(DurationUnit.DAYS), TimeUnit.DAYS, GcpStorage.SignUrlOption.withV4Signature())</span>
+<span class="nc" id="L94">            url.toString()</span>
+<span class="nc" id="L95">        } catch (e: Exception) {</span>
+<span class="nc" id="L96">            log.error(&quot;Failed to create signed URL for file $fileName in GCP bucket: ${e.message}&quot;, e)</span>
+<span class="nc" id="L97">            null</span>
+<span class="nc" id="L98">        }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

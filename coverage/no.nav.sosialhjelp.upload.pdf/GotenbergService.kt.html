@@ -29,7 +29,7 @@ import java.io.File
 <span class="nc" id="L29">        val res =</span>
 <span class="nc" id="L30">            gotenbergClient</span>
 <span class="nc" id="L31">                .submitFormWithBinaryData(</span>
-<span class="nc" id="L32">                    formData { append(&quot;file&quot;, upload.file.readBytes(), buildHeaders(upload.originalFileExtension)) },</span>
+<span class="nc" id="L32">                    formData { append(&quot;file&quot;, upload.file, buildHeaders(upload.originalFileExtension)) },</span>
                 )
 
 <span class="nc bnc" id="L35" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}&quot; }</span>
@@ -46,7 +46,7 @@ import java.io.File
 <span class="nc" id="L46">                    append(&quot;merge&quot;, &quot;true&quot;)</span>
 <span class="nc" id="L47">                    append(&quot;pdfa&quot;, &quot;PDF/A-3b&quot;)</span>
 <span class="nc" id="L48">                    append(&quot;pdfua&quot;, &quot;true&quot;)</span>
-<span class="nc" id="L49">                }</span>
+<span class="nc" id="L49">                },</span>
             )
 
 <span class="nc bnc" id="L52" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to merge ${res.status}&quot; }</span>

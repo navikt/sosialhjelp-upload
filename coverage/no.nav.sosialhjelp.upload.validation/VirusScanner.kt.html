@@ -26,24 +26,28 @@ import kotlinx.serialization.json.JsonNames
             // No virus scanner configured, assume all files are clean
 <span class="nc" id="L27">            return Result.OK</span>
         }
-<span class="nc" id="L29">        return httpClient.put(url) {</span>
+<span class="nc" id="L29">        val body = httpClient.put(url) {</span>
 <span class="nc" id="L30">            setBody(ByteReadChannel(file))</span>
-<span class="nc" id="L31">        }.body&lt;ScanResult&gt;().result</span>
+<span class="nc" id="L31">        }.body&lt;List&lt;ScanResult&gt;&gt;()</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">        if (body.all { it.result == Result.OK }) {</span>
+<span class="nc" id="L33">            return Result.OK</span>
+        }
+<span class="nc" id="L35">        return Result.ERROR</span>
     }
 }
 
 enum class Result {
-<span class="nc" id="L36">    FOUND,</span>
-<span class="nc" id="L37">    OK,</span>
-<span class="nc" id="L38">    ERROR,</span>
+<span class="nc" id="L40">    FOUND,</span>
+<span class="nc" id="L41">    OK,</span>
+<span class="nc" id="L42">    ERROR,</span>
 }
 
-<span class="nc bnc" id="L41" title="All 2 branches missed.">@OptIn(ExperimentalSerializationApi::class)</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">@OptIn(ExperimentalSerializationApi::class)</span>
 @Serializable
-<span class="nc" id="L43">private data class ScanResult(</span>
-<span class="nc" id="L44">    @JsonNames(&quot;filename&quot;, &quot;Filename&quot;)</span>
+<span class="nc" id="L47">private data class ScanResult(</span>
+<span class="nc" id="L48">    @JsonNames(&quot;filename&quot;, &quot;Filename&quot;)</span>
     val filename: String,
-<span class="nc" id="L46">    @JsonNames(&quot;result&quot;, &quot;Result&quot;)</span>
+<span class="nc" id="L50">    @JsonNames(&quot;result&quot;, &quot;Result&quot;)</span>
     val result: Result,
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

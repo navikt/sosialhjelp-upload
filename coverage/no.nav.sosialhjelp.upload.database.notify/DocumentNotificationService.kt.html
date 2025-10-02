@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocumentNotificationService.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.database.notify</a> &gt; <span class="el_source">DocumentNotificationService.kt</span></div><h1>DocumentNotificationService.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.database.notify
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import org.postgresql.PGConnection
+import org.slf4j.LoggerFactory
+import java.util.*
+import javax.sql.DataSource
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+
+/**
+ * Service to manage document update notifications using Postgres LISTEN/NOTIFY.
+ */
+<span class="fc" id="L18">class DocumentNotificationService(</span>
+<span class="fc" id="L19">    private val dataSource: DataSource,</span>
+) {
+<span class="fc" id="L21">    private val log = LoggerFactory.getLogger(DocumentNotificationService::class.java)</span>
+
+    fun notifyUpdate(documentId: UUID) {
+<span class="nc" id="L24">        dataSource.connection.use { conn -&gt;</span>
+<span class="nc" id="L25">            conn.createStatement().use { stmt -&gt;</span>
+<span class="nc" id="L26">                stmt.execute(&quot;NOTIFY document_update, '$documentId'&quot;)</span>
+<span class="nc" id="L27">            }</span>
+        }
+<span class="nc" id="L29">    }</span>
+
+<span class="nc" id="L31">    fun getDocumentFlow(</span>
+        documentId: UUID,
+<span class="nc" id="L33">        pollInterval: Duration = 1.seconds,</span>
+    ): Flow&lt;Unit&gt; =
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        flow {</span>
+<span class="nc" id="L36">            dataSource.connection.use { conn -&gt;</span>
+<span class="nc" id="L37">                val pgConn = conn.unwrap(PGConnection::class.java)</span>
+<span class="nc" id="L38">                conn.createStatement().execute(&quot;LISTEN document_update&quot;)</span>
+<span class="nc" id="L39">                while (true) {</span>
+<span class="nc" id="L40">                    val notifications = pgConn.notifications</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">                    notifications?.forEach {</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                        if (it.parameter == documentId.toString()) {</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                            emit(Unit)</span>
+                        }
+<span class="nc" id="L45">                    }</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">                    delay(pollInterval)</span>
+                }
+            }
+<span class="nc" id="L49">        }.flowOn(Dispatchers.IO)</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

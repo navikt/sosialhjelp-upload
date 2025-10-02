@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TexasClient.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.texas</a> &gt; <span class="el_source">TexasClient.kt</span></div><h1>TexasClient.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.texas
+
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.accept
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.plugins.di.annotations.Property
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
+
+<span class="nc" id="L20">class TexasClient(</span>
+<span class="nc" id="L21">    @Property(&quot;texas.url&quot;) val texasUrl: String,</span>
+) {
+<span class="nc" id="L23">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
+<span class="nc" id="L25">    val client by lazy {</span>
+<span class="nc" id="L26">        HttpClient(CIO) {</span>
+<span class="nc" id="L27">            install(ContentNegotiation) {</span>
+<span class="nc" id="L28">                json()</span>
+<span class="nc" id="L29">            }</span>
+<span class="nc" id="L30">        }</span>
+    }
+
+    suspend fun getMaskinportenToken(): String {
+<span class="nc" id="L34">        val response =</span>
+<span class="nc" id="L35">            client</span>
+<span class="nc" id="L36">                .post(texasUrl) {</span>
+<span class="nc" id="L37">                    accept(ContentType.Application.Json)</span>
+<span class="nc" id="L38">                    contentType(ContentType.Application.Json)</span>
+<span class="nc" id="L39">                    setBody(maskinportenParams)</span>
+<span class="nc" id="L40">                }</span>
+<span class="nc" id="L41">        val body =</span>
+<span class="nc" id="L42">            try {</span>
+<span class="nc" id="L43">                response.body&lt;TokenResponse.Success&gt;()</span>
+<span class="nc" id="L44">            } catch (e: Exception) {</span>
+<span class="nc" id="L45">                response.body&lt;TokenErrorResponse&gt;()</span>
+            }
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (body is TokenResponse.Success) {</span>
+<span class="nc" id="L48">            return body.accessToken</span>
+        } else {
+<span class="nc" id="L50">            logger.error(&quot;Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}&quot;)</span>
+<span class="nc" id="L51">            throw RuntimeException(&quot;Failed to get token from Texas&quot;)</span>
+        }
+    }
+}
+
+<span class="nc" id="L56">private val maskinportenParams: Map&lt;String, String&gt; = mapOf(&quot;identity_provider&quot; to &quot;maskinporten&quot;, &quot;target&quot; to &quot;ks:fiks&quot;)</span>
+
+<span class="nc" id="L58">@Serializable</span>
+sealed class TokenResponse {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">    @Serializable</span>
+<span class="nc" id="L61">    data class Success(</span>
+<span class="nc" id="L62">        @SerialName(&quot;access_token&quot;)</span>
+        val accessToken: String,
+<span class="nc" id="L64">        @SerialName(&quot;expires_in&quot;)</span>
+        val expiresInSeconds: Int,
+<span class="nc" id="L66">        @SerialName(&quot;token_type&quot;)</span>
+        val tokenType: String,
+<span class="nc" id="L68">    ) : TokenResponse()</span>
+
+<span class="nc" id="L70">    data class Error(</span>
+<span class="nc" id="L71">        val error: TokenErrorResponse,</span>
+<span class="nc" id="L72">        val status: HttpStatusCode,</span>
+<span class="nc" id="L73">    ) : TokenResponse()</span>
+<span class="nc" id="L74">}</span>
+
+<span class="nc bnc" id="L76" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L77">data class TokenErrorResponse(</span>
+<span class="nc" id="L78">    val error: String,</span>
+<span class="nc" id="L79">    @SerialName(&quot;error_description&quot;)</span>
+    val errorDescription: String,
+)
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

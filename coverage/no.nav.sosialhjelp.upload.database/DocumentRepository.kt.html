@@ -1,104 +1,102 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocumentRepository.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.database</a> &gt; <span class="el_source">DocumentRepository.kt</span></div><h1>DocumentRepository.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.database
 
-import kotlinx.coroutines.reactive.awaitFirstOrNull
-import kotlinx.coroutines.reactive.awaitSingle
 import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
 import org.jooq.Configuration
 import org.jooq.DSLContext
 import java.util.*
 
-<span class="fc" id="L10">class DocumentRepository(</span>
-<span class="fc" id="L11">    private val dsl: DSLContext,</span>
+<span class="fc" id="L8">class DocumentRepository(</span>
+<span class="fc" id="L9">    private val dsl: DSLContext,</span>
 ) {
-<span class="fc" id="L13">    class DocumentOwnedByAnotherUserException : RuntimeException()</span>
+<span class="fc" id="L11">    class DocumentOwnedByAnotherUserException : RuntimeException()</span>
 
-    suspend fun getDocument(
+    fun getDocument(
         tx: Configuration,
         id: UUID,
-<span class="nc" id="L18">    ) = tx</span>
-<span class="nc" id="L19">        .dsl()</span>
-<span class="nc" id="L20">        .selectFrom(DOCUMENT)</span>
-<span class="nc" id="L21">        .where(DOCUMENT.ID.eq(id))</span>
-<span class="nc" id="L22">        .awaitSingle()</span>
+<span class="nc" id="L16">    ) = tx</span>
+<span class="nc" id="L17">        .dsl()</span>
+<span class="nc" id="L18">        .selectFrom(DOCUMENT)</span>
+<span class="nc" id="L19">        .where(DOCUMENT.ID.eq(id))</span>
+<span class="nc" id="L20">        .fetchSingle()</span>
 
-<span class="fc" id="L24">    suspend fun getOrCreateDocument(</span>
+    fun getOrCreateDocument(
         tx: Configuration,
         externalId: String,
         personIdent: String,
     ): UUID {
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (isOwnedByAnotherUser(externalId, personIdent)) {</span>
-<span class="fc" id="L30">            throw DocumentOwnedByAnotherUserException()</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (isOwnedByAnotherUser(externalId, personIdent)) {</span>
+<span class="fc" id="L28">            throw DocumentOwnedByAnotherUserException()</span>
         }
 
-<span class="fc" id="L33">        val insertedId =</span>
-<span class="fc" id="L34">            tx</span>
-<span class="fc" id="L35">                .dsl()</span>
-<span class="fc" id="L36">                .insertInto(DOCUMENT)</span>
-<span class="fc" id="L37">                .set(DOCUMENT.ID, UUID.randomUUID())</span>
-<span class="fc" id="L38">                .set(DOCUMENT.OWNER_IDENT, personIdent)</span>
-<span class="fc" id="L39">                .set(DOCUMENT.EXTERNAL_ID, externalId)</span>
-<span class="fc" id="L40">                .onDuplicateKeyIgnore()</span>
-<span class="fc" id="L41">                .returning(DOCUMENT.ID)</span>
-<span class="fc" id="L42">                .awaitFirstOrNull()</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">                ?.get(DOCUMENT.ID)</span>
+<span class="fc" id="L31">        val insertedId =</span>
+<span class="fc" id="L32">            tx</span>
+<span class="fc" id="L33">                .dsl()</span>
+<span class="fc" id="L34">                .insertInto(DOCUMENT)</span>
+<span class="fc" id="L35">                .set(DOCUMENT.ID, UUID.randomUUID())</span>
+<span class="fc" id="L36">                .set(DOCUMENT.OWNER_IDENT, personIdent)</span>
+<span class="fc" id="L37">                .set(DOCUMENT.EXTERNAL_ID, externalId)</span>
+<span class="fc" id="L38">                .onDuplicateKeyIgnore()</span>
+<span class="fc" id="L39">                .returning(DOCUMENT.ID)</span>
+<span class="fc" id="L40">                .fetchOne()</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">                ?.get(DOCUMENT.ID)</span>
 
-<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (insertedId != null) return insertedId</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (insertedId != null) return insertedId</span>
 
         // Otherwise, select existing
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        return tx</span>
-<span class="fc" id="L49">            .dsl()</span>
-<span class="fc" id="L50">            .select(DOCUMENT.ID)</span>
-<span class="fc" id="L51">            .from(DOCUMENT)</span>
-<span class="fc" id="L52">            .where(</span>
-<span class="fc" id="L53">                DOCUMENT.EXTERNAL_ID</span>
-<span class="fc" id="L54">                    .eq(externalId)</span>
-<span class="fc" id="L55">                    .and(DOCUMENT.OWNER_IDENT.eq(personIdent)),</span>
-<span class="fc" id="L56">            ).awaitFirstOrNull()</span>
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            ?.get(DOCUMENT.ID) ?: error(&quot;Could not find or create document&quot;)</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        return tx</span>
+<span class="fc" id="L47">            .dsl()</span>
+<span class="fc" id="L48">            .select(DOCUMENT.ID)</span>
+<span class="fc" id="L49">            .from(DOCUMENT)</span>
+<span class="fc" id="L50">            .where(</span>
+<span class="fc" id="L51">                DOCUMENT.EXTERNAL_ID</span>
+<span class="fc" id="L52">                    .eq(externalId)</span>
+<span class="fc" id="L53">                    .and(DOCUMENT.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L54">            ).fetchOne()</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            ?.get(DOCUMENT.ID) ?: error(&quot;Could not find or create document&quot;)</span>
     }
 
-<span class="fc" id="L60">    private suspend fun isOwnedByAnotherUser(</span>
+    private fun isOwnedByAnotherUser(
         externalId: String,
         personIdent: String,
     ): Boolean {
-<span class="fc" id="L64">        val count =</span>
-<span class="fc" id="L65">            dsl</span>
-<span class="fc" id="L66">                .selectCount()</span>
-<span class="fc" id="L67">                .from(DOCUMENT)</span>
-<span class="fc" id="L68">                .where(</span>
-<span class="fc" id="L69">                    DOCUMENT.EXTERNAL_ID</span>
-<span class="fc" id="L70">                        .eq(externalId)</span>
-<span class="fc" id="L71">                        .and(DOCUMENT.OWNER_IDENT.ne(personIdent)),</span>
-<span class="fc" id="L72">                ).awaitSingle()</span>
-<span class="fc" id="L73">                .value1()</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        return count &gt; 0</span>
+<span class="fc" id="L62">        val count =</span>
+<span class="fc" id="L63">            dsl</span>
+<span class="fc" id="L64">                .selectCount()</span>
+<span class="fc" id="L65">                .from(DOCUMENT)</span>
+<span class="fc" id="L66">                .where(</span>
+<span class="fc" id="L67">                    DOCUMENT.EXTERNAL_ID</span>
+<span class="fc" id="L68">                        .eq(externalId)</span>
+<span class="fc" id="L69">                        .and(DOCUMENT.OWNER_IDENT.ne(personIdent)),</span>
+<span class="fc" id="L70">                ).fetchSingle()</span>
+<span class="fc" id="L71">                .value1()</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        return count &gt; 0</span>
     }
 
-<span class="nc" id="L77">    suspend fun isOwnedByUser(</span>
+    fun isOwnedByUser(
         id: UUID,
         personIdent: String,
     ): Boolean {
-<span class="nc" id="L81">        val count =</span>
-<span class="nc" id="L82">            dsl</span>
-<span class="nc" id="L83">                .selectCount()</span>
-<span class="nc" id="L84">                .from(DOCUMENT)</span>
-<span class="nc" id="L85">                .where(</span>
-<span class="nc" id="L86">                    DOCUMENT.ID</span>
-<span class="nc" id="L87">                        .eq(id)</span>
-<span class="nc" id="L88">                        .and(DOCUMENT.OWNER_IDENT.eq(personIdent)),</span>
-<span class="nc" id="L89">                ).awaitSingle()</span>
-<span class="nc bnc" id="L90" title="All 2 branches missed.">                ?.value1()</span>
-<span class="nc bnc" id="L91" title="All 4 branches missed.">        return count != 0</span>
+<span class="nc" id="L79">        val count =</span>
+<span class="nc" id="L80">            dsl</span>
+<span class="nc" id="L81">                .selectCount()</span>
+<span class="nc" id="L82">                .from(DOCUMENT)</span>
+<span class="nc" id="L83">                .where(</span>
+<span class="nc" id="L84">                    DOCUMENT.ID</span>
+<span class="nc" id="L85">                        .eq(id)</span>
+<span class="nc" id="L86">                        .and(DOCUMENT.OWNER_IDENT.eq(personIdent)),</span>
+<span class="nc" id="L87">                ).fetchOne()</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                ?.value1()</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">        return count != 0</span>
     }
 
-<span class="nc" id="L94">    suspend fun cleanup(</span>
+    fun cleanup(
         tx: Configuration,
         documentId: UUID,
     ): Int =
-<span class="nc" id="L98">        tx</span>
-<span class="nc" id="L99">            .dsl()</span>
-<span class="nc" id="L100">            .deleteFrom(DOCUMENT)</span>
-<span class="nc" id="L101">            .where(DOCUMENT.ID.eq(documentId))</span>
-<span class="nc" id="L102">            .awaitSingle()</span>
+<span class="nc" id="L96">        tx</span>
+<span class="nc" id="L97">            .dsl()</span>
+<span class="nc" id="L98">            .deleteFrom(DOCUMENT)</span>
+<span class="nc" id="L99">            .where(DOCUMENT.ID.eq(documentId))</span>
+<span class="nc" id="L100">            .execute()</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

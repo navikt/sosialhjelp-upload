@@ -14,30 +14,34 @@ import no.nav.sosialhjelp.upload.tusd.dto.HookResponse
 fun Route.configureTusRoutes() {
 <span class="nc" id="L15">    val tusService: TusService by application.dependencies</span>
 
-<span class="nc bnc" id="L17" title="All 10 branches missed.">    post {</span>
+<span class="nc bnc" id="L17" title="All 7 branches missed.">    post {</span>
 <span class="nc" id="L18">        val request = call.receive&lt;HookRequest&gt;()</span>
 <span class="nc bnc" id="L19" title="All 2 branches missed.">        val personIdent = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
 
 <span class="nc bnc" id="L21" title="All 2 branches missed.">        if (personIdent == null) {</span>
-<span class="nc" id="L22">            call.respond(HttpStatusCode.Unauthorized, &quot;missing or invalid token&quot;)</span>
-<span class="nc" id="L23">            return@post</span>
+<span class="nc" id="L22">            environment.log.info(&quot;Mangler personident&quot;)</span>
+<span class="nc" id="L23">            call.respond(HttpStatusCode.Unauthorized, &quot;missing or invalid token&quot;)</span>
+<span class="nc" id="L24">            return@post</span>
         }
 
-<span class="nc" id="L26">        environment.log.info(&quot;got hook request of type ${request.type}&quot;)</span>
+<span class="nc" id="L27">        environment.log.info(&quot;got hook request of type ${request.type}&quot;)</span>
 
-<span class="nc" id="L28">        call.respond(</span>
-<span class="nc bnc" id="L29" title="All 6 branches missed.">            when (request.type) {</span>
-<span class="nc bnc" id="L30" title="All 2 branches missed.">                HookType.PreFinish -&gt; tusService.validateUpload(request, personIdent)</span>
-<span class="nc bnc" id="L31" title="All 2 branches missed.">                HookType.PreTerminate -&gt; tusService.preTerminate(request, personIdent)</span>
-<span class="nc bnc" id="L32" title="All 2 branches missed.">                HookType.PostTerminate -&gt; tusService.postTerminate(request, personIdent)</span>
-<span class="nc bnc" id="L33" title="All 2 branches missed.">                HookType.PreCreate -&gt; tusService.preCreate(request, personIdent)</span>
-<span class="nc bnc" id="L34" title="All 2 branches missed.">                HookType.PostFinish -&gt; tusService.postFinish(request)</span>
-                else -&gt; {
-<span class="nc" id="L36">                    environment.log.warn(&quot;got unhandled hook request of type ${request.type}&quot;)</span>
-<span class="nc" id="L37">                    HookResponse()</span>
-                }
-            },
-        )
-<span class="nc" id="L41">    }</span>
-<span class="nc" id="L42">}</span>
+<span class="nc" id="L29">        runCatching {</span>
+<span class="nc" id="L30">            call.respond(</span>
+<span class="nc bnc" id="L31" title="All 6 branches missed.">                when (request.type) {</span>
+<span class="nc" id="L32">                    HookType.PreCreate -&gt; tusService.preCreate(request, personIdent)</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">                    HookType.PreFinish -&gt; tusService.validateUpload(request)</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">                    HookType.PostFinish -&gt; tusService.postFinish(request)</span>
+
+<span class="nc" id="L36">                    HookType.PreTerminate -&gt; tusService.preTerminate(request, personIdent)</span>
+<span class="nc" id="L37">                    HookType.PostTerminate -&gt; tusService.postTerminate(request, personIdent)</span>
+                    else -&gt; {
+<span class="nc" id="L39">                        environment.log.warn(&quot;got unhandled hook request of type ${request.type}&quot;)</span>
+<span class="nc" id="L40">                        HookResponse()</span>
+                    }
+                },
+            )
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        }.onFailure { cause -&gt; environment.log.error(&quot;Something happened during Tus hook&quot;, cause) }.getOrThrow()</span>
+<span class="nc" id="L45">    }</span>
+<span class="nc" id="L46">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

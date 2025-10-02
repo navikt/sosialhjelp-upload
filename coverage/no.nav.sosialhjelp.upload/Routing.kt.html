@@ -4,7 +4,6 @@ import io.ktor.http.ContentType
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.http.content.*
-import io.ktor.server.resources.*
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
@@ -14,24 +13,31 @@ import no.nav.sosialhjelp.upload.tusd.configureTusRoutes
 import java.io.File
 
 fun Application.configureRouting() {
-<span class="nc" id="L17">    install(Resources)</span>
-<span class="nc" id="L18">    install(SSE)</span>
-<span class="nc" id="L19">    routing {</span>
-<span class="nc" id="L20">        route(&quot;/sosialhjelp/upload&quot;) {</span>
-<span class="nc" id="L21">            route(&quot;/internal/isAlive&quot;) {</span>
-<span class="nc bnc" id="L22" title="All 3 branches missed.">                get {</span>
-<span class="nc bnc" id="L23" title="All 2 branches missed.">                    call.respondText(&quot;I'm alive!&quot;, ContentType.Text.Plain)</span>
-<span class="nc" id="L24">                }</span>
-<span class="nc" id="L25">            }</span>
-<span class="nc" id="L26">            authenticate {</span>
-<span class="nc" id="L27">                configureStatusRoutes()</span>
-<span class="nc" id="L28">                configureActionRoutes()</span>
-                // todo: user permission check for files
-<span class="nc" id="L30">            }</span>
-<span class="nc" id="L31">            staticFiles(&quot;/thumbnails&quot;, File(&quot;./tusd-data&quot;))</span>
-<span class="nc" id="L32">        }</span>
+<span class="nc" id="L16">    install(SSE)</span>
+<span class="nc" id="L17">    routing {</span>
+<span class="nc" id="L18">        route(&quot;/sosialhjelp/upload&quot;) {</span>
+<span class="nc" id="L19">            route(&quot;/internal/isAlive&quot;) {</span>
+<span class="nc bnc" id="L20" title="All 3 branches missed.">                get {</span>
+<span class="nc bnc" id="L21" title="All 2 branches missed.">                    call.respondText(&quot;I'm alive!&quot;, ContentType.Text.Plain)</span>
+<span class="nc" id="L22">                }</span>
+<span class="nc" id="L23">            }</span>
+<span class="nc" id="L24">            authenticate {</span>
+<span class="nc" id="L25">                configureStatusRoutes()</span>
+<span class="nc" id="L26">                configureActionRoutes()</span>
+<span class="nc" id="L27">            }</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">            if (environment.config</span>
+<span class="nc" id="L29">                    .propertyOrNull(&quot;runtimeEnv&quot;)</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">                    ?.getString() == &quot;local&quot;</span>
+            ) {
+<span class="nc" id="L32">                staticFiles(&quot;/thumbnails&quot;, File(&quot;./tusd-data&quot;))</span>
+            }
+<span class="nc" id="L34">        }</span>
 
-<span class="nc" id="L34">        route(&quot;/tus-hooks&quot;) { authenticate { configureTusRoutes() } }</span>
-<span class="nc" id="L35">    }</span>
-<span class="nc" id="L36">}</span>
+<span class="nc" id="L36">        route(&quot;/tus-hooks&quot;) {</span>
+<span class="nc" id="L37">            authenticate {</span>
+<span class="nc" id="L38">                configureTusRoutes()</span>
+<span class="nc" id="L39">            }</span>
+<span class="nc" id="L40">        }</span>
+<span class="nc" id="L41">    }</span>
+<span class="nc" id="L42">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

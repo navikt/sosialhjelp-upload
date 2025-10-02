@@ -5,13 +5,13 @@ import no.nav.sosialhjelp.upload.contentnegotiation.UUIDSerializer
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import java.util.UUID
 
-<span class="pc bnc" id="L8" title="All 18 branches missed.">@Serializable</span>
+<span class="pc bnc" id="L8" title="All 10 branches missed.">@Serializable</span>
 <span class="pc" id="L9">data class UploadSuccessState(</span>
 <span class="fc" id="L10">    @property:Serializable(with = UUIDSerializer::class)</span>
     val id: UUID?,
 <span class="fc" id="L12">    val originalFilename: String,</span>
 <span class="pc" id="L13">    val convertedFilename: String?,</span>
-<span class="pc" id="L14">    val pages: List&lt;PageState&gt;? = null,</span>
-<span class="pc" id="L15">    val validations: List&lt;ValidationCode&gt; = emptyList(),</span>
+<span class="pc" id="L14">    val validations: List&lt;ValidationCode&gt; = emptyList(),</span>
+<span class="pc" id="L15">    val signedUrl: String?,</span>
 <span class="nc" id="L16">)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

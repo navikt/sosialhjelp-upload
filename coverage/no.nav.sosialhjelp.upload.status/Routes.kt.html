@@ -8,16 +8,16 @@ import io.ktor.server.sse.*
 import io.ktor.sse.*
 import io.ktor.util.reflect.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.DocumentRepository
-import no.nav.sosialhjelp.upload.database.reactive.DocumentStatusChannelFactory
+import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import kotlin.time.Duration.Companion.seconds
 
 fun Route.configureStatusRoutes() {
-<span class="nc" id="L20">    val statusChannelFactory = DocumentStatusChannelFactory(environment)</span>
+<span class="nc" id="L20">    val statusChannelFactory: DocumentNotificationService by application.dependencies</span>
 <span class="nc" id="L21">    val dsl: DSLContext by application.dependencies</span>
 <span class="nc" id="L22">    val documentRepository: DocumentRepository by application.dependencies</span>
 <span class="nc" id="L23">    val documentStatusService: DocumentStatusService by application.dependencies</span>
@@ -25,7 +25,7 @@ fun Route.configureStatusRoutes() {
 <span class="nc" id="L25">    sse(&quot;/status/{id}&quot;, serialize = { typeInfo: TypeInfo, value: Any -&gt;</span>
 <span class="nc" id="L26">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
 <span class="nc" id="L27">        Default.encodeToString(serializer, value)</span>
-<span class="nc bnc" id="L28" title="All 6 branches missed.">    }) {</span>
+<span class="nc bnc" id="L28" title="All 4 branches missed.">    }) {</span>
 <span class="nc bnc" id="L29" title="All 4 branches missed.">        val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
 
 <span class="nc" id="L31">        heartbeat {</span>
@@ -34,17 +34,15 @@ fun Route.configureStatusRoutes() {
 <span class="nc" id="L34">        }</span>
 
 <span class="nc" id="L36">        val documentId =</span>
-<span class="nc bnc" id="L37" title="All 5 branches missed.">            dsl.transactionCoroutine(Dispatchers.IO) {</span>
-<span class="nc bnc" id="L38" title="All 4 branches missed.">                documentRepository.getOrCreateDocument(it, call.parameters[&quot;id&quot;] ?: &quot;&quot;, personident)</span>
+<span class="nc" id="L37">            dsl.transactionResult { config -&gt;</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">                documentRepository.getOrCreateDocument(config, call.parameters[&quot;id&quot;] ?: &quot;&quot;, personident)</span>
             }
 
-<span class="nc" id="L41">        DocumentNotificationListener(statusChannelFactory, documentId).use { emitter -&gt;</span>
-<span class="nc bnc" id="L42" title="All 2 branches missed.">            send(documentStatusService.getDocumentStatus(documentId))</span>
+<span class="nc" id="L41">        send(documentStatusService.getDocumentStatus(documentId))</span>
 
-<span class="nc" id="L44">            emitter</span>
-<span class="nc" id="L45">                .getDocumentUpdateFlow()</span>
-<span class="nc bnc" id="L46" title="All 2 branches missed.">                .collect { send(documentStatusService.getDocumentStatus(documentId)) }</span>
-<span class="nc" id="L47">        }</span>
-<span class="nc" id="L48">    }</span>
-<span class="nc" id="L49">}</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        statusChannelFactory.getDocumentFlow(documentId).collect {</span>
+<span class="nc" id="L44">            send(documentStatusService.getDocumentStatus(documentId))</span>
+<span class="nc" id="L45">        }</span>
+<span class="nc" id="L46">    }</span>
+<span class="nc" id="L47">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
