@@ -1,7 +1,7 @@
 apiVersion: "nais.io/v1alpha1"
 kind: "Application"
 metadata:
-  name: sosialhjelp-upload-dev
+  name: sosialhjelp-upload-mock
   namespace: teamdigisos
   labels:
     team: teamdigisos
@@ -31,24 +31,20 @@ spec:
   accessPolicy:
     outbound:
       external:
-        - host: api.fiks.test.ks.no
-        - host: minside.fiks.test.ks.no
-        - host: test.idporten.no
+        - host: "digisos.ekstern.dev.nav.no"
       rules:
-        - application: clamav
-          namespace: nais-system
+        - application: sosialhjelp-mock-alt-api-mock
         - application: sosialhjelp-konvertering-til-pdf
     inbound:
       rules:
-        - application: sosialhjelp-innsyn-dev
-        - application: sosialhjelp-innsyn
-        - application: sosialhjelp-tusd-dev
+        - application: sosialhjelp-innsyn-mock
+        - application: sosialhjelp-tusd-mock
   gcp:
     sqlInstances:
       - type: POSTGRES_17
         tier: db-f1-micro
         databases:
-          - name: sosialhjelp-upload
+          - name: sosialhjelp-upload-mock
             envVarPrefix: POSTGRES
   resources:
     limits:
@@ -56,25 +52,22 @@ spec:
     requests:
       cpu: 10m
       memory: 512Mi
-  maskinporten:
-    enabled: true
-    scopes:
-      consumes:
-        - name: "ks:fiks"
   envFrom:
-    - secret: fiks-integrasjon-secret
-    - secret: idporten-sosialhjelp
-    - secret: gcs-credentials
+    - secret: gcs-credentials-mock
   env:
     - name: FIKS_URL
-      value: "https://api.fiks.test.ks.no"
+      value: "http://sosialhjelp-mock-alt-api-mock/sosialhjelp/mock-alt-api/fiks"
     - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
-      value: "https://minside.fiks.test.ks.no"
-    - name: CLAMAV_URL
-      value: "http://clamav.nais-system/scan"
+      value: "http://sosialhjelp-mock-alt-api-mock/sosialhjelp/mock-alt-api/fiks/dokumentlager"
     - name: GOTENBERG_URL
       value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
     - name: RUNTIME_ENV
-      value: "dev"
+      value: "mock"
     - name: BUCKET_NAME
-      value: "sosialhjelp-upload-dev"
+      value: "sosialhjelp-upload-mock"
+    - name: IDPORTEN_ISSUER
+      value: "https://sosiauth2.ekstern.dev.nav.no/default"
+    - name: IDPORTEN_JWKS_URI
+      value: "https://sosiauth2.ekstern.dev.nav.no/default/jwks"
+    - name: NAIS_TOKEN_ENDPOINT
+

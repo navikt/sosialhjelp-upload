@@ -66,18 +66,6 @@ class FiksClient(
         }
     }
 
-    private val publicKeyClient by lazy {
-        HttpClient(CIO) {
-            install(Logging) {
-                logger = Logger.DEFAULT
-                level = LogLevel.BODY
-            }
-            install(ContentNegotiation) {
-                json()
-            }
-        }
-    }
-
     suspend fun fetchPublicKey(): X509Certificate {
         val publicKey =
             withContext(Dispatchers.IO) {

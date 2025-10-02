@@ -2,10 +2,14 @@ package no.nav.sosialhjelp.upload
 
 import io.ktor.server.application.*
 import io.ktor.server.config.ApplicationConfig
+import io.ktor.server.config.property
 import io.ktor.server.plugins.di.*
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
+import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
+import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
@@ -54,6 +58,9 @@ private fun migrateDatabase(dataSource: DataSource) {
 fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource)
+    val runtimeEnv = this@module.property<String>("runtimeEnv")
+    val isLocal = runtimeEnv == "local"
+    val isMock = runtimeEnv == "mock"
     dependencies {
         provide<DataSource> {
             dataSource
@@ -61,31 +68,19 @@ fun Application.module() {
         provide<DSLContext> {
             DSL.using(dataSource, SQLDialect.POSTGRES)
         }
+        provide<EncryptionService> {
+            if (isMock || isLocal) {
+                create(EncryptionServiceMock::class)
+            } else {
+                create(EncryptionServiceImpl::class)
+            }
+        }
         provide { this@module.environment.log }
         provide<Storage> {
-            val isLocal =
-                this@module
-                    .environment.config
-                    .property("runtimeEnv")
-                    .getString() == "local"
             if (isLocal) {
-                FileSystemStorage(
-                    this@module
-                        .environment.config
-                        .property("storage.basePath")
-                        .getString(),
-                )
+                create(FileSystemStorage::class)
             } else {
-                GcpBucketStorage(
-                    this@module
-                        .environment.config
-                        .property("storage.bucketName")
-                        .getString(),
-                    this@module
-                        .environment.config
-                        .property("storage.gcsCredentials")
-                        .getString(),
-                )
+                create(GcpBucketStorage::class)
             }
         }
         provide(TexasClient::class)
