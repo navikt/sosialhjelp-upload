@@ -12,47 +12,55 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import no.nav.sosialhjelp.upload.common.FinishedUpload
+import org.slf4j.LoggerFactory
 import java.io.File
 
-<span class="nc" id="L17">class GotenbergService(</span>
+<span class="nc" id="L18">class GotenbergService(</span>
     @Property(&quot;gotenberg.url&quot;) gotenbergUrl: String,
 ) {
+<span class="nc" id="L21">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
     private val gotenbergClient =
-<span class="nc" id="L21">        HttpClient(CIO) {</span>
-<span class="nc" id="L22">            expectSuccess = false</span>
-<span class="nc" id="L23">            defaultRequest { url(gotenbergUrl) }</span>
-<span class="nc" id="L24">        }</span>
+<span class="nc" id="L24">        HttpClient(CIO) {</span>
+<span class="nc" id="L25">            expectSuccess = false</span>
+<span class="nc" id="L26">            defaultRequest { url(gotenbergUrl) }</span>
+<span class="nc" id="L27">        }</span>
 
     private fun buildHeaders(originalFiletype: String): Headers =
-<span class="nc" id="L27">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$originalFiletype&quot;&quot;&quot;&quot;) }</span>
+<span class="nc" id="L30">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$originalFiletype&quot;&quot;&quot;&quot;) }</span>
 
     suspend fun convertToPdf(upload: FinishedUpload): ByteReadChannel {
-<span class="nc" id="L30">        val res =</span>
-<span class="nc" id="L31">            gotenbergClient</span>
-<span class="nc" id="L32">                .submitFormWithBinaryData(</span>
-<span class="nc" id="L33">                    formData { append(&quot;file&quot;, ChannelProvider { upload.file }, buildHeaders(upload.originalFileExtension)) },</span>
-                )
+<span class="nc" id="L33">        val res =</span>
+<span class="nc" id="L34">            try {</span>
+<span class="nc" id="L35">                gotenbergClient</span>
+<span class="nc" id="L36">                    .submitFormWithBinaryData(</span>
+<span class="nc" id="L37">                        formData { append(&quot;file&quot;, ChannelProvider { upload.file }, buildHeaders(upload.originalFileExtension)) },</span>
+                    )
+<span class="nc" id="L39">            } catch (e: Exception) {</span>
+<span class="nc" id="L40">                logger</span>
+<span class="nc" id="L41">                throw RuntimeException(&quot;Failed to convert file type ${upload.originalFileExtension} to PDF&quot;)</span>
+            }
 
-<span class="nc bnc" id="L36" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}&quot; }</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}&quot; }</span>
 
-<span class="nc" id="L38">        return res.bodyAsChannel()</span>
+<span class="nc" id="L46">        return res.bodyAsChannel()</span>
     }
 
-<span class="nc" id="L41">    suspend fun merge(pdfs: Flow&lt;File&gt;): ByteArray {</span>
-<span class="nc" id="L42">        val byteReadChannels = pdfs.map { it.readBytes() }.toList()</span>
-<span class="nc" id="L43">        val res =</span>
-<span class="nc" id="L44">            gotenbergClient.submitFormWithBinaryData(</span>
-<span class="nc" id="L45">                formData {</span>
-<span class="nc" id="L46">                    byteReadChannels.forEachIndexed { index, pdf -&gt; append(&quot;file&quot;, pdf, headers = buildHeaders(&quot;$index.pdf&quot;)) }</span>
-<span class="nc" id="L47">                    append(&quot;merge&quot;, &quot;true&quot;)</span>
-<span class="nc" id="L48">                    append(&quot;pdfa&quot;, &quot;PDF/A-3b&quot;)</span>
-<span class="nc" id="L49">                    append(&quot;pdfua&quot;, &quot;true&quot;)</span>
-<span class="nc" id="L50">                },</span>
+<span class="nc" id="L49">    suspend fun merge(pdfs: Flow&lt;File&gt;): ByteArray {</span>
+<span class="nc" id="L50">        val byteReadChannels = pdfs.map { it.readBytes() }.toList()</span>
+<span class="nc" id="L51">        val res =</span>
+<span class="nc" id="L52">            gotenbergClient.submitFormWithBinaryData(</span>
+<span class="nc" id="L53">                formData {</span>
+<span class="nc" id="L54">                    byteReadChannels.forEachIndexed { index, pdf -&gt; append(&quot;file&quot;, pdf, headers = buildHeaders(&quot;$index.pdf&quot;)) }</span>
+<span class="nc" id="L55">                    append(&quot;merge&quot;, &quot;true&quot;)</span>
+<span class="nc" id="L56">                    append(&quot;pdfa&quot;, &quot;PDF/A-3b&quot;)</span>
+<span class="nc" id="L57">                    append(&quot;pdfua&quot;, &quot;true&quot;)</span>
+<span class="nc" id="L58">                },</span>
             )
 
-<span class="nc bnc" id="L53" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to merge ${res.status}&quot; }</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to merge ${res.status}&quot; }</span>
 
-<span class="nc" id="L55">        return res.readRawBytes()</span>
+<span class="nc" id="L63">        return res.readRawBytes()</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -12,42 +12,57 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import org.slf4j.LoggerFactory
 
-<span class="nc" id="L16">class VirusScanner(@Property(&quot;virus.scanner.url&quot;) val url: String) {</span>
-<span class="nc" id="L17">    val httpClient = HttpClient(CIO) {</span>
-<span class="nc" id="L18">        expectSuccess = true</span>
-<span class="nc" id="L19">        install(ContentNegotiation) {</span>
-<span class="nc" id="L20">            json()</span>
-<span class="nc" id="L21">        }</span>
-<span class="nc" id="L22">    }</span>
+<span class="nc" id="L17">class VirusScanner(</span>
+<span class="nc" id="L18">    @Property(&quot;virus.scanner.url&quot;) val url: String,</span>
+) {
+<span class="nc" id="L20">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
+<span class="nc" id="L22">    val httpClient =</span>
+<span class="nc" id="L23">        HttpClient(CIO) {</span>
+<span class="nc" id="L24">            expectSuccess = true</span>
+<span class="nc" id="L25">            install(ContentNegotiation) {</span>
+<span class="nc" id="L26">                json()</span>
+<span class="nc" id="L27">            }</span>
+<span class="nc" id="L28">        }</span>
 
     suspend fun scan(file: ByteReadChannel): Result {
-<span class="nc bnc" id="L25" title="All 4 branches missed.">        if (url.isEmpty()) {</span>
-            // No virus scanner configured, assume all files are clean
-<span class="nc" id="L27">            return Result.OK</span>
+<span class="nc" id="L31">        try {</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">            if (url.isEmpty()) {</span>
+                // No virus scanner configured, assume all files are clean
+<span class="nc" id="L34">                return Result.OK</span>
+            }
+<span class="nc" id="L36">            val body =</span>
+<span class="nc" id="L37">                httpClient</span>
+<span class="nc" id="L38">                    .put(url) {</span>
+<span class="nc" id="L39">                        setBody(file)</span>
+<span class="nc" id="L40">                    }.body&lt;List&lt;ScanResult&gt;&gt;()</span>
+<span class="nc bnc" id="L41" title="All 4 branches missed.">            if (body.all { it.result == Result.OK }) {</span>
+<span class="nc" id="L42">                return Result.OK</span>
+            }
+<span class="nc" id="L44">            return Result.ERROR</span>
+<span class="nc" id="L45">        } catch (e: Exception) {</span>
+            // If the virus scanner is unreachable or returns an error, we assume the file is clean
+            // This is to avoid blocking uploads due to temporary issues with the virus scanner
+<span class="nc" id="L48">            logger.warn(&quot;Virus scanner error: ${e.message}, assuming file is clean&quot;)</span>
+<span class="nc" id="L49">            return Result.OK</span>
         }
-<span class="nc" id="L29">        val body = httpClient.put(url) {</span>
-<span class="nc" id="L30">            setBody(file)</span>
-<span class="nc" id="L31">        }.body&lt;List&lt;ScanResult&gt;&gt;()</span>
-<span class="nc bnc" id="L32" title="All 4 branches missed.">        if (body.all { it.result == Result.OK }) {</span>
-<span class="nc" id="L33">            return Result.OK</span>
-        }
-<span class="nc" id="L35">        return Result.ERROR</span>
     }
 }
 
 enum class Result {
-<span class="nc" id="L40">    FOUND,</span>
-<span class="nc" id="L41">    OK,</span>
-<span class="nc" id="L42">    ERROR,</span>
+<span class="nc" id="L55">    FOUND,</span>
+<span class="nc" id="L56">    OK,</span>
+<span class="nc" id="L57">    ERROR,</span>
 }
 
-<span class="nc bnc" id="L45" title="All 2 branches missed.">@OptIn(ExperimentalSerializationApi::class)</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">@OptIn(ExperimentalSerializationApi::class)</span>
 @Serializable
-<span class="nc" id="L47">private data class ScanResult(</span>
-<span class="nc" id="L48">    @JsonNames(&quot;filename&quot;, &quot;Filename&quot;)</span>
+<span class="nc" id="L62">private data class ScanResult(</span>
+<span class="nc" id="L63">    @JsonNames(&quot;filename&quot;, &quot;Filename&quot;)</span>
     val filename: String,
-<span class="nc" id="L50">    @JsonNames(&quot;result&quot;, &quot;Result&quot;)</span>
+<span class="nc" id="L65">    @JsonNames(&quot;result&quot;, &quot;Result&quot;)</span>
     val result: Result,
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
