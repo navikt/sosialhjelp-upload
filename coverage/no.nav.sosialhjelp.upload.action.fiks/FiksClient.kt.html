@@ -13,6 +13,7 @@ import io.ktor.http.*
 import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -28,69 +29,69 @@ import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 
-<span class="nc" id="L31">class FiksClient(</span>
-<span class="nc" id="L32">    @Property(&quot;fiks.baseUrl&quot;) private val fiksBaseUrl: String,</span>
-<span class="nc" id="L33">    @Property(&quot;fiks.integrasjonsid&quot;) private val integrasjonsid: String?,</span>
-<span class="nc" id="L34">    @Property(&quot;fiks.integrasjonspassord&quot;) private val integrasjonspassord: String?,</span>
-<span class="nc" id="L35">    private val texasClient: TexasClient,</span>
+<span class="nc" id="L32">class FiksClient(</span>
+<span class="nc" id="L33">    @Property(&quot;fiks.baseUrl&quot;) private val fiksBaseUrl: String,</span>
+<span class="nc" id="L34">    @Property(&quot;fiks.integrasjonsid&quot;) private val integrasjonsid: String?,</span>
+<span class="nc" id="L35">    @Property(&quot;fiks.integrasjonspassord&quot;) private val integrasjonspassord: String?,</span>
+<span class="nc" id="L36">    private val texasClient: TexasClient,</span>
 ) {
-<span class="nc" id="L37">    private val logger = LoggerFactory.getLogger(this::class.java.name)</span>
+<span class="nc" id="L38">    private val logger = LoggerFactory.getLogger(this::class.java.name)</span>
 
     private fun ettersendelseUrl(
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-<span class="nc" id="L43">    ) = &quot;$fiksBaseUrl/digisos/api/v1/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId&quot;</span>
+<span class="nc" id="L44">    ) = &quot;$fiksBaseUrl/digisos/api/v1/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId&quot;</span>
 
-<span class="nc" id="L45">    private fun digisosSakUrl(fiksDigisosId: String) = &quot;$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId&quot;</span>
+<span class="nc" id="L46">    private fun digisosSakUrl(fiksDigisosId: String) = &quot;$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId&quot;</span>
 
-<span class="nc" id="L47">    private val jacksonClient by lazy {</span>
-<span class="nc" id="L48">        HttpClient(CIO) {</span>
-<span class="nc" id="L49">            expectSuccess = false</span>
-<span class="nc" id="L50">            install(ContentNegotiation) {</span>
-<span class="nc" id="L51">                jackson()</span>
-<span class="nc" id="L52">            }</span>
-<span class="nc" id="L53">        }</span>
+<span class="nc" id="L48">    private val jacksonClient by lazy {</span>
+<span class="nc" id="L49">        HttpClient(CIO) {</span>
+<span class="nc" id="L50">            expectSuccess = false</span>
+<span class="nc" id="L51">            install(ContentNegotiation) {</span>
+<span class="nc" id="L52">                jackson()</span>
+<span class="nc" id="L53">            }</span>
+<span class="nc" id="L54">        }</span>
     }
 
-<span class="nc" id="L56">    private val client by lazy {</span>
-<span class="nc" id="L57">        HttpClient(CIO) {</span>
-<span class="nc" id="L58">            expectSuccess = false</span>
-<span class="nc" id="L59">            install(Logging) {</span>
-<span class="nc" id="L60">                logger = Logger.DEFAULT</span>
-<span class="nc" id="L61">                level = LogLevel.BODY</span>
-<span class="nc" id="L62">            }</span>
-<span class="nc" id="L63">            install(ContentNegotiation) {</span>
-<span class="nc" id="L64">                json()</span>
-<span class="nc" id="L65">            }</span>
-<span class="nc" id="L66">        }</span>
+<span class="nc" id="L57">    private val client by lazy {</span>
+<span class="nc" id="L58">        HttpClient(CIO) {</span>
+<span class="nc" id="L59">            expectSuccess = false</span>
+<span class="nc" id="L60">            install(Logging) {</span>
+<span class="nc" id="L61">                logger = Logger.DEFAULT</span>
+<span class="nc" id="L62">                level = LogLevel.BODY</span>
+<span class="nc" id="L63">            }</span>
+<span class="nc" id="L64">            install(ContentNegotiation) {</span>
+<span class="nc" id="L65">                json()</span>
+<span class="nc" id="L66">            }</span>
+<span class="nc" id="L67">        }</span>
     }
 
-<span class="nc" id="L69">    suspend fun fetchPublicKey(): X509Certificate {</span>
-<span class="nc" id="L70">        val publicKey =</span>
-<span class="nc" id="L71">            withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L72">                client</span>
-<span class="nc" id="L73">                    .get(&quot;$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key&quot;) {</span>
-<span class="nc" id="L74">                        headers {</span>
-<span class="nc bnc" id="L75" title="All 2 branches missed.">                            integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L76" title="All 2 branches missed.">                            integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L77">                        }</span>
-<span class="nc" id="L78">                        bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L79">                    }.apply {</span>
-<span class="nc bnc" id="L80" title="All 2 branches missed.">                        if (!status.isSuccess()) {</span>
-<span class="nc" id="L81">                            logger.error(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
-<span class="nc" id="L82">                            throw Exception(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
+<span class="nc" id="L70">    suspend fun fetchPublicKey(): X509Certificate {</span>
+<span class="nc" id="L71">        val publicKey =</span>
+<span class="nc" id="L72">            withContext(Dispatchers.IO) {</span>
+<span class="nc" id="L73">                client</span>
+<span class="nc" id="L74">                    .get(&quot;$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key&quot;) {</span>
+<span class="nc" id="L75">                        headers {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                            integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                            integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L78">                        }</span>
+<span class="nc" id="L79">                        bearerAuth(texasClient.getMaskinportenToken())</span>
+<span class="nc" id="L80">                    }.apply {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                        if (!status.isSuccess()) {</span>
+<span class="nc" id="L82">                            logger.error(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
+<span class="nc" id="L83">                            throw Exception(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
                         }
-<span class="nc" id="L84">                    }.bodyAsBytes()</span>
-<span class="nc" id="L85">                    .also {</span>
-<span class="nc" id="L86">                        logger.info(&quot;Hentet public key fra dokumentlager&quot;)</span>
-<span class="nc" id="L87">                    }</span>
+<span class="nc" id="L85">                    }.bodyAsChannel()</span>
+<span class="nc" id="L86">                    .also {</span>
+<span class="nc" id="L87">                        logger.info(&quot;Hentet public key fra dokumentlager&quot;)</span>
+<span class="nc" id="L88">                    }</span>
             }
-<span class="nc" id="L89">        return try {</span>
-<span class="nc" id="L90">            val certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;)</span>
-<span class="nc" id="L91">            (certificateFactory.generateCertificate(ByteArrayInputStream(publicKey)) as X509Certificate)</span>
-<span class="nc" id="L92">        } catch (e: CertificateException) {</span>
-<span class="nc" id="L93">            throw IllegalStateException(e)</span>
+<span class="nc" id="L90">        return try {</span>
+<span class="nc" id="L91">            val certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;)</span>
+<span class="nc" id="L92">            (certificateFactory.generateCertificate(publicKey.toInputStream())) as X509Certificate</span>
+<span class="nc" id="L93">        } catch (e: CertificateException) {</span>
+<span class="nc" id="L94">            throw IllegalStateException(e)</span>
         }
     }
 
@@ -102,79 +103,81 @@ import java.security.cert.X509Certificate
         metadata: Metadata,
         token: String,
     ): HttpResponse =
-<span class="nc" id="L105">        client.submitFormWithBinaryData(</span>
-<span class="nc" id="L106">            ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
-<span class="nc" id="L107">            formData {</span>
-<span class="nc" id="L108">                val vedleggJson =</span>
-<span class="nc" id="L109">                    VedleggSpesifikasjon(</span>
-<span class="nc" id="L110">                        type = metadata.type,</span>
-<span class="nc" id="L111">                        tilleggsinfo = metadata.tilleggsinfo,</span>
-<span class="nc" id="L112">                        innsendelsesfrist = metadata.innsendelsesfrist,</span>
-<span class="nc" id="L113">                        hendelsetype = metadata.hendelsetype,</span>
-<span class="nc" id="L114">                        hendelsereferanse = metadata.hendelsereferanse,</span>
-                    )
-<span class="nc" id="L116">                append(</span>
-<span class="nc" id="L117">                    &quot;vedlegg.json&quot;,</span>
-<span class="nc" id="L118">                    Json.encodeToString(vedleggJson),</span>
-<span class="nc" id="L119">                    Headers.build {</span>
-<span class="nc" id="L120">                        append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
-<span class="nc" id="L121">                    },</span>
-                )
-<span class="nc" id="L123">                files.forEachIndexed { index, file -&gt;</span>
-<span class="nc" id="L124">                    val vedleggMetadata =</span>
-<span class="nc" id="L125">                        VedleggMetadata(</span>
-<span class="nc" id="L126">                            filnavn = file.filename,</span>
-<span class="nc" id="L127">                            mimetype = file.fileType,</span>
-<span class="nc" id="L128">                            storrelse = file.file.size.toLong(),</span>
+<span class="nc" id="L106">        withContext(Dispatchers.IO) {</span>
+<span class="nc" id="L107">            client.submitFormWithBinaryData(</span>
+<span class="nc" id="L108">                ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
+<span class="nc" id="L109">                formData {</span>
+<span class="nc" id="L110">                    val vedleggJson =</span>
+<span class="nc" id="L111">                        VedleggSpesifikasjon(</span>
+<span class="nc" id="L112">                            type = metadata.type,</span>
+<span class="nc" id="L113">                            tilleggsinfo = metadata.tilleggsinfo,</span>
+<span class="nc" id="L114">                            innsendelsesfrist = metadata.innsendelsesfrist,</span>
+<span class="nc" id="L115">                            hendelsetype = metadata.hendelsetype,</span>
+<span class="nc" id="L116">                            hendelsereferanse = metadata.hendelsereferanse,</span>
                         )
-<span class="nc" id="L130">                    append(</span>
-<span class="nc" id="L131">                        &quot;vedleggSpesifikasjon:$index&quot;,</span>
-<span class="nc" id="L132">                        Json.encodeToString(vedleggMetadata),</span>
-<span class="nc" id="L133">                        Headers.build {</span>
-<span class="nc" id="L134">                            append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
-<span class="nc" id="L135">                        },</span>
+<span class="nc" id="L118">                    append(</span>
+<span class="nc" id="L119">                        &quot;vedlegg.json&quot;,</span>
+<span class="nc" id="L120">                        Json.encodeToString(vedleggJson),</span>
+<span class="nc" id="L121">                        Headers.build {</span>
+<span class="nc" id="L122">                            append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L123">                        },</span>
                     )
-<span class="nc" id="L137">                    append(</span>
-<span class="nc" id="L138">                        &quot;dokument:$index&quot;,</span>
-<span class="nc" id="L139">                        file.file,</span>
-<span class="nc" id="L140">                        Headers.build {</span>
-<span class="nc" id="L141">                            append(HttpHeaders.ContentType, ContentType.Application.OctetStream)</span>
-<span class="nc" id="L142">                            append(HttpHeaders.ContentDisposition, &quot;filename=\&quot;${file.filename}\&quot;&quot;)</span>
-<span class="nc" id="L143">                        },</span>
-                    )
-<span class="nc" id="L145">                }</span>
-<span class="nc" id="L146">            },</span>
-        ) {
-            // TODO: Legg på integrasjonsid/-passord i header
-<span class="nc" id="L149">            headers {</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">                integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L151" title="All 2 branches missed.">                integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L152">            }</span>
-<span class="nc" id="L153">            bearerAuth(token)</span>
-<span class="nc" id="L154">            contentType(ContentType.MultiPart.FormData)</span>
-<span class="nc" id="L155">        }</span>
+<span class="nc" id="L125">                    files.forEachIndexed { index, file -&gt;</span>
+<span class="nc" id="L126">                        val vedleggMetadata =</span>
+<span class="nc" id="L127">                            VedleggMetadata(</span>
+<span class="nc" id="L128">                                filnavn = file.filename,</span>
+<span class="nc" id="L129">                                mimetype = file.fileType,</span>
+<span class="nc" id="L130">                                storrelse = file.fileSize,</span>
+                            )
+<span class="nc" id="L132">                        append(</span>
+<span class="nc" id="L133">                            &quot;vedleggSpesifikasjon:$index&quot;,</span>
+<span class="nc" id="L134">                            Json.encodeToString(vedleggMetadata),</span>
+<span class="nc" id="L135">                            Headers.build {</span>
+<span class="nc" id="L136">                                append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L137">                            },</span>
+                        )
+<span class="nc" id="L139">                        append(</span>
+<span class="nc" id="L140">                            &quot;dokument:$index&quot;,</span>
+<span class="nc" id="L141">                            ChannelProvider { file.file },</span>
+<span class="nc" id="L142">                            Headers.build {</span>
+<span class="nc" id="L143">                                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)</span>
+<span class="nc" id="L144">                                append(HttpHeaders.ContentDisposition, &quot;filename=\&quot;${file.filename}\&quot;&quot;)</span>
+<span class="nc" id="L145">                            },</span>
+                        )
+<span class="nc" id="L147">                    }</span>
+<span class="nc" id="L148">                },</span>
+            ) {
+                // TODO: Legg på integrasjonsid/-passord i header
+<span class="nc" id="L151">                headers {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L154">                }</span>
+<span class="nc" id="L155">                bearerAuth(token)</span>
+<span class="nc" id="L156">                contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L157">            }</span>
+<span class="nc" id="L158">        }</span>
 
     suspend fun getSak(
         id: String,
         token: String,
     ): DigisosSak =
-<span class="nc" id="L161">        jacksonClient</span>
-<span class="nc" id="L162">            .get(digisosSakUrl(id)) {</span>
-<span class="nc" id="L163">                headers {</span>
-<span class="nc bnc" id="L164" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
-<span class="nc" id="L165">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
-<span class="nc" id="L166">                    }</span>
-<span class="nc bnc" id="L167" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L168">                }</span>
-<span class="nc" id="L169">                accept(ContentType.Application.Json)</span>
-<span class="nc" id="L170">                bearerAuth(token)</span>
-<span class="nc" id="L171">            }.body()</span>
+<span class="nc" id="L164">        jacksonClient</span>
+<span class="nc" id="L165">            .get(digisosSakUrl(id)) {</span>
+<span class="nc" id="L166">                headers {</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
+<span class="nc" id="L168">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
+<span class="nc" id="L169">                    }</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L171">                }</span>
+<span class="nc" id="L172">                accept(ContentType.Application.Json)</span>
+<span class="nc" id="L173">                bearerAuth(token)</span>
+<span class="nc" id="L174">            }.body()</span>
 }
 
-<span class="nc bnc" id="L174" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L175">private data class VedleggMetadata(</span>
-<span class="nc" id="L176">    val filnavn: String?,</span>
-<span class="nc" id="L177">    val mimetype: String?,</span>
-<span class="nc" id="L178">    val storrelse: Long,</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L178">private data class VedleggMetadata(</span>
+<span class="nc" id="L179">    val filnavn: String?,</span>
+<span class="nc" id="L180">    val mimetype: String?,</span>
+<span class="nc" id="L181">    val storrelse: Long,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
