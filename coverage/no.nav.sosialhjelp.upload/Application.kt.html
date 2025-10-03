@@ -50,7 +50,8 @@ private fun migrateDatabase(dataSource: DataSource) {
         Flyway
             .configure()
             .dataSource(dataSource)
-            .locations(&quot;db/migration&quot;)
+            .locations(&quot;classpath:db/migration&quot;)
+            .validateMigrationNaming(true)
             .cleanDisabled(false)
             .load()
     load.clean()
@@ -65,25 +66,25 @@ fun Application.module() {
     val isMock = runtimeEnv == &quot;mock&quot;
     dependencies {
         provide&lt;DataSource&gt; {
-<span class="nc" id="L68">            dataSource</span>
+<span class="nc" id="L69">            dataSource</span>
         }
         provide&lt;DSLContext&gt; {
-<span class="nc" id="L71">            DSL.using(dataSource, SQLDialect.POSTGRES)</span>
+<span class="nc" id="L72">            DSL.using(dataSource, SQLDialect.POSTGRES)</span>
         }
-<span class="nc bnc" id="L73" title="All 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
-<span class="nc bnc" id="L74" title="All 4 branches missed.">            if (isMock || isLocal) {</span>
-<span class="nc" id="L75">                create(EncryptionServiceMock::class)</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="nc bnc" id="L75" title="All 4 branches missed.">            if (isMock || isLocal) {</span>
+<span class="nc" id="L76">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L77">                create(EncryptionServiceImpl::class)</span>
-<span class="nc" id="L78">            }</span>
+<span class="nc" id="L78">                create(EncryptionServiceImpl::class)</span>
+<span class="nc" id="L79">            }</span>
         }
-<span class="nc" id="L80">        provide { this@module.environment.log }</span>
-<span class="nc bnc" id="L81" title="All 4 branches missed.">        provide&lt;Storage&gt; {</span>
-<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (isLocal) {</span>
-<span class="nc" id="L83">                create(FileSystemStorage::class)</span>
+<span class="nc" id="L81">        provide { this@module.environment.log }</span>
+<span class="nc bnc" id="L82" title="All 4 branches missed.">        provide&lt;Storage&gt; {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (isLocal) {</span>
+<span class="nc" id="L84">                create(FileSystemStorage::class)</span>
             } else {
-<span class="nc" id="L85">                create(GcpBucketStorage::class)</span>
-<span class="nc" id="L86">            }</span>
+<span class="nc" id="L86">                create(GcpBucketStorage::class)</span>
+<span class="nc" id="L87">            }</span>
         }
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
