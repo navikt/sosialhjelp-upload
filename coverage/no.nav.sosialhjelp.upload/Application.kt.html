@@ -50,7 +50,7 @@ private fun migrateDatabase(dataSource: DataSource) {
         Flyway
             .configure()
             .dataSource(dataSource)
-            .locations(&quot;classpath:db/migration&quot;)
+            .locations(&quot;db/migration&quot;)
             .validateMigrationNaming(true)
             .cleanDisabled(false)
             .load()
