@@ -5,5 +5,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class FileMetadata(
     val filename: String,
-    val externalId: String
+    val externalId: String,
 )

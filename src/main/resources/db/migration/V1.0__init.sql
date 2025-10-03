@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS upload (
     document_id uuid references document(id) ON DELETE CASCADE,
     original_filename varchar(255) NOT NULL,
     signed_url varchar,
-    converted_filename varchar(255)
+    converted_filename varchar(255),
+    size bigint
 );
 
 CREATE TABLE IF NOT EXISTS error

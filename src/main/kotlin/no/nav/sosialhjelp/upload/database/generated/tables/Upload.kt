@@ -86,12 +86,17 @@ open class Upload(
     /**
      * The column <code>public.upload.signed_url</code>.
      */
-    val SIGNED_URL: TableField<UploadRecord, String?> = createField(DSL.name("signed_url"), SQLDataType.VARCHAR(255), this, "")
+    val SIGNED_URL: TableField<UploadRecord, String?> = createField(DSL.name("signed_url"), SQLDataType.VARCHAR, this, "")
 
     /**
      * The column <code>public.upload.converted_filename</code>.
      */
     val CONVERTED_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("converted_filename"), SQLDataType.VARCHAR(255), this, "")
+
+    /**
+     * The column <code>public.upload.size</code>.
+     */
+    val SIZE: TableField<UploadRecord, Long?> = createField(DSL.name("size"), SQLDataType.BIGINT, this, "")
 
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

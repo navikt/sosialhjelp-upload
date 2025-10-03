@@ -15,6 +15,7 @@ data class UploadWithFilename(
     val convertedFilename: String?,
     val errors: List<ValidationCode>,
     val signedUrl: String?,
+    val fileSize: Long?
 )
 
 class UploadRepository(
@@ -77,7 +78,7 @@ class UploadRepository(
     ): List<UploadWithFilename> =
         tx
             .dsl()
-            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, ERROR.CODE, UPLOAD.SIGNED_URL)
+            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, ERROR.CODE, UPLOAD.SIGNED_URL, UPLOAD.SIZE)
             .from(UPLOAD)
             .leftJoin(ERROR)
             .on(ERROR.UPLOAD.eq(UPLOAD.ID))
@@ -91,6 +92,7 @@ class UploadRepository(
                     convertedFilename = records.first().get(UPLOAD.CONVERTED_FILENAME),
                     errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },
                     signedUrl = records.first().get(UPLOAD.SIGNED_URL),
+                    fileSize = records.first().get(UPLOAD.SIZE),
                 )
             }
 

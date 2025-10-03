@@ -51,7 +51,9 @@ private fun migrateDatabase(dataSource: DataSource) {
             .configure()
             .dataSource(dataSource)
             .locations("db/migration")
+            .cleanDisabled(false)
             .load()
+    load.clean()
     load.migrate()
 }
 

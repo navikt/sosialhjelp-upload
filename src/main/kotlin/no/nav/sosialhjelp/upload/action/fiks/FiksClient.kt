@@ -13,6 +13,7 @@ import io.ktor.http.*
 import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -81,14 +82,14 @@ class FiksClient(
                             logger.error("Feil ved henting av public key fra dokumentlager: $status")
                             throw Exception("Feil ved henting av public key fra dokumentlager: $status")
                         }
-                    }.bodyAsBytes()
+                    }.bodyAsChannel()
                     .also {
                         logger.info("Hentet public key fra dokumentlager")
                     }
             }
         return try {
             val certificateFactory = CertificateFactory.getInstance("X.509")
-            (certificateFactory.generateCertificate(ByteArrayInputStream(publicKey)) as X509Certificate)
+            (certificateFactory.generateCertificate(publicKey.toInputStream())) as X509Certificate
         } catch (e: CertificateException) {
             throw IllegalStateException(e)
         }
@@ -102,56 +103,58 @@ class FiksClient(
         metadata: Metadata,
         token: String,
     ): HttpResponse =
-        client.submitFormWithBinaryData(
-            ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
-            formData {
-                val vedleggJson =
-                    VedleggSpesifikasjon(
-                        type = metadata.type,
-                        tilleggsinfo = metadata.tilleggsinfo,
-                        innsendelsesfrist = metadata.innsendelsesfrist,
-                        hendelsetype = metadata.hendelsetype,
-                        hendelsereferanse = metadata.hendelsereferanse,
-                    )
-                append(
-                    "vedlegg.json",
-                    Json.encodeToString(vedleggJson),
-                    Headers.build {
-                        append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
-                    },
-                )
-                files.forEachIndexed { index, file ->
-                    val vedleggMetadata =
-                        VedleggMetadata(
-                            filnavn = file.filename,
-                            mimetype = file.fileType,
-                            storrelse = file.file.size.toLong(),
+        withContext(Dispatchers.IO) {
+            client.submitFormWithBinaryData(
+                ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
+                formData {
+                    val vedleggJson =
+                        VedleggSpesifikasjon(
+                            type = metadata.type,
+                            tilleggsinfo = metadata.tilleggsinfo,
+                            innsendelsesfrist = metadata.innsendelsesfrist,
+                            hendelsetype = metadata.hendelsetype,
+                            hendelsereferanse = metadata.hendelsereferanse,
                         )
                     append(
-                        "vedleggSpesifikasjon:$index",
-                        Json.encodeToString(vedleggMetadata),
+                        "vedlegg.json",
+                        Json.encodeToString(vedleggJson),
                         Headers.build {
                             append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
                         },
                     )
-                    append(
-                        "dokument:$index",
-                        file.file,
-                        Headers.build {
-                            append(HttpHeaders.ContentType, ContentType.Application.OctetStream)
-                            append(HttpHeaders.ContentDisposition, "filename=\"${file.filename}\"")
-                        },
-                    )
+                    files.forEachIndexed { index, file ->
+                        val vedleggMetadata =
+                            VedleggMetadata(
+                                filnavn = file.filename,
+                                mimetype = file.fileType,
+                                storrelse = file.fileSize,
+                            )
+                        append(
+                            "vedleggSpesifikasjon:$index",
+                            Json.encodeToString(vedleggMetadata),
+                            Headers.build {
+                                append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
+                            },
+                        )
+                        append(
+                            "dokument:$index",
+                            ChannelProvider { file.file },
+                            Headers.build {
+                                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)
+                                append(HttpHeaders.ContentDisposition, "filename=\"${file.filename}\"")
+                            },
+                        )
+                    }
+                },
+            ) {
+                // TODO: Legg på integrasjonsid/-passord i header
+                headers {
+                    integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
                 }
-            },
-        ) {
-            // TODO: Legg på integrasjonsid/-passord i header
-            headers {
-                integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
-                integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+                bearerAuth(token)
+                contentType(ContentType.MultiPart.FormData)
             }
-            bearerAuth(token)
-            contentType(ContentType.MultiPart.FormData)
         }
 
     suspend fun getSak(

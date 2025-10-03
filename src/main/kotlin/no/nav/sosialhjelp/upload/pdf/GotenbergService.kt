@@ -7,15 +7,19 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.Property
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import no.nav.sosialhjelp.upload.common.FinishedUpload
+import org.slf4j.LoggerFactory
 import java.io.File
 
 class GotenbergService(
     @Property("gotenberg.url") gotenbergUrl: String,
 ) {
+    private val logger = LoggerFactory.getLogger(this::class.java)
+
     private val gotenbergClient =
         HttpClient(CIO) {
             expectSuccess = false
@@ -25,16 +29,21 @@ class GotenbergService(
     private fun buildHeaders(originalFiletype: String): Headers =
         Headers.build { append(HttpHeaders.ContentDisposition, """filename="file.$originalFiletype"""") }
 
-    suspend fun convertToPdf(upload: FinishedUpload): ByteArray {
+    suspend fun convertToPdf(upload: FinishedUpload): ByteReadChannel {
         val res =
-            gotenbergClient
-                .submitFormWithBinaryData(
-                    formData { append("file", upload.file, buildHeaders(upload.originalFileExtension)) },
-                )
+            try {
+                gotenbergClient
+                    .submitFormWithBinaryData(
+                        formData { append("file", ChannelProvider { upload.file }, buildHeaders(upload.originalFileExtension)) },
+                    )
+            } catch (e: Exception) {
+                logger
+                throw RuntimeException("Failed to convert file type ${upload.originalFileExtension} to PDF")
+            }
 
         check(res.status.isSuccess()) { "Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}" }
 
-        return res.readRawBytes()
+        return res.bodyAsChannel()
     }
 
     suspend fun merge(pdfs: Flow<File>): ByteArray {

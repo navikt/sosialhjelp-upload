@@ -3,18 +3,22 @@
 package no.nav.sosialhjelp.upload.validation
 
 import io.ktor.util.logging.Logger
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import no.nav.sosialhjelp.upload.fs.Storage
 import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import org.apache.pdfbox.Loader
+import org.apache.pdfbox.io.RandomAccessReadBuffer
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
 import org.apache.tika.Tika
 import java.io.IOException
 import java.text.Normalizer
 
 // 10 MB
+// TODO: Er dette en begrensning hos oss, Fiks eller fagsystemene?
 const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
 val SUPPORTED_MIME_TYPES =
@@ -40,7 +44,6 @@ class UploadValidator(
     val storage: Storage,
 ) {
     suspend fun validate(request: HookRequest): List<Validation> {
-        // TODO: Ikke ByteArray (og bucket)
         val file = storage.retrieve(request.event.upload.id) ?: error("File not found: ${request.event.upload.id}")
 
         val validations =
@@ -57,8 +60,8 @@ class UploadValidator(
         return validations.filterNotNull()
     }
 
-    private fun validateFileType(file: ByteArray): Validation? {
-        val mimeType = Tika().detect(file)
+    private fun validateFileType(file: ByteReadChannel): Validation? {
+        val mimeType = Tika().detect(file.toInputStream())
         if (mimeType !in SUPPORTED_MIME_TYPES) {
             println("Unsupported mime type: $mimeType")
             return FileTypeValidation()
@@ -70,10 +73,11 @@ class UploadValidator(
         return null
     }
 
-    private fun ByteArray.checkIfPdfIsValid(): Validation? {
+    private fun ByteReadChannel.checkIfPdfIsValid(): Validation? {
         return try {
+            val randomAccessRead = RandomAccessReadBuffer(this.toInputStream())
             Loader
-                .loadPDF(this)
+                .loadPDF(randomAccessRead)
                 .use { document ->
                     if (document.isEncrypted) {
                         EncryptedPdfValidation()
@@ -86,10 +90,13 @@ class UploadValidator(
         } catch (e: IOException) {
             logger.warn(ValidationCode.INVALID_PDF.name, e)
             InvalidPdfValidation()
+        } catch (e: Exception) {
+            logger.warn(ValidationCode.INVALID_PDF.name + " " + e.message, e)
+            InvalidPdfValidation()
         }
     }
 
-    private suspend fun runVirusScan(file: ByteArray): Validation? =
+    private suspend fun runVirusScan(file: ByteReadChannel): Validation? =
         when (virusScanner.scan(file)) {
             Result.FOUND -> VirusValidation()
             Result.ERROR -> TODO()

@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.upload.action
 import io.ktor.http.ContentType
 import io.ktor.http.defaultForFile
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -16,9 +17,10 @@ import java.io.File
 import java.util.UUID
 
 data class Upload(
-    val file: ByteArray,
+    val file: ByteReadChannel,
     val filename: String,
     val fileType: String,
+    val fileSize: Long,
 )
 
 private const val COUNTER_SUFFIX_LENGTH = 4
@@ -69,7 +71,7 @@ class DownstreamUploadService(
                     upload.convertedFilename?.let { storage.retrieve(it) } ?: storage.retrieve(upload.originalFilename!!)
                         ?: error("File not found")
                 val ext = ContentType.defaultForFile(File(upload.convertedFilename ?: upload.originalFilename!!))
-                Upload(file, upload.originalFilename!!, ext.toString())
+                Upload(file, upload.originalFilename!!, ext.toString(), upload.fileSize ?: -1L)
             }
         val sak = fiksClient.getSak(fiksDigisosId, token)
         val kommunenummer = sak.kommunenummer
@@ -86,8 +88,11 @@ class DownstreamUploadService(
                     upload.id?.toString()?.let {
                         storage.delete(it)
                     }
-                    if (upload.convertedFilename != null) {
-                        storage.delete(upload.convertedFilename)
+                    upload.originalFilename?.let {
+                        storage.delete(it)
+                    }
+                    upload.convertedFilename?.let {
+                        storage.delete(it)
                     }
                 }
                 notificationService.notifyUpdate(documentId)

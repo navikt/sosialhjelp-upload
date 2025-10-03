@@ -6,6 +6,11 @@ import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.BucketInfo
 import com.google.cloud.storage.StorageOptions
 import io.ktor.server.plugins.di.annotations.Property
+import io.ktor.util.cio.readChannel
+import io.ktor.util.cio.writeChannel
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.copyTo
+import io.ktor.utils.io.jvm.nio.toByteReadChannel
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
@@ -15,13 +20,13 @@ import kotlin.time.DurationUnit
 import com.google.cloud.storage.Storage as GcpStorage
 
 interface Storage {
-    fun store(
+    suspend fun store(
         fileName: String,
-        content: ByteArray,
+        content: ByteReadChannel,
         contentType: String,
     )
 
-    fun retrieve(fileName: String): ByteArray?
+    fun retrieve(fileName: String): ByteReadChannel?
 
     fun delete(fileName: String)
 
@@ -31,15 +36,16 @@ interface Storage {
 class FileSystemStorage(
     @Property("storage.basePath") private val basePath: String,
 ) : Storage {
-    override fun store(
+    override suspend fun store(
         fileName: String,
-        content: ByteArray,
+        content: ByteReadChannel,
         contentType: String,
     ) {
-        File("$basePath/$fileName").writeBytes(content)
+        val writeChannel = File("$basePath/$fileName").writeChannel()
+        content.copyTo(writeChannel)
     }
 
-    override fun retrieve(fileName: String): ByteArray? = File("$basePath/$fileName").readBytes()
+    override fun retrieve(fileName: String): ByteReadChannel = File("$basePath/$fileName").readChannel()
 
     override fun delete(fileName: String) {
         File("$basePath/$fileName").delete()
@@ -62,22 +68,27 @@ class GcpBucketStorage(
             ).build()
             .service
 
-    override fun store(
+    override suspend fun store(
         fileName: String,
-        content: ByteArray,
+        content: ByteReadChannel,
         contentType: String,
     ) {
         try {
-            storage.create(BlobInfo.newBuilder(BucketInfo.of(bucketName), fileName).setContentType(contentType).build(), content)
+            storage
+                .writer(
+                    BlobInfo.newBuilder(BucketInfo.of(bucketName), fileName).setContentType(contentType).build(),
+                ).use { writeChannel ->
+                    content.copyTo(writeChannel)
+                }
         } catch (e: Exception) {
             log.error("Failed to store file in GCP bucket: ${e.message}", e)
             throw IOException("Failed to store file in GCP bucket: ${e.message}", e)
         }
     }
 
-    override fun retrieve(fileName: String): ByteArray? =
+    override fun retrieve(fileName: String): ByteReadChannel? =
         try {
-            storage.get(BlobId.of(bucketName, fileName))?.getContent()
+            storage.get(BlobId.of(bucketName, fileName))?.reader()?.toByteReadChannel()
         } catch (e: Exception) {
             log.error("Failed to retrieve file from GCP bucket: ${e.message}", e)
             null

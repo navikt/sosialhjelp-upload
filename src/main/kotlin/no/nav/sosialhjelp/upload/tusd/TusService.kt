@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.upload.tusd
 import io.ktor.http.ContentType
 import io.ktor.http.defaultForFileExtension
 import io.ktor.util.logging.Logger
+import io.ktor.utils.io.ByteReadChannel
 import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
@@ -89,7 +90,7 @@ class TusService(
     private suspend fun convertUploadToPdf(
         uploadId: UUID,
         filename: String,
-    ): ByteArray {
+    ): ByteReadChannel {
         val file = storage.retrieve(uploadId.toString()) ?: error("File not found")
         return gotenbergService.convertToPdf(
             FinishedUpload(

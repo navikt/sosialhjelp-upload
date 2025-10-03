@@ -37,15 +37,20 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(4, value)
         get(): String? = get(4) as String?
 
+    open var size: Long?
+        set(value): Unit = set(5, value)
+        get(): Long? = get(5) as Long?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, signedUrl: String? = null, convertedFilename: String? = null): this() {
+    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, signedUrl: String? = null, convertedFilename: String? = null, size: Long? = null): this() {
         this.id = id
         this.documentId = documentId
         this.originalFilename = originalFilename
         this.signedUrl = signedUrl
         this.convertedFilename = convertedFilename
+        this.size = size
         resetChangedOnNotNull()
     }
 }
