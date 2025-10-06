@@ -33,25 +33,25 @@ interface Storage {
     fun createSignedUrl(fileName: String): String?
 }
 
-<span class="nc" id="L36">class FileSystemStorage(</span>
-<span class="nc" id="L37">    @Property(&quot;storage.basePath&quot;) private val basePath: String,</span>
+<span class="fc" id="L36">class FileSystemStorage(</span>
+<span class="fc" id="L37">    @Property(&quot;storage.basePath&quot;) private val basePath: String,</span>
 ) : Storage {
     override suspend fun store(
         fileName: String,
         content: ByteReadChannel,
         contentType: String,
     ) {
-<span class="nc" id="L44">        val writeChannel = File(&quot;$basePath/$fileName&quot;).writeChannel()</span>
-<span class="nc" id="L45">        content.copyTo(writeChannel)</span>
-<span class="nc" id="L46">    }</span>
+<span class="fc" id="L44">        val writeChannel = File(&quot;$basePath/$fileName&quot;).writeChannel()</span>
+<span class="fc" id="L45">        content.copyTo(writeChannel)</span>
+<span class="fc" id="L46">    }</span>
 
-<span class="nc" id="L48">    override fun retrieve(fileName: String): ByteReadChannel = File(&quot;$basePath/$fileName&quot;).readChannel()</span>
+<span class="fc" id="L48">    override fun retrieve(fileName: String): ByteReadChannel = File(&quot;$basePath/$fileName&quot;).readChannel()</span>
 
     override fun delete(fileName: String) {
 <span class="nc" id="L51">        File(&quot;$basePath/$fileName&quot;).delete()</span>
 <span class="nc" id="L52">    }</span>
 
-<span class="nc" id="L54">    override fun createSignedUrl(fileName: String): String = &quot;http://localhost:3000/sosialhjelp/innsyn/api/upload-api/thumbnails/$fileName&quot;</span>
+<span class="fc" id="L54">    override fun createSignedUrl(fileName: String): String = &quot;http://localhost:3000/sosialhjelp/innsyn/api/upload-api/thumbnails/$fileName&quot;</span>
 }
 
 <span class="nc" id="L57">class GcpBucketStorage(</span>

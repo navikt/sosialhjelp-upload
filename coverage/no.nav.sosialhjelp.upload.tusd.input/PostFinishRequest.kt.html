@@ -4,18 +4,18 @@ import HookType
 import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import java.util.*
 
-<span class="nc" id="L7">data class PostFinishRequest(</span>
-<span class="nc" id="L8">    val uploadId: UUID,</span>
-<span class="nc" id="L9">    val filename: String,</span>
+<span class="fc" id="L7">data class PostFinishRequest(</span>
+<span class="fc" id="L8">    val uploadId: UUID,</span>
+<span class="fc" id="L9">    val filename: String,</span>
 ) {
     companion object {
         fun fromRequest(request: HookRequest): PostFinishRequest =
-<span class="nc bnc" id="L13" title="All 4 branches missed.">            require(request.type == HookType.PostFinish).let {</span>
-<span class="nc" id="L14">                PostFinishRequest(</span>
-<span class="nc" id="L15">                    uploadId = UUID.fromString(request.event.upload.id),</span>
-<span class="nc" id="L16">                    filename = request.event.upload.metadata.filename,</span>
-<span class="nc" id="L17">                )</span>
-<span class="nc" id="L18">            }</span>
+<span class="pc bpc" id="L13" title="2 of 4 branches missed.">            require(request.type == HookType.PostFinish).let {</span>
+<span class="fc" id="L14">                PostFinishRequest(</span>
+<span class="fc" id="L15">                    uploadId = UUID.fromString(request.event.upload.id),</span>
+<span class="fc" id="L16">                    filename = request.event.upload.metadata.filename,</span>
+<span class="fc" id="L17">                )</span>
+<span class="fc" id="L18">            }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

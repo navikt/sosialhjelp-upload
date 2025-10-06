@@ -14,24 +14,24 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import org.slf4j.LoggerFactory
 
-<span class="nc" id="L17">class VirusScanner(</span>
-<span class="nc" id="L18">    @Property(&quot;virus.scanner.url&quot;) val url: String,</span>
+<span class="fc" id="L17">class VirusScanner(</span>
+<span class="pc" id="L18">    @Property(&quot;virus.scanner.url&quot;) val url: String,</span>
 ) {
-<span class="nc" id="L20">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L20">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
 
 <span class="nc" id="L22">    val httpClient =</span>
-<span class="nc" id="L23">        HttpClient(CIO) {</span>
-<span class="nc" id="L24">            expectSuccess = true</span>
-<span class="nc" id="L25">            install(ContentNegotiation) {</span>
-<span class="nc" id="L26">                json()</span>
-<span class="nc" id="L27">            }</span>
-<span class="nc" id="L28">        }</span>
+<span class="fc" id="L23">        HttpClient(CIO) {</span>
+<span class="fc" id="L24">            expectSuccess = true</span>
+<span class="fc" id="L25">            install(ContentNegotiation) {</span>
+<span class="fc" id="L26">                json()</span>
+<span class="fc" id="L27">            }</span>
+<span class="fc" id="L28">        }</span>
 
     suspend fun scan(file: ByteReadChannel): Result {
-<span class="nc" id="L31">        try {</span>
-<span class="nc bnc" id="L32" title="All 4 branches missed.">            if (url.isEmpty()) {</span>
+<span class="fc" id="L31">        try {</span>
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">            if (url.isEmpty()) {</span>
                 // No virus scanner configured, assume all files are clean
-<span class="nc" id="L34">                return Result.OK</span>
+<span class="fc" id="L34">                return Result.OK</span>
             }
 <span class="nc" id="L36">            val body =</span>
 <span class="nc" id="L37">                httpClient</span>
@@ -52,9 +52,9 @@ import org.slf4j.LoggerFactory
 }
 
 enum class Result {
-<span class="nc" id="L55">    FOUND,</span>
-<span class="nc" id="L56">    OK,</span>
-<span class="nc" id="L57">    ERROR,</span>
+<span class="fc" id="L55">    FOUND,</span>
+<span class="fc" id="L56">    OK,</span>
+<span class="fc" id="L57">    ERROR,</span>
 }
 
 <span class="nc bnc" id="L60" title="All 2 branches missed.">@OptIn(ExperimentalSerializationApi::class)</span>

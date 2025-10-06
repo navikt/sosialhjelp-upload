@@ -66,12 +66,12 @@ import org.jooq.impl.TableImpl
     /**
      * The class holding records for this type
      */
-<span class="nc" id="L69">    override fun getRecordType(): Class&lt;ErrorRecord&gt; = ErrorRecord::class.java</span>
+<span class="fc" id="L69">    override fun getRecordType(): Class&lt;ErrorRecord&gt; = ErrorRecord::class.java</span>
 
     /**
      * The column &lt;code&gt;public.error.id&lt;/code&gt;.
      */
-<span class="pc" id="L74">    val ID: TableField&lt;ErrorRecord, UUID?&gt; = createField(DSL.name(&quot;id&quot;), SQLDataType.UUID.nullable(false), this, &quot;&quot;)</span>
+<span class="fc" id="L74">    val ID: TableField&lt;ErrorRecord, UUID?&gt; = createField(DSL.name(&quot;id&quot;), SQLDataType.UUID.nullable(false), this, &quot;&quot;)</span>
 
     /**
      * The column &lt;code&gt;public.error.upload&lt;/code&gt;.

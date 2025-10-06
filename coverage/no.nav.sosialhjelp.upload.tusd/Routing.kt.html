@@ -41,7 +41,10 @@ fun Route.configureTusRoutes() {
                     }
                 },
             )
-<span class="nc bnc" id="L44" title="All 2 branches missed.">        }.onFailure { cause -&gt; environment.log.error(&quot;Something happened during Tus hook&quot;, cause) }.getOrThrow()</span>
-<span class="nc" id="L45">    }</span>
-<span class="nc" id="L46">}</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        }.onFailure { cause -&gt;</span>
+<span class="nc" id="L45">            environment.log.error(&quot;Something happened during Tus hook&quot;, cause)</span>
+<span class="nc" id="L46">            cause.printStackTrace()</span>
+<span class="nc" id="L47">        }.getOrThrow()</span>
+<span class="nc" id="L48">    }</span>
+<span class="nc" id="L49">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

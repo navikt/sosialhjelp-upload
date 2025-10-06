@@ -21,12 +21,12 @@ import kotlin.time.Duration.Companion.seconds
 <span class="fc" id="L21">    private val log = LoggerFactory.getLogger(DocumentNotificationService::class.java)</span>
 
     fun notifyUpdate(documentId: UUID) {
-<span class="nc" id="L24">        dataSource.connection.use { conn -&gt;</span>
-<span class="nc" id="L25">            conn.createStatement().use { stmt -&gt;</span>
-<span class="nc" id="L26">                stmt.execute(&quot;NOTIFY document_update, '$documentId'&quot;)</span>
-<span class="nc" id="L27">            }</span>
+<span class="pc" id="L24">        dataSource.connection.use { conn -&gt;</span>
+<span class="pc" id="L25">            conn.createStatement().use { stmt -&gt;</span>
+<span class="fc" id="L26">                stmt.execute(&quot;NOTIFY document_update, '$documentId'&quot;)</span>
+<span class="fc" id="L27">            }</span>
         }
-<span class="nc" id="L29">    }</span>
+<span class="fc" id="L29">    }</span>
 
 <span class="nc" id="L31">    fun getDocumentFlow(</span>
         documentId: UUID,

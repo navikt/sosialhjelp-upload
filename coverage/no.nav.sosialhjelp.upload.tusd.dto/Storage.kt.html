@@ -4,9 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 
-<span class="nc" id="L7">@Serializable</span>
+<span class="pc" id="L7">@Serializable</span>
 <span class="nc" id="L8">@JsonClassDiscriminator(&quot;Type&quot;)</span>
-<span class="nc" id="L9">sealed class Storage</span>
+<span class="fc" id="L9">sealed class Storage</span>
 
 <span class="nc bnc" id="L11" title="All 2 branches missed.">@Serializable</span>
 @SerialName(&quot;gcsstore&quot;)
@@ -19,10 +19,10 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 
 <span class="nc bnc" id="L20" title="All 2 branches missed.">@Serializable</span>
 @SerialName(&quot;filestore&quot;)
-<span class="nc" id="L22">class LocalStorage(</span>
-<span class="nc" id="L23">    @SerialName(&quot;InfoPath&quot;)</span>
+<span class="fc" id="L22">class LocalStorage(</span>
+<span class="pc" id="L23">    @SerialName(&quot;InfoPath&quot;)</span>
     val infoPath: String,
-<span class="nc" id="L25">    @SerialName(&quot;Path&quot;)</span>
+<span class="pc" id="L25">    @SerialName(&quot;Path&quot;)</span>
     val path: String,
-<span class="nc" id="L27">) : Storage()</span>
+<span class="fc" id="L27">) : Storage()</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

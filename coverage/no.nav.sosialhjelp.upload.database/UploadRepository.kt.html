@@ -49,16 +49,16 @@ import java.util.*
         uploadId: UUID,
         ownerIdent: String,
     ): Boolean =
-<span class="nc bnc" id="L52" title="All 2 branches missed.">        tx</span>
-<span class="nc" id="L53">            .dsl()</span>
-<span class="nc" id="L54">            .selectCount()</span>
-<span class="nc" id="L55">            .from(UPLOAD)</span>
-<span class="nc" id="L56">            .join(DOCUMENT)</span>
-<span class="nc" id="L57">            .on(DOCUMENT.ID.eq(UPLOAD.DOCUMENT_ID))</span>
-<span class="nc" id="L58">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="nc" id="L59">            .and(DOCUMENT.OWNER_IDENT.eq(ownerIdent))</span>
-<span class="nc" id="L60">            .fetchSingle()</span>
-<span class="nc" id="L61">            .value1() &gt; 0</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        tx</span>
+<span class="fc" id="L53">            .dsl()</span>
+<span class="fc" id="L54">            .selectCount()</span>
+<span class="fc" id="L55">            .from(UPLOAD)</span>
+<span class="fc" id="L56">            .join(DOCUMENT)</span>
+<span class="fc" id="L57">            .on(DOCUMENT.ID.eq(UPLOAD.DOCUMENT_ID))</span>
+<span class="fc" id="L58">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L59">            .and(DOCUMENT.OWNER_IDENT.eq(ownerIdent))</span>
+<span class="fc" id="L60">            .fetchSingle()</span>
+<span class="fc" id="L61">            .value1() &gt; 0</span>
 
     fun getDocumentIdFromUploadId(
         tx: Configuration,
@@ -101,27 +101,27 @@ import java.util.*
         name: String,
         uploadId: UUID,
     ) {
-<span class="nc" id="L104">        tx</span>
-<span class="nc" id="L105">            .dsl()</span>
-<span class="nc" id="L106">            .update(UPLOAD)</span>
-<span class="nc" id="L107">            .set(UPLOAD.CONVERTED_FILENAME, name)</span>
-<span class="nc" id="L108">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="nc" id="L109">            .execute()</span>
-<span class="nc" id="L110">    }</span>
+<span class="fc" id="L104">        tx</span>
+<span class="fc" id="L105">            .dsl()</span>
+<span class="fc" id="L106">            .update(UPLOAD)</span>
+<span class="fc" id="L107">            .set(UPLOAD.CONVERTED_FILENAME, name)</span>
+<span class="fc" id="L108">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L109">            .execute()</span>
+<span class="fc" id="L110">    }</span>
 
     fun deleteUpload(
         tx: Configuration,
         uploadId: UUID,
     ): Int {
-<span class="nc bnc" id="L116" title="All 2 branches missed.">        val documentId = getDocumentIdFromUploadId(tx, uploadId) ?: error(&quot;No documentid for upload&quot;)</span>
-<span class="nc" id="L117">        val deleted =</span>
-<span class="nc" id="L118">            tx</span>
-<span class="nc" id="L119">                .dsl()</span>
-<span class="nc" id="L120">                .delete(UPLOAD)</span>
-<span class="nc" id="L121">                .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="nc" id="L122">                .execute()</span>
-<span class="nc" id="L123">        notificationService.notifyUpdate(documentId)</span>
-<span class="nc" id="L124">        return deleted</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        val documentId = getDocumentIdFromUploadId(tx, uploadId) ?: error(&quot;No documentid for upload&quot;)</span>
+<span class="fc" id="L117">        val deleted =</span>
+<span class="fc" id="L118">            tx</span>
+<span class="fc" id="L119">                .dsl()</span>
+<span class="fc" id="L120">                .delete(UPLOAD)</span>
+<span class="fc" id="L121">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L122">                .execute()</span>
+<span class="fc" id="L123">        notificationService.notifyUpdate(documentId)</span>
+<span class="fc" id="L124">        return deleted</span>
     }
 
     fun addErrors(
@@ -129,29 +129,29 @@ import java.util.*
         uploadId: UUID,
         validations: List&lt;Validation&gt;,
     ) {
-<span class="nc" id="L132">        validations</span>
-<span class="nc" id="L133">            .forEach {</span>
-<span class="nc" id="L134">                tx</span>
-<span class="nc" id="L135">                    .dsl()</span>
-<span class="nc" id="L136">                    .insertInto(ERROR)</span>
-<span class="nc" id="L137">                    .set(ERROR.UPLOAD, uploadId)</span>
-<span class="nc" id="L138">                    .set(ERROR.CODE, it.code.name)</span>
-<span class="nc" id="L139">                    .set(ERROR.ID, UUID.randomUUID())</span>
-<span class="nc" id="L140">                    .execute()</span>
-<span class="nc" id="L141">            }.also { notifyChange(tx, uploadId) }</span>
-<span class="nc" id="L142">    }</span>
+<span class="fc" id="L132">        validations</span>
+<span class="fc" id="L133">            .forEach {</span>
+<span class="fc" id="L134">                tx</span>
+<span class="fc" id="L135">                    .dsl()</span>
+<span class="fc" id="L136">                    .insertInto(ERROR)</span>
+<span class="fc" id="L137">                    .set(ERROR.UPLOAD, uploadId)</span>
+<span class="fc" id="L138">                    .set(ERROR.CODE, it.code.name)</span>
+<span class="fc" id="L139">                    .set(ERROR.ID, UUID.randomUUID())</span>
+<span class="fc" id="L140">                    .execute()</span>
+<span class="fc" id="L141">            }.also { notifyChange(tx, uploadId) }</span>
+<span class="fc" id="L142">    }</span>
 
     fun setSignedUrl(
         tx: Configuration,
         url: String,
         id: UUID,
     ) {
-<span class="nc" id="L149">        tx</span>
-<span class="nc" id="L150">            .dsl()</span>
-<span class="nc" id="L151">            .update(UPLOAD)</span>
-<span class="nc" id="L152">            .set(UPLOAD.SIGNED_URL, url)</span>
-<span class="nc" id="L153">            .where(UPLOAD.ID.eq(id))</span>
-<span class="nc" id="L154">            .execute()</span>
-<span class="nc" id="L155">    }</span>
+<span class="fc" id="L149">        tx</span>
+<span class="fc" id="L150">            .dsl()</span>
+<span class="fc" id="L151">            .update(UPLOAD)</span>
+<span class="fc" id="L152">            .set(UPLOAD.SIGNED_URL, url)</span>
+<span class="fc" id="L153">            .where(UPLOAD.ID.eq(id))</span>
+<span class="fc" id="L154">            .execute()</span>
+<span class="fc" id="L155">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

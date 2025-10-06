@@ -2,24 +2,24 @@
 
 import kotlinx.serialization.Serializable
 
-<span class="nc" id="L5">@Serializable</span>
+<span class="pc" id="L5">@Serializable</span>
 enum class ValidationCode {
-<span class="nc" id="L7">    FILE_TOO_LARGE,</span>
-<span class="nc" id="L8">    INVALID_FILENAME,</span>
-<span class="nc" id="L9">    POSSIBLY_INFECTED,</span>
-<span class="nc" id="L10">    FILETYPE_NOT_SUPPORTED,</span>
-<span class="nc" id="L11">    ENCRYPTED_PDF,</span>
-<span class="nc" id="L12">    INVALID_PDF,</span>
-<span class="nc" id="L13">}</span>
+<span class="fc" id="L7">    FILE_TOO_LARGE,</span>
+<span class="fc" id="L8">    INVALID_FILENAME,</span>
+<span class="fc" id="L9">    POSSIBLY_INFECTED,</span>
+<span class="fc" id="L10">    FILETYPE_NOT_SUPPORTED,</span>
+<span class="fc" id="L11">    ENCRYPTED_PDF,</span>
+<span class="fc" id="L12">    INVALID_PDF,</span>
+<span class="fc" id="L13">}</span>
 
 interface Validation {
     val message: String
     val code: ValidationCode
 }
 
-<span class="nc" id="L20">class FileSizeValidation : Validation {</span>
-<span class="nc" id="L21">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
-<span class="nc" id="L22">    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE</span>
+<span class="fc" id="L20">class FileSizeValidation : Validation {</span>
+<span class="fc" id="L21">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
+<span class="fc" id="L22">    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE</span>
 }
 
 <span class="nc" id="L25">class FilenameValidation : Validation {</span>
@@ -32,9 +32,9 @@ interface Validation {
 <span class="nc" id="L32">    override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED</span>
 }
 
-<span class="nc" id="L35">class FileTypeValidation : Validation {</span>
-<span class="nc" id="L36">    override val message: String = &quot;File type is not supported.&quot;</span>
-<span class="nc" id="L37">    override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED</span>
+<span class="fc" id="L35">class FileTypeValidation : Validation {</span>
+<span class="fc" id="L36">    override val message: String = &quot;File type is not supported.&quot;</span>
+<span class="fc" id="L37">    override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED</span>
 }
 
 <span class="nc" id="L40">class EncryptedPdfValidation : Validation {</span>

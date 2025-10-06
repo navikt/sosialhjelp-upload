@@ -21,68 +21,68 @@ import java.text.Normalizer
 // TODO: Er dette en begrensning hos oss, Fiks eller fagsystemene?
 const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
-<span class="nc" id="L24">val SUPPORTED_MIME_TYPES =</span>
-<span class="nc" id="L25">    setOf(</span>
-<span class="nc" id="L26">        &quot;text/plain&quot;,</span>
+<span class="fc" id="L24">val SUPPORTED_MIME_TYPES =</span>
+<span class="fc" id="L25">    setOf(</span>
+<span class="fc" id="L26">        &quot;text/plain&quot;,</span>
         // .docx er i realiteten .zip-filer
-<span class="nc" id="L28">        &quot;application/zip&quot;,</span>
-<span class="nc" id="L29">        &quot;application/pdf&quot;,</span>
-<span class="nc" id="L30">        &quot;image/png&quot;,</span>
-<span class="nc" id="L31">        &quot;image/jpeg&quot;,</span>
-<span class="nc" id="L32">        &quot;image/tiff&quot;,</span>
-<span class="nc" id="L33">        &quot;image/bmp&quot;,</span>
-<span class="nc" id="L34">        &quot;image/gif&quot;,</span>
-<span class="nc" id="L35">        &quot;application/msword&quot;,</span>
-<span class="nc" id="L36">        &quot;application/x-tika-ooxml&quot;,</span>
-<span class="nc" id="L37">        &quot;application/vnd.openxmlformats-officedocument.wordprocessingml.document&quot;,</span>
-<span class="nc" id="L38">        &quot;application/vnd.oasis.opendocument.text&quot;,</span>
+<span class="fc" id="L28">        &quot;application/zip&quot;,</span>
+<span class="fc" id="L29">        &quot;application/pdf&quot;,</span>
+<span class="fc" id="L30">        &quot;image/png&quot;,</span>
+<span class="fc" id="L31">        &quot;image/jpeg&quot;,</span>
+<span class="fc" id="L32">        &quot;image/tiff&quot;,</span>
+<span class="fc" id="L33">        &quot;image/bmp&quot;,</span>
+<span class="fc" id="L34">        &quot;image/gif&quot;,</span>
+<span class="fc" id="L35">        &quot;application/msword&quot;,</span>
+<span class="fc" id="L36">        &quot;application/x-tika-ooxml&quot;,</span>
+<span class="fc" id="L37">        &quot;application/vnd.openxmlformats-officedocument.wordprocessingml.document&quot;,</span>
+<span class="fc" id="L38">        &quot;application/vnd.oasis.opendocument.text&quot;,</span>
     )
 
-<span class="nc" id="L41">class UploadValidator(</span>
-<span class="nc" id="L42">    val virusScanner: VirusScanner,</span>
-<span class="nc" id="L43">    val logger: Logger,</span>
-<span class="nc" id="L44">    val storage: Storage,</span>
+<span class="fc" id="L41">class UploadValidator(</span>
+<span class="pc" id="L42">    val virusScanner: VirusScanner,</span>
+<span class="pc" id="L43">    val logger: Logger,</span>
+<span class="pc" id="L44">    val storage: Storage,</span>
 ) {
-<span class="nc" id="L46">    suspend fun validate(request: HookRequest): List&lt;Validation&gt; {</span>
-<span class="nc bnc" id="L47" title="All 2 branches missed.">        val file = storage.retrieve(request.event.upload.id) ?: error(&quot;File not found: ${request.event.upload.id}&quot;)</span>
+<span class="fc" id="L46">    suspend fun validate(request: HookRequest): List&lt;Validation&gt; {</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        val file = storage.retrieve(request.event.upload.id) ?: error(&quot;File not found: ${request.event.upload.id}&quot;)</span>
 
-<span class="nc" id="L49">        val validations =</span>
-<span class="nc bnc" id="L50" title="All 3 branches missed.">            coroutineScope {</span>
-<span class="nc" id="L51">                val virusScanValidation = async(Dispatchers.IO) { runVirusScan(file) }</span>
+<span class="fc" id="L49">        val validations =</span>
+<span class="pc bpc" id="L50" title="2 of 3 branches missed.">            coroutineScope {</span>
+<span class="fc" id="L51">                val virusScanValidation = async(Dispatchers.IO) { runVirusScan(file) }</span>
 
-<span class="nc" id="L53">                listOf(</span>
-<span class="nc" id="L54">                    validateFileSize(request.event.upload.size),</span>
-<span class="nc" id="L55">                    validateFilename(Filename(request.event.upload.metadata.filename)),</span>
-<span class="nc" id="L56">                    validateFileType(file),</span>
-<span class="nc bnc" id="L57" title="All 2 branches missed.">                    virusScanValidation.await(),</span>
-<span class="nc" id="L58">                )</span>
+<span class="fc" id="L53">                listOf(</span>
+<span class="fc" id="L54">                    validateFileSize(request.event.upload.size),</span>
+<span class="fc" id="L55">                    validateFilename(Filename(request.event.upload.metadata.filename)),</span>
+<span class="fc" id="L56">                    validateFileType(file),</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                    virusScanValidation.await(),</span>
+<span class="fc" id="L58">                )</span>
             }
-<span class="nc" id="L60">        return validations.filterNotNull()</span>
+<span class="fc" id="L60">        return validations.filterNotNull()</span>
     }
 
     private fun validateFileType(file: ByteReadChannel): Validation? {
-<span class="nc" id="L64">        val mimeType = Tika().detect(file.toInputStream())</span>
-<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (mimeType !in SUPPORTED_MIME_TYPES) {</span>
-<span class="nc" id="L66">            println(&quot;Unsupported mime type: $mimeType&quot;)</span>
-<span class="nc" id="L67">            return FileTypeValidation()</span>
+<span class="fc" id="L64">        val mimeType = Tika().detect(file.toInputStream())</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (mimeType !in SUPPORTED_MIME_TYPES) {</span>
+<span class="fc" id="L66">            println(&quot;Unsupported mime type: $mimeType&quot;)</span>
+<span class="fc" id="L67">            return FileTypeValidation()</span>
         }
-<span class="nc" id="L69">        println(&quot;Detected mime type: $mimeType&quot;)</span>
-<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (mimeType == &quot;application/pdf&quot;) {</span>
-<span class="nc" id="L71">            file.checkIfPdfIsValid()</span>
+<span class="fc" id="L69">        println(&quot;Detected mime type: $mimeType&quot;)</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (mimeType == &quot;application/pdf&quot;) {</span>
+<span class="fc" id="L71">            file.checkIfPdfIsValid()</span>
         }
-<span class="nc" id="L73">        return null</span>
+<span class="fc" id="L73">        return null</span>
     }
 
     private fun ByteReadChannel.checkIfPdfIsValid(): Validation? {
-<span class="nc" id="L77">        return try {</span>
-<span class="nc" id="L78">            val randomAccessRead = RandomAccessReadBuffer(this.toInputStream())</span>
+<span class="pc" id="L77">        return try {</span>
+<span class="fc" id="L78">            val randomAccessRead = RandomAccessReadBuffer(this.toInputStream())</span>
             Loader
-<span class="nc" id="L80">                .loadPDF(randomAccessRead)</span>
-<span class="nc" id="L81">                .use { document -&gt;</span>
-<span class="nc bnc" id="L82" title="All 2 branches missed.">                    if (document.isEncrypted) {</span>
+<span class="fc" id="L80">                .loadPDF(randomAccessRead)</span>
+<span class="fc" id="L81">                .use { document -&gt;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                    if (document.isEncrypted) {</span>
 <span class="nc" id="L83">                        EncryptedPdfValidation()</span>
                     }
-<span class="nc" id="L85">                    return null</span>
+<span class="pc" id="L85">                    return null</span>
                 }
 <span class="nc" id="L87">        } catch (e: InvalidPasswordException) {</span>
 <span class="nc" id="L88">            logger.warn(ValidationCode.ENCRYPTED_PDF.name + &quot; &quot; + e.message)</span>
@@ -97,24 +97,24 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
     }
 
     private suspend fun runVirusScan(file: ByteReadChannel): Validation? =
-<span class="nc bnc" id="L100" title="All 3 branches missed.">        when (virusScanner.scan(file)) {</span>
+<span class="pc bpc" id="L100" title="2 of 3 branches missed.">        when (virusScanner.scan(file)) {</span>
 <span class="nc" id="L101">            Result.FOUND -&gt; VirusValidation()</span>
 <span class="nc" id="L102">            Result.ERROR -&gt; TODO()</span>
-<span class="nc" id="L103">            Result.OK -&gt; null</span>
-<span class="nc" id="L104">        }</span>
+<span class="fc" id="L103">            Result.OK -&gt; null</span>
+<span class="fc" id="L104">        }</span>
 
     private fun validateFileSize(filesize: Long): Validation? {
-<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (filesize &gt; MAX_FILE_SIZE) {</span>
-<span class="nc" id="L108">            return FileSizeValidation()</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (filesize &gt; MAX_FILE_SIZE) {</span>
+<span class="fc" id="L108">            return FileSizeValidation()</span>
         }
-<span class="nc" id="L110">        return null</span>
+<span class="fc" id="L110">        return null</span>
     }
 
     private fun validateFilename(filename: Filename): Validation? {
-<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (filename.containsIllegalCharacters()) {</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (filename.containsIllegalCharacters()) {</span>
 <span class="nc" id="L115">            return FilenameValidation()</span>
         }
-<span class="nc" id="L117">        return null</span>
+<span class="fc" id="L117">        return null</span>
     }
 }
 
@@ -122,8 +122,8 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 private value class Filename(
     val value: String,
 ) {
-<span class="nc" id="L125">    fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()</span>
+<span class="fc" id="L125">    fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()</span>
 
-<span class="nc" id="L127">    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(&quot;[^a-zæøåA-ZÆØÅ0-9 (),._–-]&quot;.toRegex())</span>
+<span class="fc" id="L127">    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(&quot;[^a-zæøåA-ZÆØÅ0-9 (),._–-]&quot;.toRegex())</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

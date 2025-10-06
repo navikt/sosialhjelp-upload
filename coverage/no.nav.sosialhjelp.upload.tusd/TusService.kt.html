@@ -21,81 +21,85 @@ import org.jooq.DSLContext
 import java.io.File
 import java.util.*
 
-<span class="nc" id="L24">class TusService(</span>
-<span class="nc" id="L25">    val logger: Logger,</span>
-<span class="nc" id="L26">    val uploadRepository: UploadRepository,</span>
-<span class="nc" id="L27">    val gotenbergService: GotenbergService,</span>
-<span class="nc" id="L28">    val documentRepository: DocumentRepository,</span>
-<span class="nc" id="L29">    val dsl: DSLContext,</span>
-<span class="nc" id="L30">    val validator: UploadValidator,</span>
-<span class="nc" id="L31">    val storage: Storage,</span>
+<span class="fc" id="L24">class TusService(</span>
+<span class="pc" id="L25">    val logger: Logger,</span>
+<span class="pc" id="L26">    val uploadRepository: UploadRepository,</span>
+<span class="pc" id="L27">    val gotenbergService: GotenbergService,</span>
+<span class="pc" id="L28">    val documentRepository: DocumentRepository,</span>
+<span class="pc" id="L29">    val dsl: DSLContext,</span>
+<span class="pc" id="L30">    val validator: UploadValidator,</span>
+<span class="pc" id="L31">    val storage: Storage,</span>
 ) {
     fun preCreate(
         request: HookRequest,
         personident: String,
     ): HookResponse {
-<span class="nc" id="L37">        val uploadRequest = CreateUploadRequest.fromRequest(request)</span>
+<span class="fc" id="L37">        val uploadRequest =</span>
+<span class="fc" id="L38">            CreateUploadRequest(</span>
+<span class="fc" id="L39">                externalId = request.event.upload.metadata.externalId,</span>
+<span class="fc" id="L40">                filename = request.event.upload.metadata.filename,</span>
+            )
 
-<span class="nc" id="L39">        val uploadId =</span>
-<span class="nc" id="L40">            try {</span>
-<span class="nc" id="L41">                dsl.transactionResult { it -&gt;</span>
-<span class="nc" id="L42">                    val documentId = documentRepository.getOrCreateDocument(it, uploadRequest.externalId, personident)</span>
-<span class="nc" id="L43">                    val uploadId = uploadRepository.create(it, documentId, uploadRequest.filename)</span>
-<span class="nc" id="L44">                    logger.info(&quot;Creating a new upload, ID: $uploadId for document $documentId&quot;)</span>
-<span class="nc" id="L45">                    uploadId</span>
+<span class="fc" id="L43">        val uploadId =</span>
+<span class="fc" id="L44">            try {</span>
+<span class="fc" id="L45">                dsl.transactionResult { it -&gt;</span>
+<span class="fc" id="L46">                    val documentId = documentRepository.getOrCreateDocument(it, uploadRequest.externalId, personident)</span>
+<span class="fc" id="L47">                    val uploadId = uploadRepository.create(it, documentId, uploadRequest.filename)</span>
+<span class="fc" id="L48">                    logger.info(&quot;Creating a new upload, ID: $uploadId for document $documentId&quot;)</span>
+<span class="fc" id="L49">                    uploadId</span>
                 }
-<span class="nc" id="L47">            } catch (_: DocumentOwnedByAnotherUserException) {</span>
-<span class="nc" id="L48">                return HookResponse(</span>
-<span class="nc" id="L49">                    HTTPResponse(403, mapOf(&quot;Content-Type&quot; to &quot;application/json&quot;), &quot;&quot;&quot;&quot;message&quot;: &quot;Not yours&quot;&quot;&quot;&quot;),</span>
-<span class="nc" id="L50">                    rejectUpload = true,</span>
+<span class="nc" id="L51">            } catch (_: DocumentOwnedByAnotherUserException) {</span>
+<span class="nc" id="L52">                return HookResponse(</span>
+<span class="nc" id="L53">                    HTTPResponse(403, mapOf(&quot;Content-Type&quot; to &quot;application/json&quot;), &quot;&quot;&quot;&quot;message&quot;: &quot;Not yours&quot;&quot;&quot;&quot;),</span>
+<span class="nc" id="L54">                    rejectUpload = true,</span>
                 )
             }
 
-<span class="nc" id="L54">        return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))</span>
+<span class="fc" id="L58">        return HookResponse(changeFileInfo = FileInfoChanges(id = uploadId.toString()))</span>
     }
 
-<span class="nc" id="L57">    suspend fun postFinish(request: HookRequest) {</span>
-<span class="nc" id="L58">        val request = PostFinishRequest.fromRequest(request)</span>
+<span class="fc" id="L61">    suspend fun postFinish(request: HookRequest) {</span>
+<span class="fc" id="L62">        val request = PostFinishRequest.fromRequest(request)</span>
         // Ikke konverter det som fagsystemene godkjenner (pdf, jpg/jpeg, png)
-<span class="nc" id="L60">        val extension = File(request.filename).extension</span>
-<span class="nc" id="L61">        val uploadId = request.uploadId</span>
-<span class="nc" id="L62">        val filename =</span>
-<span class="nc bnc" id="L63" title="All 2 branches missed.">            if (extension !in listOf(&quot;pdf&quot;, &quot;jpeg&quot;, &quot;jpg&quot;, &quot;png&quot;)) {</span>
-<span class="nc" id="L64">                val converted = convertUploadToPdf(uploadId, request.filename)</span>
-<span class="nc" id="L65">                val pdfName = File(request.filename).nameWithoutExtension + &quot;.pdf&quot;</span>
-<span class="nc" id="L66">                storage.store(pdfName, converted, &quot;application/pdf&quot;)</span>
-<span class="nc" id="L67">                dsl.transactionResult { it -&gt;</span>
-<span class="nc" id="L68">                    uploadRepository.updateConvertedFilename(it, pdfName, uploadId)</span>
-<span class="nc" id="L69">                }</span>
-<span class="nc" id="L70">                pdfName</span>
+<span class="fc" id="L64">        val extension = File(request.filename).extension</span>
+<span class="fc" id="L65">        val uploadId = request.uploadId</span>
+<span class="fc" id="L66">        val filename =</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            if (extension !in listOf(&quot;pdf&quot;, &quot;jpeg&quot;, &quot;jpg&quot;, &quot;png&quot;)) {</span>
+<span class="fc" id="L68">                val converted = convertUploadToPdf(uploadId, request.filename)</span>
+<span class="fc" id="L69">                val pdfName = File(request.filename).nameWithoutExtension + &quot;.pdf&quot;</span>
+<span class="fc" id="L70">                storage.store(pdfName, converted, &quot;application/pdf&quot;)</span>
+<span class="fc" id="L71">                dsl.transactionResult { it -&gt;</span>
+<span class="fc" id="L72">                    uploadRepository.updateConvertedFilename(it, pdfName, uploadId)</span>
+<span class="fc" id="L73">                }</span>
+<span class="fc" id="L74">                pdfName</span>
             } else {
                 // If we don't convert, we just need to copy the file to the original file name
-<span class="nc bnc" id="L73" title="All 2 branches missed.">                val original = storage.retrieve(uploadId.toString()) ?: error(&quot;File not found&quot;)</span>
-<span class="nc" id="L74">                val changedPath = request.filename</span>
-<span class="nc" id="L75">                val contentType = ContentType.defaultForFileExtension(extension)</span>
-<span class="nc" id="L76">                storage.store(changedPath, original, contentType.toString())</span>
-<span class="nc" id="L77">                changedPath</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                val original = storage.retrieve(uploadId.toString()) ?: error(&quot;File not found&quot;)</span>
+<span class="nc" id="L78">                val changedPath = request.filename</span>
+<span class="nc" id="L79">                val contentType = ContentType.defaultForFileExtension(extension)</span>
+<span class="nc" id="L80">                storage.store(changedPath, original, contentType.toString())</span>
+<span class="nc" id="L81">                changedPath</span>
             }
 
-<span class="nc" id="L80">        dsl.transaction { tx -&gt;</span>
-<span class="nc" id="L81">            uploadRepository.setSignedUrl(</span>
-<span class="nc" id="L82">                tx,</span>
-<span class="nc" id="L83">                storage.createSignedUrl(filename)!!,</span>
-<span class="nc" id="L84">                uploadId,</span>
+<span class="fc" id="L84">        dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L85">            uploadRepository.setSignedUrl(</span>
+<span class="fc" id="L86">                tx,</span>
+<span class="fc" id="L87">                storage.createSignedUrl(filename)!!,</span>
+<span class="fc" id="L88">                uploadId,</span>
             )
-<span class="nc" id="L86">            uploadRepository.notifyChange(tx, uploadId)</span>
-<span class="nc" id="L87">        }</span>
-<span class="nc" id="L88">    }</span>
+<span class="fc" id="L90">            uploadRepository.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">    }</span>
 
     private suspend fun convertUploadToPdf(
         uploadId: UUID,
         filename: String,
     ): ByteReadChannel {
-<span class="nc bnc" id="L94" title="All 2 branches missed.">        val file = storage.retrieve(uploadId.toString()) ?: error(&quot;File not found&quot;)</span>
-<span class="nc" id="L95">        return gotenbergService.convertToPdf(</span>
-<span class="nc" id="L96">            FinishedUpload(</span>
-<span class="nc" id="L97">                file = file,</span>
-<span class="nc" id="L98">                originalFileExtension = File(filename).extension,</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        val file = storage.retrieve(uploadId.toString()) ?: error(&quot;File not found&quot;)</span>
+<span class="fc" id="L99">        return gotenbergService.convertToPdf(</span>
+<span class="fc" id="L100">            FinishedUpload(</span>
+<span class="fc" id="L101">                file = file,</span>
+<span class="fc" id="L102">                originalFileExtension = File(filename).extension,</span>
             ),
         )
     }
@@ -104,49 +108,49 @@ import java.util.*
         request: HookRequest,
         personIdent: String,
     ): HookResponse =
-<span class="nc" id="L107">        dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L108">            val correctOwner = uploadRepository.isOwnedByUser(tx, UUID.fromString(request.event.upload.id), personIdent)</span>
-<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (!correctOwner) {</span>
-<span class="nc" id="L110">                HookResponse(HTTPResponse(403), rejectTermination = true)</span>
+<span class="fc" id="L111">        dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L112">            val correctOwner = uploadRepository.isOwnedByUser(tx, UUID.fromString(request.event.upload.id), personIdent)</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (!correctOwner) {</span>
+<span class="fc" id="L114">                HookResponse(HTTPResponse(403), rejectTermination = true)</span>
             } else {
-<span class="nc" id="L112">                HookResponse()</span>
-<span class="nc" id="L113">            }</span>
-<span class="nc" id="L114">        }</span>
+<span class="nc" id="L116">                HookResponse()</span>
+<span class="fc" id="L117">            }</span>
+<span class="fc" id="L118">        }</span>
 
     fun postTerminate(
         request: HookRequest,
         personIdent: String,
     ): HookResponse =
-<span class="nc" id="L120">        dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L121">            val uploadId = UUID.fromString(request.event.upload.id)</span>
-<span class="nc" id="L122">            val correctOwner = uploadRepository.isOwnedByUser(tx, uploadId, personIdent)</span>
-<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (!correctOwner) {</span>
-<span class="nc" id="L124">                HookResponse(HTTPResponse(403), rejectTermination = true)</span>
+<span class="fc" id="L124">        dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L125">            val uploadId = UUID.fromString(request.event.upload.id)</span>
+<span class="fc" id="L126">            val correctOwner = uploadRepository.isOwnedByUser(tx, uploadId, personIdent)</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (!correctOwner) {</span>
+<span class="fc" id="L128">                return@transactionResult HookResponse(HTTPResponse(403), rejectTermination = true)</span>
             }
-<span class="nc" id="L126">            uploadRepository.deleteUpload(tx, uploadId)</span>
-<span class="nc" id="L127">            HookResponse(HTTPResponse(204))</span>
-<span class="nc" id="L128">        }</span>
+<span class="fc" id="L130">            uploadRepository.deleteUpload(tx, uploadId)</span>
+<span class="fc" id="L131">            HookResponse(HTTPResponse(204))</span>
+<span class="fc" id="L132">        }</span>
 
-<span class="nc" id="L130">    suspend fun validateUpload(request: HookRequest): HookResponse {</span>
+<span class="fc" id="L134">    suspend fun validateUpload(request: HookRequest): HookResponse {</span>
         // TODO: Trenger vi å validere person?
-<span class="nc" id="L132">        val validations = validator.validate(request)</span>
+<span class="fc" id="L136">        val validations = validator.validate(request)</span>
         // Also filename
-<span class="nc" id="L134">        val uploadId = request.event.upload.id</span>
-<span class="nc" id="L135">        val response =</span>
-<span class="nc bnc" id="L136" title="All 4 branches missed.">            if (validations.isNotEmpty()) {</span>
-<span class="nc" id="L137">                dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L138">                    uploadRepository.addErrors(tx, UUID.fromString(uploadId), validations)</span>
-<span class="nc" id="L139">                }</span>
+<span class="fc" id="L138">        val uploadId = request.event.upload.id</span>
+<span class="fc" id="L139">        val response =</span>
+<span class="fc bfc" id="L140" title="All 4 branches covered.">            if (validations.isNotEmpty()) {</span>
+<span class="fc" id="L141">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L142">                    uploadRepository.addErrors(tx, UUID.fromString(uploadId), validations)</span>
+<span class="fc" id="L143">                }</span>
                 // TODO: Litt penere serialisering please
-<span class="nc" id="L141">                HTTPResponse(</span>
-<span class="nc" id="L142">                    400,</span>
-<span class="nc" id="L143">                    mapOf(&quot;Content-Type&quot; to &quot;application/json&quot;),</span>
-<span class="nc" id="L144">                    &quot;&quot;&quot;{&quot;errors&quot;: [${validations.joinToString(&quot;,&quot;) { &quot;&quot;&quot;{&quot;code&quot;: &quot;${it.code}&quot;, &quot;message&quot;: &quot;${it.message}&quot;}&quot;&quot;&quot; }}]}&quot;&quot;&quot;,</span>
+<span class="fc" id="L145">                HTTPResponse(</span>
+<span class="fc" id="L146">                    400,</span>
+<span class="fc" id="L147">                    mapOf(&quot;Content-Type&quot; to &quot;application/json&quot;),</span>
+<span class="fc" id="L148">                    &quot;&quot;&quot;{&quot;errors&quot;: [${validations.joinToString(&quot;,&quot;) { &quot;&quot;&quot;{&quot;code&quot;: &quot;${it.code}&quot;, &quot;message&quot;: &quot;${it.message}&quot;}&quot;&quot;&quot; }}]}&quot;&quot;&quot;,</span>
                 )
             } else {
-<span class="nc" id="L147">                HTTPResponse()</span>
+<span class="fc" id="L151">                HTTPResponse()</span>
             }
-<span class="nc" id="L149">        return HookResponse(response)</span>
+<span class="fc" id="L153">        return HookResponse(response)</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
