@@ -31,15 +31,10 @@ class GotenbergService(
 
     suspend fun convertToPdf(upload: FinishedUpload): ByteReadChannel {
         val res =
-            try {
-                gotenbergClient
-                    .submitFormWithBinaryData(
-                        formData { append("file", ChannelProvider { upload.file }, buildHeaders(upload.originalFileExtension)) },
-                    )
-            } catch (e: Exception) {
-                logger
-                throw RuntimeException("Failed to convert file type ${upload.originalFileExtension} to PDF")
-            }
+            gotenbergClient
+                .submitFormWithBinaryData(
+                    formData { append("file", ChannelProvider { upload.file }, buildHeaders(upload.originalFileExtension)) },
+                )
 
         check(res.status.isSuccess()) { "Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}" }
 

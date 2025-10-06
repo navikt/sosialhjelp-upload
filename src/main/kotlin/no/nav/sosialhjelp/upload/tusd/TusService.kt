@@ -34,7 +34,11 @@ class TusService(
         request: HookRequest,
         personident: String,
     ): HookResponse {
-        val uploadRequest = CreateUploadRequest.fromRequest(request)
+        val uploadRequest =
+            CreateUploadRequest(
+                externalId = request.event.upload.metadata.externalId,
+                filename = request.event.upload.metadata.filename,
+            )
 
         val uploadId =
             try {
@@ -121,7 +125,7 @@ class TusService(
             val uploadId = UUID.fromString(request.event.upload.id)
             val correctOwner = uploadRepository.isOwnedByUser(tx, uploadId, personIdent)
             if (!correctOwner) {
-                HookResponse(HTTPResponse(403), rejectTermination = true)
+                return@transactionResult HookResponse(HTTPResponse(403), rejectTermination = true)
             }
             uploadRepository.deleteUpload(tx, uploadId)
             HookResponse(HTTPResponse(204))

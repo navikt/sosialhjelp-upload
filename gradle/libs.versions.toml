@@ -18,6 +18,8 @@ bouncycastle = "1.82"
 jooq = "3.19.26"
 google-cloud = "26.68.0"
 fiks_kryptering = "2.0.8"
+mockwebserver = "5.1.0"
+
 
 [libraries]
 fiks-kryptering = { module = "no.ks.fiks:kryptering", version.ref = "fiks_kryptering" }
@@ -61,6 +63,7 @@ jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+mock-web-server = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "mockwebserver" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 sosialhjelp-common-api = { module = "no.nav.sosialhjelp:sosialhjelp-common-api", version.ref = "sosialhjelp_common" }

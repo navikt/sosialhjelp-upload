@@ -86,6 +86,7 @@ dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.bundles.junit)
     testImplementation(libs.bundles.testcontainers)
+    testImplementation(libs.mock.web.server)
 }
 
 tasks.test {

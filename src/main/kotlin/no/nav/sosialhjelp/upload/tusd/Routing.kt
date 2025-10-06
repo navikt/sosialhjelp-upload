@@ -41,6 +41,9 @@ fun Route.configureTusRoutes() {
                     }
                 },
             )
-        }.onFailure { cause -> environment.log.error("Something happened during Tus hook", cause) }.getOrThrow()
+        }.onFailure { cause ->
+            environment.log.error("Something happened during Tus hook", cause)
+            cause.printStackTrace()
+        }.getOrThrow()
     }
 }
