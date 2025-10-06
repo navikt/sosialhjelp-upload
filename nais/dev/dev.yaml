@@ -71,7 +71,7 @@ spec:
     - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
       value: "https://minside.fiks.test.ks.no"
     - name: CLAMAV_URL
-      value: "http://clamav.nais-system/scan"
+      value: ""
     - name: GOTENBERG_URL
       value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
     - name: RUNTIME_ENV
