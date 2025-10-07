@@ -4,6 +4,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.defaultForFile
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -16,99 +17,102 @@ import org.jooq.DSLContext
 import java.io.File
 import java.util.UUID
 
-<span class="nc" id="L19">data class Upload(</span>
-<span class="nc" id="L20">    val file: ByteReadChannel,</span>
-<span class="nc" id="L21">    val filename: String,</span>
-<span class="nc" id="L22">    val fileType: String,</span>
-<span class="nc" id="L23">    val fileSize: Long,</span>
+<span class="nc" id="L20">data class Upload(</span>
+<span class="nc" id="L21">    val file: ByteReadChannel,</span>
+<span class="nc" id="L22">    val filename: String,</span>
+<span class="nc" id="L23">    val fileType: String,</span>
+<span class="nc" id="L24">    val fileSize: Long,</span>
 )
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-<span class="nc" id="L28">class DownstreamUploadService(</span>
-<span class="nc" id="L29">    private val fiksClient: FiksClient,</span>
-<span class="nc" id="L30">    private val encryptionService: EncryptionService,</span>
-<span class="nc" id="L31">    private val dsl: DSLContext,</span>
-<span class="nc" id="L32">    private val documentRepository: DocumentRepository,</span>
-<span class="nc" id="L33">    private val uploadRepository: UploadRepository,</span>
-<span class="nc" id="L34">    private val storage: Storage,</span>
-<span class="nc" id="L35">    private val notificationService: DocumentNotificationService,</span>
+<span class="nc" id="L29">class DownstreamUploadService(</span>
+<span class="nc" id="L30">    private val fiksClient: FiksClient,</span>
+<span class="nc" id="L31">    private val encryptionService: EncryptionService,</span>
+<span class="nc" id="L32">    private val dsl: DSLContext,</span>
+<span class="nc" id="L33">    private val documentRepository: DocumentRepository,</span>
+<span class="nc" id="L34">    private val uploadRepository: UploadRepository,</span>
+<span class="nc" id="L35">    private val storage: Storage,</span>
+<span class="nc" id="L36">    private val notificationService: DocumentNotificationService,</span>
 ) {
     private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
-<span class="nc" id="L38">        val previousId: String =</span>
-<span class="nc bnc" id="L39" title="All 2 branches missed.">            digisosSak.ettersendtInfoNAV</span>
-<span class="nc bnc" id="L40" title="All 2 branches missed.">                ?.ettersendelser</span>
-<span class="nc bnc" id="L41" title="All 2 branches missed.">                ?.map { it.navEksternRefId }</span>
-<span class="nc" id="L42">                ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
-<span class="nc bnc" id="L43" title="All 4 branches missed.">                ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
-<span class="nc" id="L44">                ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
+<span class="nc" id="L39">        val previousId: String =</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            digisosSak.ettersendtInfoNAV</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">                ?.ettersendelser</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                ?.map { it.navEksternRefId }</span>
+<span class="nc" id="L43">                ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
+<span class="nc bnc" id="L44" title="All 4 branches missed.">                ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
+<span class="nc" id="L45">                ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
 
-<span class="nc" id="L46">        val nesteSuffix = lagIdSuffix(previousId)</span>
-<span class="nc" id="L47">        return (previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix))</span>
+<span class="nc" id="L47">        val nesteSuffix = lagIdSuffix(previousId)</span>
+<span class="nc" id="L48">        return (previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix))</span>
     }
 
     /**
      * returnerer neste id-suffix som 4-sifret String
      */
     private fun lagIdSuffix(previousId: String): String {
-<span class="nc" id="L54">        val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1</span>
-<span class="nc" id="L55">        return suffix.toString().padStart(4, '0')</span>
+<span class="nc" id="L55">        val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1</span>
+<span class="nc" id="L56">        return suffix.toString().padStart(4, '0')</span>
     }
 
-<span class="nc" id="L58">    suspend fun upload(</span>
+<span class="nc" id="L59">    suspend fun upload(</span>
         metadata: Metadata,
         fiksDigisosId: String,
         token: String,
         documentId: UUID,
     ): Boolean {
-<span class="nc" id="L64">        val uploads =</span>
-<span class="nc" id="L65">            dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L66">                uploadRepository.getUploadsWithFilenames(tx, documentId).toList()</span>
+<span class="nc" id="L65">        val uploads =</span>
+<span class="nc" id="L66">            dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L67">                uploadRepository.getUploadsWithFilenames(tx, documentId).toList()</span>
             }
-<span class="nc" id="L68">        val files =</span>
-<span class="nc" id="L69">            uploads.filter { it.errors.isEmpty() }.map { upload -&gt;</span>
-<span class="nc" id="L70">                val file =</span>
-<span class="nc bnc" id="L71" title="All 6 branches missed.">                    upload.convertedFilename?.let { storage.retrieve(it) } ?: storage.retrieve(upload.originalFilename!!)</span>
-<span class="nc" id="L72">                        ?: error(&quot;File not found&quot;)</span>
-<span class="nc bnc" id="L73" title="All 2 branches missed.">                val ext = ContentType.defaultForFile(File(upload.convertedFilename ?: upload.originalFilename!!))</span>
-<span class="nc bnc" id="L74" title="All 2 branches missed.">                Upload(file, upload.originalFilename!!, ext.toString(), upload.fileSize ?: -1L)</span>
+<span class="nc" id="L69">        val files =</span>
+<span class="nc" id="L70">            uploads.filter { it.errors.isEmpty() }.map { upload -&gt;</span>
+<span class="nc" id="L71">                val file =</span>
+<span class="nc bnc" id="L72" title="All 6 branches missed.">                    upload.convertedFilename?.let { storage.retrieve(it) } ?: storage.retrieve(upload.originalFilename!!)</span>
+<span class="nc" id="L73">                        ?: error(&quot;File not found&quot;)</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                val ext = ContentType.defaultForFile(File(upload.convertedFilename ?: upload.originalFilename!!))</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                Upload(file, upload.originalFilename!!, ext.toString(), upload.fileSize ?: -1L)</span>
             }
-<span class="nc" id="L76">        val sak = fiksClient.getSak(fiksDigisosId, token)</span>
-<span class="nc" id="L77">        val kommunenummer = sak.kommunenummer</span>
-<span class="nc" id="L78">        val navEksternRefId = lagNavEksternRefId(sak)</span>
+<span class="nc" id="L77">        val sak = fiksClient.getSak(fiksDigisosId, token)</span>
+<span class="nc" id="L78">        val kommunenummer = sak.kommunenummer</span>
+<span class="nc" id="L79">        val navEksternRefId = lagNavEksternRefId(sak)</span>
 
-<span class="nc" id="L80">        val encrypted = encryptionService.encrypt(files)</span>
+<span class="nc" id="L81">        val response =</span>
+<span class="nc bnc" id="L82" title="All 4 branches missed.">            coroutineScope {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                val encrypted = encryptionService.encrypt(files, this)</span>
 
-        // TODO: Ta med ettersendelse.pdf i opplastingen
-<span class="nc" id="L83">        val response = fiksClient.uploadEttersendelse(fiksDigisosId, kommunenummer, navEksternRefId, encrypted, metadata, token)</span>
-<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (response.status.isSuccess()) {</span>
-<span class="nc" id="L85">            dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L86">                documentRepository.cleanup(tx, documentId)</span>
-<span class="nc" id="L87">                uploads.onEach { upload -&gt;</span>
-<span class="nc bnc" id="L88" title="All 4 branches missed.">                    upload.id?.toString()?.let {</span>
-<span class="nc" id="L89">                        storage.delete(it)</span>
-<span class="nc" id="L90">                    }</span>
-<span class="nc bnc" id="L91" title="All 2 branches missed.">                    upload.originalFilename?.let {</span>
-<span class="nc" id="L92">                        storage.delete(it)</span>
-<span class="nc" id="L93">                    }</span>
-<span class="nc bnc" id="L94" title="All 2 branches missed.">                    upload.convertedFilename?.let {</span>
-<span class="nc" id="L95">                        storage.delete(it)</span>
-<span class="nc" id="L96">                    }</span>
-<span class="nc" id="L97">                }</span>
-<span class="nc" id="L98">                notificationService.notifyUpdate(documentId)</span>
-<span class="nc" id="L99">            }</span>
-<span class="nc" id="L100">            return true</span>
+                // TODO: Ta med ettersendelse.pdf i opplastingen
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                fiksClient.uploadEttersendelse(fiksDigisosId, kommunenummer, navEksternRefId, encrypted, metadata, token)</span>
+            }
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (response.status.isSuccess()) {</span>
+<span class="nc" id="L89">            dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L90">                documentRepository.cleanup(tx, documentId)</span>
+<span class="nc" id="L91">                uploads.onEach { upload -&gt;</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">                    upload.id?.toString()?.let {</span>
+<span class="nc" id="L93">                        storage.delete(it)</span>
+<span class="nc" id="L94">                    }</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                    upload.originalFilename?.let {</span>
+<span class="nc" id="L96">                        storage.delete(it)</span>
+<span class="nc" id="L97">                    }</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                    upload.convertedFilename?.let {</span>
+<span class="nc" id="L99">                        storage.delete(it)</span>
+<span class="nc" id="L100">                    }</span>
+<span class="nc" id="L101">                }</span>
+<span class="nc" id="L102">                notificationService.notifyUpdate(documentId)</span>
+<span class="nc" id="L103">            }</span>
+<span class="nc" id="L104">            return true</span>
         }
-<span class="nc" id="L102">        return false</span>
+<span class="nc" id="L106">        return false</span>
     }
 }
 
-<span class="nc bnc" id="L106" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L107">data class VedleggSpesifikasjon(</span>
-<span class="nc" id="L108">    val type: String,</span>
-<span class="nc" id="L109">    val tilleggsinfo: String?,</span>
-<span class="nc" id="L110">    val innsendelsesfrist: String?,</span>
-<span class="nc" id="L111">    val hendelsetype: String?,</span>
-<span class="nc" id="L112">    val hendelsereferanse: String?,</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L111">data class VedleggSpesifikasjon(</span>
+<span class="nc" id="L112">    val type: String,</span>
+<span class="nc" id="L113">    val tilleggsinfo: String?,</span>
+<span class="nc" id="L114">    val innsendelsesfrist: String?,</span>
+<span class="nc" id="L115">    val hendelsetype: String?,</span>
+<span class="nc" id="L116">    val hendelsereferanse: String?,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
