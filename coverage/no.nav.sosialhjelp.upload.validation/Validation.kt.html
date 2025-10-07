@@ -27,9 +27,9 @@ interface Validation {
 <span class="nc" id="L27">    override val code: ValidationCode = ValidationCode.INVALID_FILENAME</span>
 }
 
-<span class="nc" id="L30">class VirusValidation : Validation {</span>
-<span class="nc" id="L31">    override val message: String = &quot;File may contain virus.&quot;</span>
-<span class="nc" id="L32">    override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED</span>
+<span class="fc" id="L30">class VirusValidation : Validation {</span>
+<span class="fc" id="L31">    override val message: String = &quot;File may contain virus.&quot;</span>
+<span class="fc" id="L32">    override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED</span>
 }
 
 <span class="fc" id="L35">class FileTypeValidation : Validation {</span>

@@ -78,13 +78,12 @@ fun Application.module() {
 <span class="nc" id="L78">                create(EncryptionServiceImpl::class)</span>
 <span class="nc" id="L79">            }</span>
         }
-<span class="nc" id="L81">        provide { this@module.environment.log }</span>
-<span class="nc bnc" id="L82" title="All 4 branches missed.">        provide&lt;Storage&gt; {</span>
-<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (isLocal) {</span>
-<span class="nc" id="L84">                create(FileSystemStorage::class)</span>
+<span class="nc bnc" id="L81" title="All 4 branches missed.">        provide&lt;Storage&gt; {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (isLocal) {</span>
+<span class="nc" id="L83">                create(FileSystemStorage::class)</span>
             } else {
-<span class="nc" id="L86">                create(GcpBucketStorage::class)</span>
-<span class="nc" id="L87">            }</span>
+<span class="nc" id="L85">                create(GcpBucketStorage::class)</span>
+<span class="nc" id="L86">            }</span>
         }
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
