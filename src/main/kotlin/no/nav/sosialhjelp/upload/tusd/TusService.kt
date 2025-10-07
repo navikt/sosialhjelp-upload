@@ -135,7 +135,6 @@ class TusService(
     suspend fun validateUpload(request: HookRequest): HookResponse {
         // TODO: Trenger vi å validere person?
         val validations = validator.validate(request)
-        // Also filename
         val uploadId = request.event.upload.id
         val response =
             if (validations.isNotEmpty()) {
