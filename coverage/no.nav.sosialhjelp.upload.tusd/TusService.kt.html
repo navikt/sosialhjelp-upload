@@ -135,23 +135,22 @@ import java.util.*
 <span class="fc" id="L135">    suspend fun validateUpload(request: HookRequest): HookResponse {</span>
         // TODO: Trenger vi å validere person?
 <span class="fc" id="L137">        val validations = validator.validate(request)</span>
-        // Also filename
-<span class="fc" id="L139">        val uploadId = request.event.upload.id</span>
-<span class="fc" id="L140">        val response =</span>
-<span class="fc bfc" id="L141" title="All 4 branches covered.">            if (validations.isNotEmpty()) {</span>
-<span class="fc" id="L142">                dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L143">                    uploadRepository.addErrors(tx, UUID.fromString(uploadId), validations)</span>
-<span class="fc" id="L144">                }</span>
+<span class="fc" id="L138">        val uploadId = request.event.upload.id</span>
+<span class="fc" id="L139">        val response =</span>
+<span class="fc bfc" id="L140" title="All 4 branches covered.">            if (validations.isNotEmpty()) {</span>
+<span class="fc" id="L141">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L142">                    uploadRepository.addErrors(tx, UUID.fromString(uploadId), validations)</span>
+<span class="fc" id="L143">                }</span>
                 // TODO: Litt penere serialisering please
-<span class="fc" id="L146">                HTTPResponse(</span>
-<span class="fc" id="L147">                    400,</span>
-<span class="fc" id="L148">                    mapOf(&quot;Content-Type&quot; to &quot;application/json&quot;),</span>
-<span class="fc" id="L149">                    &quot;&quot;&quot;{&quot;errors&quot;: [${validations.joinToString(&quot;,&quot;) { &quot;&quot;&quot;{&quot;code&quot;: &quot;${it.code}&quot;, &quot;message&quot;: &quot;${it.message}&quot;}&quot;&quot;&quot; }}]}&quot;&quot;&quot;,</span>
+<span class="fc" id="L145">                HTTPResponse(</span>
+<span class="fc" id="L146">                    400,</span>
+<span class="fc" id="L147">                    mapOf(&quot;Content-Type&quot; to &quot;application/json&quot;),</span>
+<span class="fc" id="L148">                    &quot;&quot;&quot;{&quot;errors&quot;: [${validations.joinToString(&quot;,&quot;) { &quot;&quot;&quot;{&quot;code&quot;: &quot;${it.code}&quot;, &quot;message&quot;: &quot;${it.message}&quot;}&quot;&quot;&quot; }}]}&quot;&quot;&quot;,</span>
                 )
             } else {
-<span class="fc" id="L152">                HTTPResponse()</span>
+<span class="fc" id="L151">                HTTPResponse()</span>
             }
-<span class="fc" id="L154">        return HookResponse(response)</span>
+<span class="fc" id="L153">        return HookResponse(response)</span>
     }
 }
 
