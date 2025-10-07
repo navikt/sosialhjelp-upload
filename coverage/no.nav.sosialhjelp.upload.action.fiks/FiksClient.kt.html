@@ -99,79 +99,86 @@ import java.security.cert.X509Certificate
         token: String,
     ): HttpResponse =
 <span class="nc" id="L101">        withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L102">            client.submitFormWithBinaryData(</span>
-<span class="nc" id="L103">                ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
-<span class="nc" id="L104">                formData {</span>
-<span class="nc" id="L105">                    val vedleggJson =</span>
-<span class="nc" id="L106">                        VedleggSpesifikasjon(</span>
-<span class="nc" id="L107">                            type = metadata.type,</span>
-<span class="nc" id="L108">                            tilleggsinfo = metadata.tilleggsinfo,</span>
-<span class="nc" id="L109">                            innsendelsesfrist = metadata.innsendelsesfrist,</span>
-<span class="nc" id="L110">                            hendelsetype = metadata.hendelsetype,</span>
-<span class="nc" id="L111">                            hendelsereferanse = metadata.hendelsereferanse,</span>
+<span class="nc" id="L102">            val formData =</span>
+<span class="nc" id="L103">                formData {</span>
+<span class="nc" id="L104">                    val vedleggJson =</span>
+<span class="nc" id="L105">                        VedleggSpesifikasjon(</span>
+<span class="nc" id="L106">                            type = metadata.type,</span>
+<span class="nc" id="L107">                            tilleggsinfo = metadata.tilleggsinfo,</span>
+<span class="nc" id="L108">                            innsendelsesfrist = metadata.innsendelsesfrist,</span>
+<span class="nc" id="L109">                            hendelsetype = metadata.hendelsetype,</span>
+<span class="nc" id="L110">                            hendelsereferanse = metadata.hendelsereferanse,</span>
                         )
-<span class="nc" id="L113">                    append(</span>
-<span class="nc" id="L114">                        &quot;vedlegg.json&quot;,</span>
-<span class="nc" id="L115">                        Json.encodeToString(vedleggJson),</span>
-<span class="nc" id="L116">                        Headers.build {</span>
-<span class="nc" id="L117">                            append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
-<span class="nc" id="L118">                        },</span>
+<span class="nc" id="L112">                    append(</span>
+<span class="nc" id="L113">                        &quot;vedlegg.json&quot;,</span>
+<span class="nc" id="L114">                        Json.encodeToString(vedleggJson),</span>
+<span class="nc" id="L115">                        Headers.build {</span>
+<span class="nc" id="L116">                            append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L117">                        },</span>
                     )
-<span class="nc" id="L120">                    files.forEachIndexed { index, file -&gt;</span>
-<span class="nc" id="L121">                        val vedleggMetadata =</span>
-<span class="nc" id="L122">                            VedleggMetadata(</span>
-<span class="nc" id="L123">                                filnavn = file.filename,</span>
-<span class="nc" id="L124">                                mimetype = file.fileType,</span>
-<span class="nc" id="L125">                                storrelse = file.fileSize,</span>
+<span class="nc" id="L119">                    files.forEachIndexed { index, file -&gt;</span>
+<span class="nc" id="L120">                        val vedleggMetadata =</span>
+<span class="nc" id="L121">                            VedleggMetadata(</span>
+<span class="nc" id="L122">                                filnavn = file.filename,</span>
+<span class="nc" id="L123">                                mimetype = file.fileType,</span>
+<span class="nc" id="L124">                                storrelse = file.fileSize,</span>
                             )
-<span class="nc" id="L127">                        append(</span>
-<span class="nc" id="L128">                            &quot;vedleggSpesifikasjon:$index&quot;,</span>
-<span class="nc" id="L129">                            Json.encodeToString(vedleggMetadata),</span>
-<span class="nc" id="L130">                            Headers.build {</span>
-<span class="nc" id="L131">                                append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
-<span class="nc" id="L132">                            },</span>
+<span class="nc" id="L126">                        append(</span>
+<span class="nc" id="L127">                            &quot;vedleggSpesifikasjon:$index&quot;,</span>
+<span class="nc" id="L128">                            Json.encodeToString(vedleggMetadata),</span>
+<span class="nc" id="L129">                            Headers.build {</span>
+<span class="nc" id="L130">                                append(HttpHeaders.ContentType, &quot;text/plain;charset=UTF-8&quot;)</span>
+<span class="nc" id="L131">                            },</span>
                         )
-<span class="nc" id="L134">                        append(</span>
-<span class="nc" id="L135">                            &quot;dokument:$index&quot;,</span>
-<span class="nc" id="L136">                            ChannelProvider { file.file },</span>
-<span class="nc" id="L137">                            Headers.build {</span>
-<span class="nc" id="L138">                                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)</span>
-<span class="nc" id="L139">                                append(HttpHeaders.ContentDisposition, &quot;filename=\&quot;${file.filename}\&quot;&quot;)</span>
-<span class="nc" id="L140">                            },</span>
+<span class="nc" id="L133">                        append(</span>
+<span class="nc" id="L134">                            &quot;dokument:$index&quot;,</span>
+<span class="nc" id="L135">                            ChannelProvider { file.file },</span>
+<span class="nc" id="L136">                            Headers.build {</span>
+<span class="nc" id="L137">                                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)</span>
+<span class="nc" id="L138">                                append(HttpHeaders.ContentDisposition, &quot;filename=\&quot;${file.filename}\&quot;&quot;)</span>
+<span class="nc" id="L139">                            },</span>
                         )
-<span class="nc" id="L142">                    }</span>
-<span class="nc" id="L143">                },</span>
-            ) {
-<span class="nc" id="L145">                headers {</span>
-<span class="nc bnc" id="L146" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L147" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L148">                }</span>
-<span class="nc" id="L149">                bearerAuth(token)</span>
-<span class="nc" id="L150">                contentType(ContentType.MultiPart.FormData)</span>
-<span class="nc" id="L151">            }</span>
-<span class="nc" id="L152">        }</span>
+<span class="nc" id="L141">                    }</span>
+<span class="nc" id="L142">                }</span>
+<span class="nc" id="L143">            try {</span>
+<span class="nc" id="L144">                client.submitFormWithBinaryData(</span>
+<span class="nc" id="L145">                    ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
+<span class="nc" id="L146">                    formData,</span>
+                ) {
+<span class="nc" id="L148">                    headers {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L151">                    }</span>
+<span class="nc" id="L152">                    bearerAuth(token)</span>
+<span class="nc" id="L153">                    contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L154">                }</span>
+<span class="nc" id="L155">            } catch (e: Exception) {</span>
+<span class="nc" id="L156">                logger.error(&quot;Feil ved opplasting til fiks: ${e.message}&quot;, e)</span>
+<span class="nc" id="L157">                throw e</span>
+<span class="nc" id="L158">            }</span>
+<span class="nc" id="L159">        }</span>
 
     suspend fun getSak(
         id: String,
         token: String,
     ): DigisosSak =
-<span class="nc" id="L158">        jacksonClient</span>
-<span class="nc" id="L159">            .get(digisosSakUrl(id)) {</span>
-<span class="nc" id="L160">                headers {</span>
-<span class="nc bnc" id="L161" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
-<span class="nc" id="L162">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
-<span class="nc" id="L163">                    }</span>
-<span class="nc bnc" id="L164" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L165">                }</span>
-<span class="nc" id="L166">                accept(ContentType.Application.Json)</span>
-<span class="nc" id="L167">                bearerAuth(token)</span>
-<span class="nc" id="L168">            }.body()</span>
+<span class="nc" id="L165">        jacksonClient</span>
+<span class="nc" id="L166">            .get(digisosSakUrl(id)) {</span>
+<span class="nc" id="L167">                headers {</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
+<span class="nc" id="L169">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
+<span class="nc" id="L170">                    }</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L172">                }</span>
+<span class="nc" id="L173">                accept(ContentType.Application.Json)</span>
+<span class="nc" id="L174">                bearerAuth(token)</span>
+<span class="nc" id="L175">            }.body()</span>
 }
 
-<span class="nc bnc" id="L171" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L172">private data class VedleggMetadata(</span>
-<span class="nc" id="L173">    val filnavn: String?,</span>
-<span class="nc" id="L174">    val mimetype: String?,</span>
-<span class="nc" id="L175">    val storrelse: Long,</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L179">private data class VedleggMetadata(</span>
+<span class="nc" id="L180">    val filnavn: String?,</span>
+<span class="nc" id="L181">    val mimetype: String?,</span>
+<span class="nc" id="L182">    val storrelse: Long,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
