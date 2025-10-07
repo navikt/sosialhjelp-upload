@@ -141,7 +141,6 @@ class FiksClient(
                     }
                 },
             ) {
-                // TODO: Legg på integrasjonsid/-passord i header
                 headers {
                     integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
                     integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }

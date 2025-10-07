@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.upload.action.kryptering
 import io.ktor.utils.io.jvm.javaio.toByteReadChannel
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.Upload
@@ -26,9 +27,16 @@ class EncryptionServiceImpl(
             withContext(Dispatchers.IO) {
                 val pipedOut = PipedOutputStream()
                 val pipedIn = PipedInputStream(pipedOut)
-                pipedOut.use {
-                    kryptering.krypterData(it, file.file.toInputStream(), cert, Security.getProvider("BC"))
-                    file.copy(file = pipedIn.toByteReadChannel())
+                val channel = pipedIn.toByteReadChannel()
+                val encryptionJob =
+                    launch {
+                        pipedOut.use {
+                            kryptering.krypterData(it, file.file.toInputStream(), cert, Security.getProvider("BC"))
+                            it.flush()
+                        }
+                    }
+                file.copy(file = channel).also {
+                    encryptionJob.join()
                 }
             }
         }
