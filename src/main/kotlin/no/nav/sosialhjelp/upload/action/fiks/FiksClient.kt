@@ -3,7 +3,6 @@ package no.nav.sosialhjelp.upload.action.fiks
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.cache.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -24,7 +23,6 @@ import no.nav.sosialhjelp.upload.action.Upload
 import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayInputStream
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -57,10 +55,6 @@ class FiksClient(
     private val client by lazy {
         HttpClient(CIO) {
             expectSuccess = false
-            install(Logging) {
-                logger = Logger.DEFAULT
-                level = LogLevel.BODY
-            }
             install(ContentNegotiation) {
                 json()
             }
