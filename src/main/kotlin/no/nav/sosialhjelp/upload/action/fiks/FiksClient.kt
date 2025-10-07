@@ -13,6 +13,7 @@ import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -98,8 +99,7 @@ class FiksClient(
         token: String,
     ): HttpResponse =
         withContext(Dispatchers.IO) {
-            client.submitFormWithBinaryData(
-                ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
+            val formData =
                 formData {
                     val vedleggJson =
                         VedleggSpesifikasjon(
@@ -139,14 +139,29 @@ class FiksClient(
                             },
                         )
                     }
-                },
-            ) {
-                headers {
-                    integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
-                    integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
                 }
-                bearerAuth(token)
-                contentType(ContentType.MultiPart.FormData)
+            try {
+                client
+                    .submitFormWithBinaryData(
+                        ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
+                        formData,
+                    ) {
+                        headers {
+                            integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
+                            integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+                        }
+                        bearerAuth(token)
+                        contentType(ContentType.MultiPart.FormData)
+                    }.also {
+                        if (!it.status.isSuccess()) {
+                            logger.error("Feil ved opplasting til fiks: ${it.status}: ${it.bodyAsText()}")
+                        } else {
+                            logger.info("Opplasting til fiks vellykket: ${it.status}")
+                        }
+                    }
+            } catch (e: Exception) {
+                logger.error("Feil ved opplasting til fiks: ${e.message}", e)
+                throw e
             }
         }
 

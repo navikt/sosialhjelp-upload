@@ -4,6 +4,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.defaultForFile
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -15,6 +17,7 @@ import no.nav.sosialhjelp.upload.fs.Storage
 import org.jooq.DSLContext
 import java.io.File
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
 
 data class Upload(
     val file: ByteReadChannel,
@@ -77,10 +80,17 @@ class DownstreamUploadService(
         val kommunenummer = sak.kommunenummer
         val navEksternRefId = lagNavEksternRefId(sak)
 
-        val encrypted = encryptionService.encrypt(files)
+        val response =
+            coroutineScope {
+                val encrypted = encryptionService.encrypt(files, this)
 
-        // TODO: Ta med ettersendelse.pdf i opplastingen
-        val response = fiksClient.uploadEttersendelse(fiksDigisosId, kommunenummer, navEksternRefId, encrypted, metadata, token)
+                // TODO: Ta med ettersendelse.pdf i opplastingen
+                fiksClient.uploadEttersendelse(fiksDigisosId, kommunenummer, navEksternRefId, encrypted, metadata, token).also {
+                    this.coroutineContext.cancelChildren(
+                        CancellationException("Kryptering og opplasting ferdig. Kansellerer child coroutines"),
+                    )
+                }
+            }
         if (response.status.isSuccess()) {
             dsl.transactionResult { tx ->
                 documentRepository.cleanup(tx, documentId)
