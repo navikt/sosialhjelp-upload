@@ -32,26 +32,23 @@ interface EncryptionService {
 <span class="nc" id="L32">        return files.map { file -&gt;</span>
 <span class="nc" id="L33">            val pipedIn = PipedInputStream()</span>
 <span class="nc" id="L34">            val channel = pipedIn.toByteReadChannel()</span>
-<span class="nc" id="L35">            val encryptionJob =</span>
-<span class="nc" id="L36">                scope.launch(Dispatchers.Default) {</span>
-<span class="nc" id="L37">                    val pipedOut = PipedOutputStream(pipedIn)</span>
-<span class="nc" id="L38">                    pipedOut.use {</span>
-<span class="nc" id="L39">                        kryptering.krypterData(it, file.file.toInputStream(), cert, Security.getProvider(&quot;BC&quot;))</span>
-<span class="nc" id="L40">                        it.flush()</span>
-<span class="nc" id="L41">                    }</span>
-<span class="nc" id="L42">                }</span>
-<span class="nc" id="L43">            file.copy(file = channel).also {</span>
-<span class="nc" id="L44">                encryptionJob.join()</span>
-<span class="nc" id="L45">            }</span>
+<span class="nc" id="L35">            scope.launch(Dispatchers.Default) {</span>
+<span class="nc" id="L36">                val pipedOut = PipedOutputStream(pipedIn)</span>
+<span class="nc" id="L37">                pipedOut.use {</span>
+<span class="nc" id="L38">                    kryptering.krypterData(it, file.file.toInputStream(), cert, Security.getProvider(&quot;BC&quot;))</span>
+<span class="nc" id="L39">                    it.flush()</span>
+<span class="nc" id="L40">                }</span>
+<span class="nc" id="L41">            }</span>
+<span class="nc" id="L42">            file.copy(file = channel)</span>
         }
     }
 }
 
-<span class="nc" id="L50">class EncryptionServiceMock : EncryptionService {</span>
+<span class="nc" id="L47">class EncryptionServiceMock : EncryptionService {</span>
     // Ikke krypter i mock/lokalt
     override suspend fun encrypt(
         files: List&lt;Upload&gt;,
         scope: CoroutineScope,
-<span class="nc" id="L55">    ): List&lt;Upload&gt; = files</span>
+<span class="nc" id="L52">    ): List&lt;Upload&gt; = files</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
