@@ -1,9 +1,11 @@
 package no.nav.sosialhjelp.upload.tusd
 
-import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR
@@ -18,10 +20,11 @@ import no.nav.sosialhjelp.upload.testutils.createHTTPRequest
 import no.nav.sosialhjelp.upload.testutils.createHookEvent
 import no.nav.sosialhjelp.upload.testutils.createHookRequest
 import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
+import no.nav.sosialhjelp.upload.validation.Result
+import no.nav.sosialhjelp.upload.validation.ScanResult
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
 import okhttp3.Headers
-import okio.Buffer
 import org.jooq.DSLContext
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -32,12 +35,49 @@ import org.junit.jupiter.api.assertNull
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
+import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+class MockDispatcher : Dispatcher() {
+    override fun dispatch(request: RecordedRequest): MockResponse {
+        println("Received request: ${request.url}. Path: ${request.url.encodedPath}")
+        return when (request.url.encodedPath) {
+            "/convert" -> {
+                MockResponse()
+                    .newBuilder()
+                    .code(200)
+                    .body("pdf-content")
+                    .headers(Headers.headersOf("Content-Type", "application/pdf", "Content-Length", "11"))
+                    .setHeader("Content-Length", "11")
+                    .build()
+            }
+
+            "/virus" -> {
+                val buffer = request.body
+                val content = buffer?.utf8() ?: ""
+                val response =
+                    if (content.contains("infected")) {
+                        ScanResult("file", Result.FOUND)
+                    } else {
+                        ScanResult("file", Result.OK)
+                    }.let { Json.encodeToString(listOf(it)) }
+                MockResponse()
+                    .newBuilder()
+                    .code(200)
+                    .body(response)
+                    .headers(Headers.headersOf("Content-Type", "application/json", "Content-Length", response.length.toString()))
+                    .build()
+            }
+
+            else -> MockResponse().newBuilder().code(404).build()
+        }
+    }
+}
+
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TusServiceTest {
+class TusServiceIntegrationTest {
     private lateinit var dsl: DSLContext
     private lateinit var mockWebServer: MockWebServer
     private lateinit var storage: FileSystemStorage
@@ -47,26 +87,29 @@ class TusServiceTest {
     private lateinit var gotenbergService: GotenbergService
     private lateinit var notificationService: DocumentNotificationService
     private lateinit var tempDir: Path
+    private lateinit var virusScanner: VirusScanner
+    private lateinit var tusService: TusService
 
     @BeforeAll
     fun setup() {
         PostgresTestContainer.migrate()
         dsl = PostgresTestContainer.dsl
         mockWebServer = MockWebServer()
+        mockWebServer.dispatcher = MockDispatcher()
         mockWebServer.start()
         tempDir = Files.createTempDirectory("upload-test-storage")
-        storage = FileSystemStorage(tempDir.toString())
+        storage = FileSystemStorage(tempDir.toString().also { println(it) })
         notificationService = DocumentNotificationService(PostgresTestContainer.dataSource)
         uploadRepository = UploadRepository(notificationService)
         documentRepository = DocumentRepository(dsl)
-
+        virusScanner = VirusScanner(mockWebServer.url("/virus").toString())
         validator =
             UploadValidator(
-                VirusScanner(""),
-                KtorSimpleLogger("UploadValidatorTest"),
+                virusScanner,
                 storage,
             )
-        gotenbergService = GotenbergService(mockWebServer.url("/").toString())
+        gotenbergService = GotenbergService(mockWebServer.url("/convert").toString())
+        tusService = TusService(uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
     }
 
     @AfterAll
@@ -77,7 +120,6 @@ class TusServiceTest {
 
     @Test
     fun `preCreate should create upload and return HookResponse with uploadId`() {
-        val logger = KtorSimpleLogger("TusServiceTest")
         val externalId = UUID.randomUUID().toString()
         val filename = "testfile.pdf"
         val personident = UUID.randomUUID().toString().take(11)
@@ -92,11 +134,10 @@ class TusServiceTest {
                 fileInfo = createFileInfo(metadata = createFileMetadata(filename, externalId)),
             )
 
-        val service = TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
-        val response = service.preCreate(hookRequest, personident)
+        val response = tusService.preCreate(hookRequest, personident)
 
         // Assert: upload exists in DB
-        val uploadId = java.util.UUID.fromString(response.changeFileInfo?.id)
+        val uploadId = UUID.fromString(response.changeFileInfo?.id)
         val upload =
             dsl
                 .selectFrom(UPLOAD)
@@ -112,8 +153,6 @@ class TusServiceTest {
     @Test
     fun `postFinish should convert non-pdf file to pdf and update upload`() =
         runTest {
-            val logger =
-                KtorSimpleLogger("TusServiceTest")
             val externalId = UUID.randomUUID().toString()
             val filename = "testfile.docx"
             val personident = UUID.randomUUID().toString().take(11)
@@ -130,19 +169,6 @@ class TusServiceTest {
 
             // Simulate Gotenberg PDF conversion response
             val pdfContent = "pdf-content".toByteArray()
-            mockWebServer.enqueue(
-                MockResponse
-                    .Builder()
-                    .code(200)
-                    .body(Buffer().write(pdfContent))
-                    .headers(
-                        Headers
-                            .Builder()
-                            .set("Content-Type", "application/pdf")
-                            .set("Content-Length", pdfContent.size.toString())
-                            .build(),
-                    ).build(),
-            )
 
             // Prepare HookRequest
             val hookRequest =
@@ -152,7 +178,7 @@ class TusServiceTest {
                 )
 
             // Act
-            TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage).postFinish(hookRequest)
+            tusService.postFinish(hookRequest)
 
             // Assert: PDF file should be stored
             val pdfPath = tempDir.resolve("testfile.pdf")
@@ -172,7 +198,6 @@ class TusServiceTest {
 
     @Test
     fun `preTerminate should reject termination if not owned by user`() {
-        val logger = KtorSimpleLogger("TusServiceTest")
         val externalId = UUID.randomUUID().toString()
         val filename = "testfile.pdf"
         val personident = UUID.randomUUID().toString().take(11)
@@ -188,8 +213,7 @@ class TusServiceTest {
                 fileInfo = createFileInfo(metadata = createFileMetadata(filename, externalId), id = uploadId.toString()),
             )
 
-        val service = TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
-        val response = service.preTerminate(hookRequest, personident)
+        val response = tusService.preTerminate(hookRequest, personident)
 
         // Assert: should reject termination
         assertEquals(response.httpResponse.StatusCode, 403)
@@ -198,7 +222,6 @@ class TusServiceTest {
 
     @Test
     fun `postTerminate should reject if not owned by user`() {
-        val logger = KtorSimpleLogger("TusServiceTest")
         val externalId = UUID.randomUUID().toString()
         val filename = "testfile.pdf"
         val personident = UUID.randomUUID().toString().take(11)
@@ -219,8 +242,7 @@ class TusServiceTest {
                     ),
             )
 
-        val service = TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
-        val response = service.postTerminate(hookRequest, personident)
+        val response = tusService.postTerminate(hookRequest, personident)
 
         // Assert: should reject termination
         assertEquals(403, response.httpResponse.StatusCode)
@@ -229,7 +251,6 @@ class TusServiceTest {
 
     @Test
     fun `postTerminate should delete and return 204 if owned by user`() {
-        val logger = KtorSimpleLogger("TusServiceTest")
         val externalId = UUID.randomUUID().toString()
         val filename = "testfile.pdf"
         val personident = UUID.randomUUID().toString().take(11)
@@ -243,8 +264,7 @@ class TusServiceTest {
                 HookType.PostFinish,
                 fileInfo = createFileInfo(metadata = createFileMetadata(filename, externalId), id = uploadId.toString()),
             )
-        val service = TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
-        val response = service.postTerminate(hookRequest, personident)
+        val response = tusService.postTerminate(hookRequest, personident)
 
         // Assert: should delete and return 204
         assertEquals(response.httpResponse.StatusCode, 204)
@@ -261,7 +281,6 @@ class TusServiceTest {
     @Test
     fun `validateUpload should return errors if file is too large`() =
         runTest {
-            val logger = KtorSimpleLogger("TusServiceTest")
             val externalId = UUID.randomUUID().toString()
             val filename = "largefile.pdf"
             val personident = UUID.randomUUID().toString().take(11)
@@ -289,8 +308,7 @@ class TusServiceTest {
                         ),
                 )
 
-            val service = TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
-            val response = service.validateUpload(hookRequest)
+            val response = tusService.validateUpload(hookRequest)
 
             // Assert: should return 400 and error about file size
             assertEquals(response.httpResponse.StatusCode, 400)
@@ -309,7 +327,6 @@ class TusServiceTest {
     @Test
     fun `validateUpload should return 200 and no errors for valid non-pdf upload`() =
         runTest {
-            val logger = KtorSimpleLogger("TusServiceTest")
             val externalId = UUID.randomUUID().toString()
             val filename = "validfile.pdf"
             val personident = UUID.randomUUID().toString().take(11)
@@ -335,8 +352,7 @@ class TusServiceTest {
                         ),
                 )
 
-            val service = TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
-            val response = service.validateUpload(hookRequest)
+            val response = tusService.validateUpload(hookRequest)
 
             assertEquals(200, response.httpResponse.StatusCode)
             assertTrue(response.httpResponse.body == null || response.httpResponse.body.isEmpty())
@@ -353,7 +369,6 @@ class TusServiceTest {
     @Test
     fun `validateUpload should return 200 and no errors for valid pdf upload`() =
         runTest {
-            val logger = KtorSimpleLogger("TusServiceTest")
             val externalId = UUID.randomUUID().toString()
             val filename = "validfile.pdf"
             val personident = UUID.randomUUID().toString().take(11)
@@ -379,8 +394,7 @@ class TusServiceTest {
                         ),
                 )
 
-            val service = TusService(logger, uploadRepository, gotenbergService, documentRepository, dsl, validator, storage)
-            val response = service.validateUpload(hookRequest)
+            val response = tusService.validateUpload(hookRequest)
 
             assertEquals(200, response.httpResponse.StatusCode)
             assertTrue(response.httpResponse.body == null || response.httpResponse.body.isEmpty())
@@ -392,5 +406,91 @@ class TusServiceTest {
                             .eq(uploadId),
                     ).fetch()
             assertTrue(errors.isEmpty())
+        }
+
+    @Test
+    fun `validateUpload should return 200 and no errors with virus check`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val filename = "validfile.pdf"
+            val personident = UUID.randomUUID().toString().take(11)
+            val tx = dsl.configuration()
+
+            // Insert document and upload in DB
+            val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
+            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+
+            val validContent = "roflmao".toByteArray()
+            val filePath = tempDir.resolve(uploadId.toString())
+            Files.write(filePath, validContent)
+
+            // Prepare HookRequest
+            val hookRequest =
+                createHookRequest(
+                    HookType.PostFinish,
+                    fileInfo =
+                        createFileInfo(
+                            metadata = createFileMetadata(filename, externalId),
+                            id = uploadId.toString(),
+                            size = validContent.size.toLong(),
+                        ),
+                )
+
+            val response = tusService.validateUpload(hookRequest)
+
+            assertEquals(200, response.httpResponse.StatusCode)
+            assertTrue(response.httpResponse.body == null || response.httpResponse.body.isEmpty())
+            val errors =
+                dsl
+                    .selectFrom(ERROR)
+                    .where(
+                        ERROR.UPLOAD
+                            .eq(uploadId),
+                    ).fetch()
+            assertTrue(errors.isEmpty())
+        }
+
+    @Test
+    fun `validateUpload should return 400 and make errors with virus infected file`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val filename = "infected.pdf"
+            val personident = UUID.randomUUID().toString().take(11)
+            val tx = dsl.configuration()
+
+            // Insert document and upload in DB
+            val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
+            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+
+            val validContent = "infected content".toByteArray()
+            val filePath = tempDir.resolve(uploadId.toString())
+            Files.write(filePath, validContent)
+
+            // Prepare HookRequest
+            val hookRequest =
+                createHookRequest(
+                    HookType.PostFinish,
+                    fileInfo =
+                        createFileInfo(
+                            metadata = createFileMetadata(filename, externalId),
+                            id = uploadId.toString(),
+                            size = validContent.size.toLong(),
+                        ),
+                )
+
+            validator = UploadValidator(virusScanner, storage)
+            val response = tusService.validateUpload(hookRequest)
+
+            assertEquals(400, response.httpResponse.StatusCode)
+            assertContains(response.httpResponse.body ?: "", "POSSIBLY_INFECTED")
+            val errors =
+                dsl
+                    .selectFrom(ERROR)
+                    .where(
+                        ERROR.UPLOAD
+                            .eq(uploadId),
+                    ).fetch()
+                    .toList()
+            assertTrue(errors.isNotEmpty())
         }
 }

@@ -2,7 +2,6 @@ package no.nav.sosialhjelp.upload.tusd
 
 import io.ktor.http.ContentType
 import io.ktor.http.defaultForFileExtension
-import io.ktor.util.logging.Logger
 import io.ktor.utils.io.ByteReadChannel
 import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.DocumentRepository
@@ -18,11 +17,11 @@ import no.nav.sosialhjelp.upload.tusd.input.CreateUploadRequest
 import no.nav.sosialhjelp.upload.tusd.input.PostFinishRequest
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
 
 class TusService(
-    val logger: Logger,
     val uploadRepository: UploadRepository,
     val gotenbergService: GotenbergService,
     val documentRepository: DocumentRepository,
@@ -30,6 +29,8 @@ class TusService(
     val validator: UploadValidator,
     val storage: Storage,
 ) {
+    private val logger = LoggerFactory.getLogger(this::class.java)
+
     fun preCreate(
         request: HookRequest,
         personident: String,
@@ -153,3 +154,4 @@ class TusService(
         return HookResponse(response)
     }
 }
+

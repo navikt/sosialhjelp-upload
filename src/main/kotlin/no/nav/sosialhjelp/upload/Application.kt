@@ -78,7 +78,6 @@ fun Application.module() {
                 create(EncryptionServiceImpl::class)
             }
         }
-        provide { this@module.environment.log }
         provide<Storage> {
             if (isLocal) {
                 create(FileSystemStorage::class)

@@ -1,8 +1,5 @@
-@file:Suppress("INFERRED_INVISIBLE_RETURN_TYPE_WARNING")
-
 package no.nav.sosialhjelp.upload.validation
 
-import io.ktor.util.logging.Logger
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +11,7 @@ import org.apache.pdfbox.Loader
 import org.apache.pdfbox.io.RandomAccessReadBuffer
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
 import org.apache.tika.Tika
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
 
@@ -40,42 +38,35 @@ val SUPPORTED_MIME_TYPES =
 
 class UploadValidator(
     val virusScanner: VirusScanner,
-    val logger: Logger,
     val storage: Storage,
 ) {
-    suspend fun validate(request: HookRequest): List<Validation> {
-        val file = storage.retrieve(request.event.upload.id) ?: error("File not found: ${request.event.upload.id}")
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
+    fun retrieveFile(uploadId: String): ByteReadChannel = storage.retrieve(uploadId) ?: error("File not found: $uploadId")
+
+    suspend fun validate(request: HookRequest): List<Validation> {
+        val openChannel = {
+            retrieveFile(request.event.upload.id)
+        }
         val validations =
             coroutineScope {
-                val virusScanValidation = async(Dispatchers.IO) { runVirusScan(file) }
+                val virusScanValidation = async(Dispatchers.IO) { runVirusScan(openChannel()) }
 
-                listOf(
+                val (mimeType, fileTypeValidation) = validateFileType(openChannel())
+                listOfNotNull(
                     validateFileSize(request.event.upload.size),
                     validateFilename(Filename(request.event.upload.metadata.filename)),
-                    validateFileType(file),
+                    fileTypeValidation,
+                    if (mimeType == "application/pdf") validatePdf(openChannel()) else null,
                     virusScanValidation.await(),
                 )
             }
-        return validations.filterNotNull()
+        return validations
     }
 
-    private fun validateFileType(file: ByteReadChannel): Validation? {
-        val mimeType = Tika().detect(file.toInputStream())
-        if (mimeType !in SUPPORTED_MIME_TYPES) {
-            println("Unsupported mime type: $mimeType")
-            return FileTypeValidation()
-        }
-        println("Detected mime type: $mimeType")
-        if (mimeType == "application/pdf") {
-            file.checkIfPdfIsValid()
-        }
-        return null
-    }
-
-    private fun ByteReadChannel.checkIfPdfIsValid(): Validation? {
+    private fun validatePdf(file: ByteReadChannel): Validation? {
         return try {
-            val randomAccessRead = RandomAccessReadBuffer(this.toInputStream())
+            val randomAccessRead = RandomAccessReadBuffer(file.toInputStream())
             Loader
                 .loadPDF(randomAccessRead)
                 .use { document ->
@@ -94,6 +85,16 @@ class UploadValidator(
             logger.warn(ValidationCode.INVALID_PDF.name + " " + e.message, e)
             InvalidPdfValidation()
         }
+    }
+
+    private fun validateFileType(file: ByteReadChannel): Pair<String, Validation?> {
+        val mimeType = Tika().detect(file.toInputStream())
+        if (mimeType !in SUPPORTED_MIME_TYPES) {
+            println("Unsupported mime type: $mimeType")
+            return mimeType to FileTypeValidation()
+        }
+        println("Detected mime type: $mimeType")
+        return mimeType to null
     }
 
     private suspend fun runVirusScan(file: ByteReadChannel): Validation? =
