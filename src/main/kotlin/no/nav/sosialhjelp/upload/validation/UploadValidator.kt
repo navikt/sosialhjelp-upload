@@ -1,6 +1,9 @@
 package no.nav.sosialhjelp.upload.validation
 
+import io.ktor.util.cio.readChannel
+import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.copyTo
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -14,6 +17,7 @@ import org.apache.tika.Tika
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
+import kotlin.io.path.createTempFile
 
 // 10 MB
 // TODO: Er dette en begrensning hos oss, Fiks eller fagsystemene?
@@ -45,23 +49,33 @@ class UploadValidator(
     fun retrieveFile(uploadId: String): ByteReadChannel = storage.retrieve(uploadId) ?: error("File not found: $uploadId")
 
     suspend fun validate(request: HookRequest): List<Validation> {
-        val openChannel = {
-            retrieveFile(request.event.upload.id)
-        }
-        val validations =
-            coroutineScope {
-                val virusScanValidation = async(Dispatchers.IO) { runVirusScan(openChannel()) }
-
-                val (mimeType, fileTypeValidation) = validateFileType(openChannel())
-                listOfNotNull(
-                    validateFileSize(request.event.upload.size),
-                    validateFilename(Filename(request.event.upload.metadata.filename)),
-                    fileTypeValidation,
-                    if (mimeType == "application/pdf") validatePdf(openChannel()) else null,
-                    virusScanValidation.await(),
-                )
+        // Fetch the file once and write to a temp file in /tmp
+        val uploadId = request.event.upload.id
+        val channel = retrieveFile(uploadId)
+        val tempFile =
+            createTempFile(prefix = uploadId, suffix = ".tmp").toFile().also {
+                channel.copyTo(it.writeChannel())
             }
-        return validations
+        try {
+            val validations =
+                coroutineScope {
+                    val virusScanValidation =
+                        async(Dispatchers.IO) {
+                            runVirusScan(tempFile.readChannel())
+                        }
+                    val (mimeType, fileTypeValidation) = validateFileType(tempFile.readChannel())
+                    listOfNotNull(
+                        validateFileSize(request.event.upload.size),
+                        validateFilename(Filename(request.event.upload.metadata.filename)),
+                        fileTypeValidation,
+                        if (mimeType == "application/pdf") validatePdf(tempFile.readChannel()) else null,
+                        virusScanValidation.await(),
+                    )
+                }
+            return validations
+        } finally {
+            tempFile.delete()
+        }
     }
 
     private fun validatePdf(file: ByteReadChannel): Validation? {
