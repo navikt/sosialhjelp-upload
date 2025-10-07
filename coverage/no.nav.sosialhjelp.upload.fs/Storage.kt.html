@@ -42,8 +42,8 @@ interface Storage {
         contentType: String,
     ) {
 <span class="fc" id="L44">        val writeChannel = File(&quot;$basePath/$fileName&quot;).writeChannel()</span>
-<span class="pc" id="L45">        content.copyTo(writeChannel)</span>
-<span class="nc" id="L46">    }</span>
+<span class="fc" id="L45">        content.copyTo(writeChannel)</span>
+<span class="fc" id="L46">    }</span>
 
 <span class="fc" id="L48">    override fun retrieve(fileName: String): ByteReadChannel = File(&quot;$basePath/$fileName&quot;).readChannel()</span>
 

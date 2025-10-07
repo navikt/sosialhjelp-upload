@@ -141,44 +141,51 @@ import java.security.cert.X509Certificate
 <span class="nc" id="L141">                    }</span>
 <span class="nc" id="L142">                }</span>
 <span class="nc" id="L143">            try {</span>
-<span class="nc" id="L144">                client.submitFormWithBinaryData(</span>
-<span class="nc" id="L145">                    ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
-<span class="nc" id="L146">                    formData,</span>
-                ) {
-<span class="nc" id="L148">                    headers {</span>
-<span class="nc bnc" id="L149" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L151">                    }</span>
-<span class="nc" id="L152">                    bearerAuth(token)</span>
-<span class="nc" id="L153">                    contentType(ContentType.MultiPart.FormData)</span>
-<span class="nc" id="L154">                }</span>
-<span class="nc" id="L155">            } catch (e: Exception) {</span>
-<span class="nc" id="L156">                logger.error(&quot;Feil ved opplasting til fiks: ${e.message}&quot;, e)</span>
-<span class="nc" id="L157">                throw e</span>
-<span class="nc" id="L158">            }</span>
-<span class="nc" id="L159">        }</span>
+<span class="nc" id="L144">                client</span>
+<span class="nc" id="L145">                    .submitFormWithBinaryData(</span>
+<span class="nc" id="L146">                        ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
+<span class="nc" id="L147">                        formData,</span>
+                    ) {
+<span class="nc" id="L149">                        headers {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                            integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                            integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L152">                        }</span>
+<span class="nc" id="L153">                        bearerAuth(token)</span>
+<span class="nc" id="L154">                        contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L155">                    }.also {</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                        if (!it.status.isSuccess()) {</span>
+<span class="nc" id="L157">                            logger.error(&quot;Feil ved opplasting til fiks: ${it.status}: ${it.bodyAsText()}&quot;)</span>
+                        } else {
+<span class="nc" id="L159">                            logger.info(&quot;Opplasting til fiks vellykket: ${it.status}&quot;)</span>
+                        }
+<span class="nc" id="L161">                    }</span>
+<span class="nc" id="L162">            } catch (e: Exception) {</span>
+<span class="nc" id="L163">                logger.error(&quot;Feil ved opplasting til fiks: ${e.message}&quot;, e)</span>
+<span class="nc" id="L164">                throw e</span>
+<span class="nc" id="L165">            }</span>
+<span class="nc" id="L166">        }</span>
 
     suspend fun getSak(
         id: String,
         token: String,
     ): DigisosSak =
-<span class="nc" id="L165">        jacksonClient</span>
-<span class="nc" id="L166">            .get(digisosSakUrl(id)) {</span>
-<span class="nc" id="L167">                headers {</span>
-<span class="nc bnc" id="L168" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
-<span class="nc" id="L169">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
-<span class="nc" id="L170">                    }</span>
-<span class="nc bnc" id="L171" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L172">                }</span>
-<span class="nc" id="L173">                accept(ContentType.Application.Json)</span>
-<span class="nc" id="L174">                bearerAuth(token)</span>
-<span class="nc" id="L175">            }.body()</span>
+<span class="nc" id="L172">        jacksonClient</span>
+<span class="nc" id="L173">            .get(digisosSakUrl(id)) {</span>
+<span class="nc" id="L174">                headers {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
+<span class="nc" id="L176">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
+<span class="nc" id="L177">                    }</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L179">                }</span>
+<span class="nc" id="L180">                accept(ContentType.Application.Json)</span>
+<span class="nc" id="L181">                bearerAuth(token)</span>
+<span class="nc" id="L182">            }.body()</span>
 }
 
-<span class="nc bnc" id="L178" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L179">private data class VedleggMetadata(</span>
-<span class="nc" id="L180">    val filnavn: String?,</span>
-<span class="nc" id="L181">    val mimetype: String?,</span>
-<span class="nc" id="L182">    val storrelse: Long,</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L186">private data class VedleggMetadata(</span>
+<span class="nc" id="L187">    val filnavn: String?,</span>
+<span class="nc" id="L188">    val mimetype: String?,</span>
+<span class="nc" id="L189">    val storrelse: Long,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
