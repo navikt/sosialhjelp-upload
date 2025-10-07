@@ -160,7 +160,7 @@ class TusServiceIntegrationTest {
 
             // Insert document and upload in DB
             val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+            val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
             // Store a test file in the file system
             val fileContent = "file-content".toByteArray()
@@ -205,7 +205,7 @@ class TusServiceIntegrationTest {
 
         // Insert document and upload with a different owner
         val documentId = documentRepository.getOrCreateDocument(tx, externalId, "other-user")
-        val uploadId = uploadRepository.create(tx, documentId, filename)!!
+        val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
         val hookRequest =
             createHookRequest(
@@ -229,7 +229,7 @@ class TusServiceIntegrationTest {
 
         // Insert document and upload with a different owner
         val documentId = documentRepository.getOrCreateDocument(tx, externalId, "other-user")
-        val uploadId = uploadRepository.create(tx, documentId, filename)!!
+        val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
         val hookRequest =
             createHookRequest(
@@ -258,7 +258,7 @@ class TusServiceIntegrationTest {
 
         // Insert document and upload with correct owner
         val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-        val uploadId = uploadRepository.create(tx, documentId, filename)!!
+        val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
         val hookRequest =
             createHookRequest(
                 HookType.PostFinish,
@@ -288,7 +288,7 @@ class TusServiceIntegrationTest {
 
             // Insert document and upload in DB
             val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+            val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
             // Store a large file in the file system (exceeds MAX_FILE_SIZE)
             val largeContent = ByteArray(20) { 1 }
@@ -334,7 +334,7 @@ class TusServiceIntegrationTest {
 
             // Insert document and upload in DB
             val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+            val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
             val validContent = "Roflmao".toByteArray()
             val filePath = tempDir.resolve(uploadId.toString())
@@ -376,7 +376,7 @@ class TusServiceIntegrationTest {
 
             // Insert document and upload in DB
             val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+            val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
             val validContent = this::class.java.getResource("/sample.pdf")!!.readBytes()
             val filePath = tempDir.resolve(uploadId.toString())
@@ -418,7 +418,7 @@ class TusServiceIntegrationTest {
 
             // Insert document and upload in DB
             val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+            val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
             val validContent = "roflmao".toByteArray()
             val filePath = tempDir.resolve(uploadId.toString())
@@ -460,7 +460,7 @@ class TusServiceIntegrationTest {
 
             // Insert document and upload in DB
             val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-            val uploadId = uploadRepository.create(tx, documentId, filename)!!
+            val uploadId = uploadRepository.create(tx, documentId, filename, 1L)!!
 
             val validContent = "infected content".toByteArray()
             val filePath = tempDir.resolve(uploadId.toString())

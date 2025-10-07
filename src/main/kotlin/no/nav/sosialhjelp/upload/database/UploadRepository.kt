@@ -25,6 +25,7 @@ class UploadRepository(
         tx: Configuration,
         documentId: UUID,
         filename: String,
+        filesize: Long,
     ): UUID? =
         tx
             .dsl()
@@ -32,6 +33,7 @@ class UploadRepository(
             .set(UPLOAD.ID, UUID.randomUUID())
             .set(UPLOAD.DOCUMENT_ID, documentId)
             .set(UPLOAD.ORIGINAL_FILENAME, filename)
+            .set(UPLOAD.SIZE, filesize)
             .returning(UPLOAD.ID)
             .fetchOne()
             ?.get(UPLOAD.ID)

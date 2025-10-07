@@ -39,13 +39,14 @@ class TusService(
             CreateUploadRequest(
                 externalId = request.event.upload.metadata.externalId,
                 filename = request.event.upload.metadata.filename,
+                filesize = request.event.upload.size,
             )
 
         val uploadId =
             try {
                 dsl.transactionResult { it ->
                     val documentId = documentRepository.getOrCreateDocument(it, uploadRequest.externalId, personident)
-                    val uploadId = uploadRepository.create(it, documentId, uploadRequest.filename)
+                    val uploadId = uploadRepository.create(it, documentId, uploadRequest.filename, uploadRequest.filesize)
                     logger.info("Creating a new upload, ID: $uploadId for document $documentId")
                     uploadId
                 }
@@ -153,4 +154,3 @@ class TusService(
         return HookResponse(response)
     }
 }
-

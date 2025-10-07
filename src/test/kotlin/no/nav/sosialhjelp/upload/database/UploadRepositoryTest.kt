@@ -43,7 +43,7 @@ class UploadRepositoryTest {
         val documentId = TestUtils.createMockDocument(dsl)
         val filename = "testfile.txt"
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { tx -> uploadRepository.create(tx, documentId, filename) }
+        val uploadId = dsl.transactionResult { tx -> uploadRepository.create(tx, documentId, filename, 10L) }
 
         dsl.transaction { tx ->
             val upload =
@@ -64,11 +64,11 @@ class UploadRepositoryTest {
     fun `test getUploadsByDocumentId returns correct uploads`() {
         val documentId = TestUtils.createMockDocument(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId1 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file1.txt") }
-        val uploadId2 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file2.txt") }
+        val uploadId1 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file1.txt", 10L) }
+        val uploadId2 = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file2.txt", 190L) }
         // Create an upload for a different document to ensure filtering works.
         val otherDocumentId = TestUtils.createMockDocument(dsl)
-        dsl.transaction { it -> uploadRepository.create(it, otherDocumentId, "otherfile.txt") }
+        dsl.transaction { it -> uploadRepository.create(it, otherDocumentId, "otherfile.txt", 19L) }
 
         val uploads =
             dsl
@@ -84,7 +84,7 @@ class UploadRepositoryTest {
     fun `test getDocumentIdFromUploadId returns correct document id`() {
         val documentId = TestUtils.createMockDocument(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file.txt") } ?: error("Ingen uploadId")
+        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "file.txt", 10L) } ?: error("Ingen uploadId")
         // Retrieve the document id using the upload id.
         val retrievedDocumentId = dsl.transactionResult { it -> uploadRepository.getDocumentIdFromUploadId(it, uploadId) }
         assertEquals(documentId, retrievedDocumentId)
@@ -94,7 +94,7 @@ class UploadRepositoryTest {
     fun `test notifyChange calls DocumentRepository with correct document id`() {
         val documentId = TestUtils.createMockDocument(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "notify.txt") } ?: error("Ingen uploadId")
+        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, documentId, "notify.txt", 10L) } ?: error("Ingen uploadId")
 
         dsl.transaction { it -> uploadRepository.notifyChange(it, uploadId) }
 
