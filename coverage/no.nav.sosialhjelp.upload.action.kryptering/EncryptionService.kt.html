@@ -3,6 +3,7 @@
 import io.ktor.utils.io.jvm.javaio.toByteReadChannel
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.Upload
@@ -15,28 +16,35 @@ interface EncryptionService {
     suspend fun encrypt(files: List&lt;Upload&gt;): List&lt;Upload&gt;
 }
 
-<span class="nc" id="L18">class EncryptionServiceImpl(</span>
-<span class="nc" id="L19">    private val fiksClient: FiksClient,</span>
-<span class="nc" id="L20">    private val kryptering: CMSKrypteringImpl,</span>
+<span class="nc" id="L19">class EncryptionServiceImpl(</span>
+<span class="nc" id="L20">    private val fiksClient: FiksClient,</span>
+<span class="nc" id="L21">    private val kryptering: CMSKrypteringImpl,</span>
 ) : EncryptionService {
-<span class="nc" id="L22">    override suspend fun encrypt(files: List&lt;Upload&gt;): List&lt;Upload&gt; {</span>
-<span class="nc" id="L23">        val cert = fiksClient.fetchPublicKey()</span>
+<span class="nc" id="L23">    override suspend fun encrypt(files: List&lt;Upload&gt;): List&lt;Upload&gt; {</span>
+<span class="nc" id="L24">        val cert = fiksClient.fetchPublicKey()</span>
 
-<span class="nc" id="L25">        return files.map { file -&gt;</span>
-<span class="nc" id="L26">            withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L27">                val pipedOut = PipedOutputStream()</span>
-<span class="nc" id="L28">                val pipedIn = PipedInputStream(pipedOut)</span>
-<span class="nc" id="L29">                pipedOut.use {</span>
-<span class="nc" id="L30">                    kryptering.krypterData(it, file.file.toInputStream(), cert, Security.getProvider(&quot;BC&quot;))</span>
-<span class="nc" id="L31">                    file.copy(file = pipedIn.toByteReadChannel())</span>
-<span class="nc" id="L32">                }</span>
-<span class="nc" id="L33">            }</span>
+<span class="nc" id="L26">        return files.map { file -&gt;</span>
+<span class="nc bnc" id="L27" title="All 3 branches missed.">            withContext(Dispatchers.IO) {</span>
+<span class="nc" id="L28">                val pipedOut = PipedOutputStream()</span>
+<span class="nc" id="L29">                val pipedIn = PipedInputStream(pipedOut)</span>
+<span class="nc" id="L30">                val channel = pipedIn.toByteReadChannel()</span>
+<span class="nc" id="L31">                val encryptionJob =</span>
+<span class="nc" id="L32">                    launch {</span>
+<span class="nc" id="L33">                        pipedOut.use {</span>
+<span class="nc" id="L34">                            kryptering.krypterData(it, file.file.toInputStream(), cert, Security.getProvider(&quot;BC&quot;))</span>
+<span class="nc" id="L35">                            it.flush()</span>
+<span class="nc" id="L36">                        }</span>
+<span class="nc" id="L37">                    }</span>
+<span class="nc" id="L38">                file.copy(file = channel).also {</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">                    encryptionJob.join()</span>
+<span class="nc" id="L40">                }</span>
+<span class="nc" id="L41">            }</span>
         }
     }
 }
 
-<span class="nc" id="L38">class EncryptionServiceMock : EncryptionService {</span>
+<span class="nc" id="L46">class EncryptionServiceMock : EncryptionService {</span>
     // Ikke krypter i mock/lokalt
-<span class="nc" id="L40">    override suspend fun encrypt(files: List&lt;Upload&gt;): List&lt;Upload&gt; = files</span>
+<span class="nc" id="L48">    override suspend fun encrypt(files: List&lt;Upload&gt;): List&lt;Upload&gt; = files</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

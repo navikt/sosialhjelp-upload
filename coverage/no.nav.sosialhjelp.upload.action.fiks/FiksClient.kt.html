@@ -141,37 +141,36 @@ import java.security.cert.X509Certificate
 <span class="nc" id="L141">                    }</span>
 <span class="nc" id="L142">                },</span>
             ) {
-                // TODO: Legg på integrasjonsid/-passord i header
-<span class="nc" id="L145">                headers {</span>
-<span class="nc bnc" id="L146" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L147" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L148">                }</span>
-<span class="nc" id="L149">                bearerAuth(token)</span>
-<span class="nc" id="L150">                contentType(ContentType.MultiPart.FormData)</span>
-<span class="nc" id="L151">            }</span>
-<span class="nc" id="L152">        }</span>
+<span class="nc" id="L144">                headers {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L147">                }</span>
+<span class="nc" id="L148">                bearerAuth(token)</span>
+<span class="nc" id="L149">                contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L150">            }</span>
+<span class="nc" id="L151">        }</span>
 
     suspend fun getSak(
         id: String,
         token: String,
     ): DigisosSak =
-<span class="nc" id="L158">        jacksonClient</span>
-<span class="nc" id="L159">            .get(digisosSakUrl(id)) {</span>
-<span class="nc" id="L160">                headers {</span>
-<span class="nc bnc" id="L161" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
-<span class="nc" id="L162">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
-<span class="nc" id="L163">                    }</span>
-<span class="nc bnc" id="L164" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L165">                }</span>
-<span class="nc" id="L166">                accept(ContentType.Application.Json)</span>
-<span class="nc" id="L167">                bearerAuth(token)</span>
-<span class="nc" id="L168">            }.body()</span>
+<span class="nc" id="L157">        jacksonClient</span>
+<span class="nc" id="L158">            .get(digisosSakUrl(id)) {</span>
+<span class="nc" id="L159">                headers {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
+<span class="nc" id="L161">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
+<span class="nc" id="L162">                    }</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L164">                }</span>
+<span class="nc" id="L165">                accept(ContentType.Application.Json)</span>
+<span class="nc" id="L166">                bearerAuth(token)</span>
+<span class="nc" id="L167">            }.body()</span>
 }
 
-<span class="nc bnc" id="L171" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L172">private data class VedleggMetadata(</span>
-<span class="nc" id="L173">    val filnavn: String?,</span>
-<span class="nc" id="L174">    val mimetype: String?,</span>
-<span class="nc" id="L175">    val storrelse: Long,</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L171">private data class VedleggMetadata(</span>
+<span class="nc" id="L172">    val filnavn: String?,</span>
+<span class="nc" id="L173">    val mimetype: String?,</span>
+<span class="nc" id="L174">    val storrelse: Long,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
