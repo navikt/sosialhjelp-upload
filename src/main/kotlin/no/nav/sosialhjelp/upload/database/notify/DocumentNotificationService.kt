@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 import java.util.*
 import javax.sql.DataSource
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -30,7 +31,7 @@ class DocumentNotificationService(
 
     fun getDocumentFlow(
         documentId: UUID,
-        pollInterval: Duration = 1.seconds,
+        pollInterval: Duration = 500.milliseconds,
     ): Flow<Unit> =
         flow {
             dataSource.connection.use { conn ->
