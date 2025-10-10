@@ -10,42 +10,43 @@ import org.slf4j.LoggerFactory
 import java.util.*
 import javax.sql.DataSource
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * Service to manage document update notifications using Postgres LISTEN/NOTIFY.
  */
-<span class="fc" id="L18">class DocumentNotificationService(</span>
-<span class="fc" id="L19">    private val dataSource: DataSource,</span>
+<span class="fc" id="L19">class DocumentNotificationService(</span>
+<span class="fc" id="L20">    private val dataSource: DataSource,</span>
 ) {
-<span class="fc" id="L21">    private val log = LoggerFactory.getLogger(DocumentNotificationService::class.java)</span>
+<span class="fc" id="L22">    private val log = LoggerFactory.getLogger(DocumentNotificationService::class.java)</span>
 
     fun notifyUpdate(documentId: UUID) {
-<span class="pc" id="L24">        dataSource.connection.use { conn -&gt;</span>
-<span class="pc" id="L25">            conn.createStatement().use { stmt -&gt;</span>
-<span class="fc" id="L26">                stmt.execute(&quot;NOTIFY document_update, '$documentId'&quot;)</span>
-<span class="fc" id="L27">            }</span>
+<span class="pc" id="L25">        dataSource.connection.use { conn -&gt;</span>
+<span class="pc" id="L26">            conn.createStatement().use { stmt -&gt;</span>
+<span class="fc" id="L27">                stmt.execute(&quot;NOTIFY document_update, '$documentId'&quot;)</span>
+<span class="fc" id="L28">            }</span>
         }
-<span class="fc" id="L29">    }</span>
+<span class="fc" id="L30">    }</span>
 
-<span class="nc" id="L31">    fun getDocumentFlow(</span>
+<span class="nc" id="L32">    fun getDocumentFlow(</span>
         documentId: UUID,
-<span class="nc" id="L33">        pollInterval: Duration = 1.seconds,</span>
+<span class="nc" id="L34">        pollInterval: Duration = 500.milliseconds,</span>
     ): Flow&lt;Unit&gt; =
-<span class="nc bnc" id="L35" title="All 4 branches missed.">        flow {</span>
-<span class="nc" id="L36">            dataSource.connection.use { conn -&gt;</span>
-<span class="nc" id="L37">                val pgConn = conn.unwrap(PGConnection::class.java)</span>
-<span class="nc" id="L38">                conn.createStatement().execute(&quot;LISTEN document_update&quot;)</span>
-<span class="nc" id="L39">                while (true) {</span>
-<span class="nc" id="L40">                    val notifications = pgConn.notifications</span>
-<span class="nc bnc" id="L41" title="All 2 branches missed.">                    notifications?.forEach {</span>
-<span class="nc bnc" id="L42" title="All 2 branches missed.">                        if (it.parameter == documentId.toString()) {</span>
-<span class="nc bnc" id="L43" title="All 2 branches missed.">                            emit(Unit)</span>
+<span class="nc bnc" id="L36" title="All 4 branches missed.">        flow {</span>
+<span class="nc" id="L37">            dataSource.connection.use { conn -&gt;</span>
+<span class="nc" id="L38">                val pgConn = conn.unwrap(PGConnection::class.java)</span>
+<span class="nc" id="L39">                conn.createStatement().execute(&quot;LISTEN document_update&quot;)</span>
+<span class="nc" id="L40">                while (true) {</span>
+<span class="nc" id="L41">                    val notifications = pgConn.notifications</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                    notifications?.forEach {</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                        if (it.parameter == documentId.toString()) {</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                            emit(Unit)</span>
                         }
-<span class="nc" id="L45">                    }</span>
-<span class="nc bnc" id="L46" title="All 2 branches missed.">                    delay(pollInterval)</span>
+<span class="nc" id="L46">                    }</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">                    delay(pollInterval)</span>
                 }
             }
-<span class="nc" id="L49">        }.flowOn(Dispatchers.IO)</span>
+<span class="nc" id="L50">        }.flowOn(Dispatchers.IO)</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
