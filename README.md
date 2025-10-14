@@ -74,23 +74,43 @@ Flyway brukes for database-migreringer. Migreringer kjøres automatisk ved oppst
 
 ## Flyt
 
+### Komponenter
+
 ```mermaid
 flowchart
-    fs[File storage]
+    fs[GCP Bucket]
     db[(Database)]
-    app[innsyn/soknad]
-    Browser -- (1) POST /sosialhjelp/soknad/tusd/files --> app
-app -- (2) POST /files --> Tusd
-Tusd -- (3) POST /pre-create --> UploadApi
-UploadApi -- (4) Save record --> db
-Tusd -- (5) Save to files --> fs
-Tusd -- (6) POST /pre-finish --> UploadApi
-UploadApi -- (7) Validate file --> UploadApi
-UploadApi -- (8) Update record --> db
-Tusd -- (9) POST /post-finish --> UploadApi
-UploadApi -- (10) POST /convert --> Gotenberg
-UploadApi -- (11) Save converted --> fs
-UploadApi -. SSE update .-> app
+    app[Client]
+    app -- Last opp --> Tusd
+    Tusd -- Hooks --> UploadApi
+    UploadApi -- Lagre metadata --> db
+    Tusd -- Lagre fil --> fs
+    UploadApi -- Konvertere --> Gotenberg
+    UploadApi -- Lagre konvertert fil --> fs
+    UploadApi -. SSE oppdatering .-> app
+    app -- Hent filer --> fs
+    app -- Submit --> UploadApi
+    UploadApi -- Last opp --> Fiks-mellomlager
+```
+
+
+### Fullstendig
+```mermaid
+flowchart
+    fs[GCP Bucket]
+    db[(Database)]
+    app[Client]
+    app -- (2) POST /files --> Tusd
+    Tusd -- (3) POST /pre-create --> UploadApi
+    UploadApi -- (4) Save record --> db
+    Tusd -- (5) Save to files --> fs
+    Tusd -- (6) POST /pre-finish --> UploadApi
+    UploadApi -- (7) Validate file --> UploadApi
+    UploadApi -- (8) Update record --> db
+    Tusd -- (9) POST /post-finish --> UploadApi
+    UploadApi -- (10) POST /convert --> Gotenberg
+    UploadApi -- (11) Save converted --> fs
+    UploadApi -. SSE update .-> app
 ```
 
 ## Environment Variables
