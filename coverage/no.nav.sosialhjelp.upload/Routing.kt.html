@@ -13,31 +13,36 @@ import no.nav.sosialhjelp.upload.tusd.configureTusRoutes
 import java.io.File
 
 fun Application.configureRouting() {
-<span class="nc" id="L16">    install(SSE)</span>
-<span class="nc" id="L17">    routing {</span>
-<span class="nc" id="L18">        route(&quot;/sosialhjelp/upload&quot;) {</span>
-<span class="nc" id="L19">            route(&quot;/internal/isAlive&quot;) {</span>
-<span class="nc bnc" id="L20" title="All 3 branches missed.">                get {</span>
-<span class="nc bnc" id="L21" title="All 2 branches missed.">                    call.respondText(&quot;I'm alive!&quot;, ContentType.Text.Plain)</span>
-<span class="nc" id="L22">                }</span>
-<span class="nc" id="L23">            }</span>
-<span class="nc" id="L24">            authenticate {</span>
-<span class="nc" id="L25">                configureStatusRoutes()</span>
-<span class="nc" id="L26">                configureActionRoutes()</span>
-<span class="nc" id="L27">            }</span>
-<span class="nc bnc" id="L28" title="All 2 branches missed.">            if (environment.config</span>
-<span class="nc" id="L29">                    .propertyOrNull(&quot;runtimeEnv&quot;)</span>
-<span class="nc bnc" id="L30" title="All 2 branches missed.">                    ?.getString() == &quot;local&quot;</span>
+<span class="nc bnc" id="L16" title="All 2 branches missed.">    val storageBasePath = environment.config.propertyOrNull(&quot;storage.basePath&quot;)?.getString()</span>
+<span class="nc" id="L17">    install(SSE)</span>
+<span class="nc" id="L18">    routing {</span>
+<span class="nc" id="L19">        route(&quot;/sosialhjelp/upload&quot;) {</span>
+<span class="nc" id="L20">            route(&quot;/internal/isAlive&quot;) {</span>
+<span class="nc bnc" id="L21" title="All 3 branches missed.">                get {</span>
+<span class="nc bnc" id="L22" title="All 2 branches missed.">                    call.respondText(&quot;I'm alive!&quot;, ContentType.Text.Plain)</span>
+<span class="nc" id="L23">                }</span>
+<span class="nc" id="L24">            }</span>
+<span class="nc" id="L25">            authenticate {</span>
+<span class="nc" id="L26">                configureStatusRoutes()</span>
+<span class="nc" id="L27">                configureActionRoutes()</span>
+<span class="nc" id="L28">            }</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">            if (environment.config</span>
+<span class="nc" id="L30">                    .propertyOrNull(&quot;runtimeEnv&quot;)</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">                    ?.getString() == &quot;local&quot;</span>
             ) {
-<span class="nc" id="L32">                staticFiles(&quot;/thumbnails&quot;, File(&quot;./tusd-data&quot;))</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">                if (storageBasePath != null) {</span>
+<span class="nc" id="L34">                    staticFiles(&quot;/files&quot;, File(storageBasePath))</span>
+                } else {
+<span class="nc" id="L36">                    environment.log.warn(&quot;runtimeEnv is local, but storage.basePath is not set. Files will not be served.&quot;)</span>
+                }
             }
-<span class="nc" id="L34">        }</span>
+<span class="nc" id="L39">        }</span>
 
-<span class="nc" id="L36">        route(&quot;/tus-hooks&quot;) {</span>
-<span class="nc" id="L37">            authenticate {</span>
-<span class="nc" id="L38">                configureTusRoutes()</span>
-<span class="nc" id="L39">            }</span>
-<span class="nc" id="L40">        }</span>
-<span class="nc" id="L41">    }</span>
-<span class="nc" id="L42">}</span>
+<span class="nc" id="L41">        route(&quot;/tus-hooks&quot;) {</span>
+<span class="nc" id="L42">            authenticate {</span>
+<span class="nc" id="L43">                configureTusRoutes()</span>
+<span class="nc" id="L44">            }</span>
+<span class="nc" id="L45">        }</span>
+<span class="nc" id="L46">    }</span>
+<span class="nc" id="L47">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

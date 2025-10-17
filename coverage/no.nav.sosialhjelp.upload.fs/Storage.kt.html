@@ -51,7 +51,7 @@ interface Storage {
 <span class="nc" id="L51">        File(&quot;$basePath/$fileName&quot;).delete()</span>
 <span class="nc" id="L52">    }</span>
 
-<span class="fc" id="L54">    override fun createSignedUrl(fileName: String): String = &quot;http://localhost:3000/sosialhjelp/innsyn/api/upload-api/thumbnails/$fileName&quot;</span>
+<span class="fc" id="L54">    override fun createSignedUrl(fileName: String): String = &quot;http://localhost:3007/sosialhjelp/upload/files/$fileName&quot;</span>
 }
 
 <span class="nc" id="L57">class GcpBucketStorage(</span>
