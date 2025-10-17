@@ -16,7 +16,7 @@ database:
 gotenberg:
   url: "$GOTENBERG_URL:http://localhost:3010/forms/libreoffice/convert"
 storage:
-  basePath: "./tusd-data"
+  basePath: "../digisos-docker-compose/tusd-data"
   bucketName: "$BUCKET_NAME:sosialhjelp-upload-dev"
   gcsCredentials: "$GCS_CREDENTIALS:"
 fiks:

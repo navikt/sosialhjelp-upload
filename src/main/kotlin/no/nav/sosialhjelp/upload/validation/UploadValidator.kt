@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.validation
 
 import io.ktor.util.cio.readChannel
+import io.ktor.util.cio.use
 import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.copyTo
@@ -8,6 +9,7 @@ import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.fs.Storage
 import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import org.apache.pdfbox.Loader
@@ -52,10 +54,14 @@ class UploadValidator(
         // Fetch the file once and write to a temp file in /tmp
         val uploadId = request.event.upload.id
         val channel = retrieveFile(uploadId)
-        val tempFile =
-            createTempFile(prefix = uploadId, suffix = ".tmp").toFile().also {
-                channel.copyTo(it.writeChannel())
+        val tempFile = withContext(Dispatchers.IO) {
+            createTempFile(prefix = uploadId, suffix = ".tmp").toFile().also { tempFile ->
+                tempFile.writeChannel().use {
+                    channel.copyTo(this)
+                    flush()
+                }
             }
+        }
         try {
             val validations =
                 coroutineScope {
@@ -78,17 +84,18 @@ class UploadValidator(
         }
     }
 
-    private fun validatePdf(file: ByteReadChannel): Validation? {
-        return try {
-            val randomAccessRead = RandomAccessReadBuffer(file.toInputStream())
-            Loader
-                .loadPDF(randomAccessRead)
-                .use { document ->
-                    if (document.isEncrypted) {
-                        EncryptedPdfValidation()
+    private suspend fun validatePdf(file: ByteReadChannel): Validation? = withContext(Dispatchers.IO) {
+        try {
+            file.toInputStream().use { inputStream ->
+                val randomAccessRead = RandomAccessReadBuffer(inputStream)
+                Loader
+                    .loadPDF(randomAccessRead)
+                    .use { document ->
+                        if (document.isEncrypted) {
+                            EncryptedPdfValidation()
+                        } else null
                     }
-                    return null
-                }
+            }
         } catch (e: InvalidPasswordException) {
             logger.warn(ValidationCode.ENCRYPTED_PDF.name + " " + e.message)
             EncryptedPdfValidation()
@@ -101,14 +108,14 @@ class UploadValidator(
         }
     }
 
-    private fun validateFileType(file: ByteReadChannel): Pair<String, Validation?> {
-        val mimeType = Tika().detect(file.toInputStream())
+    private suspend fun validateFileType(file: ByteReadChannel): Pair<String, Validation?> = withContext(Dispatchers.IO) {
+        val mimeType = file.toInputStream().use { Tika().detect(it) }
         if (mimeType !in SUPPORTED_MIME_TYPES) {
             println("Unsupported mime type: $mimeType")
-            return mimeType to FileTypeValidation()
+            return@withContext mimeType to FileTypeValidation()
         }
         println("Detected mime type: $mimeType")
-        return mimeType to null
+        return@withContext mimeType to null
     }
 
     private suspend fun runVirusScan(file: ByteReadChannel): Validation? =

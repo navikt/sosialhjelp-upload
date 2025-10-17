@@ -51,7 +51,7 @@ class FileSystemStorage(
         File("$basePath/$fileName").delete()
     }
 
-    override fun createSignedUrl(fileName: String): String = "http://localhost:3000/sosialhjelp/innsyn/api/upload-api/thumbnails/$fileName"
+    override fun createSignedUrl(fileName: String): String = "http://localhost:3007/sosialhjelp/upload/files/$fileName"
 }
 
 class GcpBucketStorage(

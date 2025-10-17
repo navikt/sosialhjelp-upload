@@ -50,15 +50,9 @@ gsutil cors set cors-config.json gs://your-bucket-name
 
 Appen krever database, tusd, gotenberg, wonderwall og mock-alt-api (hvis det skal sendes inn dokumenter).
 
-Tusd, databasen og gotenberg kan startes ved hjelp av docker compose:
+Tusd, databasen og gotenberg kan startes ved hjelp av docker compose i [digisos-docker-compose](https://github.com/navikt/digisos-docker-compose)
 
-```bash
-  docker compose up -d
-```
-
-Lokalt brukes ikke GCS, men filene lagres lokalt i en mappe. Default her er ./tusd-data. Dette kan overstyres ved å sette miljøvariabelen `storage.basePath`.
-
-Resterende tjenester kan startes opp ved hjelp av docker compose i [digisos-docker-compose](https://github.com/navikt/digisos-docker-compose)
+Lokalt brukes ikke GCS, men filene lagres lokalt i en mappe. Default her er ../digisos-docker-compose/tusd-data. Dette kan overstyres ved å sette miljøvariabelen `storage.basePath`.
 
 ## Database
 Appen bruker PostgreSQL som database og JOOQ for databaseoperasjoner. For typesafe SQL-spørringer brukes JOOQ sin kodegenerator som genererer Java-klasser basert på database-skjemaet. Kommandoen for å generere JOOQ-klasser er:

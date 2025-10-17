@@ -13,6 +13,7 @@ import no.nav.sosialhjelp.upload.tusd.configureTusRoutes
 import java.io.File
 
 fun Application.configureRouting() {
+    val storageBasePath = environment.config.propertyOrNull("storage.basePath")?.getString()
     install(SSE)
     routing {
         route("/sosialhjelp/upload") {
@@ -29,7 +30,11 @@ fun Application.configureRouting() {
                     .propertyOrNull("runtimeEnv")
                     ?.getString() == "local"
             ) {
-                staticFiles("/thumbnails", File("./tusd-data"))
+                if (storageBasePath != null) {
+                    staticFiles("/files", File(storageBasePath))
+                } else {
+                    environment.log.warn("runtimeEnv is local, but storage.basePath is not set. Files will not be served.")
+                }
             }
         }
 
