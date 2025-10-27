@@ -59,23 +59,23 @@ sealed class TokenResponse {
 <span class="nc bnc" id="L59" title="All 2 branches missed.">    @Serializable</span>
 <span class="nc" id="L60">    data class Success(</span>
 <span class="nc" id="L61">        @SerialName(&quot;access_token&quot;)</span>
-        val accessToken: String,
+<span class="nc" id="L62">        val accessToken: String,</span>
 <span class="nc" id="L63">        @SerialName(&quot;expires_in&quot;)</span>
-        val expiresInSeconds: Int,
+<span class="nc" id="L64">        val expiresInSeconds: Int,</span>
 <span class="nc" id="L65">        @SerialName(&quot;token_type&quot;)</span>
-        val tokenType: String,
-<span class="nc" id="L67">    ) : TokenResponse()</span>
+<span class="nc" id="L66">        val tokenType: String,</span>
+    ) : TokenResponse()
 
 <span class="nc" id="L69">    data class Error(</span>
 <span class="nc" id="L70">        val error: TokenErrorResponse,</span>
 <span class="nc" id="L71">        val status: HttpStatusCode,</span>
-<span class="nc" id="L72">    ) : TokenResponse()</span>
+    ) : TokenResponse()
 <span class="nc" id="L73">}</span>
 
 <span class="nc bnc" id="L75" title="All 2 branches missed.">@Serializable</span>
 <span class="nc" id="L76">data class TokenErrorResponse(</span>
 <span class="nc" id="L77">    val error: String,</span>
 <span class="nc" id="L78">    @SerialName(&quot;error_description&quot;)</span>
-    val errorDescription: String,
+<span class="nc" id="L79">    val errorDescription: String,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

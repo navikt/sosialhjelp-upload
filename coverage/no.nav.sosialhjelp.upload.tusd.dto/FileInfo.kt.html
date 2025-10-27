@@ -6,22 +6,22 @@ import kotlinx.serialization.Serializable
 <span class="pc bnc" id="L6" title="All 18 branches missed.">@Serializable</span>
 <span class="pc" id="L7">data class FileInfo(</span>
 <span class="fc" id="L8">    @SerialName(&quot;ID&quot;)</span>
-    val id: String,
+<span class="fc" id="L9">    val id: String,</span>
 <span class="fc" id="L10">    @SerialName(&quot;Size&quot;)</span>
-    val size: Long,
-<span class="pc" id="L12">    @SerialName(&quot;SizeIsDeferred&quot;)</span>
-    val sizeIsDeferred: Boolean,
-<span class="pc" id="L14">    @SerialName(&quot;Offset&quot;)</span>
-    val offset: Long,
+<span class="fc" id="L11">    val size: Long,</span>
+<span class="fc" id="L12">    @SerialName(&quot;SizeIsDeferred&quot;)</span>
+<span class="nc" id="L13">    val sizeIsDeferred: Boolean,</span>
+<span class="fc" id="L14">    @SerialName(&quot;Offset&quot;)</span>
+<span class="nc" id="L15">    val offset: Long,</span>
 <span class="fc" id="L16">    @SerialName(&quot;MetaData&quot;)</span>
-    val metadata: FileMetadata,
-<span class="pc" id="L18">    @SerialName(&quot;IsPartial&quot;)</span>
-    val isPartial: Boolean,
-<span class="pc" id="L20">    @SerialName(&quot;IsFinal&quot;)</span>
-    val isFinal: Boolean,
-<span class="pc" id="L22">    @SerialName(&quot;PartialUploads&quot;)</span>
+<span class="fc" id="L17">    val metadata: FileMetadata,</span>
+<span class="fc" id="L18">    @SerialName(&quot;IsPartial&quot;)</span>
+<span class="nc" id="L19">    val isPartial: Boolean,</span>
+<span class="fc" id="L20">    @SerialName(&quot;IsFinal&quot;)</span>
+<span class="nc" id="L21">    val isFinal: Boolean,</span>
+<span class="fc" id="L22">    @SerialName(&quot;PartialUploads&quot;)</span>
 <span class="nc" id="L23">    val partialUploads: List&lt;String&gt;? = null,</span>
-<span class="pc" id="L24">    @SerialName(&quot;Storage&quot;)</span>
+<span class="fc" id="L24">    @SerialName(&quot;Storage&quot;)</span>
 <span class="nc" id="L25">    val storage: Storage? = null,</span>
 <span class="nc" id="L26">)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

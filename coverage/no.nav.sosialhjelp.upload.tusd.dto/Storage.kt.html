@@ -14,17 +14,17 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @SerialName(&quot;gcsstore&quot;)
 <span class="nc" id="L15">class BucketStorage(</span>
 <span class="nc" id="L16">    @SerialName(&quot;Bucket&quot;)</span>
-    val bucket: String,
+<span class="nc" id="L17">    val bucket: String,</span>
 <span class="nc" id="L18">    @SerialName(&quot;Key&quot;)</span>
-    val key: String,
-<span class="nc" id="L20">) : Storage()</span>
+<span class="nc" id="L19">    val key: String,</span>
+) : Storage()
 
-<span class="nc bnc" id="L22" title="All 2 branches missed.">@Serializable</span>
+<span class="pc bnc" id="L22" title="All 2 branches missed.">@Serializable</span>
 @SerialName(&quot;filestore&quot;)
 <span class="fc" id="L24">class LocalStorage(</span>
-<span class="pc" id="L25">    @SerialName(&quot;InfoPath&quot;)</span>
-    val infoPath: String,
-<span class="pc" id="L27">    @SerialName(&quot;Path&quot;)</span>
-    val path: String,
-<span class="fc" id="L29">) : Storage()</span>
+<span class="fc" id="L25">    @SerialName(&quot;InfoPath&quot;)</span>
+<span class="nc" id="L26">    val infoPath: String,</span>
+<span class="fc" id="L27">    @SerialName(&quot;Path&quot;)</span>
+<span class="nc" id="L28">    val path: String,</span>
+) : Storage()
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
