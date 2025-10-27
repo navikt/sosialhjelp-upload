@@ -159,5 +159,7 @@ jooq {
 tasks {
     shadowJar {
         mergeServiceFiles()
+        isZip64 = true
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 }
