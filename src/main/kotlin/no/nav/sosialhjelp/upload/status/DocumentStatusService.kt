@@ -20,9 +20,8 @@ class DocumentStatusService(
                             UploadSuccessState(
                                 upload.id,
                                 upload.originalFilename ?: "Ukjent fil",
-                                upload.convertedFilename,
                                 upload.errors,
-                                upload.signedUrl,
+                                upload.filId,
                             )
                         }
                 }

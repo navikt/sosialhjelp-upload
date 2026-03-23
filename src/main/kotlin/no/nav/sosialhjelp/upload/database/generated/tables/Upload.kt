@@ -84,19 +84,29 @@ open class Upload(
     val ORIGINAL_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("original_filename"), SQLDataType.VARCHAR(255).nullable(false), this, "")
 
     /**
-     * The column <code>public.upload.signed_url</code>.
-     */
-    val SIGNED_URL: TableField<UploadRecord, String?> = createField(DSL.name("signed_url"), SQLDataType.VARCHAR, this, "")
-
-    /**
-     * The column <code>public.upload.converted_filename</code>.
-     */
-    val CONVERTED_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("converted_filename"), SQLDataType.VARCHAR(255), this, "")
-
-    /**
      * The column <code>public.upload.size</code>.
      */
     val SIZE: TableField<UploadRecord, Long?> = createField(DSL.name("size"), SQLDataType.BIGINT, this, "")
+
+    /**
+     * The column <code>public.upload.upload_offset</code>.
+     */
+    val UPLOAD_OFFSET: TableField<UploadRecord, Long?> = createField(DSL.name("upload_offset"), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline(0L)), this, "")
+
+    /**
+     * The column <code>public.upload.chunk_data</code>.
+     */
+    val CHUNK_DATA: TableField<UploadRecord, ByteArray?> = createField(DSL.name("chunk_data"), SQLDataType.BINARY, this, "")
+
+    /**
+     * The column <code>public.upload.fil_id</code>.
+     */
+    val FIL_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("fil_id"), SQLDataType.UUID, this, "")
+
+    /**
+     * The column <code>public.upload.mellomlagring_ref_id</code>.
+     */
+    val MELLOMLAGRING_REF_ID: TableField<UploadRecord, String?> = createField(DSL.name("mellomlagring_ref_id"), SQLDataType.VARCHAR(255), this, "")
 
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

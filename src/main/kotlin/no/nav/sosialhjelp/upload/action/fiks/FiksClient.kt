@@ -4,7 +4,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -13,14 +12,13 @@ import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
+import no.nav.sosialhjelp.upload.action.FilReferanse
 import no.nav.sosialhjelp.upload.action.Metadata
-import no.nav.sosialhjelp.upload.action.Upload
 import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
@@ -94,7 +92,7 @@ class FiksClient(
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-        files: List<Upload>,
+        filReferanser: List<FilReferanse>,
         metadata: Metadata,
         token: String,
     ): HttpResponse =
@@ -116,26 +114,19 @@ class FiksClient(
                             append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
                         },
                     )
-                    files.forEachIndexed { index, file ->
+                    filReferanser.forEachIndexed { index, ref ->
                         val vedleggMetadata =
                             VedleggMetadata(
-                                filnavn = file.filename,
-                                mimetype = file.fileType,
-                                storrelse = file.fileSize,
+                                filnavn = ref.filnavn,
+                                filId = ref.filId.toString(),
+                                mellomlagringRefId = ref.mellomlagringRefId,
+                                storrelse = ref.storrelse,
                             )
                         append(
                             "vedleggSpesifikasjon:$index",
                             Json.encodeToString(vedleggMetadata),
                             Headers.build {
                                 append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
-                            },
-                        )
-                        append(
-                            "dokument:$index",
-                            ChannelProvider { file.file },
-                            Headers.build {
-                                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)
-                                append(HttpHeaders.ContentDisposition, "filename=\"${file.filename}\"")
                             },
                         )
                     }
@@ -185,6 +176,7 @@ class FiksClient(
 @Serializable
 private data class VedleggMetadata(
     val filnavn: String?,
-    val mimetype: String?,
+    val filId: String?,
+    val mellomlagringRefId: String?,
     val storrelse: Long,
 )

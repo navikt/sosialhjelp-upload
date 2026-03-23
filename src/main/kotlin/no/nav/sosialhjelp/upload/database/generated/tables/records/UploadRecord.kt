@@ -29,28 +29,38 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(2, value)
         get(): String? = get(2) as String?
 
-    open var signedUrl: String?
-        set(value): Unit = set(3, value)
-        get(): String? = get(3) as String?
-
-    open var convertedFilename: String?
-        set(value): Unit = set(4, value)
-        get(): String? = get(4) as String?
-
     open var size: Long?
+        set(value): Unit = set(3, value)
+        get(): Long? = get(3) as Long?
+
+    open var uploadOffset: Long?
+        set(value): Unit = set(4, value)
+        get(): Long? = get(4) as Long?
+
+    open var chunkData: ByteArray?
         set(value): Unit = set(5, value)
-        get(): Long? = get(5) as Long?
+        get(): ByteArray? = get(5) as ByteArray?
+
+    open var filId: UUID?
+        set(value): Unit = set(6, value)
+        get(): UUID? = get(6) as UUID?
+
+    open var mellomlagringRefId: String?
+        set(value): Unit = set(7, value)
+        get(): String? = get(7) as String?
 
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, signedUrl: String? = null, convertedFilename: String? = null, size: Long? = null): this() {
+    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringRefId: String? = null): this() {
         this.id = id
         this.documentId = documentId
         this.originalFilename = originalFilename
-        this.signedUrl = signedUrl
-        this.convertedFilename = convertedFilename
         this.size = size
+        this.uploadOffset = uploadOffset
+        this.chunkData = chunkData
+        this.filId = filId
+        this.mellomlagringRefId = mellomlagringRefId
         resetChangedOnNotNull()
     }
 }

@@ -11,7 +11,6 @@ import java.util.*
 import javax.sql.DataSource
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Service to manage document update notifications using Postgres LISTEN/NOTIFY.

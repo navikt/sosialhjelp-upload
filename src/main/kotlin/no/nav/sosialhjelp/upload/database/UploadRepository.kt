@@ -12,10 +12,17 @@ import java.util.*
 data class UploadWithFilename(
     val id: UUID?,
     val originalFilename: String?,
-    val convertedFilename: String?,
     val errors: List<ValidationCode>,
-    val signedUrl: String?,
-    val fileSize: Long?
+    val filId: UUID?,
+    val mellomlagringRefId: String?,
+    val fileSize: Long?,
+)
+
+data class UploadForProcessing(
+    val filename: String,
+    val chunkData: ByteArray,
+    val documentId: UUID,
+    val externalId: String,
 )
 
 class UploadRepository(
@@ -34,12 +41,11 @@ class UploadRepository(
             .set(UPLOAD.DOCUMENT_ID, documentId)
             .set(UPLOAD.ORIGINAL_FILENAME, filename)
             .set(UPLOAD.SIZE, filesize)
+            .set(UPLOAD.UPLOAD_OFFSET, 0L)
             .returning(UPLOAD.ID)
             .fetchOne()
             ?.get(UPLOAD.ID)
-            ?.also {
-                notifyChange(tx, it)
-            }
+            ?.also { notifyChange(tx, it) }
 
     fun notifyChange(
         tx: Configuration,
@@ -74,13 +80,102 @@ class UploadRepository(
             .fetchOne()
             ?.get(UPLOAD.DOCUMENT_ID)
 
+    fun getUploadInfo(
+        tx: Configuration,
+        uploadId: UUID,
+    ): Pair<Long, Long> =
+        tx
+            .dsl()
+            .select(UPLOAD.UPLOAD_OFFSET, UPLOAD.SIZE)
+            .from(UPLOAD)
+            .where(UPLOAD.ID.eq(uploadId))
+            .fetchSingle()
+            .let { it.get(UPLOAD.UPLOAD_OFFSET)!! to it.get(UPLOAD.SIZE)!! }
+
+    fun appendChunk(
+        tx: Configuration,
+        uploadId: UUID,
+        expectedOffset: Long,
+        data: ByteArray,
+    ): Pair<Long, Long> {
+        val newOffset = expectedOffset + data.size
+        tx.dsl().execute(
+            "UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ? WHERE id = ?",
+            data, newOffset, uploadId,
+        )
+        val totalSize =
+            tx
+                .dsl()
+                .select(UPLOAD.SIZE)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .fetchSingle()
+                .get(UPLOAD.SIZE)!!
+        return totalSize to newOffset
+    }
+
+    fun getUploadForProcessing(
+        tx: Configuration,
+        uploadId: UUID,
+    ): UploadForProcessing {
+        val record =
+            tx
+                .dsl()
+                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CHUNK_DATA, UPLOAD.DOCUMENT_ID)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .fetchSingle()
+        val documentId = record.get(UPLOAD.DOCUMENT_ID)!!
+        val externalId =
+            tx
+                .dsl()
+                .select(DOCUMENT.EXTERNAL_ID)
+                .from(DOCUMENT)
+                .where(DOCUMENT.ID.eq(documentId))
+                .fetchSingle()
+                .get(DOCUMENT.EXTERNAL_ID)!!
+        return UploadForProcessing(
+            filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,
+            chunkData = record.get(UPLOAD.CHUNK_DATA)!!,
+            documentId = documentId,
+            externalId = externalId,
+        )
+    }
+
+    fun setFilId(
+        tx: Configuration,
+        uploadId: UUID,
+        filId: UUID,
+        mellomlagringRefId: String,
+    ) {
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.FIL_ID, filId)
+            .set(UPLOAD.MELLOMLAGRING_REF_ID, mellomlagringRefId)
+            .where(UPLOAD.ID.eq(uploadId))
+            .execute()
+    }
+
+    fun clearChunkData(
+        tx: Configuration,
+        uploadId: UUID,
+    ) {
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .setNull(UPLOAD.CHUNK_DATA)
+            .where(UPLOAD.ID.eq(uploadId))
+            .execute()
+    }
+
     fun getUploadsWithFilenames(
         tx: Configuration,
         documentId: UUID,
     ): List<UploadWithFilename> =
         tx
             .dsl()
-            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, ERROR.CODE, UPLOAD.SIGNED_URL, UPLOAD.SIZE)
+            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, UPLOAD.MELLOMLAGRING_REF_ID, UPLOAD.SIZE)
             .from(UPLOAD)
             .leftJoin(ERROR)
             .on(ERROR.UPLOAD.eq(UPLOAD.ID))
@@ -91,25 +186,12 @@ class UploadRepository(
                 UploadWithFilename(
                     id = id,
                     originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),
-                    convertedFilename = records.first().get(UPLOAD.CONVERTED_FILENAME),
                     errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },
-                    signedUrl = records.first().get(UPLOAD.SIGNED_URL),
+                    filId = records.first().get(UPLOAD.FIL_ID),
+                    mellomlagringRefId = records.first().get(UPLOAD.MELLOMLAGRING_REF_ID),
                     fileSize = records.first().get(UPLOAD.SIZE),
                 )
             }
-
-    fun updateConvertedFilename(
-        tx: Configuration,
-        name: String,
-        uploadId: UUID,
-    ) {
-        tx
-            .dsl()
-            .update(UPLOAD)
-            .set(UPLOAD.CONVERTED_FILENAME, name)
-            .where(UPLOAD.ID.eq(uploadId))
-            .execute()
-    }
 
     fun deleteUpload(
         tx: Configuration,
@@ -141,18 +223,5 @@ class UploadRepository(
                     .set(ERROR.ID, UUID.randomUUID())
                     .execute()
             }.also { notifyChange(tx, uploadId) }
-    }
-
-    fun setSignedUrl(
-        tx: Configuration,
-        url: String,
-        id: UUID,
-    ) {
-        tx
-            .dsl()
-            .update(UPLOAD)
-            .set(UPLOAD.SIGNED_URL, url)
-            .where(UPLOAD.ID.eq(id))
-            .execute()
     }
 }

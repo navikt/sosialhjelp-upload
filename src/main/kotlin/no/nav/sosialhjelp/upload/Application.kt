@@ -7,19 +7,17 @@ import io.ktor.server.plugins.di.*
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
-import no.nav.sosialhjelp.upload.fs.FileSystemStorage
-import no.nav.sosialhjelp.upload.fs.GcpBucketStorage
-import no.nav.sosialhjelp.upload.fs.Storage
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.DocumentStatusService
 import no.nav.sosialhjelp.upload.texas.TexasClient
-import no.nav.sosialhjelp.upload.tusd.TusService
+import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
 import org.flywaydb.core.Flyway
@@ -62,27 +60,15 @@ fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource)
     val runtimeEnv = this@module.property<String>("runtimeEnv")
-    val isLocal = runtimeEnv == "local"
     val isMock = runtimeEnv == "mock"
     dependencies {
-        provide<DataSource> {
-            dataSource
-        }
-        provide<DSLContext> {
-            DSL.using(dataSource, SQLDialect.POSTGRES)
-        }
+        provide<DataSource> { dataSource }
+        provide<DSLContext> { DSL.using(dataSource, SQLDialect.POSTGRES) }
         provide<EncryptionService> {
-            if (isMock || isLocal) {
+            if (isMock) {
                 create(EncryptionServiceMock::class)
             } else {
                 create(EncryptionServiceImpl::class)
-            }
-        }
-        provide<Storage> {
-            if (isLocal) {
-                create(FileSystemStorage::class)
-            } else {
-                create(GcpBucketStorage::class)
             }
         }
         provide(TexasClient::class)
@@ -90,7 +76,8 @@ fun Application.module() {
         provide(VirusScanner::class)
         provide(UploadValidator::class)
         provide(FiksClient::class)
-        provide(TusService::class)
+        provide(MellomlagringClient::class)
+        provide(TusUploadService::class)
         provide(UploadRepository::class)
         provide(DocumentRepository::class)
         provide(DocumentStatusService::class)
