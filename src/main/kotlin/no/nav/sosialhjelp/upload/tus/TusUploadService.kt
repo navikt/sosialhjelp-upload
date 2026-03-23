@@ -4,6 +4,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.defaultForFileExtension
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.FinishedUpload
@@ -65,11 +67,13 @@ class TusUploadService(
         userToken: String,
     ): Long {
         val (totalSize, newOffset) =
-            dsl.transactionResult { tx ->
-                check(uploadRepository.isOwnedByUser(tx, uploadId, personident)) {
-                    "Upload $uploadId not owned by $personident"
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    check(uploadRepository.isOwnedByUser(tx, uploadId, personident)) {
+                        "Upload $uploadId not owned by $personident"
+                    }
+                    uploadRepository.appendChunk(tx, uploadId, expectedOffset, data)
                 }
-                uploadRepository.appendChunk(tx, uploadId, expectedOffset, data)
             }
 
         if (newOffset == totalSize) {
@@ -85,16 +89,20 @@ class TusUploadService(
         userToken: String,
     ) {
         val upload =
-            dsl.transactionResult { tx ->
-                uploadRepository.getUploadForProcessing(tx, uploadId)
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    uploadRepository.getUploadForProcessing(tx, uploadId)
+                }
             }
 
         val errors = validator.validate(upload.filename, upload.chunkData, upload.chunkData.size.toLong())
         if (errors.isNotEmpty()) {
             logger.info("Upload $uploadId failed validation: ${errors.map { it.code }}")
-            dsl.transaction { tx ->
-                uploadRepository.addErrors(tx, uploadId, errors)
-                uploadRepository.clearChunkData(tx, uploadId)
+            withContext(Dispatchers.IO) {
+                dsl.transaction { tx ->
+                    uploadRepository.addErrors(tx, uploadId, errors)
+                    uploadRepository.clearChunkData(tx, uploadId)
+                }
             }
             return
         }
@@ -118,10 +126,12 @@ class TusUploadService(
             )
         logger.info("Upload $uploadId stored in mellomlagring as $filId")
 
-        dsl.transaction { tx ->
-            uploadRepository.setFilId(tx, uploadId, filId, upload.externalId)
-            uploadRepository.clearChunkData(tx, uploadId)
-            uploadRepository.notifyChange(tx, uploadId)
+        withContext(Dispatchers.IO) {
+            dsl.transaction { tx ->
+                uploadRepository.setFilId(tx, uploadId, filId, upload.externalId)
+                uploadRepository.clearChunkData(tx, uploadId)
+                uploadRepository.notifyChange(tx, uploadId)
+            }
         }
     }
 

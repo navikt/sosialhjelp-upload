@@ -1,6 +1,8 @@
 package no.nav.sosialhjelp.upload.action
 
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -44,8 +46,10 @@ class DownstreamUploadService(
         documentId: UUID,
     ): Boolean {
         val uploads =
-            dsl.transactionResult { tx ->
-                uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
+                }
             }
 
         val validUploads = uploads.filter { it.errors.isEmpty() && it.filId != null }
@@ -75,8 +79,10 @@ class DownstreamUploadService(
             )
 
         if (response.status.isSuccess()) {
-            dsl.transactionResult { tx ->
-                documentRepository.cleanup(tx, documentId)
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    documentRepository.cleanup(tx, documentId)
+                }
             }
             notificationService.notifyUpdate(documentId)
             return true
