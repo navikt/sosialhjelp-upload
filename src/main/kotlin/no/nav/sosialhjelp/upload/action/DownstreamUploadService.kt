@@ -61,7 +61,7 @@ class DownstreamUploadService(
         val filReferanser =
             validUploads.map { upload ->
                 FilReferanse(
-                    filnavn = upload.originalFilename!!,
+                    filnavn = upload.mellomlagringFilnavn ?: upload.originalFilename!!,
                     filId = upload.filId!!,
                     mellomlagringRefId = upload.mellomlagringRefId!!,
                     storrelse = upload.fileSize ?: 0L,

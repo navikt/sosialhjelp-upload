@@ -20,8 +20,11 @@ private const val TUS_VERSION = "1.0.0"
 private const val TUS_EXTENSION = "creation,termination"
 private const val MAX_CHUNK_SIZE = 10 * 1024 * 1024 + 1024 // 10MB + some headroom
 
+private const val ProxyPath = "/sosialhjelp/innsyn/api/upload-api"
+
 fun Route.configureTusRoutes(basePath: String) {
     val tusUploadService: TusUploadService by application.dependencies
+
 
     options {
         call.response.header("Tus-Resumable", TUS_RESUMABLE)
@@ -56,7 +59,7 @@ fun Route.configureTusRoutes(basePath: String) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }
 
-        call.response.header("Location", "$basePath/$uploadId")
+        call.response.header("Location", "$ProxyPath$basePath/$uploadId")
         call.response.header("Tus-Resumable", TUS_RESUMABLE)
         call.respond(HttpStatusCode.Created)
     }

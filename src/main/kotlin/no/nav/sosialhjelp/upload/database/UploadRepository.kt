@@ -8,6 +8,8 @@ import no.nav.sosialhjelp.upload.validation.Validation
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.Configuration
 import java.util.*
+import kotlin.collections.component1
+import kotlin.collections.component2
 
 data class UploadWithFilename(
     val id: UUID?,
@@ -15,6 +17,7 @@ data class UploadWithFilename(
     val errors: List<ValidationCode>,
     val filId: UUID?,
     val mellomlagringRefId: String?,
+    val mellomlagringFilnavn: String?,
     val fileSize: Long?,
 )
 
@@ -147,12 +150,16 @@ class UploadRepository(
         uploadId: UUID,
         filId: UUID,
         mellomlagringRefId: String,
+        mellomlagringFilnavn: String,
+        mellomlagringStorrelse: Long,
     ) {
         tx
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.FIL_ID, filId)
             .set(UPLOAD.MELLOMLAGRING_REF_ID, mellomlagringRefId)
+            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)
+            .set(UPLOAD.SIZE, mellomlagringStorrelse)
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
     }
@@ -169,13 +176,34 @@ class UploadRepository(
             .execute()
     }
 
+    fun getUpload(
+        tx: Configuration,
+        uploadId: UUID,
+    ) = tx
+        .dsl()
+        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, UPLOAD.MELLOMLAGRING_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE)
+        .from(UPLOAD)
+        .where(UPLOAD.ID.eq(uploadId))
+        .fetchSingle()
+        .let {
+            UploadWithFilename(
+                id = it.get(UPLOAD.ID),
+                originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),
+                errors = emptyList(),
+                filId = it.get(UPLOAD.FIL_ID),
+                mellomlagringRefId = it.get(UPLOAD.MELLOMLAGRING_REF_ID),
+                mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),
+                fileSize = it.get(UPLOAD.SIZE),
+            )
+        }
+
     fun getUploadsWithFilenames(
         tx: Configuration,
         documentId: UUID,
     ): List<UploadWithFilename> =
         tx
             .dsl()
-            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, UPLOAD.MELLOMLAGRING_REF_ID, UPLOAD.SIZE)
+            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, UPLOAD.MELLOMLAGRING_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE)
             .from(UPLOAD)
             .leftJoin(ERROR)
             .on(ERROR.UPLOAD.eq(UPLOAD.ID))
@@ -189,6 +217,7 @@ class UploadRepository(
                     errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },
                     filId = records.first().get(UPLOAD.FIL_ID),
                     mellomlagringRefId = records.first().get(UPLOAD.MELLOMLAGRING_REF_ID),
+                    mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),
                     fileSize = records.first().get(UPLOAD.SIZE),
                 )
             }

@@ -13,4 +13,6 @@ data class UploadSuccessState(
     val validations: List<ValidationCode> = emptyList(),
     @property:Serializable(with = UUIDSerializer::class)
     val filId: UUID?,
+    val url: String?,
+    val finalFilename: String?,
 )

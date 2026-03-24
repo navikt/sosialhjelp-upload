@@ -1,7 +1,7 @@
 package no.nav.sosialhjelp.upload.tus
 
 import io.ktor.http.ContentType
-import io.ktor.http.defaultForFileExtension
+import io.ktor.http.defaultForFile
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +112,7 @@ class TusUploadService(
 
         val contentType =
             ContentType
-                .defaultForFileExtension(File(finalFilename).extension)
+                .defaultForFile(File(finalFilename))
                 .toString()
 
         logger.info("Uploading $finalFilename (${encrypted.size} bytes) to mellomlagring for ${upload.externalId}")
@@ -128,7 +128,7 @@ class TusUploadService(
 
         withContext(Dispatchers.IO) {
             dsl.transaction { tx ->
-                uploadRepository.setFilId(tx, uploadId, filId, upload.externalId)
+                uploadRepository.setFilId(tx, uploadId, filId, upload.externalId, finalFilename, encrypted.size.toLong())
                 uploadRepository.clearChunkData(tx, uploadId)
                 uploadRepository.notifyChange(tx, uploadId)
             }

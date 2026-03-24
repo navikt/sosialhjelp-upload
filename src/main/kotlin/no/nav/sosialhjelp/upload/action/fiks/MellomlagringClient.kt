@@ -7,13 +7,18 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.forms.ChannelProvider
+import io.ktor.client.request.forms.FormPart
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
+import io.ktor.client.request.get
 import io.ktor.client.request.headers
+import io.ktor.client.statement.bodyAsBytes
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
@@ -42,6 +47,20 @@ class MellomlagringClient(
     private fun mellomlagringUrl(navEksternRefId: String) =
         "$fiksBaseUrl/digisos/api/v1/mellomlagring/$navEksternRefId"
 
+    suspend fun getFile(navEksternRefId: String, id: UUID, token: String): ByteArray {
+        val response = client.get(mellomlagringUrl(navEksternRefId) + "/$id") {
+            headers {
+                headers {
+                    integrasjonsid?.let { append("IntegrasjonId", it) }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+                }
+                bearerAuth(token)
+            }
+        }
+        check(response.status.isSuccess()) { "Fikk feil fra Fiks på GET /mellomlagring/$navEksternRefId/$id: ${response.bodyAsText()}" }
+        return response.bodyAsBytes()
+    }
+
     suspend fun uploadFile(
         navEksternRefId: String,
         filename: String,
@@ -50,16 +69,23 @@ class MellomlagringClient(
         token: String,
     ): UUID =
         withContext(Dispatchers.IO) {
+            val metadataPart = FormPart(
+                key = "metadata",
+                value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
+                headers = Headers.build { append(HttpHeaders.ContentType, ContentType.Application.Json.toString()) },
+            )
+            val filePart = FormPart(
+                key = "files",
+                value = ChannelProvider { ByteReadChannel(data) },
+                headers = Headers.build {
+                    append(HttpHeaders.ContentType, contentType)
+                    append(HttpHeaders.ContentDisposition, """filename="$filename"""")
+                },
+            )
             val formData =
                 formData {
-                    append(
-                        filename,
-                        ChannelProvider(data.size.toLong()) { ByteReadChannel(data) },
-                        Headers.build {
-                            append(HttpHeaders.ContentType, contentType)
-                            append(HttpHeaders.ContentDisposition, """filename="$filename"""")
-                        },
-                    )
+                    append(metadataPart)
+                    append(filePart)
                 }
             val response =
                 client.submitFormWithBinaryData(mellomlagringUrl(navEksternRefId), formData) {
@@ -67,11 +93,12 @@ class MellomlagringClient(
                         integrasjonsid?.let { append("IntegrasjonId", it) }
                         integrasjonspassord?.let { append("IntegrasjonPassord", it) }
                     }
+                    contentType(ContentType.MultiPart.FormData)
                     bearerAuth(token)
                 }
 
             check(response.status.isSuccess()) {
-                "Mellomlagring upload failed: ${response.status}"
+                "Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}"
             }
 
             val mellomlagring = response.body<MellomlagringResponse>()
@@ -104,15 +131,22 @@ class MellomlagringClient(
 }
 
 @Serializable
+private data class MellomlagringMetadata(
+    val filnavn: String,
+    val storrelse: Long,
+    val mimetype: String,
+)
+
+@Serializable
 private data class MellomlagringResponse(
     val navEksternRefId: String,
     val mellomlagringMetadataList: List<MellomlagringFilInfo> = emptyList(),
 )
 
 @Serializable
-private data class MellomlagringFilInfo(
-    val filnavn: String? = null,
-    val filId: String? = null,
-    val storrelse: Long? = null,
-    val mimetype: String? = null,
+data class MellomlagringFilInfo(
+    val filnavn: String,
+    val filId: String,
+    val storrelse: Long,
+    val mimetype: String,
 )

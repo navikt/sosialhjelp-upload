@@ -22,6 +22,8 @@ class DocumentStatusService(
                                 upload.originalFilename ?: "Ukjent fil",
                                 upload.errors,
                                 upload.filId,
+                                url = upload.filId?.let { "/document/${upload.id}" },
+                                finalFilename = upload.mellomlagringFilnavn
                             )
                         }
                 }

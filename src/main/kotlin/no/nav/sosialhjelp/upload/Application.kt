@@ -60,7 +60,7 @@ fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource)
     val runtimeEnv = this@module.property<String>("runtimeEnv")
-    val isMock = runtimeEnv == "mock"
+    val isMock = runtimeEnv == "mock" || runtimeEnv == "local"
     dependencies {
         provide<DataSource> { dataSource }
         provide<DSLContext> { DSL.using(dataSource, SQLDialect.POSTGRES) }

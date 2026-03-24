@@ -49,10 +49,14 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(7, value)
         get(): String? = get(7) as String?
 
+    open var mellomlagringFilnavn: String?
+        set(value): Unit = set(8, value)
+        get(): String? = get(8) as String?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringRefId: String? = null): this() {
+    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringRefId: String? = null, mellomlagringFilnavn: String? = null): this() {
         this.id = id
         this.documentId = documentId
         this.originalFilename = originalFilename
@@ -61,6 +65,7 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         this.chunkData = chunkData
         this.filId = filId
         this.mellomlagringRefId = mellomlagringRefId
+        this.mellomlagringFilnavn = mellomlagringFilnavn
         resetChangedOnNotNull()
     }
 }

@@ -49,33 +49,21 @@ class UploadValidator(
         data: ByteArray,
         fileSize: Long,
     ): List<Validation> {
-        val tempFile =
-            withContext(Dispatchers.IO) {
-                createTempFile(prefix = "upload-validate", suffix = ".tmp").toFile().also { f ->
-                    f.writeChannel().use {
-                        ByteReadChannel(data).copyTo(this)
-                        flush()
-                    }
+        return coroutineScope {
+            val virusScanValidation =
+                async(Dispatchers.IO) {
+                    runVirusScan(ByteReadChannel(data))
                 }
-            }
-        try {
-            return coroutineScope {
-                val virusScanValidation =
-                    async(Dispatchers.IO) {
-                        runVirusScan(ByteReadChannel(data))
-                    }
-                val (mimeType, fileTypeValidation) = validateFileType(ByteReadChannel(data))
-                listOfNotNull(
-                    validateFileSize(fileSize),
-                    validateFilename(Filename(filename)),
-                    fileTypeValidation,
-                    if (mimeType == "application/pdf") validatePdf(ByteReadChannel(data)) else null,
-                    virusScanValidation.await(),
-                )
-            }
-        } finally {
-            tempFile.delete()
+            val (mimeType, fileTypeValidation) = validateFileType(ByteReadChannel(data))
+            listOfNotNull(
+                validateFileSize(fileSize),
+                validateFilename(Filename(filename)),
+                fileTypeValidation,
+                if (mimeType == "application/pdf") validatePdf(ByteReadChannel(data)) else null,
+                virusScanValidation.await(),
+            )
         }
+
     }
 
     private suspend fun validatePdf(file: ByteReadChannel): Validation? =
@@ -109,7 +97,7 @@ class UploadValidator(
         withContext(Dispatchers.IO) {
             val mimeType = file.toInputStream().use { Tika().detect(it) }
             if (mimeType !in SUPPORTED_MIME_TYPES) {
-                return@withContext mimeType to FileTypeValidation()
+                return@withContext mimeType to FileTypeValidation(actual = mimeType)
             }
             return@withContext mimeType to null
         }
