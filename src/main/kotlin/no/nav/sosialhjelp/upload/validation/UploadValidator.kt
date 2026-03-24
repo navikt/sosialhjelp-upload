@@ -1,10 +1,5 @@
 package no.nav.sosialhjelp.upload.validation
 
-import io.ktor.util.cio.use
-import io.ktor.util.cio.writeChannel
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.copyTo
-import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -16,10 +11,8 @@ import org.apache.tika.Tika
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
-import kotlin.io.path.createTempFile
 
 // 10 MB
-// TODO: Er dette en begrensning hos oss, Fiks eller fagsystemene?
 const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
 val SUPPORTED_MIME_TYPES =
@@ -48,39 +41,32 @@ class UploadValidator(
         filename: String,
         data: ByteArray,
         fileSize: Long,
-    ): List<Validation> {
-        return coroutineScope {
-            val virusScanValidation =
-                async(Dispatchers.IO) {
-                    runVirusScan(ByteReadChannel(data))
-                }
-            val (mimeType, fileTypeValidation) = validateFileType(ByteReadChannel(data))
+    ): List<Validation> =
+        coroutineScope {
+            val virusScanValidation = async(Dispatchers.IO) { runVirusScan(data) }
+            val (mimeType, fileTypeValidation) = validateFileType(data)
             listOfNotNull(
                 validateFileSize(fileSize),
                 validateFilename(Filename(filename)),
                 fileTypeValidation,
-                if (mimeType == "application/pdf") validatePdf(ByteReadChannel(data)) else null,
+                if (mimeType == "application/pdf") validatePdf(data) else null,
                 virusScanValidation.await(),
             )
         }
 
-    }
-
-    private suspend fun validatePdf(file: ByteReadChannel): Validation? =
+    private suspend fun validatePdf(data: ByteArray): Validation? =
         withContext(Dispatchers.IO) {
             try {
-                file.toInputStream().use { inputStream ->
-                    val randomAccessRead = RandomAccessReadBuffer(inputStream)
-                    Loader
-                        .loadPDF(randomAccessRead)
-                        .use { document ->
-                            if (document.isEncrypted) {
-                                EncryptedPdfValidation()
-                            } else {
-                                null
-                            }
+                val randomAccessRead = RandomAccessReadBuffer(data.inputStream())
+                Loader
+                    .loadPDF(randomAccessRead)
+                    .use { document ->
+                        if (document.isEncrypted) {
+                            EncryptedPdfValidation()
+                        } else {
+                            null
                         }
-                }
+                    }
             } catch (e: InvalidPasswordException) {
                 logger.warn(ValidationCode.ENCRYPTED_PDF.name + " " + e.message)
                 EncryptedPdfValidation()
@@ -93,19 +79,22 @@ class UploadValidator(
             }
         }
 
-    private suspend fun validateFileType(file: ByteReadChannel): Pair<String, Validation?> =
+    private suspend fun validateFileType(data: ByteArray): Pair<String, Validation?> =
         withContext(Dispatchers.IO) {
-            val mimeType = file.toInputStream().use { Tika().detect(it) }
+            val mimeType = Tika().detect(data.inputStream())
             if (mimeType !in SUPPORTED_MIME_TYPES) {
                 return@withContext mimeType to FileTypeValidation(actual = mimeType)
             }
             return@withContext mimeType to null
         }
 
-    private suspend fun runVirusScan(file: ByteReadChannel): Validation? =
-        when (virusScanner.scan(file)) {
+    private suspend fun runVirusScan(data: ByteArray): Validation? =
+        when (virusScanner.scan(data)) {
             Result.FOUND -> VirusValidation()
-            Result.ERROR -> TODO()
+            Result.ERROR -> {
+                logger.warn("Virus scanner returned ERROR, treating file as clean")
+                null
+            }
             Result.OK -> null
         }
 

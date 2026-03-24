@@ -7,13 +7,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.Property
-import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.toList
-import no.nav.sosialhjelp.upload.common.FinishedUpload
 import org.slf4j.LoggerFactory
-import java.io.File
 
 class GotenbergService(
     @Property("gotenberg.url") gotenbergUrl: String,
@@ -26,34 +20,17 @@ class GotenbergService(
             defaultRequest { url(gotenbergUrl) }
         }
 
-    private fun buildHeaders(originalFiletype: String): Headers =
-        Headers.build { append(HttpHeaders.ContentDisposition, """filename="file.$originalFiletype"""") }
+    private fun buildHeaders(filetype: String): Headers =
+        Headers.build { append(HttpHeaders.ContentDisposition, """filename="file.$filetype"""") }
 
-    suspend fun convertToPdf(upload: FinishedUpload): ByteReadChannel {
+    suspend fun convertToPdf(data: ByteArray, extension: String): ByteArray {
         val res =
             gotenbergClient
                 .submitFormWithBinaryData(
-                    formData { append("file", ChannelProvider { upload.file }, buildHeaders(upload.originalFileExtension)) },
+                    formData { append("file", data, buildHeaders(extension)) },
                 )
 
-        check(res.status.isSuccess()) { "Failed to convert file type ${upload.originalFileExtension} to PDF: ${res.status}" }
-
-        return res.bodyAsChannel()
-    }
-
-    suspend fun merge(pdfs: Flow<File>): ByteArray {
-        val byteReadChannels = pdfs.map { it.readBytes() }.toList()
-        val res =
-            gotenbergClient.submitFormWithBinaryData(
-                formData {
-                    byteReadChannels.forEachIndexed { index, pdf -> append("file", pdf, headers = buildHeaders("$index.pdf")) }
-                    append("merge", "true")
-                    append("pdfa", "PDF/A-3b")
-                    append("pdfua", "true")
-                },
-            )
-
-        check(res.status.isSuccess()) { "Failed to merge ${res.status}" }
+        check(res.status.isSuccess()) { "Failed to convert file type $extension to PDF: ${res.status}" }
 
         return res.readRawBytes()
     }

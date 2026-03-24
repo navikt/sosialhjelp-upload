@@ -36,13 +36,9 @@ repositories {
 
 dependencies {
     implementation(libs.fiks.kryptering)
-    implementation(platform(libs.google.cloud.bom))
-    implementation(libs.google.cloud.storage)
-    implementation("com.google.cloud:google-cloud-storage")
 
     // Common utilities
     implementation(libs.bouncycastle)
-    implementation(libs.checker)
     implementation(libs.apache.tika)
 
     implementation(libs.sosialhjelp.common.api)

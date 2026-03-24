@@ -2,13 +2,10 @@ package no.nav.sosialhjelp.upload.tus
 
 import io.ktor.http.ContentType
 import io.ktor.http.defaultForFile
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
-import no.nav.sosialhjelp.upload.common.FinishedUpload
 import no.nav.sosialhjelp.upload.database.DocumentRepository
 import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
@@ -16,7 +13,6 @@ import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 
@@ -144,21 +140,8 @@ class TusUploadService(
             return filename to data
         }
         val pdfName = File(filename).nameWithoutExtension + ".pdf"
-        val converted =
-            gotenbergService.convertToPdf(
-                FinishedUpload(
-                    file = ByteReadChannel(data),
-                    originalFileExtension = extension,
-                ),
-            )
-        val buffer = ByteArrayOutputStream()
-        val buf = ByteArray(8192)
-        while (true) {
-            val read = converted.readAvailable(buf)
-            if (read == -1) break
-            buffer.write(buf, 0, read)
-        }
-        return pdfName to buffer.toByteArray()
+        val converted = gotenbergService.convertToPdf(data, extension)
+        return pdfName to converted
     }
 
     fun delete(
