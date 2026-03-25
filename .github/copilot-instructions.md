@@ -2,7 +2,11 @@
 
 ## Overview
 
-`sosialhjelp-upload` is a Kotlin/Ktor file upload coordination service for NAV's social assistance apps (sosialhjelp-innsyn and sosialhjelp-soknad). It receives resumable uploads via the TUS protocol, validates and converts files to PDF via Gotenberg, stores them in Google Cloud Storage, and submits them to KS Fiks/mellomlagring. Real-time status is streamed to clients via SSE.
+`sosialhjelp-upload` is a Kotlin/Ktor file upload coordination service for NAV's social assistance apps (sosialhjelp-innsyn and sosialhjelp-soknad). It receives resumable uploads via the TUS protocol, validates and converts files to PDF via Gotenberg, stores them in KS Fiks mellomlagring, and submits them to the Fiks API. Real-time status is streamed to clients via SSE.
+
+**Core concepts:**
+- **Submission** — a group of uploads sent together (maps to the `submission` DB table; `externalId` ties it to a case in the frontend)
+- **Upload** — an individual file within a submission (TUS upload, maps to the `upload` DB table)
 
 ## Build, Test, and Run
 
@@ -50,16 +54,16 @@ All routes are under `/sosialhjelp/upload/` and protected by JWT (via Wonderwall
    - Converts non-PDF/image formats to PDF via `GotenbergService`
    - Encrypts with `EncryptionService` (real CMS encryption in prod, no-op mock locally)
    - Uploads encrypted file to KS Fiks mellomlagring via `MellomlagringClient`
-4. Frontend receives status updates via SSE at `/status/{documentId}` (uses `DocumentNotificationService`)
-5. User submits via POST `/document/{documentId}/submit` → `DownstreamUploadService` → Fiks API
+4. Frontend receives status updates via SSE at `/status/{submissionExternalId}` (uses `SubmissionNotificationService`)
+5. User submits via POST `/submission/{submissionId}/submit` → `DownstreamUploadService` → Fiks API
 
 ### Key packages
 
 | Package | Responsibility |
 |---------|---------------|
 | `tus/` | TUS protocol (create/append/delete) and upload orchestration |
-| `status/` | SSE streaming of document status |
-| `documents/` | Document retrieval routes |
+| `status/` | SSE streaming of submission status |
+| `documents/` | Upload file retrieval (`GET /upload/{uploadId}`) |
 | `action/` | Downstream submission to Fiks; encryption service |
 | `database/` | JOOQ repositories, Flyway migrations, change notifications |
 | `pdf/` | Gotenberg integration for PDF conversion |
@@ -74,7 +78,7 @@ Uses Ktor's built-in DI plugin (`ktor-server-di`). All dependencies are register
 val myService: MyService by application.dependencies
 ```
 
-When `runtimeEnv` is `local` or `mock`, `EncryptionServiceMock` is used instead of the real CMS implementation. Local runs also use the filesystem instead of GCS.
+When `runtimeEnv` is `local` or `mock`, `EncryptionServiceMock` is used instead of the real CMS implementation.
 
 ## Database
 
@@ -85,7 +89,7 @@ When `runtimeEnv` is `local` or `mock`, `EncryptionServiceMock` is used instead 
   ```kotlin
   dsl.transactionResult { tx -> repository.someQuery(tx) }
   ```
-- `DocumentNotificationService` uses a Kotlin `SharedFlow` to fan out DB-level change events to SSE subscribers
+- `SubmissionNotificationService` uses a Kotlin `SharedFlow` to fan out DB-level change events to SSE subscribers
 
 ## Testing conventions
 
@@ -104,7 +108,6 @@ When `runtimeEnv` is `local` or `mock`, `EncryptionServiceMock` is used instead 
 | `POSTGRES_JDBC_URL`, `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database |
 | `IDPORTEN_CLIENT_ID`, `IDPORTEN_ISSUER`, `IDPORTEN_JWKS_URI` | JWT auth |
 | `GOTENBERG_URL` | PDF conversion service |
-| `BUCKET_NAME`, `GCS_CREDENTIALS` | Google Cloud Storage |
 | `FIKS_URL`, `INTEGRASJONSID_FIKS`, `INTEGRASJONPASSORD_FIKS` | KS Fiks integration |
 | `CLAMAV_URL` | Virus scanning |
 | `NAIS_TOKEN_ENDPOINT` | Texas Maskinporten token endpoint |
@@ -115,3 +118,25 @@ JWT validation in `Security.kt` enforces:
 - `client_id` claim must match the configured audience
 - `acr` claim must be `idporten-loa-high` (high security level)
 - Token subject (`sub`) is used as `personident` throughout for ownership checks
+
+## Ownership enforcement
+
+Route-scoped ownership is enforced via Ktor plugins in `OwnershipInterceptors.kt`, using `createRouteScopedPlugin` + `on(AuthenticationChecked)`. Two plugins exist:
+
+- **`verifyUploadOwnership()`** — installs on routes with `{id}` (TUS upload routes). Reads `upload.submission_id` → verifies `submission.owner_ident` matches the JWT subject.
+- **`verifySubmissionOwnership()`** — installs on routes with `{submissionId}`. Verifies `submission.owner_ident` matches the JWT subject.
+
+On success, verified IDs are stored in `call.attributes` and route handlers read from there:
+```kotlin
+route("/{id}") {
+    verifyUploadOwnership()
+    patch { val uploadId = call.attributes[VerifiedUploadId] }
+}
+
+route("/submission/{submissionId}") {
+    verifySubmissionOwnership()
+    post("submit") { val submissionId = call.attributes[VerifiedSubmissionId] }
+}
+```
+
+On failure the pipeline short-circuits via `call.respond(HttpStatusCode.NotFound)` — the route handler never runs. **Do not perform manual ownership checks in service methods** — rely on the interceptors instead.

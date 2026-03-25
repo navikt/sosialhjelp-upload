@@ -6,9 +6,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
-import no.nav.sosialhjelp.upload.database.DocumentRepository
-import no.nav.sosialhjelp.upload.database.DocumentRepository.DocumentOwnedByAnotherUserException
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.SubmissionRepository.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.database.UploadRepository.OffsetMismatchException
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
@@ -18,7 +19,7 @@ import java.util.UUID
 
 class TusUploadService(
     private val uploadRepository: UploadRepository,
-    private val documentRepository: DocumentRepository,
+    private val submissionRepository: SubmissionRepository,
     private val dsl: DSLContext,
     private val validator: UploadValidator,
     private val gotenbergService: GotenbergService,
@@ -28,30 +29,24 @@ class TusUploadService(
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     fun create(
-        externalId: String,
+        contextId: String,
         filename: String,
         size: Long,
         personident: String,
+        navEksternRefId: String? = null,
     ): UUID =
         try {
             dsl.transactionResult { tx ->
-                val documentId = documentRepository.getOrCreateDocument(tx, externalId, personident)
-                uploadRepository.create(tx, documentId, filename, size)
+                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, navEksternRefId)
+                uploadRepository.create(tx, submissionId, filename, size)
                     ?: error("Failed to create upload record")
             }
-        } catch (_: DocumentOwnedByAnotherUserException) {
+        } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")
         }
 
-    fun getUploadInfo(
-        uploadId: UUID,
-        personident: String,
-    ): Pair<Long, Long> =
+    fun getUploadInfo(uploadId: UUID): Pair<Long, Long> =
         dsl.transactionResult { tx ->
-            check(uploadRepository.isOwnedByUser(tx, uploadId, personident)) {
-                "Upload $uploadId not found or not owned by $personident"
-            }
-            // returns offset to totalSize
             uploadRepository.getUploadInfo(tx, uploadId)
         }
 
@@ -59,22 +54,28 @@ class TusUploadService(
         uploadId: UUID,
         expectedOffset: Long,
         data: ByteArray,
-        personident: String,
         userToken: String,
     ): Long {
         val (totalSize, newOffset) =
             withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
-                    check(uploadRepository.isOwnedByUser(tx, uploadId, personident)) {
-                        "Upload $uploadId not owned by $personident"
-                    }
+                    // Throws OffsetMismatchException if offset doesn't match (→ 409 in route)
                     uploadRepository.appendChunk(tx, uploadId, expectedOffset, data)
                 }
             }
 
         if (newOffset == totalSize) {
-            logger.info("Upload $uploadId complete, starting post-processing")
-            processCompletedUpload(uploadId, userToken)
+            // Atomically claim the upload for processing to prevent double-processing
+            // on concurrent final-chunk delivery or client retries
+            val claimed = withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx -> uploadRepository.claimForProcessing(tx, uploadId) }
+            }
+            if (claimed) {
+                logger.info("Upload $uploadId complete, starting post-processing")
+                processCompletedUpload(uploadId, userToken)
+            } else {
+                logger.info("Upload $uploadId already claimed for processing, skipping")
+            }
         }
 
         return newOffset
@@ -111,20 +112,32 @@ class TusUploadService(
                 .defaultForFile(File(finalFilename))
                 .toString()
 
-        logger.info("Uploading $finalFilename (${encrypted.size} bytes) to mellomlagring for ${upload.externalId}")
+        logger.info("Uploading $finalFilename (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}")
         val filId =
-            mellomlagringClient.uploadFile(
-                navEksternRefId = upload.externalId,
-                filename = finalFilename,
-                contentType = contentType,
-                data = encrypted,
-                token = userToken,
-            )
+            try {
+                mellomlagringClient.uploadFile(
+                    navEksternRefId = upload.navEksternRefId,
+                    filename = finalFilename,
+                    contentType = contentType,
+                    data = encrypted,
+                    token = userToken,
+                )
+            } catch (e: Exception) {
+                logger.error("Upload $uploadId failed during mellomlagring upload", e)
+                withContext(Dispatchers.IO) {
+                    dsl.transaction { tx ->
+                        uploadRepository.markFailed(tx, uploadId)
+                        uploadRepository.clearChunkData(tx, uploadId)
+                        uploadRepository.notifyChange(tx, uploadId)
+                    }
+                }
+                return
+            }
         logger.info("Upload $uploadId stored in mellomlagring as $filId")
 
         withContext(Dispatchers.IO) {
             dsl.transaction { tx ->
-                uploadRepository.setFilId(tx, uploadId, filId, upload.externalId, finalFilename, encrypted.size.toLong())
+                uploadRepository.setFilId(tx, uploadId, filId, finalFilename, encrypted.size.toLong())
                 uploadRepository.clearChunkData(tx, uploadId)
                 uploadRepository.notifyChange(tx, uploadId)
             }
@@ -144,15 +157,24 @@ class TusUploadService(
         return pdfName to converted
     }
 
-    fun delete(
+    suspend fun delete(
         uploadId: UUID,
-        personident: String,
+        userToken: String,
     ) {
-        dsl.transaction { tx ->
-            check(uploadRepository.isOwnedByUser(tx, uploadId, personident)) {
-                "Upload $uploadId not owned by $personident"
+        val (filId, navEksternRefId) = withContext(Dispatchers.IO) {
+            dsl.transactionResult { tx ->
+                val upload = uploadRepository.getUpload(tx, uploadId)
+                uploadRepository.deleteUpload(tx, uploadId)
+                upload.filId to upload.navEksternRefId
             }
-            uploadRepository.deleteUpload(tx, uploadId)
+        }
+
+        if (filId != null && navEksternRefId != null) {
+            runCatching {
+                mellomlagringClient.deleteFile(navEksternRefId, filId, userToken)
+            }.onFailure {
+                logger.warn("Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned", it)
+            }
         }
     }
 
@@ -160,3 +182,5 @@ class TusUploadService(
         message: String,
     ) : RuntimeException(message)
 }
+
+

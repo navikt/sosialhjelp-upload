@@ -21,7 +21,7 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(0, value)
         get(): UUID? = get(0) as UUID?
 
-    open var documentId: UUID?
+    open var submissionId: UUID?
         set(value): Unit = set(1, value)
         get(): UUID? = get(1) as UUID?
 
@@ -45,27 +45,32 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(6, value)
         get(): UUID? = get(6) as UUID?
 
-    open var mellomlagringRefId: String?
+    open var mellomlagringFilnavn: String?
         set(value): Unit = set(7, value)
         get(): String? = get(7) as String?
 
-    open var mellomlagringFilnavn: String?
+    open var processingStatus: String?
         set(value): Unit = set(8, value)
         get(): String? = get(8) as String?
+
+    open var mellomlagringStorrelse: Long?
+        set(value): Unit = set(9, value)
+        get(): Long? = get(9) as Long?
 
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringRefId: String? = null, mellomlagringFilnavn: String? = null): this() {
+    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null): this() {
         this.id = id
-        this.documentId = documentId
+        this.submissionId = submissionId
         this.originalFilename = originalFilename
         this.size = size
         this.uploadOffset = uploadOffset
         this.chunkData = chunkData
         this.filId = filId
-        this.mellomlagringRefId = mellomlagringRefId
         this.mellomlagringFilnavn = mellomlagringFilnavn
+        this.processingStatus = processingStatus
+        this.mellomlagringStorrelse = mellomlagringStorrelse
         resetChangedOnNotNull()
     }
 }

@@ -1,9 +1,9 @@
 package no.nav.sosialhjelp.upload.database
 
-import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
+import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.validation.Validation
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.Configuration
@@ -16,24 +16,27 @@ data class UploadWithFilename(
     val originalFilename: String?,
     val errors: List<ValidationCode>,
     val filId: UUID?,
-    val mellomlagringRefId: String?,
+    val navEksternRefId: String?,
     val mellomlagringFilnavn: String?,
     val fileSize: Long?,
+    val mellomlagringStorrelse: Long?,
 )
 
 data class UploadForProcessing(
     val filename: String,
     val chunkData: ByteArray,
-    val documentId: UUID,
-    val externalId: String,
+    val submissionId: UUID,
+    val navEksternRefId: String,
 )
 
 class UploadRepository(
-    val notificationService: DocumentNotificationService,
+    val notificationService: SubmissionNotificationService,
 ) {
+    class OffsetMismatchException(message: String) : RuntimeException(message)
+
     fun create(
         tx: Configuration,
-        documentId: UUID,
+        submissionId: UUID,
         filename: String,
         filesize: Long,
     ): UUID? =
@@ -41,7 +44,7 @@ class UploadRepository(
             .dsl()
             .insertInto(UPLOAD)
             .set(UPLOAD.ID, UUID.randomUUID())
-            .set(UPLOAD.DOCUMENT_ID, documentId)
+            .set(UPLOAD.SUBMISSION_ID, submissionId)
             .set(UPLOAD.ORIGINAL_FILENAME, filename)
             .set(UPLOAD.SIZE, filesize)
             .set(UPLOAD.UPLOAD_OFFSET, 0L)
@@ -53,7 +56,11 @@ class UploadRepository(
     fun notifyChange(
         tx: Configuration,
         uploadId: UUID,
-    ) = notificationService.notifyUpdate(getDocumentIdFromUploadId(tx, uploadId)!!)
+    ) {
+        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: return
+        // Send NOTIFY within the transaction so it fires atomically on commit
+        tx.dsl().execute("SELECT pg_notify('submission_update', ?)", submissionId.toString())
+    }
 
     fun isOwnedByUser(
         tx: Configuration,
@@ -64,24 +71,24 @@ class UploadRepository(
             .dsl()
             .selectCount()
             .from(UPLOAD)
-            .join(DOCUMENT)
-            .on(DOCUMENT.ID.eq(UPLOAD.DOCUMENT_ID))
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
             .where(UPLOAD.ID.eq(uploadId))
-            .and(DOCUMENT.OWNER_IDENT.eq(ownerIdent))
+            .and(SUBMISSION.OWNER_IDENT.eq(ownerIdent))
             .fetchSingle()
             .value1() > 0
 
-    fun getDocumentIdFromUploadId(
+    fun getSubmissionIdFromUploadId(
         tx: Configuration,
         uploadId: UUID,
     ): UUID? =
         tx
             .dsl()
-            .select(UPLOAD.DOCUMENT_ID)
+            .select(UPLOAD.SUBMISSION_ID)
             .from(UPLOAD)
             .where(UPLOAD.ID.eq(uploadId))
             .fetchOne()
-            ?.get(UPLOAD.DOCUMENT_ID)
+            ?.get(UPLOAD.SUBMISSION_ID)
 
     fun getUploadInfo(
         tx: Configuration,
@@ -95,6 +102,10 @@ class UploadRepository(
             .fetchSingle()
             .let { it.get(UPLOAD.UPLOAD_OFFSET)!! to it.get(UPLOAD.SIZE)!! }
 
+    /**
+     * Appends [data] to the upload only if the current offset matches [expectedOffset].
+     * Throws [OffsetMismatchException] if the offset doesn't match — callers must return 409 Conflict.
+     */
     fun appendChunk(
         tx: Configuration,
         uploadId: UUID,
@@ -102,10 +113,13 @@ class UploadRepository(
         data: ByteArray,
     ): Pair<Long, Long> {
         val newOffset = expectedOffset + data.size
-        tx.dsl().execute(
-            "UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ? WHERE id = ?",
-            data, newOffset, uploadId,
+        val affected = tx.dsl().execute(
+            "UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ? WHERE id = ? AND upload_offset = ?",
+            data, newOffset, uploadId, expectedOffset,
         )
+        if (affected == 0) {
+            throw OffsetMismatchException("Upload $uploadId offset mismatch: expected $expectedOffset")
+        }
         val totalSize =
             tx
                 .dsl()
@@ -117,6 +131,22 @@ class UploadRepository(
         return totalSize to newOffset
     }
 
+    /**
+     * Atomically claims an upload for processing by transitioning PENDING → PROCESSING.
+     * Returns true if this caller claimed it, false if already claimed or processed.
+     */
+    fun claimForProcessing(
+        tx: Configuration,
+        uploadId: UUID,
+    ): Boolean =
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.PROCESSING_STATUS, "PROCESSING")
+            .where(UPLOAD.ID.eq(uploadId))
+            .and(UPLOAD.PROCESSING_STATUS.eq("PENDING"))
+            .execute() > 0
+
     fun getUploadForProcessing(
         tx: Configuration,
         uploadId: UUID,
@@ -124,24 +154,24 @@ class UploadRepository(
         val record =
             tx
                 .dsl()
-                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CHUNK_DATA, UPLOAD.DOCUMENT_ID)
+                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CHUNK_DATA, UPLOAD.SUBMISSION_ID)
                 .from(UPLOAD)
                 .where(UPLOAD.ID.eq(uploadId))
                 .fetchSingle()
-        val documentId = record.get(UPLOAD.DOCUMENT_ID)!!
-        val externalId =
+        val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!
+        val navEksternRefId =
             tx
                 .dsl()
-                .select(DOCUMENT.EXTERNAL_ID)
-                .from(DOCUMENT)
-                .where(DOCUMENT.ID.eq(documentId))
+                .select(SUBMISSION.NAV_EKSTERN_REF_ID)
+                .from(SUBMISSION)
+                .where(SUBMISSION.ID.eq(submissionId))
                 .fetchSingle()
-                .get(DOCUMENT.EXTERNAL_ID)!!
+                .get(SUBMISSION.NAV_EKSTERN_REF_ID)!!
         return UploadForProcessing(
             filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,
             chunkData = record.get(UPLOAD.CHUNK_DATA)!!,
-            documentId = documentId,
-            externalId = externalId,
+            submissionId = submissionId,
+            navEksternRefId = navEksternRefId,
         )
     }
 
@@ -149,7 +179,6 @@ class UploadRepository(
         tx: Configuration,
         uploadId: UUID,
         filId: UUID,
-        mellomlagringRefId: String,
         mellomlagringFilnavn: String,
         mellomlagringStorrelse: Long,
     ) {
@@ -157,9 +186,22 @@ class UploadRepository(
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.FIL_ID, filId)
-            .set(UPLOAD.MELLOMLAGRING_REF_ID, mellomlagringRefId)
             .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)
-            .set(UPLOAD.SIZE, mellomlagringStorrelse)
+            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)
+            .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
+            // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
+            .where(UPLOAD.ID.eq(uploadId))
+            .execute()
+    }
+
+    fun markFailed(
+        tx: Configuration,
+        uploadId: UUID,
+    ) {
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.PROCESSING_STATUS, "FAILED")
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
     }
@@ -181,8 +223,9 @@ class UploadRepository(
         uploadId: UUID,
     ) = tx
         .dsl()
-        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, UPLOAD.MELLOMLAGRING_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE)
+        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE)
         .from(UPLOAD)
+        .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
         .where(UPLOAD.ID.eq(uploadId))
         .fetchSingle()
         .let {
@@ -191,23 +234,26 @@ class UploadRepository(
                 originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),
                 errors = emptyList(),
                 filId = it.get(UPLOAD.FIL_ID),
-                mellomlagringRefId = it.get(UPLOAD.MELLOMLAGRING_REF_ID),
+                navEksternRefId = it.get(SUBMISSION.NAV_EKSTERN_REF_ID),
                 mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),
                 fileSize = it.get(UPLOAD.SIZE),
+                mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),
             )
         }
 
     fun getUploadsWithFilenames(
         tx: Configuration,
-        documentId: UUID,
+        submissionId: UUID,
     ): List<UploadWithFilename> =
         tx
             .dsl()
-            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, UPLOAD.MELLOMLAGRING_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE)
+            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE)
             .from(UPLOAD)
             .leftJoin(ERROR)
             .on(ERROR.UPLOAD.eq(UPLOAD.ID))
-            .where(UPLOAD.DOCUMENT_ID.eq(documentId))
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
             .fetch()
             .groupBy { it.get(UPLOAD.ID) }
             .map { (id, records) ->
@@ -216,9 +262,10 @@ class UploadRepository(
                     originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),
                     errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },
                     filId = records.first().get(UPLOAD.FIL_ID),
-                    mellomlagringRefId = records.first().get(UPLOAD.MELLOMLAGRING_REF_ID),
+                    navEksternRefId = records.first().get(SUBMISSION.NAV_EKSTERN_REF_ID),
                     mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),
                     fileSize = records.first().get(UPLOAD.SIZE),
+                    mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
                 )
             }
 
@@ -226,14 +273,14 @@ class UploadRepository(
         tx: Configuration,
         uploadId: UUID,
     ): Int {
-        val documentId = getDocumentIdFromUploadId(tx, uploadId) ?: error("No documentid for upload")
+        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: error("No submissionId for upload")
         val deleted =
             tx
                 .dsl()
                 .delete(UPLOAD)
                 .where(UPLOAD.ID.eq(uploadId))
                 .execute()
-        notificationService.notifyUpdate(documentId)
+        tx.dsl().execute("SELECT pg_notify('submission_update', ?)", submissionId.toString())
         return deleted
     }
 
@@ -242,15 +289,18 @@ class UploadRepository(
         uploadId: UUID,
         validations: List<Validation>,
     ) {
-        validations
-            .forEach {
-                tx
-                    .dsl()
-                    .insertInto(ERROR)
-                    .set(ERROR.UPLOAD, uploadId)
-                    .set(ERROR.CODE, it.code.name)
-                    .set(ERROR.ID, UUID.randomUUID())
-                    .execute()
-            }.also { notifyChange(tx, uploadId) }
+        validations.forEach {
+            tx
+                .dsl()
+                .insertInto(ERROR)
+                .set(ERROR.UPLOAD, uploadId)
+                .set(ERROR.CODE, it.code.name)
+                .set(ERROR.ID, UUID.randomUUID())
+                .execute()
+        }
+        markFailed(tx, uploadId)
+        notifyChange(tx, uploadId)
     }
 }
+
+

@@ -25,7 +25,7 @@ fun Route.configureDocumentRoutes() {
     val uploadRepository: UploadRepository by application.dependencies
     val dsl: DSLContext by application.dependencies
 
-    get("/document/{uploadId}") {
+    get("/upload/{uploadId}") {
         val id = call.parameters["uploadId"] ?: error("uploadId is required")
         call.principal<JWTPrincipal>()?.subject
             ?: return@get call.respond(HttpStatusCode.Unauthorized, "Missing subject in token")
@@ -35,12 +35,12 @@ fun Route.configureDocumentRoutes() {
         val upload = dsl.transactionResult { tx ->
             uploadRepository.getUpload(tx, UUID.fromString(id))
         }
-        checkNotNull(upload.mellomlagringRefId) { "Mangler mellomlagringRefId. Er ikke fil ferdig opplastet?" }
+        checkNotNull(upload.navEksternRefId) { "Mangler navEksternRefId. Er ikke fil ferdig opplastet?" }
         checkNotNull(upload.filId) { "Mangler filId. Er ikke fil ferdig opplastet?" }
         checkNotNull(upload.mellomlagringFilnavn) { "Mangler originalFilename. Er ikke fil ferdig opplastet?" }
 
 
         call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"${upload.mellomlagringFilnavn}\"")
-        call.respondBytes(mellomlagringClient.getFile(upload.mellomlagringRefId, upload.filId, token), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))
+        call.respondBytes(mellomlagringClient.getFile(upload.navEksternRefId!!, upload.filId!!, token), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))
     }
 }

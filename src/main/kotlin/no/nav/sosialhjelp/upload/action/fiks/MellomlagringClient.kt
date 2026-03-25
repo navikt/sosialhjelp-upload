@@ -103,10 +103,10 @@ class MellomlagringClient(
 
             val mellomlagring = response.body<MellomlagringResponse>()
             mellomlagring.mellomlagringMetadataList
-                .find { it.filnavn == filename }
+                .firstOrNull()
                 ?.filId
                 ?.let { UUID.fromString(it) }
-                ?: error("No filId returned for filename $filename from mellomlagring")
+                ?: error("No filId returned from mellomlagring for upload to $navEksternRefId")
         }
 
     suspend fun deleteFile(

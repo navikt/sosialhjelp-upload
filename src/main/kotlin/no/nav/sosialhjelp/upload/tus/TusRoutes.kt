@@ -11,9 +11,12 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
+import no.nav.sosialhjelp.upload.VerifiedPersonident
+import no.nav.sosialhjelp.upload.VerifiedUploadId
+import no.nav.sosialhjelp.upload.database.UploadRepository.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
+import no.nav.sosialhjelp.upload.verifyUploadOwnership
 import java.util.Base64
-import java.util.UUID
 
 private const val TUS_RESUMABLE = "1.0.0"
 private const val TUS_VERSION = "1.0.0"
@@ -50,11 +53,12 @@ fun Route.configureTusRoutes(basePath: String) {
 
         val metadata = parseMetadata(call.request.header("Upload-Metadata"))
         val filename = metadata["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val externalId = metadata["externalId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val contextId = metadata["contextId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val navEksternRefId = metadata["navEksternRefId"]
 
         val uploadId =
             try {
-                tusUploadService.create(externalId, filename, uploadLength, personident)
+                tusUploadService.create(contextId, filename, uploadLength, personident, navEksternRefId)
             } catch (_: UploadForbiddenException) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }
@@ -65,15 +69,16 @@ fun Route.configureTusRoutes(basePath: String) {
     }
 
     route("/{id}") {
+        // Ownership is verified here for all routes in this group.
+        // VerifiedUploadId and VerifiedPersonident are available in call.attributes after this runs.
+        verifyUploadOwnership()
+
         // Get current upload offset (resume support)
         head {
-            val personident = call.principal<JWTPrincipal>()?.subject
-                ?: return@head call.respond(HttpStatusCode.Unauthorized)
-            val uploadId = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                ?: return@head call.respond(HttpStatusCode.NotFound)
+            val uploadId = call.attributes[VerifiedUploadId]
 
             val (offset, size) =
-                runCatching { tusUploadService.getUploadInfo(uploadId, personident) }.getOrElse {
+                runCatching { tusUploadService.getUploadInfo(uploadId) }.getOrElse {
                     return@head call.respond(HttpStatusCode.NotFound)
                 }
 
@@ -86,10 +91,7 @@ fun Route.configureTusRoutes(basePath: String) {
 
         // Append a chunk
         patch {
-            val personident = call.principal<JWTPrincipal>()?.subject
-                ?: return@patch call.respond(HttpStatusCode.Unauthorized)
-            val uploadId = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                ?: return@patch call.respond(HttpStatusCode.NotFound)
+            val uploadId = call.attributes[VerifiedUploadId]
 
             val contentType = call.request.header("Content-Type")
             if (contentType != "application/offset+octet-stream") {
@@ -101,14 +103,22 @@ fun Route.configureTusRoutes(basePath: String) {
             val userToken = call.request.header("Authorization")?.removePrefix("Bearer ")
                 ?: return@patch call.respond(HttpStatusCode.Unauthorized)
 
-            val data = call.receiveChannel().readRemaining().readByteArray()
+            val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()
+            if (data.size > MAX_CHUNK_SIZE) {
+                return@patch call.respond(HttpStatusCode.PayloadTooLarge)
+            }
 
             val newOffset =
                 runCatching {
-                    tusUploadService.appendChunk(uploadId, uploadOffset, data, personident, userToken)
+                    tusUploadService.appendChunk(uploadId, uploadOffset, data, userToken)
                 }.getOrElse { e ->
-                    environment.log.error("Error appending chunk to upload $uploadId", e)
-                    return@patch call.respond(HttpStatusCode.InternalServerError)
+                    when (e) {
+                        is OffsetMismatchException -> return@patch call.respond(HttpStatusCode.Conflict)
+                        else -> {
+                            environment.log.error("Error appending chunk to upload $uploadId", e)
+                            return@patch call.respond(HttpStatusCode.InternalServerError)
+                        }
+                    }
                 }
 
             call.response.header("Upload-Offset", newOffset.toString())
@@ -118,12 +128,11 @@ fun Route.configureTusRoutes(basePath: String) {
 
         // Terminate an upload
         delete {
-            val personident = call.principal<JWTPrincipal>()?.subject
+            val uploadId = call.attributes[VerifiedUploadId]
+            val userToken = call.request.header("Authorization")?.removePrefix("Bearer ")
                 ?: return@delete call.respond(HttpStatusCode.Unauthorized)
-            val uploadId = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                ?: return@delete call.respond(HttpStatusCode.NotFound)
 
-            runCatching { tusUploadService.delete(uploadId, personident) }.getOrElse {
+            runCatching { tusUploadService.delete(uploadId, userToken) }.getOrElse {
                 return@delete call.respond(HttpStatusCode.Forbidden)
             }
 
@@ -154,3 +163,5 @@ private fun parseMetadata(header: String?): Map<String, String> {
             }
         }.toMap()
 }
+
+

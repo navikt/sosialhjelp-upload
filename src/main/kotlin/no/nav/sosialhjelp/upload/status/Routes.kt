@@ -9,16 +9,16 @@ import io.ktor.sse.*
 import io.ktor.util.reflect.*
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
-import no.nav.sosialhjelp.upload.database.DocumentRepository
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import org.jooq.DSLContext
 import kotlin.time.Duration.Companion.seconds
 
 fun Route.configureStatusRoutes() {
-    val statusChannelFactory: DocumentNotificationService by application.dependencies
+    val statusChannelFactory: SubmissionNotificationService by application.dependencies
     val dsl: DSLContext by application.dependencies
-    val documentRepository: DocumentRepository by application.dependencies
-    val documentStatusService: DocumentStatusService by application.dependencies
+    val submissionRepository: SubmissionRepository by application.dependencies
+    val submissionStatusService: SubmissionStatusService by application.dependencies
 
     sse("/status/{id}", serialize = { typeInfo: TypeInfo, value: Any ->
         val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)
@@ -31,15 +31,20 @@ fun Route.configureStatusRoutes() {
             event = ServerSentEvent("""{"heartbeat": "ドキドキ"}""")
         }
 
-        val documentId =
+        val rawId = call.parameters["id"].orEmpty()
+        if (rawId.isBlank()) {
+            error("id parameter is required")
+        }
+
+        val submissionId =
             dsl.transactionResult { config ->
-                documentRepository.getOrCreateDocument(config, call.parameters["id"] ?: "", personident)
+                submissionRepository.getOrCreateSubmission(config, rawId, personident)
             }
 
-        send(documentStatusService.getDocumentStatus(documentId))
+        send(submissionStatusService.getSubmissionStatus(submissionId))
 
-        statusChannelFactory.getDocumentFlow(documentId).collect {
-            send(documentStatusService.getDocumentStatus(documentId))
+        statusChannelFactory.getSubmissionFlow(submissionId).collect {
+            send(submissionStatusService.getSubmissionStatus(submissionId))
         }
     }
 }

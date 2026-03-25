@@ -1,22 +1,23 @@
 package no.nav.sosialhjelp.upload.common
 
-import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Submission
 import org.jooq.DSLContext
 import java.util.UUID
 
 object TestUtils {
-    fun createMockDocument(
+    fun createMockSubmission(
         tx: DSLContext,
-        externalId: String = UUID.randomUUID().toString(),
+        contextId: String = UUID.randomUUID().toString(),
     ): UUID {
         val uuid = UUID.randomUUID()
         tx.transactionResult { it ->
             it
                 .dsl()
-                .insertInto(Document.DOCUMENT)
-                .set(Document.DOCUMENT.ID, uuid)
-                .set(Document.DOCUMENT.OWNER_IDENT, "12345678910")
-                .set(Document.DOCUMENT.EXTERNAL_ID, externalId)
+                .insertInto(Submission.SUBMISSION)
+                .set(Submission.SUBMISSION.ID, uuid)
+                .set(Submission.SUBMISSION.OWNER_IDENT, "12345678910")
+                .set(Submission.SUBMISSION.CONTEXT_ID, contextId)
+                .set(Submission.SUBMISSION.NAV_EKSTERN_REF_ID, uuid.toString())
                 .execute()
         }
         return uuid

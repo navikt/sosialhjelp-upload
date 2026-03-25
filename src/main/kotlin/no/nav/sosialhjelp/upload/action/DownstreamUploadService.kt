@@ -6,9 +6,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
-import no.nav.sosialhjelp.upload.database.DocumentRepository
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import org.jooq.DSLContext
 import java.util.UUID
 
@@ -17,9 +17,9 @@ private const val COUNTER_SUFFIX_LENGTH = 4
 class DownstreamUploadService(
     private val fiksClient: FiksClient,
     private val dsl: DSLContext,
-    private val documentRepository: DocumentRepository,
+    private val submissionRepository: SubmissionRepository,
     private val uploadRepository: UploadRepository,
-    private val notificationService: DocumentNotificationService,
+    private val notificationService: SubmissionNotificationService,
 ) {
     private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
         val previousId: String =
@@ -43,12 +43,12 @@ class DownstreamUploadService(
         metadata: Metadata,
         fiksDigisosId: String,
         token: String,
-        documentId: UUID,
+        submissionId: UUID,
     ): Boolean {
         val uploads =
             withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
-                    uploadRepository.getUploadsWithFilenames(tx, documentId).toList()
+                    uploadRepository.getUploadsWithFilenames(tx, submissionId).toList()
                 }
             }
 
@@ -63,8 +63,8 @@ class DownstreamUploadService(
                 FilReferanse(
                     filnavn = upload.mellomlagringFilnavn ?: upload.originalFilename!!,
                     filId = upload.filId!!,
-                    mellomlagringRefId = upload.mellomlagringRefId!!,
-                    storrelse = upload.fileSize ?: 0L,
+                    mellomlagringRefId = upload.navEksternRefId!!,
+                    storrelse = upload.mellomlagringStorrelse ?: 0L,
                 )
             }
 
@@ -81,10 +81,10 @@ class DownstreamUploadService(
         if (response.status.isSuccess()) {
             withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
-                    documentRepository.cleanup(tx, documentId)
+                    submissionRepository.cleanup(tx, submissionId)
                 }
             }
-            notificationService.notifyUpdate(documentId)
+            notificationService.notifyUpdate(submissionId)
             return true
         }
         return false

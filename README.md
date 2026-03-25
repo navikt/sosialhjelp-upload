@@ -1,125 +1,102 @@
 # sosialhjelp-upload
 
-Sosialhjelp-upload er en app som har ansvar for å håndtere og koordinere filopplastinger fra teamdigisos sine publikumstjenester: sosialhjelp-innsyn og sosialhjelp-soknad.
+Sosialhjelp-upload er en app som håndterer og koordinerer filopplastinger fra teamdigisos sine publikumstjenester: sosialhjelp-innsyn og sosialhjelp-soknad.
 
-Tjenesten bruker [Tusd](https://tus.io/) og Google Cloud Storage (buckets) for å håndtere selve filopplastingen, og [Gotenberg](https://gotenberg.dev/) for å konvertere filer til PDF.
+Tjenesten implementerer [tus-protokollen](https://tus.io/protocols/resumable-upload.html) direkte for å ta imot filer i deler (resumable uploads), og bruker [Gotenberg](https://gotenberg.dev/) for å konvertere filer til PDF. Ferdig behandlede filer krypteres og lagres i KS Fiks mellomlagring.
 
-Filene tilgjengeliggjøres for brukerne ved hjelp av SignedUrl fra Google Cloud Storage, som gir midlertidig tilgang til filene uten å måtte proxye dem via api-et vårt.
+## Kjernekonsepter
 
-## tusd
-
-Tusd er en open source server for resumable filopplasting basert på [tus-protokollen](https://tus.io/protocols/resumable-upload.html). I sosialhjelp-upload brukes tusd til å motta og lagre filer, og
-til å trigge hooks for å validere, konvertere og håndtere metadata. Konfigurasjon av tusd skjer via docker-compose og miljøvariabler. Tusd melder fra til denne appen underveis i opplastingen
-via [hooks](https://tus.github.io/tusd/advanced-topics/hooks/). Vi bruker følgende:
-
-- PreCreate - Kalles før opplastingen starter. Her opprettes en record i databasen for filen som skal lastes opp.
-- PreFinish - Kalles før opplastingen er ferdig, og er blocking. Her validerer vi filen.
-- PostFinish - Kalles etter at opplastingen er ferdig. Her konverterer vi til pdf.
-- PreTerminate - Kalles før en opplasting slettes. Her sjekker vi autorisasjon.
-- PostTerminate - Kalles etter at en opplasting er slettet. Her sletter vi i databasen.
-
-## Wonderwall
-
-Wonderwall er en autentiseringsproxy som beskytter tjenesten og sikrer at kun autoriserte brukere får tilgang til filopplasting og relaterte API-er. Wonderwall håndterer OIDC-autentisering og
-videresender gyldige tokens til sosialhjelp-upload. Konfigureres via docker compose.
-
-## Google Cloud buckets
-
-Filer lagres i Google Cloud Storage buckets. Hver opplasting får en unik ID og lagres i en bucket definert av miljøvariabler. Tilgang til bucket styres via service account og IAM-roller. Bucket-navn
-og credentials settes via miljøvariabler. Service account-en må opprettes manuelt i Google Cloud Console, og man må lage en api-nøkkel, lagre det som en secret og injecte inn i appen. Dette gjøres på følgende måte:
-
-1. Gå til [Google Cloud Console](https://console.cloud.google.com/).
-2. Velg prosjektet ditt.
-3. Naviger til "IAM & Admin" > "Service Accounts".
-4. Klikk på "Create Service Account".
-5. Gi service account-en et navn og en beskrivelse, og klikk "Create".
-6. Tildel nødvendige roller: "Storage Admin" for tilgang til buckets og "Service Account Token Creator" for å kunne generere tokens for [SignedUrl](https://cloud.google.com/storage/docs/access-control/signed-urls).
-7. Klikk "Continue" og deretter "Done".
-8. Finn service account-en i listen, klikk på de tre prikkene til høyre og velg "Manage keys".
-9. Klikk på "Add Key" > "Create new key".
-10. Velg JSON som nøkkeltype og klikk "Create". En JSON-fil lastes ned til din datamaskin.
-11. Lagre denne filen som en secret i kubernetes
-12. Inject secret-en som en fil i appen og sett miljøvariabelen `GCP_CREDENTIALS` til path-en der filen er injectet.
-13. Sett cors-policy på bucket-en for å tillate opplasting fra frontend. Dette kan gjøres via Google Cloud Console eller `gsutil`-verktøyet. Eksempel med `gsutil`:
-
-```bash
-gsutil cors set cors-config.json gs://your-bucket-name
-```
-
-## Building & Running
-
-Appen krever database, tusd, gotenberg, wonderwall og mock-alt-api (hvis det skal sendes inn dokumenter).
-
-Tusd, databasen og gotenberg kan startes ved hjelp av docker compose i [digisos-docker-compose](https://github.com/navikt/digisos-docker-compose)
-
-Lokalt brukes ikke GCS, men filene lagres lokalt i en mappe. Default her er ../digisos-docker-compose/tusd-data. Dette kan overstyres ved å sette miljøvariabelen `storage.basePath`.
-
-## Database
-Appen bruker PostgreSQL som database og JOOQ for databaseoperasjoner. For typesafe SQL-spørringer brukes JOOQ sin kodegenerator som genererer Java-klasser basert på database-skjemaet. Kommandoen for å generere JOOQ-klasser er:
-
-```bash
-./gradlew generateJooq
-```
-
-Denne kommandoen krever at databasen kjører og at `DB_URL`, `DB_USER` og `DB_PASSWORD` er satt i miljøet, samt at flyway har kjørt nødvendige migreringer.
-
-### DB-migrering
-Flyway brukes for database-migreringer. Migreringer kjøres automatisk ved oppstart av appen. Migreringsskriptene ligger i `src/main/resources/db/migration`.
+- **Submission** — en gruppe opplastinger som sendes inn samlet (f.eks. for en sak). Identifiseres eksternt med en `externalId` fra frontend.
+- **Upload** — en enkeltfil innenfor en submission. Representerer én TUS-opplasting.
 
 ## Flyt
 
-### Komponenter
-
 ```mermaid
-flowchart
-    fs[GCP Bucket]
-    db[(Database)]
+flowchart TD
     app[Client]
-    app -- Last opp --> Tusd
-    Tusd -- Hooks --> UploadApi
-    UploadApi -- Lagre metadata --> db
-    Tusd -- Lagre fil --> fs
-    UploadApi -- Konvertere --> Gotenberg
-    UploadApi -- Lagre konvertert fil --> fs
-    UploadApi -. SSE oppdatering .-> app
-    app -- Hent filer --> fs
-    app -- Submit --> UploadApi
-    UploadApi -- Last opp --> Fiks-mellomlager
+    db[(PostgreSQL)]
+    mellomlager[Fiks mellomlagring]
+
+    app -- "POST /tus/files" --> UploadApi
+    UploadApi -- "Opprett upload-record" --> db
+    app -- "PATCH /tus/files/{id} (chunks)" --> UploadApi
+    UploadApi -- "Lagre chunk i DB" --> db
+    UploadApi -- "Siste chunk: valider + konverter" --> Gotenberg
+    UploadApi -- "Krypter og last opp" --> mellomlager
+    UploadApi -. "SSE-oppdatering" .-> app
+    app -- "POST /submission/{id}/submit" --> UploadApi
+    UploadApi -- "Send til Fiks API" --> Fiks
 ```
 
+### Opplastingsløp steg for steg
 
-### Fullstendig
-```mermaid
-flowchart
-    fs[GCP Bucket]
-    db[(Database)]
-    app[Client]
-    app -- (2) POST /files --> Tusd
-    Tusd -- (3) POST /pre-create --> UploadApi
-    UploadApi -- (4) Save record --> db
-    Tusd -- (5) Save to files --> fs
-    Tusd -- (6) POST /pre-finish --> UploadApi
-    UploadApi -- (7) Validate file --> UploadApi
-    UploadApi -- (8) Update record --> db
-    Tusd -- (9) POST /post-finish --> UploadApi
-    UploadApi -- (10) POST /convert --> Gotenberg
-    UploadApi -- (11) Save converted --> fs
-    UploadApi -. SSE update .-> app
+1. Frontend POST-er til `/tus/files` med metadata → appen oppretter en `upload`-record og returnerer en `Location`-header
+2. Frontend sender filen i deler via PATCH `/tus/files/{id}`
+3. Etter siste chunk kjøres `processCompletedUpload()`:
+   - Filtype valideres med Apache Tika, størrelse sjekkes, virusskanning via ClamAV
+   - Ikke-PDF/bilde-formater konverteres til PDF via Gotenberg
+   - Filen krypteres (CMS i prod, no-op lokalt)
+   - Kryptert fil lastes opp til Fiks mellomlagring
+4. Frontend mottar sanntidsoppdateringer via SSE på `/status/{externalId}`
+5. Bruker sender inn via POST `/submission/{submissionId}/submit` → filen meldes inn til Fiks API
+
+## Autentisering og tilgangskontroll
+
+Alle ruter under `/sosialhjelp/upload/` er beskyttet av JWT via [Wonderwall](https://doc.nais.io/security/auth/wonderwall/). Unntaket er `/internal/isAlive`.
+
+JWT-validering krever:
+- `acr`-claim må være `idporten-loa-high`
+- `client_id`-claim må matche konfigurert audience
+
+Eierskapssjekk skjer automatisk via route-scoped Ktor-plugins (`OwnershipInterceptors.kt`) — rutehandlere trenger ikke gjøre manuelle sjekker.
+
+## Bygge og kjøre
+
+```bash
+# Start lokale avhengigheter (PostgreSQL på :54322, Gotenberg på :3010)
+docker compose up -d
+
+# Kjør alle tester (krever Docker for Testcontainers)
+./gradlew test
+
+# Bygg fat jar
+./gradlew build
+
+# Kjør lokalt
+./gradlew run -Pdevelopment
+
+# Regenerer JOOQ-klasser etter skjemaendringer (krever PostgreSQL på :54322)
+./gradlew generateJooq
 ```
 
-## Environment Variables
+Gradle krever GitHub-credentials for NAVs private pakkeregister. Sett disse i `~/.gradle/gradle.properties`:
+```properties
+githubUser=<ditt-github-brukernavn>
+githubPassword=<ditt-github-token>
+```
 
-- `GCP_BUCKET_NAME`: Navn på Google Cloud Storage bucket.
-- `GCP_CREDENTIALS`: Path til service account credentials.
-- `TUSD_HOOK_URL`: URL for tusd hooks.
-- `DB_URL`: Database connection string.
-- `WONDERWALL_ISSUER`: OIDC issuer for Wonderwall.
-- Flere variabler kan være relevante, se docker-compose og kildekode for detaljer.
+I CI settes de som `ORG_GRADLE_PROJECT_githubUser` og `ORG_GRADLE_PROJECT_githubPassword`.
 
-## Contributing
+## Database
 
-Pull requests og issues er velkomne! Følg NAVs retningslinjer for open source og inkluder tester for nye funksjoner.
+- PostgreSQL med JOOQ for typesikre spørringer og Flyway for migreringer
+- Migreringsskript ligger i `src/main/resources/db/migration/` og følger `V{major}.{minor}__{beskrivelse}.sql`
+- JOOQ-genererte klasser er committed under `database/generated/` og regenereres med `./gradlew generateJooq` ved skjemaendringer
+- `SubmissionNotificationService` bruker Postgres LISTEN/NOTIFY og en Kotlin `SharedFlow` for å sende sanntidsoppdateringer til SSE-abonnenter
 
-## License
+## Miljøvariabler
 
-Se LICENSE-fil for gjeldende lisens.
+| Variabel | Formål |
+|----------|--------|
+| `RUNTIME_ENV` | `local`/`mock`/`dev`/`prod` — styrer mock vs. ekte kryptering |
+| `POSTGRES_JDBC_URL`, `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database |
+| `IDPORTEN_CLIENT_ID`, `IDPORTEN_ISSUER`, `IDPORTEN_JWKS_URI` | JWT-autentisering |
+| `GOTENBERG_URL` | PDF-konverteringstjeneste |
+| `FIKS_URL`, `INTEGRASJONSID_FIKS`, `INTEGRASJONPASSORD_FIKS` | KS Fiks-integrasjon |
+| `CLAMAV_URL` | Virusskanning |
+| `NAIS_TOKEN_ENDPOINT` | Texas Maskinporten-tokenendepunkt |
+
+## Lisens
+
+Se LICENSE-filen.
+

@@ -74,9 +74,9 @@ open class Upload(
     val ID: TableField<UploadRecord, UUID?> = createField(DSL.name("id"), SQLDataType.UUID.nullable(false), this, "")
 
     /**
-     * The column <code>public.upload.document_id</code>.
+     * The column <code>public.upload.submission_id</code>.
      */
-    val DOCUMENT_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("document_id"), SQLDataType.UUID, this, "")
+    val SUBMISSION_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("submission_id"), SQLDataType.UUID, this, "")
 
     /**
      * The column <code>public.upload.original_filename</code>.
@@ -104,14 +104,19 @@ open class Upload(
     val FIL_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("fil_id"), SQLDataType.UUID, this, "")
 
     /**
-     * The column <code>public.upload.mellomlagring_ref_id</code>.
-     */
-    val MELLOMLAGRING_REF_ID: TableField<UploadRecord, String?> = createField(DSL.name("mellomlagring_ref_id"), SQLDataType.VARCHAR(255), this, "")
-
-    /**
      * The column <code>public.upload.mellomlagring_filnavn</code>.
      */
     val MELLOMLAGRING_FILNAVN: TableField<UploadRecord, String?> = createField(DSL.name("mellomlagring_filnavn"), SQLDataType.VARCHAR(255), this, "")
+
+    /**
+     * The column <code>public.upload.processing_status</code>.
+     */
+    val PROCESSING_STATUS: TableField<UploadRecord, String?> = createField(DSL.name("processing_status"), SQLDataType.VARCHAR(20).nullable(false).defaultValue(DSL.inline("PENDING")), this, "")
+
+    /**
+     * The column <code>public.upload.mellomlagring_storrelse</code>.
+     */
+    val MELLOMLAGRING_STORRELSE: TableField<UploadRecord, Long?> = createField(DSL.name("mellomlagring_storrelse"), SQLDataType.BIGINT, this, "")
 
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

@@ -10,11 +10,11 @@ import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
-import no.nav.sosialhjelp.upload.database.DocumentRepository
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
@@ -74,11 +74,11 @@ class TusUploadServiceIntegrationTest {
     private lateinit var dsl: DSLContext
     private lateinit var mockWebServer: MockWebServer
     private lateinit var uploadRepository: UploadRepository
-    private lateinit var documentRepository: DocumentRepository
+    private lateinit var submissionRepository: SubmissionRepository
     private lateinit var tusUploadService: TusUploadService
     private lateinit var mellomlagringClient: MellomlagringClient
     private lateinit var encryptionService: EncryptionService
-    private lateinit var notificationService: DocumentNotificationService
+    private lateinit var notificationService: SubmissionNotificationService
 
     @BeforeAll
     fun setup() {
@@ -88,9 +88,9 @@ class TusUploadServiceIntegrationTest {
         mockWebServer.dispatcher = TusMockDispatcher()
         mockWebServer.start()
 
-        notificationService = DocumentNotificationService(PostgresTestContainer.dataSource)
+        notificationService = SubmissionNotificationService(PostgresTestContainer.dataSource)
         uploadRepository = UploadRepository(notificationService)
-        documentRepository = DocumentRepository(dsl)
+        submissionRepository = SubmissionRepository(dsl)
 
         val virusScanner = VirusScanner(mockWebServer.url("/virus").toString())
         val validator = UploadValidator(virusScanner)
@@ -103,7 +103,7 @@ class TusUploadServiceIntegrationTest {
         tusUploadService =
             TusUploadService(
                 uploadRepository = uploadRepository,
-                documentRepository = documentRepository,
+                submissionRepository = submissionRepository,
                 dsl = dsl,
                 validator = validator,
                 gotenbergService = gotenbergService,
@@ -157,20 +157,10 @@ class TusUploadServiceIntegrationTest {
         val personident = "12345678910"
         val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident)
 
-        val (offset, total) = tusUploadService.getUploadInfo(uploadId, personident)
+        val (offset, total) = tusUploadService.getUploadInfo(uploadId)
 
         assertEquals(0L, offset)
         assertEquals(42L, total)
-    }
-
-    @Test
-    fun `getUploadInfo throws when called by wrong user`() {
-        val externalId = UUID.randomUUID().toString()
-        val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, "11111111111")
-
-        assertThrows<IllegalStateException> {
-            tusUploadService.getUploadInfo(uploadId, "99999999999")
-        }
     }
 
     // endregion
@@ -185,7 +175,7 @@ class TusUploadServiceIntegrationTest {
             val content = "hello world".toByteArray()
             val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident)
 
-            val newOffset = tusUploadService.appendChunk(uploadId, 0L, content, personident, "token")
+            val newOffset = tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
             assertEquals(content.size.toLong(), newOffset)
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
@@ -204,7 +194,7 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident)
-            tusUploadService.appendChunk(uploadId, 0L, content, personident, "token")
+            tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertNotNull(row)
@@ -226,7 +216,7 @@ class TusUploadServiceIntegrationTest {
                     (MAX_FILE_SIZE + 1).toLong(),
                     personident,
                 )
-            tusUploadService.appendChunk(uploadId, 0L, oversizedContent, personident, "token")
+            tusUploadService.appendChunk(uploadId, 0L, oversizedContent, "token")
 
             val errors =
                 dsl
@@ -251,7 +241,7 @@ class TusUploadServiceIntegrationTest {
                     content.size.toLong(),
                     personident,
                 )
-            tusUploadService.appendChunk(uploadId, 0L, content, personident, "token")
+            tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
             val errors =
                 dsl
@@ -280,7 +270,7 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident)
-            tusUploadService.appendChunk(uploadId, 0L, content, personident, "token")
+            tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertEquals(filId, row!![UPLOAD.FIL_ID])
@@ -291,26 +281,17 @@ class TusUploadServiceIntegrationTest {
     // region delete
 
     @Test
-    fun `delete removes upload from database`() {
-        val externalId = UUID.randomUUID().toString()
-        val personident = "12345678910"
-        val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident)
+    fun `delete removes upload from database`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident)
 
-        tusUploadService.delete(uploadId, personident)
+            tusUploadService.delete(uploadId, "token")
 
-        val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
-        assertNull(row)
-    }
-
-    @Test
-    fun `delete throws when called by wrong user`() {
-        val externalId = UUID.randomUUID().toString()
-        val uploadId = tusUploadService.create(externalId, "notmine.pdf", 10L, "11111111111")
-
-        assertThrows<IllegalStateException> {
-            tusUploadService.delete(uploadId, "99999999999")
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            assertNull(row)
         }
-    }
 
     // endregion
 }

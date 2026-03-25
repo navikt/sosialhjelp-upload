@@ -1,11 +1,11 @@
 package no.nav.sosialhjelp.upload.status
 
-import no.nav.sosialhjelp.upload.common.TestUtils.createMockDocument
-import no.nav.sosialhjelp.upload.database.DocumentRepository
+import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
-import no.nav.sosialhjelp.upload.status.dto.DocumentState
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadSuccessState
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.jooq.DSLContext
@@ -19,17 +19,17 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class DocumentStatusServiceTest {
-    private lateinit var documentRepository: DocumentRepository
+class SubmissionStatusServiceTest {
+    private lateinit var submissionRepository: SubmissionRepository
     private lateinit var uploadRepository: UploadRepository
     private val dsl: DSLContext = PostgresTestContainer.dsl
-    private lateinit var notificationService: DocumentNotificationService
+    private lateinit var notificationService: SubmissionNotificationService
 
     @BeforeAll
     fun setup() {
         PostgresTestContainer.migrate()
-        notificationService = DocumentNotificationService(PostgresTestContainer.dataSource)
-        documentRepository = DocumentRepository(dsl)
+        notificationService = SubmissionNotificationService(PostgresTestContainer.dataSource)
+        submissionRepository = SubmissionRepository(dsl)
         uploadRepository = UploadRepository(notificationService)
     }
 
@@ -40,24 +40,24 @@ class DocumentStatusServiceTest {
         }
 
     /**
-     * Test that when no uploads exist for a given document, the service returns a DocumentState
+     * Test that when no uploads exist for a given submission, the service returns a SubmissionState
      * with an empty uploads map.
      */
     @Test
-    fun `getDocumentStatus returns empty state when no uploads exist`() {
-        val documentId = createMockDocument(dsl)
-        val service = DocumentStatusService(uploadRepository, dsl)
+    fun `getSubmissionStatus returns empty state when no uploads exist`() {
+        val submissionId = createMockSubmission(dsl)
+        val service = SubmissionStatusService(uploadRepository, dsl)
 
-        // When: retrieving document status
-        val result: DocumentState = service.getDocumentStatus(documentId)
+        // When: retrieving submission status
+        val result: SubmissionState = service.getSubmissionStatus(submissionId)
 
-        // Then: the returned state should have the matching documentId and no uploads.
-        assertEquals(documentId.toString(), result.documentId)
+        // Then: the returned state should have the matching submissionId and no uploads.
+        assertEquals(submissionId.toString(), result.submissionId)
         assertTrue(result.uploads.isEmpty())
     }
 
     private fun createUpload(
-        documentId: UUID,
+        submissionId: UUID,
         filename: String,
     ) = dsl.transactionResult { it ->
         it
@@ -67,33 +67,33 @@ class DocumentStatusServiceTest {
             ).set(
                 UPLOAD.ID,
                 UUID.randomUUID(),
-            ).set(UPLOAD.DOCUMENT_ID, documentId)
+            ).set(UPLOAD.SUBMISSION_ID, submissionId)
             .set(UPLOAD.ORIGINAL_FILENAME, filename)
             .returning(UPLOAD.ID)
             .fetchSingle()[UPLOAD.ID]
     }
 
     /**
-     * Test that multiple uploads for the same document are all
-     * correctly returned in the DocumentState.
+     * Test that multiple uploads for the same submission are all
+     * correctly returned in the SubmissionState.
      */
     @Test
-    fun `getDocumentStatus returns multiple uploads each with their corresponding pages`() {
+    fun `getSubmissionStatus returns multiple uploads each with their corresponding pages`() {
         // Given
-        val documentId = createMockDocument(dsl)
+        val submissionId = createMockSubmission(dsl)
 
         val uploadId1 =
-            createUpload(documentId, "first.pdf")
+            createUpload(submissionId, "first.pdf")
         val uploadId2 =
-            createUpload(documentId, "second.pdf")
+            createUpload(submissionId, "second.pdf")
 
-        val service = DocumentStatusService(uploadRepository, dsl)
+        val service = SubmissionStatusService(uploadRepository, dsl)
 
         // When
-        val result: DocumentState = service.getDocumentStatus(documentId)
+        val result: SubmissionState = service.getSubmissionStatus(submissionId)
 
         // Then
-        assertEquals(documentId.toString(), result.documentId)
+        assertEquals(submissionId.toString(), result.submissionId)
         assertEquals(2, result.uploads.size)
         val firstUpload: UploadSuccessState? = result.uploads.find { it.id == uploadId1 }
         val secondUpload: UploadSuccessState? = result.uploads.find { it.id == uploadId2 }

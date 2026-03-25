@@ -60,7 +60,20 @@ class FiksClient(
         }
     }
 
+    private val certCacheTtlMs = 3_600_000L // 1 hour
+    @Volatile private var cachedCert: Pair<X509Certificate, Long>? = null
+
     suspend fun fetchPublicKey(): X509Certificate {
+        val cached = cachedCert
+        if (cached != null && System.currentTimeMillis() - cached.second < certCacheTtlMs) {
+            return cached.first
+        }
+        val cert = fetchPublicKeyFromNetwork()
+        cachedCert = cert to System.currentTimeMillis()
+        return cert
+    }
+
+    private suspend fun fetchPublicKeyFromNetwork(): X509Certificate {
         val publicKey =
             withContext(Dispatchers.IO) {
                 client
