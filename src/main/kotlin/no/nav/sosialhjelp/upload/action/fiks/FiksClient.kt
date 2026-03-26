@@ -61,7 +61,9 @@ class FiksClient(
     }
 
     private val certCacheTtlMs = 3_600_000L // 1 hour
-    @Volatile private var cachedCert: Pair<X509Certificate, Long>? = null
+
+    @Volatile
+    private var cachedCert: Pair<X509Certificate, Long>? = null
 
     suspend fun fetchPublicKey(): X509Certificate {
         val cached = cachedCert
@@ -173,17 +175,45 @@ class FiksClient(
         id: String,
         token: String,
     ): DigisosSak =
-        jacksonClient
-            .get(digisosSakUrl(id)) {
-                headers {
-                    integrasjonsid?.let {
-                        append("IntegrasjonId", integrasjonsid)
+        withContext(Dispatchers.IO) {
+            jacksonClient
+                .get(digisosSakUrl(id))
+                {
+                    headers {
+                        integrasjonsid?.let {
+                            append("IntegrasjonId", integrasjonsid)
+                        }
+                        integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
                     }
-                    integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
-                }
-                accept(ContentType.Application.Json)
-                bearerAuth(token)
-            }.body()
+                    accept(ContentType.Application.Json)
+                    bearerAuth(token)
+                }.body()
+        }
+
+    suspend fun getNewNavEksternRefId(fiksDigisosId: String, token: String): String {
+        val digisosSak = getSak(fiksDigisosId, token)
+        return lagNavEksternRefId(digisosSak)
+    }
+}
+
+private const val COUNTER_SUFFIX_LENGTH = 4
+
+private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
+    val previousId: String =
+        digisosSak.ettersendtInfoNAV
+            ?.ettersendelser
+            ?.map { it.navEksternRefId }
+            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }
+            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus("0000")
+            ?: digisosSak.fiksDigisosId.plus("0000")
+
+    val nesteSuffix = lagIdSuffix(previousId)
+    return (previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix))
+}
+
+private fun lagIdSuffix(previousId: String): String {
+    val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1
+    return suffix.toString().padStart(4, '0')
 }
 
 @Serializable

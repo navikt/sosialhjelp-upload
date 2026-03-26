@@ -11,7 +11,6 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
-import no.nav.sosialhjelp.upload.VerifiedPersonident
 import no.nav.sosialhjelp.upload.VerifiedUploadId
 import no.nav.sosialhjelp.upload.database.UploadRepository.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
@@ -52,13 +51,17 @@ fun Route.configureTusRoutes(basePath: String) {
             ?: return@post call.respond(HttpStatusCode.BadRequest)
 
         val metadata = parseMetadata(call.request.header("Upload-Metadata"))
-        val filename = metadata["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val contextId = metadata["contextId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val navEksternRefId = metadata["navEksternRefId"]
+        val filename = metadata["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler filename")
+        val contextId = metadata["contextId"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
+        val soknadId = metadata["soknadId"]
+        val fiksDigisosId = metadata["fiksDigisosId"]
+        if (soknadId == null && fiksDigisosId == null) return@post call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller soknadId")
+        val token = call.request.header("Authorization")?.removePrefix("Bearer ")
+            ?: return@post call.respond(HttpStatusCode.Unauthorized)
 
         val uploadId =
             try {
-                tusUploadService.create(contextId, filename, uploadLength, personident, navEksternRefId)
+                tusUploadService.create(contextId, filename, uploadLength, personident, soknadId, fiksDigisosId, token)
             } catch (_: UploadForbiddenException) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }
@@ -152,14 +155,20 @@ private fun parseMetadata(header: String?): Map<String, String> {
         .split(",")
         .mapNotNull { pair ->
             val parts = pair.trim().split(" ", limit = 2)
-            if (parts.size == 2) {
-                val key = parts[0].trim()
-                val value = runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull() ?: return@mapNotNull null
-                key to value
-            } else if (parts.size == 1) {
-                parts[0].trim() to ""
-            } else {
-                null
+            when (parts.size) {
+                2 -> {
+                    val key = parts[0].trim()
+                    val value = runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull() ?: return@mapNotNull null
+                    key to value
+                }
+
+                1 -> {
+                    parts[0].trim() to ""
+                }
+
+                else -> {
+                    null
+                }
             }
         }.toMap()
 }

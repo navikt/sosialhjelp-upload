@@ -5,12 +5,12 @@ import io.ktor.http.defaultForFile
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.SubmissionRepository.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.database.UploadRepository
-import no.nav.sosialhjelp.upload.database.UploadRepository.OffsetMismatchException
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
@@ -28,25 +28,32 @@ class TusUploadService(
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
     private val meterRegistry: MeterRegistry,
+    private val fiksClient: FiksClient,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    fun create(
+    suspend fun create(
         contextId: String,
         filename: String,
         size: Long,
         personident: String,
-        navEksternRefId: String? = null,
-    ): UUID =
-        try {
-            dsl.transactionResult { tx ->
-                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, navEksternRefId)
-                uploadRepository.create(tx, submissionId, filename, size)
-                    ?: error("Failed to create upload record")
+        soknadId: String? = null,
+        fiksDigisosId: String? = null,
+        token: String
+    ): UUID {
+        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, token) }
+        return try {
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, navEksternRefId)
+                    uploadRepository.create(tx, submissionId, filename, size)
+                        ?: error("Failed to create upload record")
+                }
             }.also { meterRegistry.counter("upload.created").increment() }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")
         }
+    }
 
     fun getUploadInfo(uploadId: UUID): Pair<Long, Long> =
         dsl.transactionResult { tx ->

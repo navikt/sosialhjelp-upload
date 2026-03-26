@@ -130,7 +130,7 @@ class TusUploadServiceIntegrationTest {
         val externalId = UUID.randomUUID().toString()
         val personident = "12345678910"
 
-        val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident)
+        val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident, fiksDigisosId = fiksDigisosId)
 
         val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
         assertNotNull(row)
@@ -141,10 +141,10 @@ class TusUploadServiceIntegrationTest {
     @Test
     fun `create with same externalId as different user should throw UploadForbiddenException`() {
         val externalId = UUID.randomUUID().toString()
-        tusUploadService.create(externalId, "first.pdf", 50L, "11111111111")
+        tusUploadService.create(externalId, "first.pdf", 50L, "11111111111", fiksDigisosId = fiksDigisosId)
 
         assertThrows<TusUploadService.UploadForbiddenException> {
-            tusUploadService.create(externalId, "second.pdf", 50L, "99999999999")
+            tusUploadService.create(externalId, "second.pdf", 50L, "99999999999", fiksDigisosId = fiksDigisosId)
         }
     }
 
@@ -156,7 +156,7 @@ class TusUploadServiceIntegrationTest {
     fun `getUploadInfo returns offset and totalSize`() {
         val externalId = UUID.randomUUID().toString()
         val personident = "12345678910"
-        val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident)
+        val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident, fiksDigisosId = fiksDigisosId)
 
         val (offset, total) = tusUploadService.getUploadInfo(uploadId)
 
@@ -174,7 +174,7 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             val content = "hello world".toByteArray()
-            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident)
+            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident, fiksDigisosId = fiksDigisosId)
 
             val newOffset = tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
@@ -194,7 +194,7 @@ class TusUploadServiceIntegrationTest {
                 mellomlagringClient.uploadFile(any(), any(), any(), any(), any())
             } returns filId
 
-            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident)
+            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident, fiksDigisosId = fiksDigisosId)
             tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
@@ -216,6 +216,7 @@ class TusUploadServiceIntegrationTest {
                     "toobig.pdf",
                     (MAX_FILE_SIZE + 1).toLong(),
                     personident,
+                    fiksDigisosId = fiksDigisosId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, oversizedContent, "token")
 
@@ -241,6 +242,7 @@ class TusUploadServiceIntegrationTest {
                     "virus.pdf",
                     content.size.toLong(),
                     personident,
+                    fiksDigisosId = fiksDigisosId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
@@ -270,7 +272,7 @@ class TusUploadServiceIntegrationTest {
                 )
             } returns filId
 
-            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident)
+            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, fiksDigisosId = fiksDigisosId)
             tusUploadService.appendChunk(uploadId, 0L, content, "token")
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
@@ -286,7 +288,7 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
-            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident)
+            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident, fiksDigisosId = fiksDigisosId)
 
             tusUploadService.delete(uploadId, "token")
 
