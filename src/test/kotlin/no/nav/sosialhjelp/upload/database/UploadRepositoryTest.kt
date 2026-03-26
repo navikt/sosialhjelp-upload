@@ -9,6 +9,7 @@ import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.jooq.DSLContext
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -97,5 +98,67 @@ class UploadRepositoryTest {
 
         // notifyChange now sends pg_notify within the transaction; just verify it doesn't throw
         dsl.transaction { it -> uploadRepository.notifyChange(it, uploadId) }
+    }
+
+    @Test
+    fun `markStaleProcessingAsFailed marks stuck uploads as failed`() {
+        val submissionId = TestUtils.createMockSubmission(dsl)
+        every { notificationServiceMock.notifyUpdate(any()) } returns Unit
+        val uploadId = dsl.transactionResult { tx ->
+            uploadRepository.create(tx, submissionId, "stuck.txt", 100L)
+        } ?: error("No uploadId")
+
+        // Set PROCESSING state with an old updated_at
+        dsl.execute(
+            "UPDATE upload SET processing_status = 'PROCESSING', chunk_data = '\\x01'::bytea, updated_at = NOW() - INTERVAL '10 minutes' WHERE id = ?",
+            uploadId,
+        )
+
+        val cutoff = java.time.OffsetDateTime.now()
+        val submissionIds = dsl.transactionResult { tx ->
+            uploadRepository.markStaleProcessingAsFailed(tx, cutoff)
+        }
+
+        assertEquals(listOf(submissionId), submissionIds)
+        dsl.transaction { tx ->
+            val record = tx.dsl()
+                .select(UPLOAD.PROCESSING_STATUS, UPLOAD.CHUNK_DATA)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .fetchSingle()
+            assertEquals("FAILED", record[UPLOAD.PROCESSING_STATUS])
+            assertNull(record[UPLOAD.CHUNK_DATA])
+        }
+    }
+
+    @Test
+    fun `markHaltedPendingAsFailed clears stalled uploads`() {
+        val submissionId = TestUtils.createMockSubmission(dsl)
+        every { notificationServiceMock.notifyUpdate(any()) } returns Unit
+        val uploadId = dsl.transactionResult { tx ->
+            uploadRepository.create(tx, submissionId, "halted.txt", 100L)
+        } ?: error("No uploadId")
+
+        // Set upload_offset > 0, chunk_data, and old updated_at
+        dsl.execute(
+            "UPDATE upload SET upload_offset = 50, chunk_data = '\\x01'::bytea, updated_at = NOW() - INTERVAL '2 hours' WHERE id = ?",
+            uploadId,
+        )
+
+        val cutoff = java.time.OffsetDateTime.now()
+        val submissionIds = dsl.transactionResult { tx ->
+            uploadRepository.markHaltedPendingAsFailed(tx, cutoff)
+        }
+
+        assertEquals(listOf(submissionId), submissionIds)
+        dsl.transaction { tx ->
+            val record = tx.dsl()
+                .select(UPLOAD.PROCESSING_STATUS, UPLOAD.CHUNK_DATA)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .fetchSingle()
+            assertEquals("FAILED", record[UPLOAD.PROCESSING_STATUS])
+            assertNull(record[UPLOAD.CHUNK_DATA])
+        }
     }
 }

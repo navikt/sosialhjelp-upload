@@ -7,6 +7,7 @@ import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.validation.Validation
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.Configuration
+import java.time.OffsetDateTime
 import java.util.*
 import kotlin.collections.component1
 import kotlin.collections.component2
@@ -114,7 +115,7 @@ class UploadRepository(
     ): Pair<Long, Long> {
         val newOffset = expectedOffset + data.size
         val affected = tx.dsl().execute(
-            "UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ? WHERE id = ? AND upload_offset = ?",
+            "UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ?, updated_at = NOW() WHERE id = ? AND upload_offset = ?",
             data, newOffset, uploadId, expectedOffset,
         )
         if (affected == 0) {
@@ -143,6 +144,7 @@ class UploadRepository(
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.PROCESSING_STATUS, "PROCESSING")
+            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
             .and(UPLOAD.PROCESSING_STATUS.eq("PENDING"))
             .execute() > 0
@@ -202,9 +204,52 @@ class UploadRepository(
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
     }
+
+    /**
+     * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
+     * Returns the submission IDs that need SSE notification.
+     */
+    fun markStaleProcessingAsFailed(
+        tx: Configuration,
+        cutoff: java.time.OffsetDateTime,
+    ): List<UUID> =
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+            .setNull(UPLOAD.CHUNK_DATA)
+            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
+            .where(UPLOAD.PROCESSING_STATUS.eq("PROCESSING"))
+            .and(UPLOAD.UPDATED_AT.lt(cutoff))
+            .returning(UPLOAD.SUBMISSION_ID)
+            .fetch()
+            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }
+
+    /**
+     * Finds PENDING uploads that have received at least one chunk but stalled since before [cutoff].
+     * Clears chunk_data and marks them FAILED.
+     * Returns the submission IDs that need SSE notification.
+     */
+    fun markHaltedPendingAsFailed(
+        tx: Configuration,
+        cutoff: OffsetDateTime,
+    ): List<UUID> =
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+            .setNull(UPLOAD.CHUNK_DATA)
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
+            .where(UPLOAD.PROCESSING_STATUS.eq("PENDING"))
+            .and(UPLOAD.UPLOAD_OFFSET.gt(0L))
+            .and(UPLOAD.UPDATED_AT.lt(cutoff))
+            .returning(UPLOAD.SUBMISSION_ID)
+            .fetch()
+            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }
 
     fun clearChunkData(
         tx: Configuration,

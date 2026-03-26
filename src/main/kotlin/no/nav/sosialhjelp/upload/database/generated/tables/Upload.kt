@@ -4,6 +4,7 @@
 package no.nav.sosialhjelp.upload.database.generated.tables
 
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 import kotlin.collections.Collection
@@ -117,6 +118,11 @@ open class Upload(
      * The column <code>public.upload.mellomlagring_storrelse</code>.
      */
     val MELLOMLAGRING_STORRELSE: TableField<UploadRecord, Long?> = createField(DSL.name("mellomlagring_storrelse"), SQLDataType.BIGINT, this, "")
+
+    /**
+     * The column <code>public.upload.updated_at</code>.
+     */
+    val UPDATED_AT: TableField<UploadRecord, OffsetDateTime?> = createField(DSL.name("updated_at"), SQLDataType.TIMESTAMPWITHTIMEZONE.nullable(false), this, "")
 
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

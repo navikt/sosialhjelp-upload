@@ -4,6 +4,7 @@
 package no.nav.sosialhjelp.upload.database.generated.tables.records
 
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
@@ -57,10 +58,14 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(9, value)
         get(): Long? = get(9) as Long?
 
+    open var updatedAt: OffsetDateTime?
+        set(value): Unit = set(10, value)
+        get(): OffsetDateTime? = get(10) as OffsetDateTime?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null): this() {
+    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, updatedAt: OffsetDateTime? = null): this() {
         this.id = id
         this.submissionId = submissionId
         this.originalFilename = originalFilename
@@ -71,6 +76,7 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         this.mellomlagringFilnavn = mellomlagringFilnavn
         this.processingStatus = processingStatus
         this.mellomlagringStorrelse = mellomlagringStorrelse
+        this.updatedAt = updatedAt
         resetChangedOnNotNull()
     }
 }

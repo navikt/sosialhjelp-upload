@@ -12,6 +12,7 @@ import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.UploadRecoveryService
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
@@ -23,6 +24,9 @@ import no.nav.sosialhjelp.upload.validation.VirusScanner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.minutes
 import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
@@ -86,10 +90,21 @@ fun Application.module() {
         provide(SubmissionStatusService::class)
         provide(GotenbergService::class)
         provide(DownstreamUploadService::class)
+        provide(UploadRecoveryService::class)
     }
     configureSecurity()
     configureHTTP()
     configureMonitoring()
     configureStatusPages()
     configureRouting()
+
+    val recoveryService: UploadRecoveryService by dependencies
+    val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    recoveryScope.launch {
+        while (true) {
+            delay(1.minutes)
+            runCatching { recoveryService.recoverAll() }
+                .onFailure { log.warn("Upload recovery sweep failed", it) }
+        }
+    }
 }
