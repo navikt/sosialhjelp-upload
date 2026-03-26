@@ -25,6 +25,7 @@ import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -68,7 +69,39 @@ class MellomlagringClient(
         return response.bodyAsBytes()
     }
 
+    companion object {
+        private val RETRY_DELAYS_MS = listOf(500L, 2000L)
+        val MAX_ATTEMPTS = RETRY_DELAYS_MS.size + 1
+    }
+
     suspend fun uploadFile(
+        navEksternRefId: String,
+        filename: String,
+        contentType: String,
+        data: ByteArray,
+        token: String,
+    ): UUID {
+        var lastException: Exception? = null
+        for (attempt in 1..MAX_ATTEMPTS) {
+            try {
+                return uploadFileAttempt(navEksternRefId, filename, contentType, data, token)
+            } catch (e: Exception) {
+                lastException = e
+                if (attempt < MAX_ATTEMPTS) {
+                    val delayMs = RETRY_DELAYS_MS[attempt - 1]
+                    logger.warn(
+                        "Mellomlagring upload attempt $attempt/$MAX_ATTEMPTS failed for $navEksternRefId, retrying in ${delayMs}ms",
+                        e,
+                    )
+                    meterRegistry.counter("mellomlagring.upload.retry").increment()
+                    delay(delayMs)
+                }
+            }
+        }
+        throw lastException!!
+    }
+
+    private suspend fun uploadFileAttempt(
         navEksternRefId: String,
         filename: String,
         contentType: String,
