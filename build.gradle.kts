@@ -50,6 +50,9 @@ dependencies {
     // Micrometer Prometheus
     implementation(libs.micrometer.registry.prometheus)
 
+    // OpenTelemetry API (SDK provided at runtime by NAIS auto-instrumentation agent)
+    implementation(libs.opentelemetry.api)
+
     // Database drivers
     implementation(libs.postgresql)
 

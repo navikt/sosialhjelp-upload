@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.action
 
 import io.ktor.http.isSuccess
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -10,6 +11,7 @@ import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import org.jooq.DSLContext
+import java.time.Duration
 import java.util.UUID
 
 private const val COUNTER_SUFFIX_LENGTH = 4
@@ -20,6 +22,7 @@ class DownstreamUploadService(
     private val submissionRepository: SubmissionRepository,
     private val uploadRepository: UploadRepository,
     private val notificationService: SubmissionNotificationService,
+    private val meterRegistry: MeterRegistry,
 ) {
     private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
         val previousId: String =
@@ -68,6 +71,7 @@ class DownstreamUploadService(
                 )
             }
 
+        val startTime = System.nanoTime()
         val response =
             fiksClient.uploadEttersendelse(
                 fiksDigisosId,
@@ -77,6 +81,9 @@ class DownstreamUploadService(
                 metadata,
                 token,
             )
+        val elapsed = Duration.ofNanos(System.nanoTime() - startTime)
+        val result = if (response.status.isSuccess()) "success" else "failure"
+        meterRegistry.timer("fiks.submission", "result", result).record(elapsed)
 
         if (response.status.isSuccess()) {
             withContext(Dispatchers.IO) {

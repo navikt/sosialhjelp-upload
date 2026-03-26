@@ -4,6 +4,9 @@ import io.ktor.server.application.*
 import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.config.property
 import io.ktor.server.plugins.di.*
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.DownstreamUploadService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -67,7 +70,10 @@ fun Application.module() {
     val runtimeEnv = this@module.property<String>("runtimeEnv")
     val isMock = runtimeEnv == "mock" || runtimeEnv == "local"
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     dependencies {
+        provide<PrometheusMeterRegistry> { appMicrometerRegistry }
+        provide<MeterRegistry> { appMicrometerRegistry }
         provide<DataSource> { dataSource }
         provide<DSLContext> { DSL.using(dataSource, SQLDialect.POSTGRES) }
         provide<EncryptionService> {
@@ -94,7 +100,7 @@ fun Application.module() {
     }
     configureSecurity()
     configureHTTP()
-    configureMonitoring()
+    configureMonitoring(appMicrometerRegistry)
     configureStatusPages()
     configureRouting()
 

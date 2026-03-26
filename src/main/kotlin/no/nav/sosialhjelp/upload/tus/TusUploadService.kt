@@ -2,6 +2,7 @@ package no.nav.sosialhjelp.upload.tus
 
 import io.ktor.http.ContentType
 import io.ktor.http.defaultForFile
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
@@ -15,6 +16,7 @@ import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.time.Duration
 import java.util.UUID
 
 class TusUploadService(
@@ -25,6 +27,7 @@ class TusUploadService(
     private val gotenbergService: GotenbergService,
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
+    private val meterRegistry: MeterRegistry,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -40,7 +43,7 @@ class TusUploadService(
                 val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, navEksternRefId)
                 uploadRepository.create(tx, submissionId, filename, size)
                     ?: error("Failed to create upload record")
-            }
+            }.also { meterRegistry.counter("upload.created").increment() }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")
         }
@@ -63,6 +66,7 @@ class TusUploadService(
                     uploadRepository.appendChunk(tx, uploadId, expectedOffset, data)
                 }
             }
+        meterRegistry.summary("upload.chunk.bytes").record(data.size.toDouble())
 
         if (newOffset == totalSize) {
             // Atomically claim the upload for processing to prevent double-processing
@@ -85,6 +89,7 @@ class TusUploadService(
         uploadId: UUID,
         userToken: String,
     ) {
+        val startTime = System.nanoTime()
         val upload =
             withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
@@ -101,6 +106,8 @@ class TusUploadService(
                     uploadRepository.clearChunkData(tx, uploadId)
                 }
             }
+            meterRegistry.timer("upload.processing", "result", "validation_failure")
+                .record(Duration.ofNanos(System.nanoTime() - startTime))
             return
         }
 
@@ -131,6 +138,8 @@ class TusUploadService(
                         uploadRepository.notifyChange(tx, uploadId)
                     }
                 }
+                meterRegistry.timer("upload.processing", "result", "mellomlagring_failure")
+                    .record(Duration.ofNanos(System.nanoTime() - startTime))
                 return
             }
         logger.info("Upload $uploadId stored in mellomlagring as $filId")
@@ -142,6 +151,8 @@ class TusUploadService(
                 uploadRepository.notifyChange(tx, uploadId)
             }
         }
+        meterRegistry.timer("upload.processing", "result", "success")
+            .record(Duration.ofNanos(System.nanoTime() - startTime))
     }
 
     private suspend fun convertIfNeeded(

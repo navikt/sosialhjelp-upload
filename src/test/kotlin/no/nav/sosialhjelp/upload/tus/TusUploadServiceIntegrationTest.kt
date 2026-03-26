@@ -109,6 +109,7 @@ class TusUploadServiceIntegrationTest {
                 gotenbergService = gotenbergService,
                 mellomlagringClient = mellomlagringClient,
                 encryptionService = encryptionService,
+                meterRegistry = io.micrometer.core.instrument.simple.SimpleMeterRegistry(),
             )
     }
 

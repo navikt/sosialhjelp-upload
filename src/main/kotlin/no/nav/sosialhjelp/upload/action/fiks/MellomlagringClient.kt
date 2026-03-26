@@ -23,17 +23,20 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import java.time.Duration
 import java.util.UUID
 
 class MellomlagringClient(
     @Property("fiks.baseUrl") private val fiksBaseUrl: String,
     @Property("fiks.integrasjonsid") private val integrasjonsid: String?,
     @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
+    private val meterRegistry: MeterRegistry,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -69,6 +72,7 @@ class MellomlagringClient(
         token: String,
     ): UUID =
         withContext(Dispatchers.IO) {
+            val startTime = System.nanoTime()
             val metadataPart = FormPart(
                 key = "metadata",
                 value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
@@ -102,11 +106,13 @@ class MellomlagringClient(
             }
 
             val mellomlagring = response.body<MellomlagringResponse>()
-            mellomlagring.mellomlagringMetadataList
+            val filId = mellomlagring.mellomlagringMetadataList
                 .firstOrNull()
                 ?.filId
                 ?.let { UUID.fromString(it) }
                 ?: error("No filId returned from mellomlagring for upload to $navEksternRefId")
+            meterRegistry.timer("mellomlagring.upload").record(Duration.ofNanos(System.nanoTime() - startTime))
+            filId
         }
 
     suspend fun deleteFile(
