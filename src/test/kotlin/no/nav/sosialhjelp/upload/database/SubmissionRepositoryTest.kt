@@ -29,7 +29,7 @@ class SubmissionRepositoryTest {
         runTest {
             val owner = "12345678910"
 
-            val submissionId = dsl.transactionResult { tx -> repository.getOrCreateSubmission(tx, "whatever", owner) }
+            val submissionId = dsl.transactionResult { tx -> repository.getOrCreateSubmission(tx, "whatever", owner, soknadId = soknadId) }
 
             dsl.transaction { config ->
                 val found =
@@ -49,8 +49,8 @@ class SubmissionRepositoryTest {
         runTest {
             val owner = "12345678910"
 
-            val first = dsl.transaction { it -> repository.getOrCreateSubmission(it, "whatever", owner) }
-            val second = dsl.transaction { it -> repository.getOrCreateSubmission(it, "whatever", owner) }
+            val first = dsl.transaction { it -> repository.getOrCreateSubmission(it, "whatever", owner, soknadId = soknadId) }
+            val second = dsl.transaction { it -> repository.getOrCreateSubmission(it, "whatever", owner, soknadId = soknadId) }
 
             assertEquals(first, second)
         }
@@ -62,13 +62,13 @@ class SubmissionRepositoryTest {
             val owner2 = "user2"
 
             dsl.transaction { it ->
-                repository.getOrCreateSubmission(it, "whatever", owner1)
+                repository.getOrCreateSubmission(it, "whatever", owner1, soknadId = soknadId)
             }
 
             val ex =
                 assertThrows<SubmissionRepository.SubmissionOwnedByAnotherUserException> {
                     dsl.transaction { it ->
-                        repository.getOrCreateSubmission(it, "whatever", owner2)
+                        repository.getOrCreateSubmission(it, "whatever", owner2, soknadId = soknadId)
                     }
                 }
 

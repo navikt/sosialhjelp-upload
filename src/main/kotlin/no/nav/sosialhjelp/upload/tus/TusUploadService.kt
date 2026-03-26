@@ -28,7 +28,6 @@ class TusUploadService(
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
     private val meterRegistry: MeterRegistry,
-    private val fiksClient: FiksClient,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -37,15 +36,11 @@ class TusUploadService(
         filename: String,
         size: Long,
         personident: String,
-        soknadId: String? = null,
-        fiksDigisosId: String? = null,
-        token: String
     ): UUID {
-        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, token) }
         return try {
             withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
-                    val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, navEksternRefId)
+                    val submissionId = submissionRepository.getSubmission(tx, contextId, personident)
                     uploadRepository.create(tx, submissionId, filename, size)
                         ?: error("Failed to create upload record")
                 }

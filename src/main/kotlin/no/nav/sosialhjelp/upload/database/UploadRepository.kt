@@ -3,7 +3,6 @@ package no.nav.sosialhjelp.upload.database
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
-import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.validation.Validation
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.Configuration
@@ -30,9 +29,7 @@ data class UploadForProcessing(
     val navEksternRefId: String,
 )
 
-class UploadRepository(
-    val notificationService: SubmissionNotificationService,
-) {
+class UploadRepository {
     class OffsetMismatchException(message: String) : RuntimeException(message)
 
     fun create(

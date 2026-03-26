@@ -46,7 +46,7 @@ class SubmissionStatusServiceTest {
     @Test
     fun `getSubmissionStatus returns empty state when no uploads exist`() {
         val submissionId = createMockSubmission(dsl)
-        val service = SubmissionStatusService(uploadRepository, dsl)
+        val service = SubmissionService(uploadRepository, dsl)
 
         // When: retrieving submission status
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
@@ -87,7 +87,7 @@ class SubmissionStatusServiceTest {
         val uploadId2 =
             createUpload(submissionId, "second.pdf")
 
-        val service = SubmissionStatusService(uploadRepository, dsl)
+        val service = SubmissionService(uploadRepository, dsl)
 
         // When
         val result: SubmissionState = service.getSubmissionStatus(submissionId)

@@ -19,7 +19,7 @@ import no.nav.sosialhjelp.upload.database.UploadRecoveryService
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
-import no.nav.sosialhjelp.upload.status.SubmissionStatusService
+import no.nav.sosialhjelp.upload.status.SubmissionService
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
@@ -93,7 +93,7 @@ fun Application.module() {
         provide(TusUploadService::class)
         provide(UploadRepository::class)
         provide(SubmissionRepository::class)
-        provide(SubmissionStatusService::class)
+        provide(SubmissionService::class)
         provide(GotenbergService::class)
         provide(DownstreamUploadService::class)
         provide(UploadRecoveryService::class)
