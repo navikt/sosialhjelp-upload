@@ -54,8 +54,12 @@ class MellomlagringClient(
         val response = client.get(mellomlagringUrl(navEksternRefId) + "/$id") {
             headers {
                 headers {
-                    integrasjonsid?.let { append("IntegrasjonId", it) }
-                    integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+                    integrasjonsid?.let { append("IntegrasjonId", it) } ?: run {
+                        logger.warn("Mangler fiks integrasjonsid")
+                    }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", it) } ?: run {
+                        logger.warn("Mangler fiks integrasjonspassord")
+                    }
                 }
                 bearerAuth(token)
             }

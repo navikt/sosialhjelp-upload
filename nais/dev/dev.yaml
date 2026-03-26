@@ -76,5 +76,3 @@ spec:
       value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
     - name: RUNTIME_ENV
       value: "dev"
-    - name: BUCKET_NAME
-      value: "sosialhjelp-upload-dev"
