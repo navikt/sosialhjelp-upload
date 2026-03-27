@@ -23,7 +23,6 @@ data class Metadata(
 data class SubmitInput(
     val fiksDigisosId: String? = null,
     val metadata: Metadata,
-    val mellomlagring: Boolean,
 )
 
 fun Route.configureActionRoutes() {

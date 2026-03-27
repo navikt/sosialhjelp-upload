@@ -10,6 +10,7 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import org.apache.tika.Tika
 import org.jooq.DSLContext
 import java.time.Duration
 import java.util.UUID
@@ -68,6 +69,9 @@ class DownstreamUploadService(
                     filId = upload.filId!!,
                     mellomlagringRefId = upload.navEksternRefId!!,
                     storrelse = upload.mellomlagringStorrelse ?: 0L,
+                    mimeType = upload.mellomlagringFilnavn?.let {
+                        Tika().detect(it)
+                    } ?: "unknown"
                 )
             }
 
@@ -103,6 +107,7 @@ data class FilReferanse(
     val filId: UUID,
     val mellomlagringRefId: String,
     val storrelse: Long,
+    val mimeType: String,
 )
 
 @Serializable

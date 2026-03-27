@@ -136,6 +136,7 @@ class FiksClient(
                                 filId = ref.filId.toString(),
                                 mellomlagringRefId = ref.mellomlagringRefId,
                                 storrelse = ref.storrelse,
+                                mimetype = ref.mimeType
                             )
                         append(
                             "vedleggSpesifikasjon:$index",
@@ -222,4 +223,5 @@ private data class VedleggMetadata(
     val filId: String?,
     val mellomlagringRefId: String?,
     val storrelse: Long,
+    val mimetype: String?,
 )
