@@ -27,15 +27,15 @@ class PdfGenerator internal constructor(
     private var xmp: XMPMetadata = XMPMetadata.createXMPMetadata()
     private var pdfaid: PDFAIdentificationSchema = PDFAIdentificationSchema(xmp)
 
-    private var colorProfile: InputStream? = this::class.java.getResourceAsStream("pdf/sRGB.icc")
+    private var colorProfile: InputStream? = this::class.java.getResourceAsStream("/pdf/sRGB.icc")
     private var oi = PDOutputIntent(document, colorProfile)
 
     private var cat: PDDocumentCatalog = document.documentCatalog
     private var metadata: PDMetadata = PDMetadata(document)
 
-    private var fontStream1: InputStream? = this::class.java.getResourceAsStream("pdf/SourceSansPro-Bold.ttf")
+    private var fontStream1: InputStream? = this::class.java.getResourceAsStream("/pdf/SourceSansPro-Bold.ttf")
     private val fontBold: PDFont = PDType0Font.load(document, fontStream1)
-    private var fontStream2: InputStream? = this::class.java.getResourceAsStream("pdf/SourceSansPro-Regular.ttf")
+    private var fontStream2: InputStream? = this::class.java.getResourceAsStream("/pdf/SourceSansPro-Regular.ttf")
     private val fontPlain: PDFont = PDType0Font.load(document, fontStream2)
 
     private fun calculateStartY(): Float = MEDIA_BOX.upperRightY - MARGIN
