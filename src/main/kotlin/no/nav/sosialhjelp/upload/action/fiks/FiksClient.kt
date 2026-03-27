@@ -15,9 +15,11 @@ import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Serializer
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
+import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
 import java.security.cert.CertificateException
@@ -107,7 +109,7 @@ class FiksClient(
         navEksternRefId: String,
         metadata: Metadata,
         token: String,
-        filer: List<Fil>
+        filer: List<Fil>,
     ): HttpResponse =
         withContext(Dispatchers.IO) {
             val vedleggJson =
@@ -130,7 +132,7 @@ class FiksClient(
                         "vedlegg.json",
                         Json.encodeToString(vedleggJson),
                         Headers.build {
-                            append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
+                            append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         },
                     )
 
@@ -211,7 +213,15 @@ data class Fil(val filnavn: String, val sha512: String)
 
 // AKA metadata
 @Serializable
-data class Vedlegg(val type: String, val tilleggsinfo: String, val klageId: String? = null, val status: Status?, val filer: List<Fil>, val hendelseType: HendelseType?, val hendelseReferanse: String?) {
+data class Vedlegg(
+    val type: String,
+    val tilleggsinfo: String,
+    val klageId: String? = null,
+    val status: Status?,
+    val filer: List<Fil>,
+    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,
+    val hendelseReferanse: String?,
+) {
     enum class Status {
         LastetOpp, VedleggKreves, VedleggAlleredeSendt
     }
