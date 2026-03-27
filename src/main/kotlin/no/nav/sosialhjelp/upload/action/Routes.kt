@@ -7,6 +7,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
+import no.nav.sosialhjelp.upload.VerifiedPersonident
 import no.nav.sosialhjelp.upload.VerifiedSubmissionId
 import no.nav.sosialhjelp.upload.verifySubmissionOwnership
 
@@ -38,11 +39,13 @@ fun Route.configureActionRoutes() {
                 ?: return@post call.respondText("fiksDigisosId is required", status = HttpStatusCode.BadRequest)
 
             val result =
-                downstreamUploadService.upload(
+                downstreamUploadService.
+                upload(
                     input.metadata,
                     fiksDigisosId = fiksDigisosId,
                     call.request.header("Authorization")!!.removePrefix("Bearer "),
                     submissionId,
+                    personIdent = call.attributes[VerifiedPersonident],
                 )
             if (result) {
                 return@post call.respond(HttpStatusCode.Created)

@@ -14,10 +14,8 @@ import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
-import no.nav.sosialhjelp.upload.action.FilReferanse
 import no.nav.sosialhjelp.upload.action.Metadata
 import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
 import no.nav.sosialhjelp.upload.texas.TexasClient
@@ -107,7 +105,6 @@ class FiksClient(
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-        filReferanser: List<FilReferanse>,
         metadata: Metadata,
         token: String,
     ): HttpResponse =
@@ -129,23 +126,6 @@ class FiksClient(
                             append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
                         },
                     )
-                    filReferanser.forEachIndexed { index, ref ->
-                        val vedleggMetadata =
-                            VedleggMetadata(
-                                filnavn = ref.filnavn,
-                                filId = ref.filId.toString(),
-                                mellomlagringRefId = ref.mellomlagringRefId,
-                                storrelse = ref.storrelse,
-                                mimetype = ref.mimeType
-                            )
-                        append(
-                            "vedleggSpesifikasjon:$index",
-                            Json.encodeToString(vedleggMetadata),
-                            Headers.build {
-                                append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
-                            },
-                        )
-                    }
                 }
             try {
                 client
@@ -216,12 +196,3 @@ private fun lagIdSuffix(previousId: String): String {
     val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1
     return suffix.toString().padStart(4, '0')
 }
-
-@Serializable
-private data class VedleggMetadata(
-    val filnavn: String?,
-    val filId: String?,
-    val mellomlagringRefId: String?,
-    val storrelse: Long,
-    val mimetype: String?,
-)

@@ -23,6 +23,19 @@ class SubmissionRepository(
             ?.get(SUBMISSION.ID) ?: error("Could not find or create submission")
     }
 
+    fun getNavEksternRefId(tx: Configuration, submissionId: UUID, personIdent: String): String {
+        return tx
+            .dsl()
+            .select(SUBMISSION.NAV_EKSTERN_REF_ID)
+            .from(SUBMISSION)
+            .where(
+                SUBMISSION.ID
+                    .eq(submissionId)
+                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
+            ).fetchOne()
+            ?.get(SUBMISSION.NAV_EKSTERN_REF_ID) ?: error("Could not find or create submission")
+    }
+
     fun getOrCreateSubmission(
         tx: Configuration,
         contextId: String,
