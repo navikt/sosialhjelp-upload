@@ -21,6 +21,7 @@ data class Upload(
     val fileSize: Long?,
     val mellomlagringStorrelse: Long?,
     val status: Status,
+    val sha512: String? = null,
 )
 
 enum class Status {
@@ -185,6 +186,7 @@ class UploadRepository {
         filId: UUID,
         mellomlagringFilnavn: String,
         mellomlagringStorrelse: Long,
+        sha512: String,
     ) {
         tx
             .dsl()
@@ -192,6 +194,7 @@ class UploadRepository {
             .set(UPLOAD.FIL_ID, filId)
             .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)
             .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)
+            .set(UPLOAD.SHA512, sha512)
             .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
             .where(UPLOAD.ID.eq(uploadId))
@@ -289,13 +292,24 @@ class UploadRepository {
             )
         }
 
-    fun getUploadsWithFilenames(
+    fun getUploads(
         tx: Configuration,
         submissionId: UUID,
     ): List<Upload> =
         tx
             .dsl()
-            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE, UPLOAD.PROCESSING_STATUS)
+            .select(
+                UPLOAD.ID,
+                UPLOAD.ORIGINAL_FILENAME,
+                ERROR.CODE,
+                UPLOAD.FIL_ID,
+                SUBMISSION.NAV_EKSTERN_REF_ID,
+                UPLOAD.MELLOMLAGRING_FILNAVN,
+                UPLOAD.SIZE,
+                UPLOAD.MELLOMLAGRING_STORRELSE,
+                UPLOAD.PROCESSING_STATUS,
+                UPLOAD.SHA512
+            )
             .from(UPLOAD)
             .leftJoin(ERROR)
             .on(ERROR.UPLOAD.eq(UPLOAD.ID))
@@ -314,7 +328,8 @@ class UploadRepository {
                     mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),
                     fileSize = records.first().get(UPLOAD.SIZE),
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
-                    status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error("No processing status. Was it not selected?")
+                    status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error("No processing status. Was it not selected?"),
+                    sha512 = records.first().get(UPLOAD.SHA512)
                 )
             }
 

@@ -57,7 +57,8 @@ dependencies {
     implementation(libs.postgresql)
 
     // Dependency Injection and PDF generation
-    implementation(libs.pdfbox.app)
+    implementation(libs.pdfbox)
+    implementation(libs.xmpbox)
 
     // Other dependencies
     implementation(libs.kotlinx.coroutines.reactive)
@@ -77,6 +78,7 @@ dependencies {
     // For build time codegen
     jooqCodegen(libs.jooq.meta)
     jooqCodegen(libs.postgresql)
+
     // Test dependencies (added separately)
     testImplementation(libs.ktor.server.test.host)
 

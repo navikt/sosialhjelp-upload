@@ -16,6 +16,7 @@ import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.security.MessageDigest
 import java.time.Duration
 import java.util.UUID
 
@@ -143,7 +144,7 @@ class TusUploadService(
 
         withContext(Dispatchers.IO) {
             dsl.transaction { tx ->
-                uploadRepository.setFilId(tx, uploadId, filId, finalFilename, finalData.size.toLong())
+                uploadRepository.setFilId(tx, uploadId, filId, finalFilename, finalData.size.toLong(), getSha512(finalData))
                 uploadRepository.clearChunkData(tx, uploadId)
                 uploadRepository.notifyChange(tx, uploadId)
             }
@@ -191,3 +192,9 @@ class TusUploadService(
 }
 
 
+fun getSha512(data: ByteArray): String {
+    val md = MessageDigest.getInstance("SHA-512")
+    md.update(data)
+    val digest = md.digest()
+    return digest.fold("") { str, it -> str + "%02x".format(it) }
+}

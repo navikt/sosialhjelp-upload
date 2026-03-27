@@ -14,10 +14,10 @@ import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
-import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
 import java.security.cert.CertificateException
@@ -107,18 +107,25 @@ class FiksClient(
         navEksternRefId: String,
         metadata: Metadata,
         token: String,
+        filer: List<Fil>
     ): HttpResponse =
         withContext(Dispatchers.IO) {
-            val formData =
-                formData {
-                    val vedleggJson =
-                        VedleggSpesifikasjon(
+            val vedleggJson =
+                VedleggSpesifikasjon(
+                    vedlegg = listOf(
+                        Vedlegg(
                             type = metadata.type,
                             tilleggsinfo = metadata.tilleggsinfo,
-                            innsendelsesfrist = metadata.innsendelsesfrist,
-                            hendelsetype = metadata.hendelsetype,
-                            hendelsereferanse = metadata.hendelsereferanse,
+                            hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },
+                            hendelseReferanse = metadata.hendelsereferanse,
+                            status = Vedlegg.Status.LastetOpp,
+                            filer = filer,
+                            klageId = null
                         )
+                    )
+                )
+            val formData =
+                formData {
                     append(
                         "vedlegg.json",
                         Json.encodeToString(vedleggJson),
@@ -126,6 +133,7 @@ class FiksClient(
                             append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
                         },
                     )
+
                 }
             try {
                 client
@@ -196,3 +204,38 @@ private fun lagIdSuffix(previousId: String): String {
     val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1
     return suffix.toString().padStart(4, '0')
 }
+
+
+@Serializable
+data class Fil(val filnavn: String, val sha512: String)
+
+// AKA metadata
+@Serializable
+data class Vedlegg(val type: String, val tilleggsinfo: String, val klageId: String? = null, val status: Status?, val filer: List<Fil>, val hendelseType: HendelseType?, val hendelseReferanse: String?) {
+    enum class Status {
+        LastetOpp, VedleggKreves, VedleggAlleredeSendt
+    }
+
+    enum class HendelseType(val value: String) {
+        DOKUMENTASJON_ETTERSPURT("dokumentasjonEtterspurt"),
+        DOKUMENTASJONKRAV("dokumentasjonkrav"),
+        SOKNAD("soknad"),
+        BRUKER("bruker");
+
+        companion object {
+            fun fromValue(value: String): HendelseType =
+                when (value) {
+                    "dokumentasjonEtterspurt" -> DOKUMENTASJON_ETTERSPURT
+                    "dokumentasjonkrav" -> DOKUMENTASJONKRAV
+                    "soknad" -> SOKNAD
+                    "bruker" -> BRUKER
+                    else -> error("Unknown hendelse type: $value")
+                }
+        }
+    }
+}
+
+@Serializable
+data class VedleggSpesifikasjon(
+    val vedlegg: List<Vedlegg>,
+)

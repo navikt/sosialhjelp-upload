@@ -3,7 +3,8 @@
 -- L5: indexes for common lookup patterns
 ALTER TABLE upload
     ADD COLUMN processing_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    ADD COLUMN mellomlagring_storrelse BIGINT;
+    ADD COLUMN mellomlagring_storrelse BIGINT,
+    ADD COLUMN sha512 VARCHAR;
 
 -- Values: PENDING, PROCESSING, COMPLETE, FAILED
 CREATE INDEX idx_upload_document_id ON upload (document_id);

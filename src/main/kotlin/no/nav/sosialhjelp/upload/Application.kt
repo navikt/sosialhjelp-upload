@@ -59,8 +59,11 @@ private fun migrateDatabase(dataSource: DataSource) {
         .dataSource(dataSource)
         .locations("db/migration")
         .validateMigrationNaming(true)
-        .cleanDisabled(true)
-        .load()
+        .cleanDisabled(false)
+        .load().also {
+            it.clean()
+            it.migrate()
+        }
         .migrate()
 }
 

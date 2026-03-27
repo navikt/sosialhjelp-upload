@@ -118,6 +118,10 @@ open class Upload(
      * The column <code>public.upload.mellomlagring_storrelse</code>.
      */
     val MELLOMLAGRING_STORRELSE: TableField<UploadRecord, Long?> = createField(DSL.name("mellomlagring_storrelse"), SQLDataType.BIGINT, this, "")
+    /**
+     * The column <code>public.upload.sha512</code>.
+     */
+    val SHA512: TableField<UploadRecord, String?> = createField(DSL.name("sha512"), SQLDataType.VARCHAR, this, "")
 
     /**
      * The column <code>public.upload.updated_at</code>.

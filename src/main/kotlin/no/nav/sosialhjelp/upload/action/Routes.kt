@@ -14,7 +14,7 @@ import no.nav.sosialhjelp.upload.verifySubmissionOwnership
 @Serializable
 data class Metadata(
     val type: String,
-    val tilleggsinfo: String? = null,
+    val tilleggsinfo: String,
     val innsendelsesfrist: String? = null,
     val hendelsetype: String? = null,
     val hendelsereferanse: String? = null,

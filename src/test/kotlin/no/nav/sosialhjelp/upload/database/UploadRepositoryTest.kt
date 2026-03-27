@@ -73,7 +73,7 @@ class UploadRepositoryTest {
         val uploads =
             dsl
                 .transactionResult { tx ->
-                    uploadRepository.getUploadsWithFilenames(tx, submissionId).toList()
+                    uploadRepository.getUploads(tx, submissionId).toList()
                 }.map { it.id }
         assertTrue(uploads.contains(uploadId1))
         assertTrue(uploads.contains(uploadId2))

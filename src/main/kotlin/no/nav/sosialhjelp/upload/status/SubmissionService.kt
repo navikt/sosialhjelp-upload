@@ -33,7 +33,7 @@ class SubmissionService(
 
     fun getSubmissionStatus(submissionId: UUID): SubmissionState =
         dsl.transactionResult { tx ->
-            val filenamesByUpload = uploadRepository.getUploadsWithFilenames(tx, submissionId)
+            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)
             val uploads =
                 filenamesByUpload.mapNotNull { upload ->
                     upload.id
