@@ -4,6 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.forms.ChannelProvider
@@ -63,6 +64,7 @@ class MellomlagringClient(
                     logger.warn("Mangler fiks integrasjonspassord")
                 }
             }
+            accept(ContentType.Any)
             bearerAuth(texasClient.getMaskinportenToken())
         }
         check(response.status.isSuccess()) { "Fikk feil fra Fiks på GET /mellomlagring/$navEksternRefId/$id: ${response.bodyAsText()}" }
