@@ -32,7 +32,7 @@ fun Route.configureActionRoutes() {
     route("/submission/{submissionId}") {
         verifySubmissionOwnership()
 
-        post("submit") {
+        post("/submit") {
             val submissionId = call.attributes[VerifiedSubmissionId]
             val input = call.receive<SubmitInput>()
             val fiksDigisosId = input.fiksDigisosId
