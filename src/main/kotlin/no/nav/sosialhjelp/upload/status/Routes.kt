@@ -4,7 +4,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.request.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
@@ -50,9 +49,8 @@ fun Route.configureStatusRoutes() {
             if (rawId.isBlank()) {
                 error("id parameter is required")
             }
-            val token = call.request.header("Authorization")?.removePrefix("Bearer ") ?: error("Authorization header is required")
 
-            val submissionId = submissionService.getOrCreate(rawId, personident, soknadId, fiksDigisosId, token)
+            val submissionId = submissionService.getOrCreate(rawId, personident, soknadId, fiksDigisosId)
 
             send(submissionService.getSubmissionStatus(submissionId))
 
