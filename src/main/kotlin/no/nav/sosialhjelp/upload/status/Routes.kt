@@ -39,7 +39,6 @@ fun Route.configureStatusRoutes() {
             if (soknadId == null && fiksDigisosId == null) return@sse call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller soknadId")
             val personident = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
 
-
             heartbeat {
                 period = 10.seconds
                 event = ServerSentEvent("""{"heartbeat": "ドキドキ"}""")

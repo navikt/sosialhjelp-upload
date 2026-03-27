@@ -41,7 +41,7 @@ class TexasClient(
             try {
                 response.body<TokenResponse.Success>()
             } catch (e: Exception) {
-                response.body<TokenErrorResponse>()
+                response.body<TokenResponse.Error>()
             }
         if (body is TokenResponse.Success) {
             return body.accessToken

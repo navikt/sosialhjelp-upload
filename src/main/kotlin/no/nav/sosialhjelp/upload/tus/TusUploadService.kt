@@ -59,7 +59,6 @@ class TusUploadService(
         uploadId: UUID,
         expectedOffset: Long,
         data: ByteArray,
-        userToken: String,
     ): Long {
         val (totalSize, newOffset) =
             withContext(Dispatchers.IO) {
@@ -78,7 +77,7 @@ class TusUploadService(
             }
             if (claimed) {
                 logger.info("Upload $uploadId complete, starting post-processing")
-                processCompletedUpload(uploadId, userToken)
+                processCompletedUpload(uploadId)
             } else {
                 logger.info("Upload $uploadId already claimed for processing, skipping")
             }
@@ -89,7 +88,6 @@ class TusUploadService(
 
     private suspend fun processCompletedUpload(
         uploadId: UUID,
-        userToken: String,
     ) {
         val startTime = System.nanoTime()
         val upload =
@@ -129,7 +127,6 @@ class TusUploadService(
                     filename = finalFilename,
                     contentType = contentType,
                     data = encrypted,
-                    token = userToken,
                 )
             } catch (e: Exception) {
                 logger.error("Upload $uploadId failed during mellomlagring upload", e)
@@ -184,7 +181,7 @@ class TusUploadService(
 
         if (filId != null && navEksternRefId != null) {
             runCatching {
-                mellomlagringClient.deleteFile(navEksternRefId, filId, userToken)
+                mellomlagringClient.deleteFile(navEksternRefId, filId)
             }.onFailure {
                 logger.warn("Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned", it)
             }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.util.UUID
@@ -38,6 +39,7 @@ class MellomlagringClient(
     @Property("fiks.integrasjonsid") private val integrasjonsid: String?,
     @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
     private val meterRegistry: MeterRegistry,
+    private val texasClient: TexasClient,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -51,19 +53,17 @@ class MellomlagringClient(
     private fun mellomlagringUrl(navEksternRefId: String) =
         "$fiksBaseUrl/digisos/api/v1/mellomlagring/$navEksternRefId"
 
-    suspend fun getFile(navEksternRefId: String, id: UUID, token: String): ByteArray {
+    suspend fun getFile(navEksternRefId: String, id: UUID): ByteArray {
         val response = client.get(mellomlagringUrl(navEksternRefId) + "/$id") {
             headers {
-                headers {
-                    integrasjonsid?.let { append("IntegrasjonId", it) } ?: run {
-                        logger.warn("Mangler fiks integrasjonsid")
-                    }
-                    integrasjonspassord?.let { append("IntegrasjonPassord", it) } ?: run {
-                        logger.warn("Mangler fiks integrasjonspassord")
-                    }
+                integrasjonsid?.let { append("IntegrasjonId", it) } ?: run {
+                    logger.warn("Mangler fiks integrasjonsid")
                 }
-                bearerAuth(token)
+                integrasjonspassord?.let { append("IntegrasjonPassord", it) } ?: run {
+                    logger.warn("Mangler fiks integrasjonspassord")
+                }
             }
+            bearerAuth(texasClient.getMaskinportenToken())
         }
         check(response.status.isSuccess()) { "Fikk feil fra Fiks på GET /mellomlagring/$navEksternRefId/$id: ${response.bodyAsText()}" }
         return response.bodyAsBytes()
@@ -79,12 +79,11 @@ class MellomlagringClient(
         filename: String,
         contentType: String,
         data: ByteArray,
-        token: String,
     ): UUID {
         var lastException: Exception? = null
         for (attempt in 1..MAX_ATTEMPTS) {
             try {
-                return uploadFileAttempt(navEksternRefId, filename, contentType, data, token)
+                return uploadFileAttempt(navEksternRefId, filename, contentType, data)
             } catch (e: Exception) {
                 lastException = e
                 if (attempt < MAX_ATTEMPTS) {
@@ -106,7 +105,6 @@ class MellomlagringClient(
         filename: String,
         contentType: String,
         data: ByteArray,
-        token: String,
     ): UUID =
         withContext(Dispatchers.IO) {
             val startTime = System.nanoTime()
@@ -135,7 +133,7 @@ class MellomlagringClient(
                         integrasjonspassord?.let { append("IntegrasjonPassord", it) }
                     }
                     contentType(ContentType.MultiPart.FormData)
-                    bearerAuth(token)
+                    bearerAuth(texasClient.getMaskinportenToken())
                 }
 
             check(response.status.isSuccess()) {
@@ -155,7 +153,6 @@ class MellomlagringClient(
     suspend fun deleteFile(
         navEksternRefId: String,
         filId: UUID,
-        token: String,
     ) {
         withContext(Dispatchers.IO) {
             val response =
@@ -164,7 +161,7 @@ class MellomlagringClient(
                         integrasjonsid?.let { append("IntegrasjonId", it) }
                         integrasjonspassord?.let { append("IntegrasjonPassord", it) }
                     }
-                    bearerAuth(token)
+                    bearerAuth(texasClient.getMaskinportenToken())
                 }
             if (response.status != HttpStatusCode.NoContent) {
                 logger.warn("Failed to delete file $filId from mellomlagring: ${response.status}")

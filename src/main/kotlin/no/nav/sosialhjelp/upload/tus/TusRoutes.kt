@@ -98,9 +98,6 @@ fun Route.configureTusRoutes(basePath: String) {
             val uploadOffset = call.request.header("Upload-Offset")?.toLongOrNull()
                 ?: return@patch call.respond(HttpStatusCode.BadRequest)
 
-            val userToken = call.request.header("Authorization")?.removePrefix("Bearer ")
-                ?: return@patch call.respond(HttpStatusCode.Unauthorized)
-
             val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()
             if (data.size > MAX_CHUNK_SIZE) {
                 return@patch call.respond(HttpStatusCode.PayloadTooLarge)
@@ -108,7 +105,7 @@ fun Route.configureTusRoutes(basePath: String) {
 
             val newOffset =
                 runCatching {
-                    tusUploadService.appendChunk(uploadId, uploadOffset, data, userToken)
+                    tusUploadService.appendChunk(uploadId, uploadOffset, data)
                 }.getOrElse { e ->
                     when (e) {
                         is OffsetMismatchException -> return@patch call.respond(HttpStatusCode.Conflict)

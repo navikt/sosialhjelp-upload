@@ -7,7 +7,6 @@ import io.ktor.http.defaultForFile
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.request.header
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
@@ -29,8 +28,6 @@ fun Route.configureDocumentRoutes() {
         val id = call.parameters["uploadId"] ?: error("uploadId is required")
         call.principal<JWTPrincipal>()?.subject
             ?: return@get call.respond(HttpStatusCode.Unauthorized, "Missing subject in token")
-        val token = call.request.header("Authorization")?.removePrefix("Bearer ")
-            ?: return@get call.respond(HttpStatusCode.Unauthorized, "Missing bearer token")
 
         val upload = dsl.transactionResult { tx ->
             uploadRepository.getUpload(tx, UUID.fromString(id))
@@ -41,6 +38,6 @@ fun Route.configureDocumentRoutes() {
 
 
         call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"${upload.mellomlagringFilnavn}\"")
-        call.respondBytes(mellomlagringClient.getFile(upload.navEksternRefId!!, upload.filId!!, token), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))
+        call.respondBytes(mellomlagringClient.getFile(upload.navEksternRefId, upload.filId), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))
     }
 }
