@@ -28,7 +28,7 @@ class UploadRepositoryTest {
         PostgresTestContainer.migrate()
         submissionRepository = SubmissionRepository(dsl)
         notificationServiceMock = mockk<SubmissionNotificationService>()
-        uploadRepository = UploadRepository(notificationServiceMock)
+        uploadRepository = UploadRepository()
     }
 
     @BeforeEach

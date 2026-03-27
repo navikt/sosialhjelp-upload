@@ -48,8 +48,9 @@ fun Route.configureStatusRoutes() {
             if (rawId.isBlank()) {
                 error("id parameter is required")
             }
+            val userToken = call.request.headers["Authorization"]?.removePrefix("Bearer ") ?: error("Authorization header is required")
 
-            val submissionId = submissionService.getOrCreate(rawId, personident, soknadId, fiksDigisosId)
+            val submissionId = submissionService.getOrCreate(rawId, personident, soknadId, fiksDigisosId, userToken)
 
             send(submissionService.getSubmissionStatus(submissionId))
 

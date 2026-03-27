@@ -124,10 +124,8 @@ fun Route.configureTusRoutes(basePath: String) {
         // Terminate an upload
         delete {
             val uploadId = call.attributes[VerifiedUploadId]
-            val userToken = call.request.header("Authorization")?.removePrefix("Bearer ")
-                ?: return@delete call.respond(HttpStatusCode.Unauthorized)
 
-            runCatching { tusUploadService.delete(uploadId, userToken) }.getOrElse {
+            runCatching { tusUploadService.delete(uploadId) }.getOrElse {
                 return@delete call.respond(HttpStatusCode.Forbidden)
             }
 

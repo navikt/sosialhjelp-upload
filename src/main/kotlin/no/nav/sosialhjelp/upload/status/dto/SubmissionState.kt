@@ -5,6 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SubmissionState(
     val submissionId: String,
-    val uploads: List<UploadSuccessState>,
+    val uploads: List<UploadDto>,
     val error: String? = null,
 )

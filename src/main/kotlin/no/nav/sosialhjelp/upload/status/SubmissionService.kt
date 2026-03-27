@@ -2,10 +2,11 @@ package no.nav.sosialhjelp.upload.status
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
-import no.nav.sosialhjelp.upload.status.dto.UploadSuccessState
+import no.nav.sosialhjelp.upload.status.dto.UploadDto
 import org.jooq.DSLContext
 import java.util.*
 
@@ -13,14 +14,16 @@ class SubmissionService(
     val uploadRepository: UploadRepository,
     val submissionRepository: SubmissionRepository,
     val dsl: DSLContext,
+    val fiksClient: FiksClient,
 ) {
     suspend fun getOrCreate(
         contextId: String,
         personIdent: String,
         soknadId: String?,
         fiksDigisosId: String?,
+        userToken: String,
     ): UUID {
-        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId ?: error("Mangler både soknadId og fiksDigisosId")
+        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, userToken) } ?: error("Mangler både soknadId og fiksDigisosId")
         return withContext(Dispatchers.IO) {
             dsl.transactionResult { tx ->
                 submissionRepository.getOrCreateSubmission(tx, contextId, personIdent, navEksternRefId)
@@ -35,13 +38,14 @@ class SubmissionService(
                 filenamesByUpload.mapNotNull { upload ->
                     upload.id
                         ?.let {
-                            UploadSuccessState(
+                            UploadDto(
                                 upload.id,
                                 upload.originalFilename ?: "Ukjent fil",
                                 upload.errors,
                                 upload.filId,
                                 url = upload.filId?.let { "/upload/${upload.id}" },
-                                finalFilename = upload.mellomlagringFilnavn
+                                finalFilename = upload.mellomlagringFilnavn,
+                                status = UploadDto.Status.valueOf(upload.status.name)
                             )
                         }
                 }

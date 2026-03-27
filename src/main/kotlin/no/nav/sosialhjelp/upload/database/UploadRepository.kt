@@ -11,7 +11,7 @@ import java.util.*
 import kotlin.collections.component1
 import kotlin.collections.component2
 
-data class UploadWithFilename(
+data class Upload(
     val id: UUID?,
     val originalFilename: String?,
     val errors: List<ValidationCode>,
@@ -20,7 +20,12 @@ data class UploadWithFilename(
     val mellomlagringFilnavn: String?,
     val fileSize: Long?,
     val mellomlagringStorrelse: Long?,
+    val status: Status,
 )
+
+enum class Status {
+    PROCESSING, FAILED, PENDING, COMPLETE
+}
 
 data class UploadForProcessing(
     val filename: String,
@@ -219,7 +224,7 @@ class UploadRepository {
             .update(UPLOAD)
             .set(UPLOAD.PROCESSING_STATUS, "FAILED")
             .setNull(UPLOAD.CHUNK_DATA)
-            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.PROCESSING_STATUS.eq("PROCESSING"))
             .and(UPLOAD.UPDATED_AT.lt(cutoff))
             .returning(UPLOAD.SUBMISSION_ID)
@@ -265,13 +270,13 @@ class UploadRepository {
         uploadId: UUID,
     ) = tx
         .dsl()
-        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE)
+        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE, UPLOAD.PROCESSING_STATUS)
         .from(UPLOAD)
         .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
         .where(UPLOAD.ID.eq(uploadId))
         .fetchSingle()
         .let {
-            UploadWithFilename(
+            Upload(
                 id = it.get(UPLOAD.ID),
                 originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),
                 errors = emptyList(),
@@ -280,16 +285,17 @@ class UploadRepository {
                 mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),
                 fileSize = it.get(UPLOAD.SIZE),
                 mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),
+                status = it.get(UPLOAD.PROCESSING_STATUS)?.let { status -> Status.valueOf(status) } ?: error("No processing status. Was it not selected?")
             )
         }
 
     fun getUploadsWithFilenames(
         tx: Configuration,
         submissionId: UUID,
-    ): List<UploadWithFilename> =
+    ): List<Upload> =
         tx
             .dsl()
-            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE)
+            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, ERROR.CODE, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE, UPLOAD.PROCESSING_STATUS)
             .from(UPLOAD)
             .leftJoin(ERROR)
             .on(ERROR.UPLOAD.eq(UPLOAD.ID))
@@ -299,7 +305,7 @@ class UploadRepository {
             .fetch()
             .groupBy { it.get(UPLOAD.ID) }
             .map { (id, records) ->
-                UploadWithFilename(
+                Upload(
                     id = id,
                     originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),
                     errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },
@@ -308,6 +314,7 @@ class UploadRepository {
                     mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),
                     fileSize = records.first().get(UPLOAD.SIZE),
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
+                    status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error("No processing status. Was it not selected?")
                 )
             }
 

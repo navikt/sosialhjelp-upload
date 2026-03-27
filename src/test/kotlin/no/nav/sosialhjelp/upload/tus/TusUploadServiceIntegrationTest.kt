@@ -89,7 +89,7 @@ class TusUploadServiceIntegrationTest {
         mockWebServer.start()
 
         notificationService = SubmissionNotificationService(PostgresTestContainer.dataSource)
-        uploadRepository = UploadRepository(notificationService)
+        uploadRepository = UploadRepository()
         submissionRepository = SubmissionRepository(dsl)
 
         val virusScanner = VirusScanner(mockWebServer.url("/virus").toString())
@@ -130,7 +130,7 @@ class TusUploadServiceIntegrationTest {
         val externalId = UUID.randomUUID().toString()
         val personident = "12345678910"
 
-        val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident, fiksDigisosId = fiksDigisosId)
+        val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident)
 
         val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
         assertNotNull(row)
@@ -141,10 +141,10 @@ class TusUploadServiceIntegrationTest {
     @Test
     fun `create with same externalId as different user should throw UploadForbiddenException`() {
         val externalId = UUID.randomUUID().toString()
-        tusUploadService.create(externalId, "first.pdf", 50L, "11111111111", fiksDigisosId = fiksDigisosId)
+        tusUploadService.create(externalId, "first.pdf", 50L, "11111111111")
 
         assertThrows<TusUploadService.UploadForbiddenException> {
-            tusUploadService.create(externalId, "second.pdf", 50L, "99999999999", fiksDigisosId = fiksDigisosId)
+            tusUploadService.create(externalId, "second.pdf", 50L, "99999999999")
         }
     }
 
@@ -156,7 +156,7 @@ class TusUploadServiceIntegrationTest {
     fun `getUploadInfo returns offset and totalSize`() {
         val externalId = UUID.randomUUID().toString()
         val personident = "12345678910"
-        val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident, fiksDigisosId = fiksDigisosId)
+        val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident)
 
         val (offset, total) = tusUploadService.getUploadInfo(uploadId)
 
@@ -174,9 +174,9 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             val content = "hello world".toByteArray()
-            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident, fiksDigisosId = fiksDigisosId)
+            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident)
 
-            val newOffset = tusUploadService.appendChunk(uploadId, 0L, content, "token")
+            val newOffset = tusUploadService.appendChunk(uploadId, 0L, content)
 
             assertEquals(content.size.toLong(), newOffset)
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
@@ -191,11 +191,11 @@ class TusUploadServiceIntegrationTest {
             val content = "hello mellomlagring".toByteArray()
             val filId = UUID.randomUUID()
             coEvery {
-                mellomlagringClient.uploadFile(any(), any(), any(), any(), any())
+                mellomlagringClient.uploadFile(any(), any(), any(), any())
             } returns filId
 
-            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident, fiksDigisosId = fiksDigisosId)
-            tusUploadService.appendChunk(uploadId, 0L, content, "token")
+            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident)
+            tusUploadService.appendChunk(uploadId, 0L, content)
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertNotNull(row)
@@ -216,9 +216,8 @@ class TusUploadServiceIntegrationTest {
                     "toobig.pdf",
                     (MAX_FILE_SIZE + 1).toLong(),
                     personident,
-                    fiksDigisosId = fiksDigisosId,
                 )
-            tusUploadService.appendChunk(uploadId, 0L, oversizedContent, "token")
+            tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
 
             val errors =
                 dsl
@@ -242,9 +241,8 @@ class TusUploadServiceIntegrationTest {
                     "virus.pdf",
                     content.size.toLong(),
                     personident,
-                    fiksDigisosId = fiksDigisosId,
                 )
-            tusUploadService.appendChunk(uploadId, 0L, content, "token")
+            tusUploadService.appendChunk(uploadId, 0L, content)
 
             val errors =
                 dsl
@@ -268,12 +266,11 @@ class TusUploadServiceIntegrationTest {
                     filename = "document.pdf",
                     contentType = any(),
                     data = any(),
-                    token = any(),
                 )
             } returns filId
 
-            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, fiksDigisosId = fiksDigisosId)
-            tusUploadService.appendChunk(uploadId, 0L, content, "token")
+            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident)
+            tusUploadService.appendChunk(uploadId, 0L, content)
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertEquals(filId, row!![UPLOAD.FIL_ID])
@@ -288,9 +285,9 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
-            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident, fiksDigisosId = fiksDigisosId)
+            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident)
 
-            tusUploadService.delete(uploadId, "token")
+            tusUploadService.delete(uploadId)
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertNull(row)

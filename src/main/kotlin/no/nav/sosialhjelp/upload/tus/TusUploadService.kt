@@ -31,19 +31,17 @@ class TusUploadService(
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    suspend fun create(
+    fun create(
         contextId: String,
         filename: String,
         size: Long,
         personident: String,
     ): UUID {
         return try {
-            withContext(Dispatchers.IO) {
-                dsl.transactionResult { tx ->
-                    val submissionId = submissionRepository.getSubmission(tx, contextId, personident)
-                    uploadRepository.create(tx, submissionId, filename, size)
-                        ?: error("Failed to create upload record")
-                }
+            dsl.transactionResult { tx ->
+                val submissionId = submissionRepository.getSubmission(tx, contextId, personident)
+                uploadRepository.create(tx, submissionId, filename, size)
+                    ?: error("Failed to create upload record")
             }.also { meterRegistry.counter("upload.created").increment() }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")
@@ -145,7 +143,7 @@ class TusUploadService(
 
         withContext(Dispatchers.IO) {
             dsl.transaction { tx ->
-                uploadRepository.setFilId(tx, uploadId, filId, finalFilename, encrypted.size.toLong())
+                uploadRepository.setFilId(tx, uploadId, filId, finalFilename, finalData.size.toLong())
                 uploadRepository.clearChunkData(tx, uploadId)
                 uploadRepository.notifyChange(tx, uploadId)
             }
@@ -169,7 +167,6 @@ class TusUploadService(
 
     suspend fun delete(
         uploadId: UUID,
-        userToken: String,
     ) {
         val (filId, navEksternRefId) = withContext(Dispatchers.IO) {
             dsl.transactionResult { tx ->

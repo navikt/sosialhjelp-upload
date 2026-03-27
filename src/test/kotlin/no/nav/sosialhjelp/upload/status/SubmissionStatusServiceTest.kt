@@ -6,7 +6,7 @@ import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
-import no.nav.sosialhjelp.upload.status.dto.UploadSuccessState
+import no.nav.sosialhjelp.upload.status.dto.UploadDto
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeAll
@@ -30,7 +30,7 @@ class SubmissionStatusServiceTest {
         PostgresTestContainer.migrate()
         notificationService = SubmissionNotificationService(PostgresTestContainer.dataSource)
         submissionRepository = SubmissionRepository(dsl)
-        uploadRepository = UploadRepository(notificationService)
+        uploadRepository = UploadRepository()
     }
 
     @BeforeEach
@@ -46,7 +46,7 @@ class SubmissionStatusServiceTest {
     @Test
     fun `getSubmissionStatus returns empty state when no uploads exist`() {
         val submissionId = createMockSubmission(dsl)
-        val service = SubmissionService(uploadRepository, dsl)
+        val service = SubmissionService(uploadRepository, submissionRepository, dsl)
 
         // When: retrieving submission status
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
@@ -87,7 +87,7 @@ class SubmissionStatusServiceTest {
         val uploadId2 =
             createUpload(submissionId, "second.pdf")
 
-        val service = SubmissionService(uploadRepository, dsl)
+        val service = SubmissionService(uploadRepository, submissionRepository, dsl)
 
         // When
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
@@ -95,8 +95,8 @@ class SubmissionStatusServiceTest {
         // Then
         assertEquals(submissionId.toString(), result.submissionId)
         assertEquals(2, result.uploads.size)
-        val firstUpload: UploadSuccessState? = result.uploads.find { it.id == uploadId1 }
-        val secondUpload: UploadSuccessState? = result.uploads.find { it.id == uploadId2 }
+        val firstUpload: UploadDto? = result.uploads.find { it.id == uploadId1 }
+        val secondUpload: UploadDto? = result.uploads.find { it.id == uploadId2 }
         assertNotNull(firstUpload)
         assertNotNull(secondUpload)
         assertEquals("first.pdf", firstUpload.originalFilename)

@@ -6,7 +6,7 @@ import no.nav.sosialhjelp.upload.validation.ValidationCode
 import java.util.UUID
 
 @Serializable
-data class UploadSuccessState(
+data class UploadDto(
     @property:Serializable(with = UUIDSerializer::class)
     val id: UUID?,
     val originalFilename: String,
@@ -15,4 +15,9 @@ data class UploadSuccessState(
     val filId: UUID?,
     val url: String?,
     val finalFilename: String?,
-)
+    val status: Status
+) {
+    enum class Status {
+        COMPLETE, PROCESSING, FAILED, PENDING
+    }
+}

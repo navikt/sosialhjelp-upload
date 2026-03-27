@@ -112,7 +112,7 @@ open class Upload(
     /**
      * The column <code>public.upload.processing_status</code>.
      */
-    val PROCESSING_STATUS: TableField<UploadRecord, String?> = createField(DSL.name("processing_status"), SQLDataType.VARCHAR(20).nullable(false).defaultValue(DSL.inline("PENDING")), this, "")
+    val PROCESSING_STATUS: TableField<UploadRecord, String> = createField(DSL.name("processing_status"), SQLDataType.VARCHAR(20).nullable(false).defaultValue(DSL.inline("PENDING")), this, "")
 
     /**
      * The column <code>public.upload.mellomlagring_storrelse</code>.
