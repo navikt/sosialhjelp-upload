@@ -38,7 +38,7 @@ class FiksClient(
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-    ) = "$fiksBaseUrl/digisos/api/v1/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId"
+    ) = "$fiksBaseUrl/digisos/api/v2/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId"
 
     private fun digisosSakUrl(fiksDigisosId: String) = "$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId"
 
