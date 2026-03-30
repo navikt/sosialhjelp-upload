@@ -8,7 +8,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import no.ks.kryptering.CMSKrypteringImpl
-import no.nav.sosialhjelp.upload.action.DownstreamUploadService
+import no.nav.sosialhjelp.upload.action.EttersendelseService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
@@ -98,7 +98,7 @@ fun Application.module() {
         provide(SubmissionRepository::class)
         provide(SubmissionService::class)
         provide(GotenbergService::class)
-        provide(DownstreamUploadService::class)
+        provide(EttersendelseService::class)
         provide(UploadRecoveryService::class)
     }
     configureSecurity()

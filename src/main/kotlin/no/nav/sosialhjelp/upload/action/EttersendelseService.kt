@@ -19,7 +19,7 @@ import java.util.*
 import kotlin.time.measureTimedValue
 import kotlin.time.toJavaDuration
 
-class DownstreamUploadService(
+class EttersendelseService(
     private val fiksClient: FiksClient,
     private val dsl: DSLContext,
     private val submissionRepository: SubmissionRepository,
@@ -51,14 +51,14 @@ class DownstreamUploadService(
 
         }
         val ettersendelsePdf = EttersendelsePdfGenerator.generate(PdfMetadata(metadata.type, uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } }), personIdent)
-        mellomlagringClient.uploadFile(navEksternRefId, "ettersendelse.pdf", "application/pdf", encryptionService.encryptBytes(ettersendelsePdf))
+//        mellomlagringClient.uploadFile(navEksternRefId, "ettersendelse.pdf", "application/pdf", encryptionService.encryptBytes(ettersendelsePdf))
 
         val filer = uploads.mapNotNull {
             if (it.mellomlagringFilnavn == null || it.sha512 == null) {
                 return@mapNotNull null
             }
             Fil(it.mellomlagringFilnavn, it.sha512)
-        } + Fil("ettersendelse.pdf", getSha512(ettersendelsePdf))
+        }
         val (response, duration) = measureTimedValue {
             fiksClient.uploadEttersendelse(
                 fiksDigisosId,
@@ -66,7 +66,8 @@ class DownstreamUploadService(
                 navEksternRefId,
                 metadata,
                 token,
-                filer
+                filer,
+                ettersendelsePdf
             )
         }
 

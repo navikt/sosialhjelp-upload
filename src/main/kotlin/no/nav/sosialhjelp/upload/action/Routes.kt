@@ -27,7 +27,7 @@ data class SubmitInput(
 )
 
 fun Route.configureActionRoutes() {
-    val downstreamUploadService: DownstreamUploadService by application.dependencies
+    val ettersendelseService: EttersendelseService by application.dependencies
 
     route("/submission/{submissionId}") {
         verifySubmissionOwnership()
@@ -39,7 +39,7 @@ fun Route.configureActionRoutes() {
                 ?: return@post call.respondText("fiksDigisosId is required", status = HttpStatusCode.BadRequest)
 
             val result =
-                downstreamUploadService.
+                ettersendelseService.
                 upload(
                     input.metadata,
                     fiksDigisosId = fiksDigisosId,

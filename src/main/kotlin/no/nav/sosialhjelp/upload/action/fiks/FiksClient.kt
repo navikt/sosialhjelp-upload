@@ -110,6 +110,7 @@ class FiksClient(
         metadata: Metadata,
         token: String,
         filer: List<Fil>,
+        ettersendelsePdf: ByteArray,
     ): HttpResponse =
         withContext(Dispatchers.IO) {
             val vedleggJson =
@@ -135,7 +136,11 @@ class FiksClient(
                             append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         },
                     )
-
+                    append(
+                        "ettersendelse.pdf",
+                        ettersendelsePdf,
+                        Headers.build { append(HttpHeaders.ContentType, ContentType.Application.Pdf.toString()) }
+                    )
                 }
             try {
                 client
