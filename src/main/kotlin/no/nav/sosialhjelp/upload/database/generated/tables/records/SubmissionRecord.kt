@@ -4,6 +4,7 @@
 package no.nav.sosialhjelp.upload.database.generated.tables.records
 
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission
@@ -33,14 +34,19 @@ open class SubmissionRecord() : TableRecordImpl<SubmissionRecord>(Submission.SUB
         set(value): Unit = set(3, value)
         get(): String? = get(3) as String?
 
+    open var createdAt: OffsetDateTime?
+        set(value): Unit = set(4, value)
+        get(): OffsetDateTime? = get(4) as OffsetDateTime?
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null): this() {
+    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null): this() {
         this.id = id
         this.contextId = contextId
         this.ownerIdent = ownerIdent
         this.navEksternRefId = navEksternRefId
+        this.createdAt = createdAt
         resetChangedOnNotNull()
     }
 }

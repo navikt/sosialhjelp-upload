@@ -13,6 +13,8 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
@@ -61,6 +63,7 @@ class FiksClient(
     }
 
     private val certCacheTtlMs = 3_600_000L // 1 hour
+    private val certCacheMutex = Mutex()
 
     @Volatile
     private var cachedCert: Pair<X509Certificate, Long>? = null
@@ -70,9 +73,16 @@ class FiksClient(
         if (cached != null && System.currentTimeMillis() - cached.second < certCacheTtlMs) {
             return cached.first
         }
-        val cert = fetchPublicKeyFromNetwork()
-        cachedCert = cert to System.currentTimeMillis()
-        return cert
+        return certCacheMutex.withLock {
+            // Re-check inside lock — another coroutine may have refreshed while we waited
+            val cachedNow = cachedCert
+            if (cachedNow != null && System.currentTimeMillis() - cachedNow.second < certCacheTtlMs) {
+                return@withLock cachedNow.first
+            }
+            val cert = fetchPublicKeyFromNetwork()
+            cachedCert = cert to System.currentTimeMillis()
+            cert
+        }
     }
 
     private suspend fun fetchPublicKeyFromNetwork(): X509Certificate {
@@ -110,7 +120,6 @@ class FiksClient(
         metadata: Metadata,
         token: String,
         filer: List<Fil>,
-        ettersendelsePdf: ByteArray,
     ): HttpResponse =
         withContext(Dispatchers.IO) {
             val vedleggJson =
@@ -135,11 +144,6 @@ class FiksClient(
                         Headers.build {
                             append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         },
-                    )
-                    append(
-                        "ettersendelse.pdf",
-                        ettersendelsePdf,
-                        Headers.build { append(HttpHeaders.ContentType, ContentType.Application.Pdf.toString()) }
                     )
                 }
             try {

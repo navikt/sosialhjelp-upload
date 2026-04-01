@@ -43,7 +43,8 @@ fun Route.configureActionRoutes() {
                 upload(
                     input.metadata,
                     fiksDigisosId = fiksDigisosId,
-                    call.request.header("Authorization")!!.removePrefix("Bearer "),
+                    call.request.header("Authorization")?.removePrefix("Bearer ")
+                        ?: return@post call.respond(HttpStatusCode.Unauthorized),
                     submissionId,
                     personIdent = call.attributes[VerifiedPersonident],
                 )

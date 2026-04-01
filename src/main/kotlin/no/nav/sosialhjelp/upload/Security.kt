@@ -39,6 +39,11 @@ fun Application.configureSecurity() {
                     this@configureSecurity.log.warn("Wrong acr in JWT. Was ${credential.payload.getClaim("acr").asString()}")
                     return@validate null
                 }
+                val subject = credential.payload.subject
+                if (subject == null || !subject.matches(Regex("\\d{11}"))) {
+                    this@configureSecurity.log.warn("JWT subject is missing or not a valid 11-digit personnummer")
+                    return@validate null
+                }
                 JWTPrincipal(credential.payload)
             }
         }

@@ -1,14 +1,19 @@
 package no.nav.sosialhjelp.upload.database
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
+import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import org.jooq.Configuration
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
+import java.time.OffsetDateTime
 import java.util.*
 
 class SubmissionRepository(
     private val dsl: DSLContext,
 ) {
     class SubmissionOwnedByAnotherUserException : RuntimeException()
+
+    data class StaleSubmission(val id: UUID, val navEksternRefId: String)
 
     fun getSubmission(tx: Configuration, contextId: String, personIdent: String): UUID {
         return tx
@@ -42,7 +47,7 @@ class SubmissionRepository(
         personIdent: String,
         navEksternRefId: String,
     ): UUID {
-        if (isOwnedByAnotherUser(contextId, personIdent)) {
+        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
             throw SubmissionOwnedByAnotherUserException()
         }
 
@@ -74,11 +79,13 @@ class SubmissionRepository(
     }
 
     private fun isOwnedByAnotherUser(
+        tx: Configuration,
         contextId: String,
         personIdent: String,
     ): Boolean {
         val count =
-            dsl
+            tx
+                .dsl()
                 .selectCount()
                 .from(SUBMISSION)
                 .where(
@@ -116,5 +123,26 @@ class SubmissionRepository(
             .deleteFrom(SUBMISSION)
             .where(SUBMISSION.ID.eq(submissionId))
             .execute()
+
+    fun getStaleSubmissions(
+        tx: Configuration,
+        cutoff: OffsetDateTime,
+    ): List<StaleSubmission> =
+        tx
+            .dsl()
+            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)
+            .from(SUBMISSION)
+            .join(UPLOAD).on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))
+            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)
+            .having(
+                DSL.max(UPLOAD.UPDATED_AT).lt(cutoff)
+                    .and(
+                        DSL.count().filterWhere(
+                            UPLOAD.PROCESSING_STATUS.`in`("PENDING", "PROCESSING"),
+                        ).eq(0),
+                    ),
+            )
+            .fetch()
+            .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }
 }
 

@@ -51,7 +51,7 @@ class EttersendelseService(
 
         }
         val ettersendelsePdf = EttersendelsePdfGenerator.generate(PdfMetadata(metadata.type, uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } }), personIdent)
-//        mellomlagringClient.uploadFile(navEksternRefId, "ettersendelse.pdf", "application/pdf", encryptionService.encryptBytes(ettersendelsePdf))
+        mellomlagringClient.uploadFile(navEksternRefId, "ettersendelse.pdf", "application/pdf", encryptionService.encryptBytes(ettersendelsePdf))
 
         val filer = uploads.mapNotNull {
             if (it.mellomlagringFilnavn == null || it.sha512 == null) {
@@ -67,7 +67,6 @@ class EttersendelseService(
                 metadata,
                 token,
                 filer,
-                ettersendelsePdf
             )
         }
 

@@ -116,6 +116,9 @@ class UploadRepository {
         expectedOffset: Long,
         data: ByteArray,
     ): Pair<Long, Long> {
+        // Lock the row to serialize concurrent chunk uploads to the same upload ID.
+        tx.dsl().select(UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(uploadId)).forUpdate().fetchOne()
+            ?: throw OffsetMismatchException("Upload $uploadId not found")
         val newOffset = expectedOffset + data.size
         val affected = tx.dsl().execute(
             "UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ?, updated_at = NOW() WHERE id = ? AND upload_offset = ?",

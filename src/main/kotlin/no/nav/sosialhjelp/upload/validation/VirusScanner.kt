@@ -10,6 +10,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
@@ -17,6 +18,7 @@ import org.slf4j.LoggerFactory
 
 class VirusScanner(
     @Property("virus.scanner.url") val url: String,
+    private val meterRegistry: MeterRegistry,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -31,6 +33,7 @@ class VirusScanner(
     suspend fun scan(data: ByteArray): Result {
         try {
             if (url.isEmpty()) {
+                meterRegistry.counter("virus.scan.skipped", "reason", "not_configured").increment()
                 return Result.OK
             }
             val body =
@@ -45,6 +48,7 @@ class VirusScanner(
             return Result.FOUND
         } catch (e: Exception) {
             logger.warn("Virus scanner error: ${e.message}, assuming file is clean", e)
+            meterRegistry.counter("virus.scan.skipped", "reason", "error").increment()
             return Result.OK
         }
     }

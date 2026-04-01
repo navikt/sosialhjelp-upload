@@ -60,6 +60,16 @@ class SubmissionNotificationService(
         }
     }
 
+    /**
+     * Fires a pg_notify immediately on a new autocommit connection.
+     *
+     * Must only be called AFTER the relevant database transaction has committed.
+     * If called before commit (or if the transaction rolls back), subscribers will
+     * receive a spurious notification for a change that was never persisted.
+     *
+     * Prefer [no.nav.sosialhjelp.upload.database.UploadRepository.notifyChange] for
+     * notifications that must be atomic with a write transaction.
+     */
     fun notifyUpdate(submissionId: UUID) {
         dataSource.connection.use { conn ->
             conn.prepareStatement("SELECT pg_notify('submission_update', ?)").use { ps ->

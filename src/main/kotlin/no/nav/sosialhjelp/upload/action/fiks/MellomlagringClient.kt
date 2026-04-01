@@ -34,6 +34,7 @@ import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 class MellomlagringClient(
     @Property("fiks.baseUrl") private val fiksBaseUrl: String,
@@ -95,7 +96,7 @@ class MellomlagringClient(
                         e,
                     )
                     meterRegistry.counter("mellomlagring.upload.retry").increment()
-                    delay(delayMs)
+                    delay(delayMs.milliseconds)
                 }
             }
         }
@@ -167,6 +168,22 @@ class MellomlagringClient(
                 }
             if (response.status != HttpStatusCode.NoContent) {
                 logger.warn("Failed to delete file $filId from mellomlagring: ${response.status}")
+            }
+        }
+    }
+
+    suspend fun deleteMellomlagring(navEksternRefId: String) {
+        withContext(Dispatchers.IO) {
+            val response =
+                client.delete(mellomlagringUrl(navEksternRefId)) {
+                    headers {
+                        integrasjonsid?.let { append("IntegrasjonId", it) }
+                        integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+                    }
+                    bearerAuth(texasClient.getMaskinportenToken())
+                }
+            if (response.status != HttpStatusCode.NoContent) {
+                logger.warn("Failed to delete mellomlagring for $navEksternRefId: ${response.status}")
             }
         }
     }

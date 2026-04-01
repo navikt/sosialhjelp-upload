@@ -14,6 +14,7 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
+import no.nav.sosialhjelp.upload.database.RetentionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRecoveryService
 import no.nav.sosialhjelp.upload.database.UploadRepository
@@ -59,11 +60,8 @@ private fun migrateDatabase(dataSource: DataSource) {
         .dataSource(dataSource)
         .locations("db/migration")
         .validateMigrationNaming(true)
-        .cleanDisabled(false)
-        .load().also {
-            it.clean()
-            it.migrate()
-        }
+        .cleanDisabled(true)
+        .load()
         .migrate()
 }
 
@@ -100,6 +98,7 @@ fun Application.module() {
         provide(GotenbergService::class)
         provide(EttersendelseService::class)
         provide(UploadRecoveryService::class)
+        provide(RetentionService::class)
     }
     configureSecurity()
     configureHTTP()
@@ -114,6 +113,16 @@ fun Application.module() {
             delay(1.minutes)
             runCatching { recoveryService.recoverAll() }
                 .onFailure { log.warn("Upload recovery sweep failed", it) }
+        }
+    }
+
+    val retentionService: RetentionService by dependencies
+    val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    retentionScope.launch {
+        while (true) {
+            delay(1.minutes)
+            runCatching { retentionService.runRetention() }
+                .onFailure { log.warn("Retention sweep failed", it) }
         }
     }
 }
