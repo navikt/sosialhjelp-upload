@@ -16,6 +16,9 @@ class SubmissionRepository(
     data class StaleSubmission(val id: UUID, val navEksternRefId: String)
 
     fun getSubmission(tx: Configuration, contextId: String, personIdent: String): UUID {
+        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
+            throw SubmissionOwnedByAnotherUserException()
+        }
         return tx
             .dsl()
             .select(SUBMISSION.ID)

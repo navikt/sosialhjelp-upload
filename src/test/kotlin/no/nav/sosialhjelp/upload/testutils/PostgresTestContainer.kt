@@ -10,12 +10,13 @@ import javax.sql.DataSource
 
 object PostgresTestContainer {
     private val instance: PostgreSQLContainer<*> by lazy {
-        PostgreSQLContainer("postgres:17").apply {
-            withDatabaseName("testdb")
-            withUsername("test")
-            withPassword("test")
-            start()
-        }
+            System.setProperty("api.version", "1.44");
+            PostgreSQLContainer("postgres:17").apply {
+                withDatabaseName("testdb")
+                withUsername("test")
+                withPassword("test")
+                start()
+            }
     }
 
     val dataSource: DataSource by lazy {
@@ -29,6 +30,10 @@ object PostgresTestContainer {
     val dsl: DSLContext by lazy {
         DSL.using(dataSource, SQLDialect.POSTGRES)
     }
+
+    val jdbcUrl: String get() = instance.jdbcUrl
+    val username: String get() = instance.username
+    val password: String get() = instance.password
 
     fun migrate() {
         val load =

@@ -8,6 +8,8 @@ object TestUtils {
     fun createMockSubmission(
         tx: DSLContext,
         contextId: String = UUID.randomUUID().toString(),
+        ownerIdent: String = "12345678910",
+        navEksternRefId: String? = null,
     ): UUID {
         val uuid = UUID.randomUUID()
         tx.transactionResult { it ->
@@ -15,9 +17,9 @@ object TestUtils {
                 .dsl()
                 .insertInto(Submission.SUBMISSION)
                 .set(Submission.SUBMISSION.ID, uuid)
-                .set(Submission.SUBMISSION.OWNER_IDENT, "12345678910")
+                .set(Submission.SUBMISSION.OWNER_IDENT, ownerIdent)
                 .set(Submission.SUBMISSION.CONTEXT_ID, contextId)
-                .set(Submission.SUBMISSION.NAV_EKSTERN_REF_ID, uuid.toString())
+                .set(Submission.SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId ?: uuid.toString())
                 .execute()
         }
         return uuid

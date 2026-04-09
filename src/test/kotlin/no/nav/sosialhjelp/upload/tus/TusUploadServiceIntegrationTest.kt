@@ -1,13 +1,9 @@
 package no.nav.sosialhjelp.upload.tus
 
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import mockwebserver3.Dispatcher
-import mockwebserver3.MockResponse
-import mockwebserver3.MockWebServer
-import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
@@ -16,13 +12,14 @@ import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
+import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.SUBMISSION
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
-import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
 import no.nav.sosialhjelp.upload.validation.Result
-import no.nav.sosialhjelp.upload.validation.ScanResult
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
-import okhttp3.Headers
+import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
 import org.jooq.DSLContext
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -36,65 +33,30 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private class TusMockDispatcher : Dispatcher() {
-    override fun dispatch(request: RecordedRequest): MockResponse {
-        return when (request.url.encodedPath) {
-            "/convert" ->
-                MockResponse()
-                    .newBuilder()
-                    .code(200)
-                    .body("pdf-content")
-                    .headers(Headers.headersOf("Content-Type", "application/pdf"))
-                    .build()
-
-            "/virus" -> {
-                val content = request.body?.utf8() ?: ""
-                val result =
-                    if (content.contains("infected")) {
-                        ScanResult("file", Result.FOUND)
-                    } else {
-                        ScanResult("file", Result.OK)
-                    }
-                val body = Json.encodeToString(listOf(result))
-                MockResponse()
-                    .newBuilder()
-                    .code(200)
-                    .body(body)
-                    .headers(Headers.headersOf("Content-Type", "application/json"))
-                    .build()
-            }
-
-            else -> MockResponse().newBuilder().code(404).build()
-        }
-    }
-}
-
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TusUploadServiceIntegrationTest {
     private lateinit var dsl: DSLContext
-    private lateinit var mockWebServer: MockWebServer
     private lateinit var uploadRepository: UploadRepository
     private lateinit var submissionRepository: SubmissionRepository
     private lateinit var tusUploadService: TusUploadService
     private lateinit var mellomlagringClient: MellomlagringClient
     private lateinit var encryptionService: EncryptionService
     private lateinit var notificationService: SubmissionNotificationService
+    private lateinit var virusScanner: VirusScanner
+    private lateinit var gotenbergService: GotenbergService
 
     @BeforeAll
     fun setup() {
         PostgresTestContainer.migrate()
         dsl = PostgresTestContainer.dsl
-        mockWebServer = MockWebServer()
-        mockWebServer.dispatcher = TusMockDispatcher()
-        mockWebServer.start()
 
         notificationService = SubmissionNotificationService(PostgresTestContainer.dataSource)
         uploadRepository = UploadRepository()
         submissionRepository = SubmissionRepository(dsl)
 
-        val virusScanner = VirusScanner(mockWebServer.url("/virus").toString())
+        virusScanner = mockk()
+        gotenbergService = mockk()
         val validator = UploadValidator(virusScanner)
-        val gotenbergService = GotenbergService(mockWebServer.url("/convert").toString())
 
         mellomlagringClient = mockk()
         encryptionService = mockk()
@@ -109,18 +71,15 @@ class TusUploadServiceIntegrationTest {
                 gotenbergService = gotenbergService,
                 mellomlagringClient = mellomlagringClient,
                 encryptionService = encryptionService,
-                meterRegistry = io.micrometer.core.instrument.simple.SimpleMeterRegistry(),
+                meterRegistry = SimpleMeterRegistry(),
             )
-    }
-
-    @AfterAll
-    fun teardown() {
-        mockWebServer.close()
     }
 
     @BeforeEach
     fun cleanDb() {
-        dsl.deleteFrom(UPLOAD).execute()
+        dsl.deleteFrom(SUBMISSION).execute()
+        // Default stub: all files are clean
+        coEvery { virusScanner.scan(any()) } returns Result.OK
     }
 
     // region create
@@ -129,6 +88,7 @@ class TusUploadServiceIntegrationTest {
     fun `create should insert upload record and return UUID`() {
         val externalId = UUID.randomUUID().toString()
         val personident = "12345678910"
+        createMockSubmission(dsl, externalId)
 
         val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident)
 
@@ -141,6 +101,7 @@ class TusUploadServiceIntegrationTest {
     @Test
     fun `create with same externalId as different user should throw UploadForbiddenException`() {
         val externalId = UUID.randomUUID().toString()
+        createMockSubmission(dsl, externalId, ownerIdent = "11111111111")
         tusUploadService.create(externalId, "first.pdf", 50L, "11111111111")
 
         assertThrows<TusUploadService.UploadForbiddenException> {
@@ -156,6 +117,7 @@ class TusUploadServiceIntegrationTest {
     fun `getUploadInfo returns offset and totalSize`() {
         val externalId = UUID.randomUUID().toString()
         val personident = "12345678910"
+        createMockSubmission(dsl, externalId)
         val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident)
 
         val (offset, total) = tusUploadService.getUploadInfo(uploadId)
@@ -174,6 +136,7 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             val content = "hello world".toByteArray()
+            createMockSubmission(dsl, externalId)
             val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident)
 
             val newOffset = tusUploadService.appendChunk(uploadId, 0L, content)
@@ -194,6 +157,7 @@ class TusUploadServiceIntegrationTest {
                 mellomlagringClient.uploadFile(any(), any(), any(), any())
             } returns filId
 
+            createMockSubmission(dsl, externalId)
             val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident)
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -210,6 +174,7 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             val oversizedContent = ByteArray(MAX_FILE_SIZE + 1) { 1 }
 
+            createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
                     externalId,
@@ -235,6 +200,9 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             val content = "infected content".toByteArray()
 
+            coEvery { virusScanner.scan(any()) } returns Result.FOUND
+
+            createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
                     externalId,
@@ -260,6 +228,9 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             val content = "word-doc-content".toByteArray()
             val filId = UUID.randomUUID()
+            val pdfBytes = "converted-pdf-content".toByteArray()
+
+            coEvery { gotenbergService.convertToPdf(any(), any()) } returns pdfBytes
             coEvery {
                 mellomlagringClient.uploadFile(
                     navEksternRefId = any(),
@@ -269,6 +240,7 @@ class TusUploadServiceIntegrationTest {
                 )
             } returns filId
 
+            createMockSubmission(dsl, externalId)
             val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident)
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -285,6 +257,7 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
+            createMockSubmission(dsl, externalId)
             val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident)
 
             tusUploadService.delete(uploadId)

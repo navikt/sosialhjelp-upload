@@ -1,5 +1,7 @@
 package no.nav.sosialhjelp.upload.status
 
+import io.mockk.mockk
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
@@ -46,7 +48,8 @@ class SubmissionStatusServiceTest {
     @Test
     fun `getSubmissionStatus returns empty state when no uploads exist`() {
         val submissionId = createMockSubmission(dsl)
-        val service = SubmissionService(uploadRepository, submissionRepository, dsl)
+        val fiksClient = mockk<FiksClient>(relaxed = true)
+        val service = SubmissionService(uploadRepository, submissionRepository, dsl, fiksClient)
 
         // When: retrieving submission status
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
@@ -87,7 +90,8 @@ class SubmissionStatusServiceTest {
         val uploadId2 =
             createUpload(submissionId, "second.pdf")
 
-        val service = SubmissionService(uploadRepository, submissionRepository, dsl)
+        val fiksClient = mockk<FiksClient>(relaxed = true)
+        val service = SubmissionService(uploadRepository, submissionRepository, dsl, fiksClient)
 
         // When
         val result: SubmissionState = service.getSubmissionStatus(submissionId)

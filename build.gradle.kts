@@ -93,6 +93,7 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
+    environment("DOCKER_API_VERSION", "1.47")
 }
 
 kotlin {

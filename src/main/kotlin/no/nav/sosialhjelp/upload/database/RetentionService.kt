@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
+import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
 
@@ -16,6 +17,7 @@ class RetentionService(
     private val submissionRepository: SubmissionRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val meterRegistry: MeterRegistry,
+    private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),
 ) {
     private val log = LoggerFactory.getLogger(RetentionService::class.java)
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
@@ -28,7 +30,7 @@ class RetentionService(
         val span = tracer.spanBuilder("submission.retention").startSpan()
         val scope = span.makeCurrent()
         try {
-            val cutoff = OffsetDateTime.now().minus(RETENTION_TIMEOUT_HOURS, ChronoUnit.HOURS)
+            val cutoff = OffsetDateTime.now().minus(retentionTimeout)
             val staleSubmissions = withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
                     submissionRepository.getStaleSubmissions(tx, cutoff)
