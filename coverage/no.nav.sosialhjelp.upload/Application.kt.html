@@ -4,24 +4,33 @@ import io.ktor.server.application.*
 import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.config.property
 import io.ktor.server.plugins.di.*
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import no.ks.kryptering.CMSKrypteringImpl
-import no.nav.sosialhjelp.upload.action.DownstreamUploadService
+import no.nav.sosialhjelp.upload.action.EttersendelseService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
-import no.nav.sosialhjelp.upload.database.DocumentRepository
+import no.nav.sosialhjelp.upload.database.RetentionService
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.UploadRecoveryService
 import no.nav.sosialhjelp.upload.database.UploadRepository
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
-import no.nav.sosialhjelp.upload.fs.FileSystemStorage
-import no.nav.sosialhjelp.upload.fs.GcpBucketStorage
-import no.nav.sosialhjelp.upload.fs.Storage
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
-import no.nav.sosialhjelp.upload.status.DocumentStatusService
+import no.nav.sosialhjelp.upload.status.SubmissionService
 import no.nav.sosialhjelp.upload.texas.TexasClient
-import no.nav.sosialhjelp.upload.tusd.TusService
+import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.minutes
 import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
@@ -46,62 +55,77 @@ private fun getDataSource(config: ApplicationConfig): DataSource {
 }
 
 private fun migrateDatabase(dataSource: DataSource) {
-    val load =
-        Flyway
-            .configure()
-            .dataSource(dataSource)
-            .locations(&quot;db/migration&quot;)
-            .validateMigrationNaming(true)
-            .cleanDisabled(false)
-            .load()
-    load.clean()
-    load.migrate()
+    Flyway
+        .configure()
+        .dataSource(dataSource)
+        .locations(&quot;db/migration&quot;)
+        .validateMigrationNaming(true)
+        .cleanDisabled(false)
+        .load().also {
+            it.clean()
+            it.migrate()
+        }
 }
 
 fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource)
     val runtimeEnv = this@module.property&lt;String&gt;(&quot;runtimeEnv&quot;)
-    val isLocal = runtimeEnv == &quot;local&quot;
-    val isMock = runtimeEnv == &quot;mock&quot;
+    val isMock = runtimeEnv == &quot;mock&quot; || runtimeEnv == &quot;local&quot;
+    val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     dependencies {
-        provide&lt;DataSource&gt; {
-<span class="nc" id="L69">            dataSource</span>
-        }
-        provide&lt;DSLContext&gt; {
-<span class="nc" id="L72">            DSL.using(dataSource, SQLDialect.POSTGRES)</span>
-        }
-<span class="nc bnc" id="L74" title="All 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
-<span class="nc bnc" id="L75" title="All 4 branches missed.">            if (isMock || isLocal) {</span>
-<span class="nc" id="L76">                create(EncryptionServiceMock::class)</span>
+<span class="nc" id="L78">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="fc" id="L79">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="nc" id="L80">        provide&lt;DataSource&gt; { dataSource }</span>
+<span class="fc" id="L81">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
+<span class="pc bpc" id="L82" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (isMock) {</span>
+<span class="fc" id="L84">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L78">                create(EncryptionServiceImpl::class)</span>
-<span class="nc" id="L79">            }</span>
+<span class="nc" id="L86">                create(EncryptionServiceImpl::class)</span>
+<span class="fc" id="L87">            }</span>
         }
-<span class="nc bnc" id="L81" title="All 4 branches missed.">        provide&lt;Storage&gt; {</span>
-<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (isLocal) {</span>
-<span class="nc" id="L83">                create(FileSystemStorage::class)</span>
-            } else {
-<span class="nc" id="L85">                create(GcpBucketStorage::class)</span>
-<span class="nc" id="L86">            }</span>
-        }
+<span class="fc" id="L89">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
         provide(VirusScanner::class)
         provide(UploadValidator::class)
         provide(FiksClient::class)
-        provide(TusService::class)
+        provide(MellomlagringClient::class)
+        provide(TusUploadService::class)
         provide(UploadRepository::class)
-        provide(DocumentRepository::class)
-        provide(DocumentStatusService::class)
+        provide(SubmissionRepository::class)
+        provide(SubmissionService::class)
         provide(GotenbergService::class)
-        provide(DownstreamUploadService::class)
-        provide(DocumentNotificationService::class)
+        provide(EttersendelseService::class)
+        provide(UploadRecoveryService::class)
+        provide(RetentionService::class)
     }
     configureSecurity()
     configureHTTP()
-    configureMonitoring()
+    configureMonitoring(appMicrometerRegistry)
     configureStatusPages()
     configureRouting()
+
+    val recoveryService: UploadRecoveryService by dependencies
+    val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+<span class="pc bpc" id="L113" title="2 of 3 branches missed.">    recoveryScope.launch {</span>
+<span class="fc" id="L114">        while (true) {</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc" id="L116">            runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+        }
+    }
+
+    val retentionService: RetentionService by dependencies
+    val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+<span class="pc bpc" id="L123" title="3 of 4 branches missed.">    retentionScope.launch {</span>
+<span class="fc" id="L124">        while (true) {</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            runCatching { retentionService.runRetention() }</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+        }
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

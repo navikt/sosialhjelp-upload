@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EttersendelseService.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.action</a> &gt; <span class="el_source">EttersendelseService.kt</span></div><h1>EttersendelseService.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.action
+
+import io.ktor.http.*
+import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.*
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import no.nav.sosialhjelp.upload.action.fiks.Fil
+import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
+import no.nav.sosialhjelp.upload.pdf.PdfFil
+import no.nav.sosialhjelp.upload.pdf.PdfMetadata
+import no.nav.sosialhjelp.upload.tus.getSha512
+import org.jooq.DSLContext
+import java.util.*
+import kotlin.time.measureTimedValue
+import kotlin.time.toJavaDuration
+
+<span class="fc" id="L22">class EttersendelseService(</span>
+<span class="fc" id="L23">    private val fiksClient: FiksClient,</span>
+<span class="fc" id="L24">    private val dsl: DSLContext,</span>
+<span class="fc" id="L25">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L26">    private val notificationService: SubmissionNotificationService,</span>
+<span class="fc" id="L27">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L28">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L29">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L30">    private val encryptionService: EncryptionService,</span>
+) {
+<span class="fc" id="L32">    suspend fun upload(</span>
+        metadata: Metadata,
+        fiksDigisosId: String,
+        token: String,
+        submissionId: UUID,
+        personIdent: String,
+    ): Boolean {
+<span class="fc" id="L39">        val sak = fiksClient.getSak(fiksDigisosId, token)</span>
+<span class="fc" id="L40">        val kommunenummer = sak.kommunenummer</span>
+<span class="fc" id="L41">        val navEksternRefId = withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L42">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L43">                submissionRepository.getNavEksternRefId(tx, submissionId, personIdent)</span>
+<span class="fc" id="L44">            }</span>
+        }
+
+<span class="fc" id="L47">        val uploads = withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L48">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L49">                uploadRepository.getUploads(tx, submissionId)</span>
+<span class="fc" id="L50">            }</span>
+
+        }
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        val ettersendelsePdf = EttersendelsePdfGenerator.generate(PdfMetadata(metadata.type, uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -&gt; PdfFil(filnavn) } }), personIdent)</span>
+<span class="fc" id="L54">        mellomlagringClient.uploadFile(navEksternRefId, &quot;ettersendelse.pdf&quot;, &quot;application/pdf&quot;, encryptionService.encryptBytes(ettersendelsePdf))</span>
+
+<span class="fc" id="L56">        val filer = uploads.mapNotNull {</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">            if (it.mellomlagringFilnavn == null || it.sha512 == null) {</span>
+<span class="nc" id="L58">                return@mapNotNull null</span>
+            }
+<span class="fc" id="L60">            Fil(it.mellomlagringFilnavn, it.sha512)</span>
+        }
+<span class="fc" id="L62">        val (response, duration) = measureTimedValue {</span>
+<span class="fc" id="L63">            fiksClient.uploadEttersendelse(</span>
+<span class="fc" id="L64">                fiksDigisosId,</span>
+<span class="fc" id="L65">                kommunenummer,</span>
+<span class="fc" id="L66">                navEksternRefId,</span>
+<span class="fc" id="L67">                metadata,</span>
+<span class="fc" id="L68">                token,</span>
+<span class="fc" id="L69">                filer,</span>
+<span class="fc" id="L70">            )</span>
+        }
+
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        val result = if (response.status.isSuccess()) &quot;success&quot; else &quot;failure&quot;</span>
+<span class="fc" id="L74">        meterRegistry.timer(&quot;fiks.submission&quot;, &quot;result&quot;, result).record(duration.toJavaDuration())</span>
+
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (response.status.isSuccess()) {</span>
+<span class="fc" id="L77">            withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L78">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L79">                    submissionRepository.cleanup(tx, submissionId)</span>
+<span class="fc" id="L80">                }</span>
+            }
+<span class="fc" id="L82">            notificationService.notifyUpdate(submissionId)</span>
+<span class="fc" id="L83">            return true</span>
+        }
+<span class="nc" id="L85">        return false</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

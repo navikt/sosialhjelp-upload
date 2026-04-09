@@ -6,7 +6,7 @@ package no.nav.sosialhjelp.upload.database.generated
 
 import kotlin.collections.List
 
-import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Submission
 import no.nav.sosialhjelp.upload.database.generated.tables.Error
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
@@ -28,9 +28,9 @@ import org.jooq.impl.SchemaImpl
     }
 
     /**
-     * The table &lt;code&gt;public.document&lt;/code&gt;.
+     * The table &lt;code&gt;public.submission&lt;/code&gt;.
      */
-<span class="nc" id="L33">    val DOCUMENT: Document get() = Document.DOCUMENT</span>
+<span class="nc" id="L33">    val SUBMISSION: Submission get() = Submission.SUBMISSION</span>
 
     /**
      * The table &lt;code&gt;public.error&lt;/code&gt;.
@@ -43,7 +43,7 @@ import org.jooq.impl.SchemaImpl
 <span class="nc" id="L43">    val UPLOAD: Upload get() = Upload.UPLOAD</span>
 
 <span class="nc" id="L45">    override fun getTables(): List&lt;Table&lt;*&gt;&gt; = listOf(</span>
-<span class="nc" id="L46">        Document.DOCUMENT,</span>
+<span class="nc" id="L46">        Submission.SUBMISSION,</span>
 <span class="nc" id="L47">        Error.ERROR,</span>
 <span class="nc" id="L48">        Upload.UPLOAD</span>
 <span class="nc" id="L49">    )</span>

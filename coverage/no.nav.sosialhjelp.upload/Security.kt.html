@@ -8,40 +8,45 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 
 fun Application.configureSecurity() {
-<span class="nc" id="L11">    val jwtIssuer = environment.config.property(&quot;jwt.issuer&quot;).getString()</span>
-<span class="nc" id="L12">    val jwksUri = environment.config.property(&quot;jwt.jwks_uri&quot;).getString()</span>
-<span class="nc" id="L13">    val jwtAudience = environment.config.property(&quot;jwt.audience&quot;).getString()</span>
+<span class="fc" id="L11">    val jwtIssuer = environment.config.property(&quot;jwt.issuer&quot;).getString()</span>
+<span class="fc" id="L12">    val jwksUri = environment.config.property(&quot;jwt.jwks_uri&quot;).getString()</span>
+<span class="fc" id="L13">    val jwtAudience = environment.config.property(&quot;jwt.audience&quot;).getString()</span>
 
-<span class="nc" id="L15">    val jwkProvider =</span>
-<span class="nc" id="L16">        JwkProviderBuilder(URI(jwksUri).toURL())</span>
-<span class="nc" id="L17">            .cached(10, 24, TimeUnit.HOURS)</span>
-<span class="nc" id="L18">            .rateLimited(10, 1, TimeUnit.MINUTES)</span>
-<span class="nc" id="L19">            .build()</span>
+<span class="fc" id="L15">    val jwkProvider =</span>
+<span class="fc" id="L16">        JwkProviderBuilder(URI(jwksUri).toURL())</span>
+<span class="fc" id="L17">            .cached(10, 24, TimeUnit.HOURS)</span>
+<span class="fc" id="L18">            .rateLimited(10, 1, TimeUnit.MINUTES)</span>
+<span class="fc" id="L19">            .build()</span>
 
-<span class="nc" id="L21">    authentication {</span>
-<span class="nc" id="L22">        jwt {</span>
-<span class="nc" id="L23">            verifier(jwkProvider, jwtIssuer)</span>
-<span class="nc bnc" id="L24" title="All 2 branches missed.">            validate { credential -&gt;</span>
-<span class="nc bnc" id="L25" title="All 2 branches missed.">                if (credential.payload.getClaim(&quot;client_id&quot;) == null) {</span>
+<span class="fc" id="L21">    authentication {</span>
+<span class="fc" id="L22">        jwt {</span>
+<span class="fc" id="L23">            verifier(jwkProvider, jwtIssuer)</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            validate { credential -&gt;</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">                if (credential.payload.getClaim(&quot;client_id&quot;) == null) {</span>
 <span class="nc" id="L26">                    this@configureSecurity.log.warn(&quot;Missing client_id in JWT&quot;)</span>
 <span class="nc" id="L27">                    return@validate null</span>
                 }
-<span class="nc bnc" id="L29" title="All 2 branches missed.">                if (credential.payload.getClaim(&quot;client_id&quot;).asString() != jwtAudience) {</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">                if (credential.payload.getClaim(&quot;client_id&quot;).asString() != jwtAudience) {</span>
 <span class="nc" id="L30">                    this@configureSecurity.log.warn(&quot;Wrong client_id in JWT&quot;)</span>
 <span class="nc" id="L31">                    return@validate null</span>
                 }
-<span class="nc bnc" id="L33" title="All 2 branches missed.">                if (&quot;idporten-loa-high&quot; !=</span>
-<span class="nc" id="L34">                    credential.payload</span>
-<span class="nc" id="L35">                        .getClaim(&quot;acr&quot;)</span>
-<span class="nc" id="L36">                        .asString()</span>
-<span class="nc" id="L37">                        .lowercase()</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                if (&quot;idporten-loa-high&quot; !=</span>
+<span class="fc" id="L34">                    credential.payload</span>
+<span class="fc" id="L35">                        .getClaim(&quot;acr&quot;)</span>
+<span class="fc" id="L36">                        .asString()</span>
+<span class="fc" id="L37">                        .lowercase()</span>
                 ) {
 <span class="nc" id="L39">                    this@configureSecurity.log.warn(&quot;Wrong acr in JWT. Was ${credential.payload.getClaim(&quot;acr&quot;).asString()}&quot;)</span>
 <span class="nc" id="L40">                    return@validate null</span>
                 }
-<span class="nc" id="L42">                JWTPrincipal(credential.payload)</span>
+<span class="fc" id="L42">                val subject = credential.payload.subject</span>
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">                if (subject == null || !subject.matches(Regex(&quot;\\d{11}&quot;))) {</span>
+<span class="nc" id="L44">                    this@configureSecurity.log.warn(&quot;JWT subject is missing or not a valid 11-digit personnummer&quot;)</span>
+<span class="nc" id="L45">                    return@validate null</span>
+                }
+<span class="fc" id="L47">                JWTPrincipal(credential.payload)</span>
             }
-<span class="nc" id="L44">        }</span>
-<span class="nc" id="L45">    }</span>
-<span class="nc" id="L46">}</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">    }</span>
+<span class="fc" id="L51">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

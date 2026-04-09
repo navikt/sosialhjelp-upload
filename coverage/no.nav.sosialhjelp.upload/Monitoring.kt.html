@@ -6,25 +6,39 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
+import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
+import io.micrometer.core.instrument.binder.system.ProcessorMetrics
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import org.slf4j.event.Level
 
-fun Application.configureMonitoring() {
-<span class="nc" id="L14">    val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)</span>
-
-<span class="nc" id="L16">    install(MicrometerMetrics) {</span>
-<span class="nc" id="L17">        registry = appMicrometerRegistry</span>
-        // ...
-<span class="nc" id="L19">    }</span>
-<span class="nc" id="L20">    install(CallLogging) {</span>
-<span class="nc" id="L21">        level = Level.INFO</span>
-<span class="nc bnc" id="L22" title="All 4 branches missed.">        filter { call -&gt; !call.request.path().contains(&quot;/internal&quot;) &amp;&amp; !call.request.path().contains(&quot;/metrics&quot;) }</span>
-<span class="nc" id="L23">    }</span>
-<span class="nc" id="L24">    routing {</span>
-<span class="nc bnc" id="L25" title="All 3 branches missed.">        get(&quot;/metrics-micrometer&quot;) {</span>
-<span class="nc" id="L26">            call.respond(appMicrometerRegistry.scrape())</span>
-<span class="nc" id="L27">        }</span>
-<span class="nc" id="L28">    }</span>
-<span class="nc" id="L29">}</span>
+fun Application.configureMonitoring(registry: PrometheusMeterRegistry) {
+<span class="fc" id="L18">    install(MicrometerMetrics) {</span>
+<span class="fc" id="L19">        this.registry = registry</span>
+<span class="fc" id="L20">        distributionStatisticConfig = DistributionStatisticConfig.Builder()</span>
+<span class="fc" id="L21">            .percentilesHistogram(true)</span>
+<span class="fc" id="L22">            .percentiles(0.5, 0.95, 0.99)</span>
+<span class="fc" id="L23">            .build()</span>
+<span class="fc" id="L24">        meterBinders = listOf(</span>
+<span class="fc" id="L25">            JvmMemoryMetrics(),</span>
+<span class="fc" id="L26">            JvmGcMetrics(),</span>
+<span class="fc" id="L27">            JvmThreadMetrics(),</span>
+<span class="fc" id="L28">            ProcessorMetrics(),</span>
+        )
+<span class="fc" id="L30">    }</span>
+<span class="fc" id="L31">    install(CallLogging) {</span>
+<span class="fc" id="L32">        level = Level.INFO</span>
+<span class="fc" id="L33">        filter { call -&gt;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            !call.request.path().contains(&quot;/internal&quot;) &amp;&amp;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            !call.request.path().contains(&quot;/metrics&quot;)</span>
+        }
+<span class="fc" id="L37">    }</span>
+<span class="fc" id="L38">    routing {</span>
+<span class="pc bnc" id="L39" title="All 3 branches missed.">        get(&quot;/metrics-micrometer&quot;) {</span>
+<span class="nc" id="L40">            call.respond(registry.scrape())</span>
+<span class="nc" id="L41">        }</span>
+<span class="fc" id="L42">    }</span>
+<span class="fc" id="L43">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

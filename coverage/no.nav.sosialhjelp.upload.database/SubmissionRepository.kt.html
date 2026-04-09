@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubmissionRepository.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.database</a> &gt; <span class="el_source">SubmissionRepository.kt</span></div><h1>SubmissionRepository.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.database
+
+import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
+import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import org.jooq.Configuration
+import org.jooq.DSLContext
+import org.jooq.impl.DSL
+import java.time.OffsetDateTime
+import java.util.*
+
+<span class="fc" id="L11">class SubmissionRepository(</span>
+<span class="fc" id="L12">    private val dsl: DSLContext,</span>
+) {
+<span class="fc" id="L14">    class SubmissionOwnedByAnotherUserException : RuntimeException()</span>
+
+<span class="fc" id="L16">    data class StaleSubmission(val id: UUID, val navEksternRefId: String)</span>
+
+    fun getSubmission(tx: Configuration, contextId: String, personIdent: String): UUID {
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {</span>
+<span class="fc" id="L20">            throw SubmissionOwnedByAnotherUserException()</span>
+        }
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        return tx</span>
+<span class="fc" id="L23">            .dsl()</span>
+<span class="fc" id="L24">            .select(SUBMISSION.ID)</span>
+<span class="fc" id="L25">            .from(SUBMISSION)</span>
+<span class="fc" id="L26">            .where(</span>
+<span class="fc" id="L27">                SUBMISSION.CONTEXT_ID</span>
+<span class="fc" id="L28">                    .eq(contextId)</span>
+<span class="fc" id="L29">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L30">            ).fetchOne()</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            ?.get(SUBMISSION.ID) ?: error(&quot;Could not find or create submission&quot;)</span>
+    }
+
+    fun getNavEksternRefId(tx: Configuration, submissionId: UUID, personIdent: String): String {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        return tx</span>
+<span class="fc" id="L36">            .dsl()</span>
+<span class="fc" id="L37">            .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L38">            .from(SUBMISSION)</span>
+<span class="fc" id="L39">            .where(</span>
+<span class="fc" id="L40">                SUBMISSION.ID</span>
+<span class="fc" id="L41">                    .eq(submissionId)</span>
+<span class="fc" id="L42">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L43">            ).fetchOne()</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            ?.get(SUBMISSION.NAV_EKSTERN_REF_ID) ?: error(&quot;Could not find or create submission&quot;)</span>
+    }
+
+    fun getOrCreateSubmission(
+        tx: Configuration,
+        contextId: String,
+        personIdent: String,
+        navEksternRefId: String,
+    ): UUID {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {</span>
+<span class="fc" id="L54">            throw SubmissionOwnedByAnotherUserException()</span>
+        }
+
+<span class="fc" id="L57">        val insertedId =</span>
+<span class="fc" id="L58">            tx</span>
+<span class="fc" id="L59">                .dsl()</span>
+<span class="fc" id="L60">                .insertInto(SUBMISSION)</span>
+<span class="fc" id="L61">                .set(SUBMISSION.ID, UUID.randomUUID())</span>
+<span class="fc" id="L62">                .set(SUBMISSION.OWNER_IDENT, personIdent)</span>
+<span class="fc" id="L63">                .set(SUBMISSION.CONTEXT_ID, contextId)</span>
+<span class="fc" id="L64">                .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)</span>
+<span class="fc" id="L65">                .onDuplicateKeyIgnore()</span>
+<span class="fc" id="L66">                .returning(SUBMISSION.ID)</span>
+<span class="fc" id="L67">                .fetchOne()</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                ?.get(SUBMISSION.ID)</span>
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (insertedId != null) return insertedId</span>
+
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        return tx</span>
+<span class="fc" id="L73">            .dsl()</span>
+<span class="fc" id="L74">            .select(SUBMISSION.ID)</span>
+<span class="fc" id="L75">            .from(SUBMISSION)</span>
+<span class="fc" id="L76">            .where(</span>
+<span class="fc" id="L77">                SUBMISSION.CONTEXT_ID</span>
+<span class="fc" id="L78">                    .eq(contextId)</span>
+<span class="fc" id="L79">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L80">            ).fetchOne()</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            ?.get(SUBMISSION.ID) ?: error(&quot;Could not find or create submission&quot;)</span>
+    }
+
+    private fun isOwnedByAnotherUser(
+        tx: Configuration,
+        contextId: String,
+        personIdent: String,
+    ): Boolean {
+<span class="fc" id="L89">        val count =</span>
+<span class="fc" id="L90">            tx</span>
+<span class="fc" id="L91">                .dsl()</span>
+<span class="fc" id="L92">                .selectCount()</span>
+<span class="fc" id="L93">                .from(SUBMISSION)</span>
+<span class="fc" id="L94">                .where(</span>
+<span class="fc" id="L95">                    SUBMISSION.CONTEXT_ID</span>
+<span class="fc" id="L96">                        .eq(contextId)</span>
+<span class="fc" id="L97">                        .and(SUBMISSION.OWNER_IDENT.ne(personIdent)),</span>
+<span class="fc" id="L98">                ).fetchSingle()</span>
+<span class="fc" id="L99">                .value1()</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        return count &gt; 0</span>
+    }
+
+    fun isOwnedByUser(
+        id: UUID,
+        personIdent: String,
+    ): Boolean {
+<span class="fc" id="L107">        val count =</span>
+<span class="fc" id="L108">            dsl</span>
+<span class="fc" id="L109">                .selectCount()</span>
+<span class="fc" id="L110">                .from(SUBMISSION)</span>
+<span class="fc" id="L111">                .where(</span>
+<span class="fc" id="L112">                    SUBMISSION.ID</span>
+<span class="fc" id="L113">                        .eq(id)</span>
+<span class="fc" id="L114">                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L115">                ).fetchOne()</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                ?.value1()</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">        return count != 0</span>
+    }
+
+    fun cleanup(
+        tx: Configuration,
+        submissionId: UUID,
+    ): Int =
+<span class="fc" id="L124">        tx</span>
+<span class="fc" id="L125">            .dsl()</span>
+<span class="fc" id="L126">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L127">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L128">            .execute()</span>
+
+    fun getStaleSubmissions(
+        tx: Configuration,
+        cutoff: OffsetDateTime,
+    ): List&lt;StaleSubmission&gt; =
+<span class="fc" id="L134">        tx</span>
+<span class="fc" id="L135">            .dsl()</span>
+<span class="fc" id="L136">            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L137">            .from(SUBMISSION)</span>
+<span class="fc" id="L138">            .join(UPLOAD).on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))</span>
+<span class="fc" id="L139">            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L140">            .having(</span>
+<span class="fc" id="L141">                DSL.max(UPLOAD.UPDATED_AT).lt(cutoff)</span>
+<span class="fc" id="L142">                    .and(</span>
+<span class="fc" id="L143">                        DSL.count().filterWhere(</span>
+<span class="fc" id="L144">                            UPLOAD.PROCESSING_STATUS.`in`(&quot;PENDING&quot;, &quot;PROCESSING&quot;),</span>
+<span class="fc" id="L145">                        ).eq(0),</span>
+                    ),
+            )
+<span class="fc" id="L148">            .fetch()</span>
+<span class="fc" id="L149">            .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }</span>
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

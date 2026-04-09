@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory
 <span class="nc" id="L41">            try {</span>
 <span class="nc" id="L42">                response.body&lt;TokenResponse.Success&gt;()</span>
 <span class="nc" id="L43">            } catch (e: Exception) {</span>
-<span class="nc" id="L44">                response.body&lt;TokenErrorResponse&gt;()</span>
+<span class="nc" id="L44">                response.body&lt;TokenResponse.Error&gt;()</span>
             }
 <span class="nc bnc" id="L46" title="All 2 branches missed.">        if (body is TokenResponse.Success) {</span>
 <span class="nc" id="L47">            return body.accessToken</span>

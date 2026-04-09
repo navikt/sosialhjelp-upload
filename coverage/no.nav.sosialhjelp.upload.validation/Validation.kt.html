@@ -18,7 +18,7 @@ interface Validation {
 }
 
 <span class="fc" id="L20">class FileSizeValidation : Validation {</span>
-<span class="fc" id="L21">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
+<span class="pc" id="L21">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
 <span class="fc" id="L22">    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE</span>
 }
 
@@ -28,12 +28,12 @@ interface Validation {
 }
 
 <span class="fc" id="L30">class VirusValidation : Validation {</span>
-<span class="fc" id="L31">    override val message: String = &quot;File may contain virus.&quot;</span>
+<span class="pc" id="L31">    override val message: String = &quot;File may contain virus.&quot;</span>
 <span class="fc" id="L32">    override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED</span>
 }
 
-<span class="fc" id="L35">class FileTypeValidation : Validation {</span>
-<span class="fc" id="L36">    override val message: String = &quot;File type is not supported.&quot;</span>
+<span class="fc" id="L35">class FileTypeValidation(actual: String) : Validation {</span>
+<span class="pc" id="L36">    override val message: String = &quot;File type is not supported. Was $actual.&quot;</span>
 <span class="fc" id="L37">    override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED</span>
 }
 

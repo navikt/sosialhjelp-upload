@@ -1,129 +1,354 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UploadRepository.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.database</a> &gt; <span class="el_source">UploadRepository.kt</span></div><h1>UploadRepository.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.database
 
-import no.nav.sosialhjelp.upload.database.generated.tables.references.DOCUMENT
+import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
-import no.nav.sosialhjelp.upload.database.notify.DocumentNotificationService
 import no.nav.sosialhjelp.upload.validation.Validation
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.Configuration
+import java.time.OffsetDateTime
 import java.util.*
+import kotlin.collections.component1
+import kotlin.collections.component2
 
-<span class="fc" id="L12">data class UploadWithFilename(</span>
-<span class="fc" id="L13">    val id: UUID?,</span>
-<span class="fc" id="L14">    val originalFilename: String?,</span>
-<span class="fc" id="L15">    val convertedFilename: String?,</span>
-<span class="fc" id="L16">    val errors: List&lt;ValidationCode&gt;,</span>
-<span class="fc" id="L17">    val signedUrl: String?,</span>
-<span class="pc" id="L18">    val fileSize: Long?</span>
+<span class="fc" id="L14">data class Upload(</span>
+<span class="fc" id="L15">    val id: UUID?,</span>
+<span class="fc" id="L16">    val originalFilename: String?,</span>
+<span class="fc" id="L17">    val errors: List&lt;ValidationCode&gt;,</span>
+<span class="fc" id="L18">    val filId: UUID?,</span>
+<span class="fc" id="L19">    val navEksternRefId: String?,</span>
+<span class="fc" id="L20">    val mellomlagringFilnavn: String?,</span>
+<span class="pc" id="L21">    val fileSize: Long?,</span>
+<span class="pc" id="L22">    val mellomlagringStorrelse: Long?,</span>
+<span class="fc" id="L23">    val status: Status,</span>
+<span class="fc" id="L24">    val sha512: String? = null,</span>
+<span class="fc" id="L25">)</span>
+
+enum class Status {
+<span class="fc" id="L28">    PROCESSING, FAILED, PENDING, COMPLETE</span>
+}
+
+<span class="fc" id="L31">data class UploadForProcessing(</span>
+<span class="fc" id="L32">    val filename: String,</span>
+<span class="fc" id="L33">    val chunkData: ByteArray,</span>
+<span class="pc" id="L34">    val submissionId: UUID,</span>
+<span class="fc" id="L35">    val navEksternRefId: String,</span>
 )
 
-<span class="fc" id="L21">class UploadRepository(</span>
-<span class="pc" id="L22">    val notificationService: DocumentNotificationService,</span>
-) {
+<span class="fc" id="L38">class UploadRepository {</span>
+<span class="nc" id="L39">    class OffsetMismatchException(message: String) : RuntimeException(message)</span>
+
     fun create(
         tx: Configuration,
-        documentId: UUID,
+        submissionId: UUID,
         filename: String,
         filesize: Long,
     ): UUID? =
-<span class="fc" id="L30">        tx</span>
-<span class="fc" id="L31">            .dsl()</span>
-<span class="fc" id="L32">            .insertInto(UPLOAD)</span>
-<span class="fc" id="L33">            .set(UPLOAD.ID, UUID.randomUUID())</span>
-<span class="fc" id="L34">            .set(UPLOAD.DOCUMENT_ID, documentId)</span>
-<span class="fc" id="L35">            .set(UPLOAD.ORIGINAL_FILENAME, filename)</span>
-<span class="fc" id="L36">            .set(UPLOAD.SIZE, filesize)</span>
-<span class="fc" id="L37">            .returning(UPLOAD.ID)</span>
-<span class="fc" id="L38">            .fetchOne()</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            ?.get(UPLOAD.ID)</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            ?.also {</span>
-<span class="fc" id="L41">                notifyChange(tx, it)</span>
-<span class="fc" id="L42">            }</span>
+<span class="fc" id="L47">        tx</span>
+<span class="fc" id="L48">            .dsl()</span>
+<span class="fc" id="L49">            .insertInto(UPLOAD)</span>
+<span class="fc" id="L50">            .set(UPLOAD.ID, UUID.randomUUID())</span>
+<span class="fc" id="L51">            .set(UPLOAD.SUBMISSION_ID, submissionId)</span>
+<span class="fc" id="L52">            .set(UPLOAD.ORIGINAL_FILENAME, filename)</span>
+<span class="fc" id="L53">            .set(UPLOAD.SIZE, filesize)</span>
+<span class="fc" id="L54">            .set(UPLOAD.UPLOAD_OFFSET, 0L)</span>
+<span class="fc" id="L55">            .returning(UPLOAD.ID)</span>
+<span class="fc" id="L56">            .fetchOne()</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            ?.get(UPLOAD.ID)</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            ?.also { notifyChange(tx, it) }</span>
 
     fun notifyChange(
         tx: Configuration,
         uploadId: UUID,
-<span class="fc" id="L47">    ) = notificationService.notifyUpdate(getDocumentIdFromUploadId(tx, uploadId)!!)</span>
+    ) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: return</span>
+        // Send NOTIFY within the transaction so it fires atomically on commit
+<span class="fc" id="L66">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
+<span class="fc" id="L67">    }</span>
 
     fun isOwnedByUser(
         tx: Configuration,
         uploadId: UUID,
         ownerIdent: String,
     ): Boolean =
-<span class="fc bfc" id="L54" title="All 2 branches covered.">        tx</span>
-<span class="fc" id="L55">            .dsl()</span>
-<span class="fc" id="L56">            .selectCount()</span>
-<span class="fc" id="L57">            .from(UPLOAD)</span>
-<span class="fc" id="L58">            .join(DOCUMENT)</span>
-<span class="fc" id="L59">            .on(DOCUMENT.ID.eq(UPLOAD.DOCUMENT_ID))</span>
-<span class="fc" id="L60">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L61">            .and(DOCUMENT.OWNER_IDENT.eq(ownerIdent))</span>
-<span class="fc" id="L62">            .fetchSingle()</span>
-<span class="fc" id="L63">            .value1() &gt; 0</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        tx</span>
+<span class="fc" id="L75">            .dsl()</span>
+<span class="fc" id="L76">            .selectCount()</span>
+<span class="fc" id="L77">            .from(UPLOAD)</span>
+<span class="fc" id="L78">            .join(SUBMISSION)</span>
+<span class="fc" id="L79">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L80">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L81">            .and(SUBMISSION.OWNER_IDENT.eq(ownerIdent))</span>
+<span class="fc" id="L82">            .fetchSingle()</span>
+<span class="fc" id="L83">            .value1() &gt; 0</span>
 
-    fun getDocumentIdFromUploadId(
+    fun getSubmissionIdFromUploadId(
         tx: Configuration,
         uploadId: UUID,
     ): UUID? =
-<span class="fc" id="L69">        tx</span>
-<span class="fc" id="L70">            .dsl()</span>
-<span class="fc" id="L71">            .select(UPLOAD.DOCUMENT_ID)</span>
-<span class="fc" id="L72">            .from(UPLOAD)</span>
-<span class="fc" id="L73">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L74">            .fetchOne()</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            ?.get(UPLOAD.DOCUMENT_ID)</span>
+<span class="fc" id="L89">        tx</span>
+<span class="fc" id="L90">            .dsl()</span>
+<span class="fc" id="L91">            .select(UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L92">            .from(UPLOAD)</span>
+<span class="fc" id="L93">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L94">            .fetchOne()</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            ?.get(UPLOAD.SUBMISSION_ID)</span>
 
-    fun getUploadsWithFilenames(
+    fun getUploadInfo(
         tx: Configuration,
-        documentId: UUID,
-    ): List&lt;UploadWithFilename&gt; =
-<span class="fc" id="L81">        tx</span>
-<span class="fc" id="L82">            .dsl()</span>
-<span class="fc" id="L83">            .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.CONVERTED_FILENAME, ERROR.CODE, UPLOAD.SIGNED_URL, UPLOAD.SIZE)</span>
-<span class="fc" id="L84">            .from(UPLOAD)</span>
-<span class="fc" id="L85">            .leftJoin(ERROR)</span>
-<span class="fc" id="L86">            .on(ERROR.UPLOAD.eq(UPLOAD.ID))</span>
-<span class="fc" id="L87">            .where(UPLOAD.DOCUMENT_ID.eq(documentId))</span>
-<span class="fc" id="L88">            .fetch()</span>
-<span class="fc" id="L89">            .groupBy { it.get(UPLOAD.ID) }</span>
-<span class="fc" id="L90">            .map { (id, records) -&gt;</span>
-<span class="fc" id="L91">                UploadWithFilename(</span>
-<span class="fc" id="L92">                    id = id,</span>
-<span class="fc" id="L93">                    originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),</span>
-<span class="fc" id="L94">                    convertedFilename = records.first().get(UPLOAD.CONVERTED_FILENAME),</span>
-<span class="pc" id="L95">                    errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },</span>
-<span class="fc" id="L96">                    signedUrl = records.first().get(UPLOAD.SIGNED_URL),</span>
-<span class="fc" id="L97">                    fileSize = records.first().get(UPLOAD.SIZE),</span>
-<span class="fc" id="L98">                )</span>
-<span class="fc" id="L99">            }</span>
+        uploadId: UUID,
+    ): Pair&lt;Long, Long&gt; =
+<span class="fc" id="L101">        tx</span>
+<span class="fc" id="L102">            .dsl()</span>
+<span class="fc" id="L103">            .select(UPLOAD.UPLOAD_OFFSET, UPLOAD.SIZE)</span>
+<span class="fc" id="L104">            .from(UPLOAD)</span>
+<span class="fc" id="L105">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L106">            .fetchSingle()</span>
+<span class="fc" id="L107">            .let { it.get(UPLOAD.UPLOAD_OFFSET)!! to it.get(UPLOAD.SIZE)!! }</span>
 
-    fun updateConvertedFilename(
+    /**
+     * Appends [data] to the upload only if the current offset matches [expectedOffset].
+     * Throws [OffsetMismatchException] if the offset doesn't match — callers must return 409 Conflict.
+     */
+    fun appendChunk(
         tx: Configuration,
-        name: String,
+        uploadId: UUID,
+        expectedOffset: Long,
+        data: ByteArray,
+    ): Pair&lt;Long, Long&gt; {
+        // Lock the row to serialize concurrent chunk uploads to the same upload ID.
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        tx.dsl().select(UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(uploadId)).forUpdate().fetchOne()</span>
+<span class="pc" id="L121">            ?: throw OffsetMismatchException(&quot;Upload $uploadId not found&quot;)</span>
+<span class="fc" id="L122">        val newOffset = expectedOffset + data.size</span>
+<span class="fc" id="L123">        val affected = tx.dsl().execute(</span>
+<span class="fc" id="L124">            &quot;UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ?, updated_at = NOW() WHERE id = ? AND upload_offset = ?&quot;,</span>
+<span class="fc" id="L125">            data, newOffset, uploadId, expectedOffset,</span>
+        )
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (affected == 0) {</span>
+<span class="nc" id="L128">            throw OffsetMismatchException(&quot;Upload $uploadId offset mismatch: expected $expectedOffset&quot;)</span>
+        }
+<span class="fc" id="L130">        val totalSize =</span>
+<span class="fc" id="L131">            tx</span>
+<span class="fc" id="L132">                .dsl()</span>
+<span class="fc" id="L133">                .select(UPLOAD.SIZE)</span>
+<span class="fc" id="L134">                .from(UPLOAD)</span>
+<span class="fc" id="L135">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L136">                .fetchSingle()</span>
+<span class="fc" id="L137">                .get(UPLOAD.SIZE)!!</span>
+<span class="fc" id="L138">        return totalSize to newOffset</span>
+    }
+
+    /**
+     * Atomically claims an upload for processing by transitioning PENDING → PROCESSING.
+     * Returns true if this caller claimed it, false if already claimed or processed.
+     */
+    fun claimForProcessing(
+        tx: Configuration,
+        uploadId: UUID,
+    ): Boolean =
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        tx</span>
+<span class="fc" id="L150">            .dsl()</span>
+<span class="fc" id="L151">            .update(UPLOAD)</span>
+<span class="fc" id="L152">            .set(UPLOAD.PROCESSING_STATUS, &quot;PROCESSING&quot;)</span>
+<span class="fc" id="L153">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
+<span class="fc" id="L154">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L155">            .and(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
+<span class="fc" id="L156">            .execute() &gt; 0</span>
+
+    fun getUploadForProcessing(
+        tx: Configuration,
+        uploadId: UUID,
+    ): UploadForProcessing {
+<span class="fc" id="L162">        val record =</span>
+<span class="fc" id="L163">            tx</span>
+<span class="fc" id="L164">                .dsl()</span>
+<span class="fc" id="L165">                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CHUNK_DATA, UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L166">                .from(UPLOAD)</span>
+<span class="fc" id="L167">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L168">                .fetchSingle()</span>
+<span class="fc" id="L169">        val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!</span>
+<span class="fc" id="L170">        val navEksternRefId =</span>
+<span class="fc" id="L171">            tx</span>
+<span class="fc" id="L172">                .dsl()</span>
+<span class="fc" id="L173">                .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L174">                .from(SUBMISSION)</span>
+<span class="fc" id="L175">                .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L176">                .fetchSingle()</span>
+<span class="fc" id="L177">                .get(SUBMISSION.NAV_EKSTERN_REF_ID)!!</span>
+<span class="fc" id="L178">        return UploadForProcessing(</span>
+<span class="fc" id="L179">            filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,</span>
+<span class="fc" id="L180">            chunkData = record.get(UPLOAD.CHUNK_DATA)!!,</span>
+<span class="fc" id="L181">            submissionId = submissionId,</span>
+<span class="fc" id="L182">            navEksternRefId = navEksternRefId,</span>
+        )
+    }
+
+    fun setFilId(
+        tx: Configuration,
+        uploadId: UUID,
+        filId: UUID,
+        mellomlagringFilnavn: String,
+        mellomlagringStorrelse: Long,
+        sha512: String,
+    ) {
+<span class="fc" id="L194">        tx</span>
+<span class="fc" id="L195">            .dsl()</span>
+<span class="fc" id="L196">            .update(UPLOAD)</span>
+<span class="fc" id="L197">            .set(UPLOAD.FIL_ID, filId)</span>
+<span class="fc" id="L198">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
+<span class="fc" id="L199">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
+<span class="fc" id="L200">            .set(UPLOAD.SHA512, sha512)</span>
+<span class="fc" id="L201">            .set(UPLOAD.PROCESSING_STATUS, &quot;COMPLETE&quot;)</span>
+            // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
+<span class="fc" id="L203">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L204">            .execute()</span>
+<span class="fc" id="L205">    }</span>
+
+    fun markFailed(
+        tx: Configuration,
         uploadId: UUID,
     ) {
-<span class="fc" id="L106">        tx</span>
-<span class="fc" id="L107">            .dsl()</span>
-<span class="fc" id="L108">            .update(UPLOAD)</span>
-<span class="fc" id="L109">            .set(UPLOAD.CONVERTED_FILENAME, name)</span>
-<span class="fc" id="L110">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L111">            .execute()</span>
-<span class="fc" id="L112">    }</span>
+<span class="fc" id="L211">        tx</span>
+<span class="fc" id="L212">            .dsl()</span>
+<span class="fc" id="L213">            .update(UPLOAD)</span>
+<span class="fc" id="L214">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
+<span class="fc" id="L215">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
+<span class="fc" id="L216">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L217">            .execute()</span>
+<span class="fc" id="L218">    }</span>
+
+    /**
+     * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
+     * Returns the submission IDs that need SSE notification.
+     */
+    fun markStaleProcessingAsFailed(
+        tx: Configuration,
+        cutoff: java.time.OffsetDateTime,
+    ): List&lt;UUID&gt; =
+<span class="fc" id="L228">        tx</span>
+<span class="fc" id="L229">            .dsl()</span>
+<span class="fc" id="L230">            .update(UPLOAD)</span>
+<span class="fc" id="L231">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
+<span class="fc" id="L232">            .setNull(UPLOAD.CHUNK_DATA)</span>
+<span class="fc" id="L233">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L234">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PROCESSING&quot;))</span>
+<span class="fc" id="L235">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
+<span class="fc" id="L236">            .returning(UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L237">            .fetch()</span>
+<span class="fc" id="L238">            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }</span>
+
+    /**
+     * Finds PENDING uploads that have received at least one chunk but stalled since before [cutoff].
+     * Clears chunk_data and marks them FAILED.
+     * Returns the submission IDs that need SSE notification.
+     */
+    fun markHaltedPendingAsFailed(
+        tx: Configuration,
+        cutoff: OffsetDateTime,
+    ): List&lt;UUID&gt; =
+<span class="fc" id="L249">        tx</span>
+<span class="fc" id="L250">            .dsl()</span>
+<span class="fc" id="L251">            .update(UPLOAD)</span>
+<span class="fc" id="L252">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
+<span class="fc" id="L253">            .setNull(UPLOAD.CHUNK_DATA)</span>
+<span class="fc" id="L254">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L255">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
+<span class="fc" id="L256">            .and(UPLOAD.UPLOAD_OFFSET.gt(0L))</span>
+<span class="fc" id="L257">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
+<span class="fc" id="L258">            .returning(UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L259">            .fetch()</span>
+<span class="fc" id="L260">            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }</span>
+
+    fun clearChunkData(
+        tx: Configuration,
+        uploadId: UUID,
+    ) {
+<span class="fc" id="L266">        tx</span>
+<span class="fc" id="L267">            .dsl()</span>
+<span class="fc" id="L268">            .update(UPLOAD)</span>
+<span class="fc" id="L269">            .setNull(UPLOAD.CHUNK_DATA)</span>
+<span class="fc" id="L270">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L271">            .execute()</span>
+<span class="fc" id="L272">    }</span>
+
+    fun getUpload(
+        tx: Configuration,
+        uploadId: UUID,
+<span class="fc" id="L277">    ) = tx</span>
+<span class="fc" id="L278">        .dsl()</span>
+<span class="fc" id="L279">        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE, UPLOAD.PROCESSING_STATUS)</span>
+<span class="fc" id="L280">        .from(UPLOAD)</span>
+<span class="fc" id="L281">        .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L282">        .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L283">        .fetchSingle()</span>
+<span class="fc" id="L284">        .let {</span>
+<span class="fc" id="L285">            Upload(</span>
+<span class="fc" id="L286">                id = it.get(UPLOAD.ID),</span>
+<span class="fc" id="L287">                originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),</span>
+<span class="fc" id="L288">                errors = emptyList(),</span>
+<span class="fc" id="L289">                filId = it.get(UPLOAD.FIL_ID),</span>
+<span class="fc" id="L290">                navEksternRefId = it.get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
+<span class="fc" id="L291">                mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
+<span class="fc" id="L292">                fileSize = it.get(UPLOAD.SIZE),</span>
+<span class="fc" id="L293">                mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">                status = it.get(UPLOAD.PROCESSING_STATUS)?.let { status -&gt; Status.valueOf(status) } ?: error(&quot;No processing status. Was it not selected?&quot;)</span>
+<span class="fc" id="L295">            )</span>
+<span class="fc" id="L296">        }</span>
+
+    fun getUploads(
+        tx: Configuration,
+        submissionId: UUID,
+    ): List&lt;Upload&gt; =
+<span class="fc" id="L302">        tx</span>
+<span class="fc" id="L303">            .dsl()</span>
+<span class="fc" id="L304">            .select(</span>
+<span class="fc" id="L305">                UPLOAD.ID,</span>
+<span class="fc" id="L306">                UPLOAD.ORIGINAL_FILENAME,</span>
+<span class="fc" id="L307">                ERROR.CODE,</span>
+<span class="fc" id="L308">                UPLOAD.FIL_ID,</span>
+<span class="fc" id="L309">                SUBMISSION.NAV_EKSTERN_REF_ID,</span>
+<span class="fc" id="L310">                UPLOAD.MELLOMLAGRING_FILNAVN,</span>
+<span class="fc" id="L311">                UPLOAD.SIZE,</span>
+<span class="fc" id="L312">                UPLOAD.MELLOMLAGRING_STORRELSE,</span>
+<span class="fc" id="L313">                UPLOAD.PROCESSING_STATUS,</span>
+<span class="fc" id="L314">                UPLOAD.SHA512</span>
+            )
+<span class="fc" id="L316">            .from(UPLOAD)</span>
+<span class="fc" id="L317">            .leftJoin(ERROR)</span>
+<span class="fc" id="L318">            .on(ERROR.UPLOAD.eq(UPLOAD.ID))</span>
+<span class="fc" id="L319">            .join(SUBMISSION)</span>
+<span class="fc" id="L320">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L321">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
+<span class="fc" id="L322">            .fetch()</span>
+<span class="fc" id="L323">            .groupBy { it.get(UPLOAD.ID) }</span>
+<span class="fc" id="L324">            .map { (id, records) -&gt;</span>
+<span class="fc" id="L325">                Upload(</span>
+<span class="fc" id="L326">                    id = id,</span>
+<span class="fc" id="L327">                    originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),</span>
+<span class="pc" id="L328">                    errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },</span>
+<span class="fc" id="L329">                    filId = records.first().get(UPLOAD.FIL_ID),</span>
+<span class="fc" id="L330">                    navEksternRefId = records.first().get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
+<span class="fc" id="L331">                    mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
+<span class="fc" id="L332">                    fileSize = records.first().get(UPLOAD.SIZE),</span>
+<span class="fc" id="L333">                    mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
+<span class="pc bpc" id="L334" title="2 of 4 branches missed.">                    status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error(&quot;No processing status. Was it not selected?&quot;),</span>
+<span class="fc" id="L335">                    sha512 = records.first().get(UPLOAD.SHA512)</span>
+<span class="fc" id="L336">                )</span>
+<span class="fc" id="L337">            }</span>
 
     fun deleteUpload(
         tx: Configuration,
         uploadId: UUID,
     ): Int {
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        val documentId = getDocumentIdFromUploadId(tx, uploadId) ?: error(&quot;No documentid for upload&quot;)</span>
-<span class="fc" id="L119">        val deleted =</span>
-<span class="fc" id="L120">            tx</span>
-<span class="fc" id="L121">                .dsl()</span>
-<span class="fc" id="L122">                .delete(UPLOAD)</span>
-<span class="fc" id="L123">                .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L124">                .execute()</span>
-<span class="fc" id="L125">        notificationService.notifyUpdate(documentId)</span>
-<span class="fc" id="L126">        return deleted</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: error(&quot;No submissionId for upload&quot;)</span>
+<span class="fc" id="L344">        val deleted =</span>
+<span class="fc" id="L345">            tx</span>
+<span class="fc" id="L346">                .dsl()</span>
+<span class="fc" id="L347">                .delete(UPLOAD)</span>
+<span class="fc" id="L348">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L349">                .execute()</span>
+<span class="fc" id="L350">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
+<span class="fc" id="L351">        return deleted</span>
     }
 
     fun addErrors(
@@ -131,29 +356,19 @@ import java.util.*
         uploadId: UUID,
         validations: List&lt;Validation&gt;,
     ) {
-<span class="fc" id="L134">        validations</span>
-<span class="fc" id="L135">            .forEach {</span>
-<span class="fc" id="L136">                tx</span>
-<span class="fc" id="L137">                    .dsl()</span>
-<span class="fc" id="L138">                    .insertInto(ERROR)</span>
-<span class="fc" id="L139">                    .set(ERROR.UPLOAD, uploadId)</span>
-<span class="fc" id="L140">                    .set(ERROR.CODE, it.code.name)</span>
-<span class="fc" id="L141">                    .set(ERROR.ID, UUID.randomUUID())</span>
-<span class="fc" id="L142">                    .execute()</span>
-<span class="fc" id="L143">            }.also { notifyChange(tx, uploadId) }</span>
-<span class="fc" id="L144">    }</span>
-
-    fun setSignedUrl(
-        tx: Configuration,
-        url: String,
-        id: UUID,
-    ) {
-<span class="fc" id="L151">        tx</span>
-<span class="fc" id="L152">            .dsl()</span>
-<span class="fc" id="L153">            .update(UPLOAD)</span>
-<span class="fc" id="L154">            .set(UPLOAD.SIGNED_URL, url)</span>
-<span class="fc" id="L155">            .where(UPLOAD.ID.eq(id))</span>
-<span class="fc" id="L156">            .execute()</span>
-<span class="fc" id="L157">    }</span>
+<span class="fc" id="L359">        validations.forEach {</span>
+<span class="fc" id="L360">            tx</span>
+<span class="fc" id="L361">                .dsl()</span>
+<span class="fc" id="L362">                .insertInto(ERROR)</span>
+<span class="fc" id="L363">                .set(ERROR.UPLOAD, uploadId)</span>
+<span class="fc" id="L364">                .set(ERROR.CODE, it.code.name)</span>
+<span class="fc" id="L365">                .set(ERROR.ID, UUID.randomUUID())</span>
+<span class="fc" id="L366">                .execute()</span>
+<span class="fc" id="L367">        }</span>
+<span class="fc" id="L368">        markFailed(tx, uploadId)</span>
+<span class="fc" id="L369">        notifyChange(tx, uploadId)</span>
+<span class="fc" id="L370">    }</span>
 }
+
+
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
