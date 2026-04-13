@@ -24,3 +24,5 @@ virus:
     url: "$CLAMAV_URL:"
 texas:
   url: "$NAIS_TOKEN_ENDPOINT:http://localhost:8081/api/v1/token"
+gcs:
+  bucketName: "$GCS_BUCKET_NAME:sosialhjelp-upload-dev"

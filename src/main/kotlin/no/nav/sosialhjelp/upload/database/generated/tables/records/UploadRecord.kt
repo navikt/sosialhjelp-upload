@@ -38,45 +38,50 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(4, value)
         get(): Long? = get(4) as Long?
 
-    open var chunkData: ByteArray?
-        set(value): Unit = set(5, value)
-        get(): ByteArray? = get(5) as ByteArray?
-
     open var filId: UUID?
-        set(value): Unit = set(6, value)
-        get(): UUID? = get(6) as UUID?
+        set(value): Unit = set(5, value)
+        get(): UUID? = get(5) as UUID?
 
     open var mellomlagringFilnavn: String?
+        set(value): Unit = set(6, value)
+        get(): String? = get(6) as String?
+
+    open var processingStatus: String?
         set(value): Unit = set(7, value)
         get(): String? = get(7) as String?
 
-    open var processingStatus: String?
-        set(value): Unit = set(8, value)
-        get(): String? = get(8) as String?
-
     open var mellomlagringStorrelse: Long?
+        set(value): Unit = set(8, value)
+        get(): Long? = get(8) as Long?
+
+    open var sha512: String?
         set(value): Unit = set(9, value)
-        get(): Long? = get(9) as Long?
+        get(): String? = get(9) as String?
 
     open var updatedAt: OffsetDateTime?
         set(value): Unit = set(10, value)
         get(): OffsetDateTime? = get(10) as OffsetDateTime?
 
+    open var gcsKey: String?
+        set(value): Unit = set(11, value)
+        get(): String? = get(11) as String?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, updatedAt: OffsetDateTime? = null): this() {
+    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null): this() {
         this.id = id
         this.submissionId = submissionId
         this.originalFilename = originalFilename
         this.size = size
         this.uploadOffset = uploadOffset
-        this.chunkData = chunkData
         this.filId = filId
         this.mellomlagringFilnavn = mellomlagringFilnavn
         this.processingStatus = processingStatus
         this.mellomlagringStorrelse = mellomlagringStorrelse
+        this.sha512 = sha512
         this.updatedAt = updatedAt
+        this.gcsKey = gcsKey
         resetChangedOnNotNull()
     }
 }

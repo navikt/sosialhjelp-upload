@@ -1,11 +1,14 @@
 package no.nav.sosialhjelp.upload.tus
 
-import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
+import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
@@ -15,13 +18,13 @@ import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.SUBMISSION
+import no.nav.sosialhjelp.upload.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.validation.Result
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
 import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
 import org.jooq.DSLContext
-import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -44,6 +47,7 @@ class TusUploadServiceIntegrationTest {
     private lateinit var notificationService: SubmissionNotificationService
     private lateinit var virusScanner: VirusScanner
     private lateinit var gotenbergService: GotenbergService
+    private val processingScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @BeforeAll
     fun setup() {
@@ -71,6 +75,8 @@ class TusUploadServiceIntegrationTest {
                 gotenbergService = gotenbergService,
                 mellomlagringClient = mellomlagringClient,
                 encryptionService = encryptionService,
+                chunkStorage = FileSystemStorage(),
+                processingScope = processingScope,
                 meterRegistry = SimpleMeterRegistry(),
             )
     }
@@ -161,10 +167,12 @@ class TusUploadServiceIntegrationTest {
             val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident)
             tusUploadService.appendChunk(uploadId, 0L, content)
 
+            awaitUploadTerminal(dsl, uploadId)
+
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertNotNull(row)
             assertEquals(filId, row[UPLOAD.FIL_ID])
-            assertNull(row[UPLOAD.CHUNK_DATA], "chunk_data should be cleared after mellomlagring upload")
+            assertNull(row[UPLOAD.GCS_KEY], "gcs_key should be cleared after mellomlagring upload")
         }
 
     @Test
@@ -183,6 +191,8 @@ class TusUploadServiceIntegrationTest {
                     personident,
                 )
             tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
+
+            awaitUploadTerminal(dsl, uploadId)
 
             val errors =
                 dsl
@@ -211,6 +221,8 @@ class TusUploadServiceIntegrationTest {
                     personident,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
+
+            awaitUploadTerminal(dsl, uploadId)
 
             val errors =
                 dsl
@@ -243,6 +255,8 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident)
             tusUploadService.appendChunk(uploadId, 0L, content)
+
+            awaitUploadTerminal(dsl, uploadId)
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertEquals(filId, row!![UPLOAD.FIL_ID])

@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.common
 
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission
+import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import org.jooq.DSLContext
 import java.util.UUID
 
@@ -23,5 +24,23 @@ object TestUtils {
                 .execute()
         }
         return uuid
+    }
+
+    /**
+     * Blocks (using Thread.sleep) until the given upload reaches a terminal status (COMPLETE or FAILED),
+     * or throws if the timeout elapses. Safe to call from coroutine tests — uses real time.
+     */
+    fun awaitUploadTerminal(dsl: DSLContext, uploadId: UUID, timeoutMs: Long = 10_000L) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val status = dsl.select(UPLOAD.PROCESSING_STATUS)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .fetchOne()
+                ?.value1()
+            if (status == "COMPLETE" || status == "FAILED") return
+            Thread.sleep(100)
+        }
+        error("Upload $uploadId did not reach COMPLETE or FAILED within ${timeoutMs}ms")
     }
 }

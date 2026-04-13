@@ -30,7 +30,7 @@ enum class Status {
 
 data class UploadForProcessing(
     val filename: String,
-    val chunkData: ByteArray,
+    val gcsKey: String,
     val submissionId: UUID,
     val navEksternRefId: String,
 )
@@ -38,24 +38,29 @@ data class UploadForProcessing(
 class UploadRepository {
     class OffsetMismatchException(message: String) : RuntimeException(message)
 
+    data class StaleUploadInfo(val submissionId: UUID, val gcsKey: String?)
     fun create(
         tx: Configuration,
         submissionId: UUID,
         filename: String,
         filesize: Long,
-    ): UUID? =
-        tx
+    ): UUID? {
+        val uploadId = UUID.randomUUID()
+        val gcsKey = "uploads/$uploadId"
+        return tx
             .dsl()
             .insertInto(UPLOAD)
-            .set(UPLOAD.ID, UUID.randomUUID())
+            .set(UPLOAD.ID, uploadId)
             .set(UPLOAD.SUBMISSION_ID, submissionId)
             .set(UPLOAD.ORIGINAL_FILENAME, filename)
             .set(UPLOAD.SIZE, filesize)
             .set(UPLOAD.UPLOAD_OFFSET, 0L)
+            .set(UPLOAD.GCS_KEY, gcsKey)
             .returning(UPLOAD.ID)
             .fetchOne()
             ?.get(UPLOAD.ID)
             ?.also { notifyChange(tx, it) }
+    }
 
     fun notifyChange(
         tx: Configuration,
@@ -107,23 +112,26 @@ class UploadRepository {
             .let { it.get(UPLOAD.UPLOAD_OFFSET)!! to it.get(UPLOAD.SIZE)!! }
 
     /**
-     * Appends [data] to the upload only if the current offset matches [expectedOffset].
-     * Throws [OffsetMismatchException] if the offset doesn't match — callers must return 409 Conflict.
+     * Updates the upload offset after a chunk is received.
+     * Throws [OffsetMismatchException] if the current offset doesn't match [expectedOffset].
+     * The actual chunk bytes are written to GCS by the caller; only metadata is tracked here.
      */
     fun appendChunk(
         tx: Configuration,
         uploadId: UUID,
         expectedOffset: Long,
-        data: ByteArray,
+        chunkSize: Int,
     ): Pair<Long, Long> {
         // Lock the row to serialize concurrent chunk uploads to the same upload ID.
         tx.dsl().select(UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(uploadId)).forUpdate().fetchOne()
             ?: throw OffsetMismatchException("Upload $uploadId not found")
-        val newOffset = expectedOffset + data.size
-        val affected = tx.dsl().execute(
-            "UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ?, updated_at = NOW() WHERE id = ? AND upload_offset = ?",
-            data, newOffset, uploadId, expectedOffset,
-        )
+        val newOffset = expectedOffset + chunkSize
+        val affected = tx.dsl().update(UPLOAD)
+            .set(UPLOAD.UPLOAD_OFFSET, newOffset)
+            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
+            .where(UPLOAD.ID.eq(uploadId))
+            .and(UPLOAD.UPLOAD_OFFSET.eq(expectedOffset))
+            .execute()
         if (affected == 0) {
             throw OffsetMismatchException("Upload $uploadId offset mismatch: expected $expectedOffset")
         }
@@ -162,7 +170,7 @@ class UploadRepository {
         val record =
             tx
                 .dsl()
-                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CHUNK_DATA, UPLOAD.SUBMISSION_ID)
+                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.GCS_KEY, UPLOAD.SUBMISSION_ID)
                 .from(UPLOAD)
                 .where(UPLOAD.ID.eq(uploadId))
                 .fetchSingle()
@@ -177,7 +185,7 @@ class UploadRepository {
                 .get(SUBMISSION.NAV_EKSTERN_REF_ID)!!
         return UploadForProcessing(
             filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,
-            chunkData = record.get(UPLOAD.CHUNK_DATA)!!,
+            gcsKey = record.get(UPLOAD.GCS_KEY)!!,
             submissionId = submissionId,
             navEksternRefId = navEksternRefId,
         )
@@ -199,6 +207,7 @@ class UploadRepository {
             .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)
             .set(UPLOAD.SHA512, sha512)
             .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
+            .setNull(UPLOAD.GCS_KEY)
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
@@ -219,57 +228,46 @@ class UploadRepository {
 
     /**
      * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
-     * Returns the submission IDs that need SSE notification.
+     * Returns info needed for SSE notification and GCS cleanup.
      */
     fun markStaleProcessingAsFailed(
         tx: Configuration,
         cutoff: java.time.OffsetDateTime,
-    ): List<UUID> =
+    ): List<StaleUploadInfo> =
         tx
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.PROCESSING_STATUS, "FAILED")
-            .setNull(UPLOAD.CHUNK_DATA)
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.PROCESSING_STATUS.eq("PROCESSING"))
             .and(UPLOAD.UPDATED_AT.lt(cutoff))
-            .returning(UPLOAD.SUBMISSION_ID)
+            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)
             .fetch()
-            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }
+            .mapNotNull { record ->
+                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }
+            }
 
     /**
      * Finds PENDING uploads that have received at least one chunk but stalled since before [cutoff].
-     * Clears chunk_data and marks them FAILED.
-     * Returns the submission IDs that need SSE notification.
+     * Marks them FAILED. Returns info needed for SSE notification and GCS cleanup.
      */
     fun markHaltedPendingAsFailed(
         tx: Configuration,
         cutoff: OffsetDateTime,
-    ): List<UUID> =
+    ): List<StaleUploadInfo> =
         tx
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.PROCESSING_STATUS, "FAILED")
-            .setNull(UPLOAD.CHUNK_DATA)
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.PROCESSING_STATUS.eq("PENDING"))
             .and(UPLOAD.UPLOAD_OFFSET.gt(0L))
             .and(UPLOAD.UPDATED_AT.lt(cutoff))
-            .returning(UPLOAD.SUBMISSION_ID)
+            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)
             .fetch()
-            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }
-
-    fun clearChunkData(
-        tx: Configuration,
-        uploadId: UUID,
-    ) {
-        tx
-            .dsl()
-            .update(UPLOAD)
-            .setNull(UPLOAD.CHUNK_DATA)
-            .where(UPLOAD.ID.eq(uploadId))
-            .execute()
-    }
+            .mapNotNull { record ->
+                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }
+            }
 
     fun getUpload(
         tx: Configuration,
@@ -335,6 +333,19 @@ class UploadRepository {
                     sha512 = records.first().get(UPLOAD.SHA512)
                 )
             }
+
+    fun getGcsKeysForSubmission(
+        tx: Configuration,
+        submissionId: UUID,
+    ): List<String> =
+        tx
+            .dsl()
+            .select(UPLOAD.GCS_KEY)
+            .from(UPLOAD)
+            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
+            .and(UPLOAD.GCS_KEY.isNotNull)
+            .fetch()
+            .mapNotNull { it.get(UPLOAD.GCS_KEY) }
 
     fun deleteUpload(
         tx: Configuration,

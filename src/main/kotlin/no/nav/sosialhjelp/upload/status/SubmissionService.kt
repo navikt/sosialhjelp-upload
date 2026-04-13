@@ -11,10 +11,10 @@ import org.jooq.DSLContext
 import java.util.*
 
 class SubmissionService(
-    val uploadRepository: UploadRepository,
-    val submissionRepository: SubmissionRepository,
-    val dsl: DSLContext,
-    val fiksClient: FiksClient,
+    private val uploadRepository: UploadRepository,
+    private val submissionRepository: SubmissionRepository,
+    private val dsl: DSLContext,
+    private val fiksClient: FiksClient,
 ) {
     suspend fun getOrCreate(
         contextId: String,

@@ -95,11 +95,6 @@ open class Upload(
     val UPLOAD_OFFSET: TableField<UploadRecord, Long?> = createField(DSL.name("upload_offset"), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline(0L)), this, "")
 
     /**
-     * The column <code>public.upload.chunk_data</code>.
-     */
-    val CHUNK_DATA: TableField<UploadRecord, ByteArray?> = createField(DSL.name("chunk_data"), SQLDataType.BINARY, this, "")
-
-    /**
      * The column <code>public.upload.fil_id</code>.
      */
     val FIL_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("fil_id"), SQLDataType.UUID, this, "")
@@ -127,6 +122,11 @@ open class Upload(
      * The column <code>public.upload.updated_at</code>.
      */
     val UPDATED_AT: TableField<UploadRecord, OffsetDateTime?> = createField(DSL.name("updated_at"), SQLDataType.TIMESTAMPWITHTIMEZONE.nullable(false), this, "")
+
+    /**
+     * The column <code>public.upload.gcs_key</code>.
+     */
+    val GCS_KEY: TableField<UploadRecord, String?> = createField(DSL.name("gcs_key"), SQLDataType.VARCHAR(500), this, "")
 
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

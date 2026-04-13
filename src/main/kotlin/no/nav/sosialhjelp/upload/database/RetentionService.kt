@@ -6,6 +6,7 @@ import io.opentelemetry.api.trace.StatusCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.storage.ChunkStorage
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -15,7 +16,9 @@ import java.time.temporal.ChronoUnit
 class RetentionService(
     private val dsl: DSLContext,
     private val submissionRepository: SubmissionRepository,
+    private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
+    private val chunkStorage: ChunkStorage,
     private val meterRegistry: MeterRegistry,
     private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),
 ) {
@@ -55,10 +58,26 @@ class RetentionService(
 
     private suspend fun deleteStaleSubmission(submission: SubmissionRepository.StaleSubmission) {
         try {
+            val gcsKeys = withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx -> uploadRepository.getGcsKeysForSubmission(tx, submission.id) }
+            }
+
             mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)
             withContext(Dispatchers.IO) {
                 dsl.transaction { tx -> submissionRepository.cleanup(tx, submission.id) }
             }
+
+            gcsKeys.forEach { gcsKey ->
+                val chunkPrefix = "$gcsKey-chunk-"
+                runCatching {
+                    val chunkKeys = chunkStorage.listKeys(chunkPrefix)
+                    (chunkKeys + listOf(gcsKey)).forEach { key ->
+                        runCatching { chunkStorage.deleteObject(key) }
+                            .onFailure { log.warn("Failed to delete GCS object $key during retention", it) }
+                    }
+                }.onFailure { log.warn("Failed to list/delete GCS objects for $gcsKey during retention", it) }
+            }
+
             log.info("Deleted stale submission ${submission.id} (navEksternRefId=${submission.navEksternRefId})")
             meterRegistry.counter("submission.retention", "result", "success").increment()
         } catch (e: Exception) {

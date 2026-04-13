@@ -75,6 +75,8 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
     implementation("io.ktor:ktor-serialization-jackson:3.2.3")
 
+    implementation(libs.google.cloud.storage)
+
     // For build time codegen
     jooqCodegen(libs.jooq.meta)
     jooqCodegen(libs.postgresql)

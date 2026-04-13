@@ -28,6 +28,7 @@ import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
@@ -163,10 +164,12 @@ class UploadFlowIntegrationTest {
 
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
 
+        no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+
         val row = PostgresTestContainer.dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
         assertNotNull(row, "Upload row should exist in DB")
         assertEquals(filId, row[UPLOAD.FIL_ID], "FIL_ID should be set to mellomlagring ID")
-        assertNull(row[UPLOAD.CHUNK_DATA], "chunk_data should be cleared after processing")
+        assertNull(row[UPLOAD.GCS_KEY], "gcs_key should be cleared after processing")
 
         coVerify { mellomlagringClient.uploadFile(any(), any(), any(), any()) }
     }
@@ -180,6 +183,7 @@ class UploadFlowIntegrationTest {
 
         createMockSubmission(PostgresTestContainer.dsl, contextId)
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
 
         val deleteResp = client.delete("/sosialhjelp/upload/tus/files/$uploadId") {
             header("Authorization", "Bearer $token")
@@ -210,7 +214,9 @@ class UploadFlowIntegrationTest {
         coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } returns fiksResponse
 
         val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
-        tusUpload(client, contextId, minimalPdf(), token)
+        val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+
+        no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
 
         val submitResp = client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
             header("Authorization", "Bearer $token")

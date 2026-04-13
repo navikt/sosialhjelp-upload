@@ -21,6 +21,10 @@ import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.SubmissionService
+import no.nav.sosialhjelp.upload.storage.ChunkStorage
+import no.nav.sosialhjelp.upload.storage.FileSystemStorage
+import no.nav.sosialhjelp.upload.storage.GcsBucketStorage
+import com.google.cloud.storage.StorageOptions
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
@@ -60,20 +64,25 @@ private fun migrateDatabase(dataSource: DataSource) {
         .dataSource(dataSource)
         .locations("db/migration")
         .validateMigrationNaming(true)
-        .cleanDisabled(false)
-        .load().also {
-            it.clean()
-            it.migrate()
-        }
+        .load()
+        .migrate()
 }
 
 fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource)
     val runtimeEnv = this@module.property<String>("runtimeEnv")
-    val isMock = runtimeEnv == "mock" || runtimeEnv == "local"
+    val isLocal = runtimeEnv == "local"
+    val isMock = runtimeEnv == "mock" || isLocal
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
+    val chunkStorage: ChunkStorage = if (isLocal) {
+        FileSystemStorage()
+    } else {
+        val bucketName = environment.config.property("gcs.bucketName").getString()
+        GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
+    }
     dependencies {
         provide<PrometheusMeterRegistry> { appMicrometerRegistry }
         provide<MeterRegistry> { appMicrometerRegistry }
@@ -86,6 +95,8 @@ fun Application.module() {
                 create(EncryptionServiceImpl::class)
             }
         }
+        provide<ChunkStorage> { chunkStorage }
+        provide<CoroutineScope> { processingScope }
         provide<SubmissionNotificationService> { SubmissionNotificationService(dataSource, notificationScope) }
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)

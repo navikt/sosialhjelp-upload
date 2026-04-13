@@ -14,7 +14,6 @@ import org.postgresql.PGConnection
 import org.slf4j.LoggerFactory
 import java.util.*
 import javax.sql.DataSource
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -41,12 +40,12 @@ class SubmissionNotificationService(
                             conn.createStatement().execute("LISTEN submission_update")
                             log.info("LISTEN connection established")
                             while (true) {
-                                pgConn.notifications?.forEach { notification ->
+                                val notifications = pgConn.getNotifications(500) ?: emptyArray()
+                                notifications.forEach { notification ->
                                     runCatching { UUID.fromString(notification.parameter) }
                                         .getOrNull()
                                         ?.let { _updates.tryEmit(it) }
                                 }
-                                delay(500.milliseconds)
                             }
                         }
                     }

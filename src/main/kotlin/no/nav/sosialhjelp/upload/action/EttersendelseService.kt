@@ -13,7 +13,6 @@ import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
-import no.nav.sosialhjelp.upload.tus.getSha512
 import org.jooq.DSLContext
 import java.util.*
 import kotlin.time.measureTimedValue

@@ -8,8 +8,10 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.RetentionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
@@ -25,7 +27,9 @@ class RetentionServiceIntegrationTest {
 
     private val dsl: DSLContext = PostgresTestContainer.dsl
     private val submissionRepository = SubmissionRepository(dsl)
+    private val uploadRepository = UploadRepository()
     private val mellomlagringClient = mockk<MellomlagringClient>(relaxed = true)
+    private val chunkStorage = FileSystemStorage()
 
     @BeforeEach
     fun cleanDb() {
@@ -34,7 +38,7 @@ class RetentionServiceIntegrationTest {
     }
 
     private fun retentionService(timeout: Duration = Duration.ofSeconds(1)) =
-        RetentionService(dsl, submissionRepository, mellomlagringClient, SimpleMeterRegistry(), timeout)
+        RetentionService(dsl, submissionRepository, uploadRepository, mellomlagringClient, chunkStorage, SimpleMeterRegistry(), timeout)
 
     @Test
     fun `stale submissions are deleted after retention period`() {
