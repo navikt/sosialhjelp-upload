@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.upload.database
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.StatusCode
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
@@ -21,6 +22,7 @@ class RetentionService(
     private val chunkStorage: ChunkStorage,
     private val meterRegistry: MeterRegistry,
     private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val log = LoggerFactory.getLogger(RetentionService::class.java)
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
@@ -34,7 +36,7 @@ class RetentionService(
         val scope = span.makeCurrent()
         try {
             val cutoff = OffsetDateTime.now().minus(retentionTimeout)
-            val staleSubmissions = withContext(Dispatchers.IO) {
+            val staleSubmissions = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     submissionRepository.getStaleSubmissions(tx, cutoff)
                 }
@@ -58,12 +60,12 @@ class RetentionService(
 
     private suspend fun deleteStaleSubmission(submission: SubmissionRepository.StaleSubmission) {
         try {
-            val gcsKeys = withContext(Dispatchers.IO) {
+            val gcsKeys = withContext(ioDispatcher) {
                 dsl.transactionResult { tx -> uploadRepository.getGcsKeysForSubmission(tx, submission.id) }
             }
 
             mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 dsl.transaction { tx -> submissionRepository.cleanup(tx, submission.id) }
             }
 

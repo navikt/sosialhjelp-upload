@@ -25,6 +25,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
 import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -42,6 +43,7 @@ class MellomlagringClient(
     @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
     private val meterRegistry: MeterRegistry,
     private val texasClient: TexasClient,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -109,7 +111,7 @@ class MellomlagringClient(
         contentType: String,
         data: ByteArray,
     ): UUID =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val startTime = System.nanoTime()
             val metadataPart = FormPart(
                 key = "metadata",
@@ -157,7 +159,7 @@ class MellomlagringClient(
         navEksternRefId: String,
         filId: UUID,
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val response =
                 client.delete("${mellomlagringUrl(navEksternRefId)}/$filId") {
                     headers {
@@ -173,7 +175,7 @@ class MellomlagringClient(
     }
 
     suspend fun deleteMellomlagring(navEksternRefId: String) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val response =
                 client.delete(mellomlagringUrl(navEksternRefId)) {
                     headers {
