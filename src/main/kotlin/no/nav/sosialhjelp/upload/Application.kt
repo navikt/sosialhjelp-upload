@@ -29,6 +29,7 @@ import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -96,6 +97,7 @@ fun Application.module() {
             }
         }
         provide<ChunkStorage> { chunkStorage }
+        provide<CoroutineDispatcher> { Dispatchers.IO }
         provide<CoroutineScope> { processingScope }
         provide<SubmissionNotificationService> { SubmissionNotificationService(dataSource, notificationScope) }
         provide(TexasClient::class)

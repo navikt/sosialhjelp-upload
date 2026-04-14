@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.upload.tus
 import io.ktor.http.ContentType
 import io.ktor.http.defaultForFile
 import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,6 +34,7 @@ class TusUploadService(
     private val chunkStorage: ChunkStorage,
     private val processingScope: CoroutineScope,
     private val meterRegistry: MeterRegistry,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -64,10 +66,10 @@ class TusUploadService(
         data: ByteArray,
     ): Long {
         val chunkKey = "uploads/$uploadId-chunk-$expectedOffset"
-        withContext(Dispatchers.IO) { chunkStorage.writeChunk(chunkKey, data) }
+        withContext(ioDispatcher) { chunkStorage.writeChunk(chunkKey, data) }
 
         val (totalSize, newOffset) =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     // Throws OffsetMismatchException if offset doesn't match (→ 409 in route)
                     uploadRepository.appendChunk(tx, uploadId, expectedOffset, data.size)
@@ -76,7 +78,7 @@ class TusUploadService(
         meterRegistry.summary("upload.chunk.bytes").record(data.size.toDouble())
 
         if (newOffset == totalSize) {
-            val claimed = withContext(Dispatchers.IO) {
+            val claimed = withContext(ioDispatcher) {
                 dsl.transactionResult { tx -> uploadRepository.claimForProcessing(tx, uploadId) }
             }
             if (claimed) {
@@ -98,13 +100,13 @@ class TusUploadService(
     ) {
         val startTime = System.nanoTime()
         val upload =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     uploadRepository.getUploadForProcessing(tx, uploadId)
                 }
             }
 
-        val chunkData = withContext(Dispatchers.IO) {
+        val chunkData = withContext(ioDispatcher) {
             val chunkPrefix = "uploads/$uploadId-chunk-"
             val chunkKeys = chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
                 key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
@@ -120,7 +122,7 @@ class TusUploadService(
         val errors = validator.validate(upload.filename, chunkData, chunkData.size.toLong())
         if (errors.isNotEmpty()) {
             logger.info("Upload $uploadId failed validation: ${errors.map { it.code }}")
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 dsl.transaction { tx ->
                     uploadRepository.addErrors(tx, uploadId, errors)
                 }
@@ -150,7 +152,7 @@ class TusUploadService(
                 )
             } catch (e: Exception) {
                 logger.error("Upload $uploadId failed during mellomlagring upload", e)
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     dsl.transaction { tx ->
                         uploadRepository.markFailed(tx, uploadId)
                         uploadRepository.notifyChange(tx, uploadId)
@@ -163,7 +165,7 @@ class TusUploadService(
             }
         logger.info("Upload $uploadId stored in mellomlagring as $filId")
 
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             dsl.transaction { tx ->
                 uploadRepository.setFilId(tx, uploadId, filId, finalFilename, finalData.size.toLong(), getSha512(finalData))
                 uploadRepository.notifyChange(tx, uploadId)
@@ -201,7 +203,7 @@ class TusUploadService(
     suspend fun delete(
         uploadId: UUID,
     ) {
-        val (filId, navEksternRefId) = withContext(Dispatchers.IO) {
+        val (filId, navEksternRefId) = withContext(ioDispatcher) {
             dsl.transactionResult { tx ->
                 val upload = uploadRepository.getUpload(tx, uploadId)
                 uploadRepository.deleteUpload(tx, uploadId)

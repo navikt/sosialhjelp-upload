@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.StatusCode
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -19,6 +20,7 @@ class UploadRecoveryService(
     private val notificationService: SubmissionNotificationService,
     private val chunkStorage: ChunkStorage,
     private val meterRegistry: MeterRegistry,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
@@ -49,7 +51,7 @@ class UploadRecoveryService(
         val scope = span.makeCurrent()
         try {
             val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
-            val staleUploads = withContext(Dispatchers.IO) {
+            val staleUploads = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     uploadRepository.markStaleProcessingAsFailed(tx, cutoff)
                 }
@@ -79,7 +81,7 @@ class UploadRecoveryService(
         val scope = span.makeCurrent()
         try {
             val cutoff = OffsetDateTime.now().minus(PENDING_CHUNK_TIMEOUT_HOURS, ChronoUnit.HOURS)
-            val staleUploads = withContext(Dispatchers.IO) {
+            val staleUploads = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     uploadRepository.markHaltedPendingAsFailed(tx, cutoff)
                 }
@@ -105,7 +107,7 @@ class UploadRecoveryService(
     }
 
     private suspend fun cleanupGcsObjects(gcsKey: String) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val chunkPrefix = "$gcsKey-chunk-"
             runCatching {
                 val chunkKeys = chunkStorage.listKeys(chunkPrefix)

@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.validation
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -34,6 +35,7 @@ val SUPPORTED_MIME_TYPES =
 
 class UploadValidator(
     val virusScanner: VirusScanner,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -43,7 +45,7 @@ class UploadValidator(
         fileSize: Long,
     ): List<Validation> =
         coroutineScope {
-            val virusScanValidation = async(Dispatchers.IO) { runVirusScan(data) }
+            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }
             val (mimeType, fileTypeValidation) = validateFileType(data)
             listOfNotNull(
                 validateFileSize(fileSize),
@@ -55,7 +57,7 @@ class UploadValidator(
         }
 
     private suspend fun validatePdf(data: ByteArray): Validation? =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             try {
                 val randomAccessRead = RandomAccessReadBuffer(data.inputStream())
                 Loader
@@ -80,7 +82,7 @@ class UploadValidator(
         }
 
     private suspend fun validateFileType(data: ByteArray): Pair<String, Validation?> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val mimeType = Tika().detect(data.inputStream())
             if (mimeType !in SUPPORTED_MIME_TYPES) {
                 return@withContext mimeType to FileTypeValidation(actual = mimeType)

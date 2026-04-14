@@ -2,7 +2,9 @@ package no.nav.sosialhjelp.upload.action
 
 import io.ktor.http.*
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
@@ -27,6 +29,7 @@ class EttersendelseService(
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun upload(
         metadata: Metadata,
@@ -37,13 +40,13 @@ class EttersendelseService(
     ): Boolean {
         val sak = fiksClient.getSak(fiksDigisosId, token)
         val kommunenummer = sak.kommunenummer
-        val navEksternRefId = withContext(Dispatchers.IO) {
+        val navEksternRefId = withContext(ioDispatcher) {
             dsl.transactionResult { tx ->
                 submissionRepository.getNavEksternRefId(tx, submissionId, personIdent)
             }
         }
 
-        val uploads = withContext(Dispatchers.IO) {
+        val uploads = withContext(ioDispatcher) {
             dsl.transactionResult { tx ->
                 uploadRepository.getUploads(tx, submissionId)
             }
@@ -73,7 +76,7 @@ class EttersendelseService(
         meterRegistry.timer("fiks.submission", "result", result).record(duration.toJavaDuration())
 
         if (response.status.isSuccess()) {
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     submissionRepository.cleanup(tx, submissionId)
                 }

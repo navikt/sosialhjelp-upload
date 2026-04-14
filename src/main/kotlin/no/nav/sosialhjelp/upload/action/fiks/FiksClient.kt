@@ -12,6 +12,7 @@ import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,6 +34,7 @@ class FiksClient(
     @Property("fiks.integrasjonsid") private val integrasjonsid: String?,
     @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
     private val texasClient: TexasClient,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java.name)
 
@@ -87,7 +89,7 @@ class FiksClient(
 
     private suspend fun fetchPublicKeyFromNetwork(): X509Certificate {
         val publicKey =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 client
                     .get("$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key") {
                         headers {
@@ -121,7 +123,7 @@ class FiksClient(
         token: String,
         filer: List<Fil>,
     ): HttpResponse =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val vedleggJson =
                 VedleggSpesifikasjon(
                     vedlegg = listOf(
@@ -175,7 +177,7 @@ class FiksClient(
         id: String,
         token: String,
     ): DigisosSak =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             jacksonClient
                 .get(digisosSakUrl(id))
                 {

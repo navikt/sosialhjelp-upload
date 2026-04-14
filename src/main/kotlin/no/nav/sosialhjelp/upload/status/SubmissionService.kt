@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.status
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -15,6 +16,7 @@ class SubmissionService(
     private val submissionRepository: SubmissionRepository,
     private val dsl: DSLContext,
     private val fiksClient: FiksClient,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun getOrCreate(
         contextId: String,
@@ -24,7 +26,7 @@ class SubmissionService(
         userToken: String,
     ): UUID {
         val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, userToken) } ?: error("Mangler både soknadId og fiksDigisosId")
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             dsl.transactionResult { tx ->
                 submissionRepository.getOrCreateSubmission(tx, contextId, personIdent, navEksternRefId)
             }

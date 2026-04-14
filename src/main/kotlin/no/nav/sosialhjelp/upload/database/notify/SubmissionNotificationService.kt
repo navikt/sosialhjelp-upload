@@ -1,8 +1,10 @@
 package no.nav.sosialhjelp.upload.database.notify
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,7 +26,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 class SubmissionNotificationService(
     private val dataSource: DataSource,
-    listenerScope: CoroutineScope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO),
+    listenerScope: CoroutineScope = CoroutineScope(SupervisorJob()),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val log = LoggerFactory.getLogger(SubmissionNotificationService::class.java)
 
@@ -34,7 +37,7 @@ class SubmissionNotificationService(
         listenerScope.launch {
             while (true) {
                 try {
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         dataSource.connection.use { conn ->
                             val pgConn = conn.unwrap(PGConnection::class.java)
                             conn.createStatement().execute("LISTEN submission_update")
