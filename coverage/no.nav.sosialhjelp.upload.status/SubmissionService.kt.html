@@ -3,7 +3,6 @@
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
@@ -11,13 +10,12 @@ import no.nav.sosialhjelp.upload.status.dto.UploadDto
 import org.jooq.DSLContext
 import java.util.*
 
-<span class="fc" id="L14">class SubmissionService(</span>
-<span class="fc" id="L15">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L16">    private val submissionRepository: SubmissionRepository,</span>
-<span class="fc" id="L17">    private val dsl: DSLContext,</span>
-<span class="fc" id="L18">    private val fiksClient: FiksClient,</span>
-<span class="fc" id="L19">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L20">) {</span>
+<span class="fc" id="L13">class SubmissionService(</span>
+<span class="fc" id="L14">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L15">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L16">    private val dsl: DSLContext,</span>
+<span class="fc" id="L17">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L18">) {</span>
     suspend fun getOrCreate(
         contextId: String,
         personIdent: String,
@@ -25,37 +23,41 @@ import java.util.*
         fiksDigisosId: String?,
         userToken: String,
     ): UUID {
-<span class="pc bpc" id="L28" title="5 of 6 branches missed.">        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, userToken) } ?: error(&quot;Mangler både soknadId og fiksDigisosId&quot;)</span>
-<span class="nc" id="L29">        return withContext(ioDispatcher) {</span>
-<span class="nc" id="L30">            dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L31">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent, navEksternRefId)</span>
-<span class="nc" id="L32">            }</span>
+<span class="nc" id="L26">        return withContext(ioDispatcher) {</span>
+<span class="nc" id="L27">            val existing = dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L28">                submissionRepository.findSubmission(tx, contextId, personIdent)</span>
+            }
+<span class="nc bnc" id="L30" title="All 2 branches missed.">            if (existing != null) return@withContext existing</span>
+
+<span class="nc" id="L32">            dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L33">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent, soknadId)</span>
+<span class="nc" id="L34">            }</span>
         }
     }
 
     fun getSubmissionStatus(submissionId: UUID): SubmissionState =
-<span class="fc" id="L37">        dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L38">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
-<span class="fc" id="L39">            val uploads =</span>
-<span class="fc" id="L40">                filenamesByUpload.mapNotNull { upload -&gt;</span>
-<span class="fc" id="L41">                    upload.id</span>
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                        ?.let {</span>
-<span class="fc" id="L43">                            UploadDto(</span>
-<span class="fc" id="L44">                                upload.id,</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                                upload.originalFilename ?: &quot;Ukjent fil&quot;,</span>
-<span class="fc" id="L46">                                upload.errors,</span>
-<span class="fc" id="L47">                                upload.filId,</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
-<span class="fc" id="L49">                                finalFilename = upload.mellomlagringFilnavn,</span>
-<span class="fc" id="L50">                                status = UploadDto.Status.valueOf(upload.status.name)</span>
-<span class="fc" id="L51">                            )</span>
-<span class="fc" id="L52">                        }</span>
+<span class="fc" id="L39">        dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L40">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
+<span class="fc" id="L41">            val uploads =</span>
+<span class="fc" id="L42">                filenamesByUpload.mapNotNull { upload -&gt;</span>
+<span class="fc" id="L43">                    upload.id</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                        ?.let {</span>
+<span class="fc" id="L45">                            UploadDto(</span>
+<span class="fc" id="L46">                                upload.id,</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                                upload.originalFilename ?: &quot;Ukjent fil&quot;,</span>
+<span class="fc" id="L48">                                upload.errors,</span>
+<span class="fc" id="L49">                                upload.filId,</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
+<span class="fc" id="L51">                                finalFilename = upload.mellomlagringFilnavn,</span>
+<span class="fc" id="L52">                                status = UploadDto.Status.valueOf(upload.status.name)</span>
+<span class="fc" id="L53">                            )</span>
+<span class="fc" id="L54">                        }</span>
                 }
 
-<span class="fc" id="L55">            SubmissionState(</span>
-<span class="fc" id="L56">                submissionId.toString(),</span>
-<span class="fc" id="L57">                uploads.toList(),</span>
-<span class="fc" id="L58">            )</span>
-<span class="fc" id="L59">        }</span>
+<span class="fc" id="L57">            SubmissionState(</span>
+<span class="fc" id="L58">                submissionId.toString(),</span>
+<span class="fc" id="L59">                uploads.toList(),</span>
+<span class="fc" id="L60">            )</span>
+<span class="fc" id="L61">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
