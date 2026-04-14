@@ -95,38 +95,38 @@ import org.jooq.impl.TableImpl
 <span class="fc" id="L95">    val UPLOAD_OFFSET: TableField&lt;UploadRecord, Long?&gt; = createField(DSL.name(&quot;upload_offset&quot;), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline(0L)), this, &quot;&quot;)</span>
 
     /**
-     * The column &lt;code&gt;public.upload.chunk_data&lt;/code&gt;.
-     */
-<span class="fc" id="L100">    val CHUNK_DATA: TableField&lt;UploadRecord, ByteArray?&gt; = createField(DSL.name(&quot;chunk_data&quot;), SQLDataType.BINARY, this, &quot;&quot;)</span>
-
-    /**
      * The column &lt;code&gt;public.upload.fil_id&lt;/code&gt;.
      */
-<span class="fc" id="L105">    val FIL_ID: TableField&lt;UploadRecord, UUID?&gt; = createField(DSL.name(&quot;fil_id&quot;), SQLDataType.UUID, this, &quot;&quot;)</span>
+<span class="fc" id="L100">    val FIL_ID: TableField&lt;UploadRecord, UUID?&gt; = createField(DSL.name(&quot;fil_id&quot;), SQLDataType.UUID, this, &quot;&quot;)</span>
 
     /**
      * The column &lt;code&gt;public.upload.mellomlagring_filnavn&lt;/code&gt;.
      */
-<span class="fc" id="L110">    val MELLOMLAGRING_FILNAVN: TableField&lt;UploadRecord, String?&gt; = createField(DSL.name(&quot;mellomlagring_filnavn&quot;), SQLDataType.VARCHAR(255), this, &quot;&quot;)</span>
+<span class="fc" id="L105">    val MELLOMLAGRING_FILNAVN: TableField&lt;UploadRecord, String?&gt; = createField(DSL.name(&quot;mellomlagring_filnavn&quot;), SQLDataType.VARCHAR(255), this, &quot;&quot;)</span>
 
     /**
      * The column &lt;code&gt;public.upload.processing_status&lt;/code&gt;.
      */
-<span class="fc" id="L115">    val PROCESSING_STATUS: TableField&lt;UploadRecord, String&gt; = createField(DSL.name(&quot;processing_status&quot;), SQLDataType.VARCHAR(20).nullable(false).defaultValue(DSL.inline(&quot;PENDING&quot;)), this, &quot;&quot;)</span>
+<span class="fc" id="L110">    val PROCESSING_STATUS: TableField&lt;UploadRecord, String&gt; = createField(DSL.name(&quot;processing_status&quot;), SQLDataType.VARCHAR(20).nullable(false).defaultValue(DSL.inline(&quot;PENDING&quot;)), this, &quot;&quot;)</span>
 
     /**
      * The column &lt;code&gt;public.upload.mellomlagring_storrelse&lt;/code&gt;.
      */
-<span class="fc" id="L120">    val MELLOMLAGRING_STORRELSE: TableField&lt;UploadRecord, Long?&gt; = createField(DSL.name(&quot;mellomlagring_storrelse&quot;), SQLDataType.BIGINT, this, &quot;&quot;)</span>
+<span class="fc" id="L115">    val MELLOMLAGRING_STORRELSE: TableField&lt;UploadRecord, Long?&gt; = createField(DSL.name(&quot;mellomlagring_storrelse&quot;), SQLDataType.BIGINT, this, &quot;&quot;)</span>
     /**
      * The column &lt;code&gt;public.upload.sha512&lt;/code&gt;.
      */
-<span class="fc" id="L124">    val SHA512: TableField&lt;UploadRecord, String?&gt; = createField(DSL.name(&quot;sha512&quot;), SQLDataType.VARCHAR, this, &quot;&quot;)</span>
+<span class="fc" id="L119">    val SHA512: TableField&lt;UploadRecord, String?&gt; = createField(DSL.name(&quot;sha512&quot;), SQLDataType.VARCHAR, this, &quot;&quot;)</span>
 
     /**
      * The column &lt;code&gt;public.upload.updated_at&lt;/code&gt;.
      */
-<span class="fc" id="L129">    val UPDATED_AT: TableField&lt;UploadRecord, OffsetDateTime?&gt; = createField(DSL.name(&quot;updated_at&quot;), SQLDataType.TIMESTAMPWITHTIMEZONE.nullable(false), this, &quot;&quot;)</span>
+<span class="fc" id="L124">    val UPDATED_AT: TableField&lt;UploadRecord, OffsetDateTime?&gt; = createField(DSL.name(&quot;updated_at&quot;), SQLDataType.TIMESTAMPWITHTIMEZONE.nullable(false), this, &quot;&quot;)</span>
+
+    /**
+     * The column &lt;code&gt;public.upload.gcs_key&lt;/code&gt;.
+     */
+<span class="fc" id="L129">    val GCS_KEY: TableField&lt;UploadRecord, String?&gt; = createField(DSL.name(&quot;gcs_key&quot;), SQLDataType.VARCHAR(500), this, &quot;&quot;)</span>
 
 <span class="fc" id="L131">    private constructor(alias: Name, aliased: Table&lt;UploadRecord&gt;?): this(alias, null, null, null, aliased, null, null)</span>
 <span class="nc" id="L132">    private constructor(alias: Name, aliased: Table&lt;UploadRecord&gt;?, parameters: Array&lt;Field&lt;*&gt;?&gt;?): this(alias, null, null, null, aliased, parameters, null)</span>

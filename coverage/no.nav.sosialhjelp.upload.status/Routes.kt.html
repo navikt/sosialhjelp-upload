@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.seconds
 
 fun Route.configureStatusRoutes() {
 <span class="pc" id="L21">    val statusChannelFactory: SubmissionNotificationService by application.dependencies</span>
-<span class="fc" id="L22">    val submissionService: SubmissionService by application.dependencies</span>
+<span class="pc" id="L22">    val submissionService: SubmissionService by application.dependencies</span>
 <span class="fc" id="L23">    val meterRegistry: MeterRegistry by application.dependencies</span>
 
 <span class="fc" id="L25">    val activeConnections = AtomicInteger(0)</span>
@@ -30,25 +30,25 @@ fun Route.configureStatusRoutes() {
 <span class="fc" id="L30">    sse(&quot;/status/{id}&quot;, serialize = { typeInfo: TypeInfo, value: Any -&gt;</span>
 <span class="nc" id="L31">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
 <span class="nc" id="L32">        Default.encodeToString(serializer, value)</span>
-<span class="pc bpc" id="L33" title="5 of 6 branches missed.">    }) {</span>
-<span class="fc" id="L34">        activeConnections.incrementAndGet()</span>
-<span class="fc" id="L35">        val queryParams = call.request.queryParameters</span>
-<span class="fc" id="L36">        val soknadId = queryParams[&quot;soknadId&quot;]</span>
-<span class="fc" id="L37">        val fiksDigisosId = queryParams[&quot;fiksDigisosId&quot;]</span>
-<span class="fc" id="L38">        try {</span>
-<span class="pc bpc" id="L39" title="3 of 4 branches missed.">            if (soknadId == null &amp;&amp; fiksDigisosId == null) return@sse call.respond(HttpStatusCode.BadRequest, &quot;Mangler fiksDigisosId eller soknadId&quot;)</span>
-<span class="pc bpc" id="L40" title="2 of 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
+<span class="nc bnc" id="L33" title="All 6 branches missed.">    }) {</span>
+<span class="nc" id="L34">        activeConnections.incrementAndGet()</span>
+<span class="nc" id="L35">        val queryParams = call.request.queryParameters</span>
+<span class="nc" id="L36">        val soknadId = queryParams[&quot;soknadId&quot;]</span>
+<span class="nc" id="L37">        val fiksDigisosId = queryParams[&quot;fiksDigisosId&quot;]</span>
+<span class="nc" id="L38">        try {</span>
+<span class="nc bnc" id="L39" title="All 4 branches missed.">            if (soknadId == null &amp;&amp; fiksDigisosId == null) return@sse call.respond(HttpStatusCode.BadRequest, &quot;Mangler fiksDigisosId eller soknadId&quot;)</span>
+<span class="nc bnc" id="L40" title="All 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
 
-<span class="fc" id="L42">            heartbeat {</span>
-<span class="fc" id="L43">                period = 10.seconds</span>
-<span class="fc" id="L44">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;ドキドキ&quot;}&quot;&quot;&quot;)</span>
-<span class="fc" id="L45">            }</span>
+<span class="nc" id="L42">            heartbeat {</span>
+<span class="nc" id="L43">                period = 10.seconds</span>
+<span class="nc" id="L44">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;ドキドキ&quot;}&quot;&quot;&quot;)</span>
+<span class="nc" id="L45">            }</span>
 
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            val rawId = call.parameters[&quot;id&quot;].orEmpty()</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (rawId.isBlank()) {</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">            val rawId = call.parameters[&quot;id&quot;].orEmpty()</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">            if (rawId.isBlank()) {</span>
 <span class="nc" id="L49">                error(&quot;id parameter is required&quot;)</span>
             }
-<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            val userToken = call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
+<span class="nc bnc" id="L51" title="All 4 branches missed.">            val userToken = call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
 
 <span class="nc bnc" id="L53" title="All 2 branches missed.">            val submissionId = submissionService.getOrCreate(rawId, personident, soknadId, fiksDigisosId, userToken)</span>
 
@@ -58,7 +58,7 @@ fun Route.configureStatusRoutes() {
 <span class="nc" id="L58">                send(submissionService.getSubmissionStatus(submissionId))</span>
 <span class="nc" id="L59">            }</span>
         } finally {
-<span class="pc" id="L61">            activeConnections.decrementAndGet()</span>
+<span class="nc" id="L61">            activeConnections.decrementAndGet()</span>
         }
 <span class="nc" id="L63">    }</span>
 <span class="fc" id="L64">}</span>

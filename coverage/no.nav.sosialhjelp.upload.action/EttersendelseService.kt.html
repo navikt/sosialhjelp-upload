@@ -13,76 +13,75 @@ import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
-import no.nav.sosialhjelp.upload.tus.getSha512
 import org.jooq.DSLContext
 import java.util.*
 import kotlin.time.measureTimedValue
 import kotlin.time.toJavaDuration
 
-<span class="fc" id="L22">class EttersendelseService(</span>
-<span class="fc" id="L23">    private val fiksClient: FiksClient,</span>
-<span class="fc" id="L24">    private val dsl: DSLContext,</span>
-<span class="fc" id="L25">    private val submissionRepository: SubmissionRepository,</span>
-<span class="fc" id="L26">    private val notificationService: SubmissionNotificationService,</span>
-<span class="fc" id="L27">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L28">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L29">    private val mellomlagringClient: MellomlagringClient,</span>
-<span class="fc" id="L30">    private val encryptionService: EncryptionService,</span>
+<span class="fc" id="L21">class EttersendelseService(</span>
+<span class="fc" id="L22">    private val fiksClient: FiksClient,</span>
+<span class="fc" id="L23">    private val dsl: DSLContext,</span>
+<span class="fc" id="L24">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L25">    private val notificationService: SubmissionNotificationService,</span>
+<span class="fc" id="L26">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L27">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L28">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L29">    private val encryptionService: EncryptionService,</span>
 ) {
-<span class="fc" id="L32">    suspend fun upload(</span>
+<span class="fc" id="L31">    suspend fun upload(</span>
         metadata: Metadata,
         fiksDigisosId: String,
         token: String,
         submissionId: UUID,
         personIdent: String,
     ): Boolean {
-<span class="fc" id="L39">        val sak = fiksClient.getSak(fiksDigisosId, token)</span>
-<span class="fc" id="L40">        val kommunenummer = sak.kommunenummer</span>
-<span class="fc" id="L41">        val navEksternRefId = withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L42">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L43">                submissionRepository.getNavEksternRefId(tx, submissionId, personIdent)</span>
-<span class="fc" id="L44">            }</span>
+<span class="fc" id="L38">        val sak = fiksClient.getSak(fiksDigisosId, token)</span>
+<span class="fc" id="L39">        val kommunenummer = sak.kommunenummer</span>
+<span class="fc" id="L40">        val navEksternRefId = withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L41">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L42">                submissionRepository.getNavEksternRefId(tx, submissionId, personIdent)</span>
+<span class="fc" id="L43">            }</span>
         }
 
-<span class="fc" id="L47">        val uploads = withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L48">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L49">                uploadRepository.getUploads(tx, submissionId)</span>
-<span class="fc" id="L50">            }</span>
+<span class="fc" id="L46">        val uploads = withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L47">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L48">                uploadRepository.getUploads(tx, submissionId)</span>
+<span class="fc" id="L49">            }</span>
 
         }
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        val ettersendelsePdf = EttersendelsePdfGenerator.generate(PdfMetadata(metadata.type, uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -&gt; PdfFil(filnavn) } }), personIdent)</span>
-<span class="fc" id="L54">        mellomlagringClient.uploadFile(navEksternRefId, &quot;ettersendelse.pdf&quot;, &quot;application/pdf&quot;, encryptionService.encryptBytes(ettersendelsePdf))</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        val ettersendelsePdf = EttersendelsePdfGenerator.generate(PdfMetadata(metadata.type, uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -&gt; PdfFil(filnavn) } }), personIdent)</span>
+<span class="fc" id="L53">        mellomlagringClient.uploadFile(navEksternRefId, &quot;ettersendelse.pdf&quot;, &quot;application/pdf&quot;, encryptionService.encryptBytes(ettersendelsePdf))</span>
 
-<span class="fc" id="L56">        val filer = uploads.mapNotNull {</span>
-<span class="pc bpc" id="L57" title="2 of 4 branches missed.">            if (it.mellomlagringFilnavn == null || it.sha512 == null) {</span>
-<span class="nc" id="L58">                return@mapNotNull null</span>
+<span class="fc" id="L55">        val filer = uploads.mapNotNull {</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">            if (it.mellomlagringFilnavn == null || it.sha512 == null) {</span>
+<span class="nc" id="L57">                return@mapNotNull null</span>
             }
-<span class="fc" id="L60">            Fil(it.mellomlagringFilnavn, it.sha512)</span>
+<span class="fc" id="L59">            Fil(it.mellomlagringFilnavn, it.sha512)</span>
         }
-<span class="fc" id="L62">        val (response, duration) = measureTimedValue {</span>
-<span class="fc" id="L63">            fiksClient.uploadEttersendelse(</span>
-<span class="fc" id="L64">                fiksDigisosId,</span>
-<span class="fc" id="L65">                kommunenummer,</span>
-<span class="fc" id="L66">                navEksternRefId,</span>
-<span class="fc" id="L67">                metadata,</span>
-<span class="fc" id="L68">                token,</span>
-<span class="fc" id="L69">                filer,</span>
-<span class="fc" id="L70">            )</span>
+<span class="fc" id="L61">        val (response, duration) = measureTimedValue {</span>
+<span class="fc" id="L62">            fiksClient.uploadEttersendelse(</span>
+<span class="fc" id="L63">                fiksDigisosId,</span>
+<span class="fc" id="L64">                kommunenummer,</span>
+<span class="fc" id="L65">                navEksternRefId,</span>
+<span class="fc" id="L66">                metadata,</span>
+<span class="fc" id="L67">                token,</span>
+<span class="fc" id="L68">                filer,</span>
+<span class="fc" id="L69">            )</span>
         }
 
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        val result = if (response.status.isSuccess()) &quot;success&quot; else &quot;failure&quot;</span>
-<span class="fc" id="L74">        meterRegistry.timer(&quot;fiks.submission&quot;, &quot;result&quot;, result).record(duration.toJavaDuration())</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        val result = if (response.status.isSuccess()) &quot;success&quot; else &quot;failure&quot;</span>
+<span class="fc" id="L73">        meterRegistry.timer(&quot;fiks.submission&quot;, &quot;result&quot;, result).record(duration.toJavaDuration())</span>
 
-<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (response.status.isSuccess()) {</span>
-<span class="fc" id="L77">            withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L78">                dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L79">                    submissionRepository.cleanup(tx, submissionId)</span>
-<span class="fc" id="L80">                }</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (response.status.isSuccess()) {</span>
+<span class="fc" id="L76">            withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L77">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L78">                    submissionRepository.cleanup(tx, submissionId)</span>
+<span class="fc" id="L79">                }</span>
             }
-<span class="fc" id="L82">            notificationService.notifyUpdate(submissionId)</span>
-<span class="fc" id="L83">            return true</span>
+<span class="fc" id="L81">            notificationService.notifyUpdate(submissionId)</span>
+<span class="fc" id="L82">            return true</span>
         }
-<span class="nc" id="L85">        return false</span>
+<span class="nc" id="L84">        return false</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

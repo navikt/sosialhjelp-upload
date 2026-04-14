@@ -30,7 +30,7 @@ enum class Status {
 
 <span class="fc" id="L31">data class UploadForProcessing(</span>
 <span class="fc" id="L32">    val filename: String,</span>
-<span class="fc" id="L33">    val chunkData: ByteArray,</span>
+<span class="fc" id="L33">    val gcsKey: String,</span>
 <span class="pc" id="L34">    val submissionId: UUID,</span>
 <span class="fc" id="L35">    val navEksternRefId: String,</span>
 )
@@ -38,104 +38,112 @@ enum class Status {
 <span class="fc" id="L38">class UploadRepository {</span>
 <span class="nc" id="L39">    class OffsetMismatchException(message: String) : RuntimeException(message)</span>
 
+<span class="pc" id="L41">    data class StaleUploadInfo(val submissionId: UUID, val gcsKey: String?)</span>
     fun create(
         tx: Configuration,
         submissionId: UUID,
         filename: String,
         filesize: Long,
-    ): UUID? =
-<span class="fc" id="L47">        tx</span>
-<span class="fc" id="L48">            .dsl()</span>
-<span class="fc" id="L49">            .insertInto(UPLOAD)</span>
-<span class="fc" id="L50">            .set(UPLOAD.ID, UUID.randomUUID())</span>
-<span class="fc" id="L51">            .set(UPLOAD.SUBMISSION_ID, submissionId)</span>
-<span class="fc" id="L52">            .set(UPLOAD.ORIGINAL_FILENAME, filename)</span>
-<span class="fc" id="L53">            .set(UPLOAD.SIZE, filesize)</span>
-<span class="fc" id="L54">            .set(UPLOAD.UPLOAD_OFFSET, 0L)</span>
-<span class="fc" id="L55">            .returning(UPLOAD.ID)</span>
-<span class="fc" id="L56">            .fetchOne()</span>
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            ?.get(UPLOAD.ID)</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            ?.also { notifyChange(tx, it) }</span>
+    ): UUID? {
+<span class="fc" id="L48">        val uploadId = UUID.randomUUID()</span>
+<span class="fc" id="L49">        val gcsKey = &quot;uploads/$uploadId&quot;</span>
+<span class="fc" id="L50">        return tx</span>
+<span class="fc" id="L51">            .dsl()</span>
+<span class="fc" id="L52">            .insertInto(UPLOAD)</span>
+<span class="fc" id="L53">            .set(UPLOAD.ID, uploadId)</span>
+<span class="fc" id="L54">            .set(UPLOAD.SUBMISSION_ID, submissionId)</span>
+<span class="fc" id="L55">            .set(UPLOAD.ORIGINAL_FILENAME, filename)</span>
+<span class="fc" id="L56">            .set(UPLOAD.SIZE, filesize)</span>
+<span class="fc" id="L57">            .set(UPLOAD.UPLOAD_OFFSET, 0L)</span>
+<span class="fc" id="L58">            .set(UPLOAD.GCS_KEY, gcsKey)</span>
+<span class="fc" id="L59">            .returning(UPLOAD.ID)</span>
+<span class="fc" id="L60">            .fetchOne()</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            ?.get(UPLOAD.ID)</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            ?.also { notifyChange(tx, it) }</span>
+    }
 
     fun notifyChange(
         tx: Configuration,
         uploadId: UUID,
     ) {
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: return</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: return</span>
         // Send NOTIFY within the transaction so it fires atomically on commit
-<span class="fc" id="L66">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
-<span class="fc" id="L67">    }</span>
+<span class="fc" id="L71">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
+<span class="fc" id="L72">    }</span>
 
     fun isOwnedByUser(
         tx: Configuration,
         uploadId: UUID,
         ownerIdent: String,
     ): Boolean =
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        tx</span>
-<span class="fc" id="L75">            .dsl()</span>
-<span class="fc" id="L76">            .selectCount()</span>
-<span class="fc" id="L77">            .from(UPLOAD)</span>
-<span class="fc" id="L78">            .join(SUBMISSION)</span>
-<span class="fc" id="L79">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
-<span class="fc" id="L80">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L81">            .and(SUBMISSION.OWNER_IDENT.eq(ownerIdent))</span>
-<span class="fc" id="L82">            .fetchSingle()</span>
-<span class="fc" id="L83">            .value1() &gt; 0</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        tx</span>
+<span class="fc" id="L80">            .dsl()</span>
+<span class="fc" id="L81">            .selectCount()</span>
+<span class="fc" id="L82">            .from(UPLOAD)</span>
+<span class="fc" id="L83">            .join(SUBMISSION)</span>
+<span class="fc" id="L84">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L85">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L86">            .and(SUBMISSION.OWNER_IDENT.eq(ownerIdent))</span>
+<span class="fc" id="L87">            .fetchSingle()</span>
+<span class="fc" id="L88">            .value1() &gt; 0</span>
 
     fun getSubmissionIdFromUploadId(
         tx: Configuration,
         uploadId: UUID,
     ): UUID? =
-<span class="fc" id="L89">        tx</span>
-<span class="fc" id="L90">            .dsl()</span>
-<span class="fc" id="L91">            .select(UPLOAD.SUBMISSION_ID)</span>
-<span class="fc" id="L92">            .from(UPLOAD)</span>
-<span class="fc" id="L93">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L94">            .fetchOne()</span>
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            ?.get(UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L94">        tx</span>
+<span class="fc" id="L95">            .dsl()</span>
+<span class="fc" id="L96">            .select(UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L97">            .from(UPLOAD)</span>
+<span class="fc" id="L98">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L99">            .fetchOne()</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            ?.get(UPLOAD.SUBMISSION_ID)</span>
 
     fun getUploadInfo(
         tx: Configuration,
         uploadId: UUID,
     ): Pair&lt;Long, Long&gt; =
-<span class="fc" id="L101">        tx</span>
-<span class="fc" id="L102">            .dsl()</span>
-<span class="fc" id="L103">            .select(UPLOAD.UPLOAD_OFFSET, UPLOAD.SIZE)</span>
-<span class="fc" id="L104">            .from(UPLOAD)</span>
-<span class="fc" id="L105">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L106">            .fetchSingle()</span>
-<span class="fc" id="L107">            .let { it.get(UPLOAD.UPLOAD_OFFSET)!! to it.get(UPLOAD.SIZE)!! }</span>
+<span class="fc" id="L106">        tx</span>
+<span class="fc" id="L107">            .dsl()</span>
+<span class="fc" id="L108">            .select(UPLOAD.UPLOAD_OFFSET, UPLOAD.SIZE)</span>
+<span class="fc" id="L109">            .from(UPLOAD)</span>
+<span class="fc" id="L110">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L111">            .fetchSingle()</span>
+<span class="fc" id="L112">            .let { it.get(UPLOAD.UPLOAD_OFFSET)!! to it.get(UPLOAD.SIZE)!! }</span>
 
     /**
-     * Appends [data] to the upload only if the current offset matches [expectedOffset].
-     * Throws [OffsetMismatchException] if the offset doesn't match — callers must return 409 Conflict.
+     * Updates the upload offset after a chunk is received.
+     * Throws [OffsetMismatchException] if the current offset doesn't match [expectedOffset].
+     * The actual chunk bytes are written to GCS by the caller; only metadata is tracked here.
      */
     fun appendChunk(
         tx: Configuration,
         uploadId: UUID,
         expectedOffset: Long,
-        data: ByteArray,
+        chunkSize: Int,
     ): Pair&lt;Long, Long&gt; {
         // Lock the row to serialize concurrent chunk uploads to the same upload ID.
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        tx.dsl().select(UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(uploadId)).forUpdate().fetchOne()</span>
-<span class="pc" id="L121">            ?: throw OffsetMismatchException(&quot;Upload $uploadId not found&quot;)</span>
-<span class="fc" id="L122">        val newOffset = expectedOffset + data.size</span>
-<span class="fc" id="L123">        val affected = tx.dsl().execute(</span>
-<span class="fc" id="L124">            &quot;UPDATE upload SET chunk_data = COALESCE(chunk_data, ''::bytea) || ?, upload_offset = ?, updated_at = NOW() WHERE id = ? AND upload_offset = ?&quot;,</span>
-<span class="fc" id="L125">            data, newOffset, uploadId, expectedOffset,</span>
-        )
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (affected == 0) {</span>
-<span class="nc" id="L128">            throw OffsetMismatchException(&quot;Upload $uploadId offset mismatch: expected $expectedOffset&quot;)</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        tx.dsl().select(UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(uploadId)).forUpdate().fetchOne()</span>
+<span class="pc" id="L127">            ?: throw OffsetMismatchException(&quot;Upload $uploadId not found&quot;)</span>
+<span class="fc" id="L128">        val newOffset = expectedOffset + chunkSize</span>
+<span class="fc" id="L129">        val affected = tx.dsl().update(UPLOAD)</span>
+<span class="fc" id="L130">            .set(UPLOAD.UPLOAD_OFFSET, newOffset)</span>
+<span class="fc" id="L131">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
+<span class="fc" id="L132">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L133">            .and(UPLOAD.UPLOAD_OFFSET.eq(expectedOffset))</span>
+<span class="fc" id="L134">            .execute()</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (affected == 0) {</span>
+<span class="nc" id="L136">            throw OffsetMismatchException(&quot;Upload $uploadId offset mismatch: expected $expectedOffset&quot;)</span>
         }
-<span class="fc" id="L130">        val totalSize =</span>
-<span class="fc" id="L131">            tx</span>
-<span class="fc" id="L132">                .dsl()</span>
-<span class="fc" id="L133">                .select(UPLOAD.SIZE)</span>
-<span class="fc" id="L134">                .from(UPLOAD)</span>
-<span class="fc" id="L135">                .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L136">                .fetchSingle()</span>
-<span class="fc" id="L137">                .get(UPLOAD.SIZE)!!</span>
-<span class="fc" id="L138">        return totalSize to newOffset</span>
+<span class="fc" id="L138">        val totalSize =</span>
+<span class="fc" id="L139">            tx</span>
+<span class="fc" id="L140">                .dsl()</span>
+<span class="fc" id="L141">                .select(UPLOAD.SIZE)</span>
+<span class="fc" id="L142">                .from(UPLOAD)</span>
+<span class="fc" id="L143">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L144">                .fetchSingle()</span>
+<span class="fc" id="L145">                .get(UPLOAD.SIZE)!!</span>
+<span class="fc" id="L146">        return totalSize to newOffset</span>
     }
 
     /**
@@ -146,40 +154,40 @@ enum class Status {
         tx: Configuration,
         uploadId: UUID,
     ): Boolean =
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        tx</span>
-<span class="fc" id="L150">            .dsl()</span>
-<span class="fc" id="L151">            .update(UPLOAD)</span>
-<span class="fc" id="L152">            .set(UPLOAD.PROCESSING_STATUS, &quot;PROCESSING&quot;)</span>
-<span class="fc" id="L153">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
-<span class="fc" id="L154">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L155">            .and(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
-<span class="fc" id="L156">            .execute() &gt; 0</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        tx</span>
+<span class="fc" id="L158">            .dsl()</span>
+<span class="fc" id="L159">            .update(UPLOAD)</span>
+<span class="fc" id="L160">            .set(UPLOAD.PROCESSING_STATUS, &quot;PROCESSING&quot;)</span>
+<span class="fc" id="L161">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
+<span class="fc" id="L162">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L163">            .and(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
+<span class="fc" id="L164">            .execute() &gt; 0</span>
 
     fun getUploadForProcessing(
         tx: Configuration,
         uploadId: UUID,
     ): UploadForProcessing {
-<span class="fc" id="L162">        val record =</span>
-<span class="fc" id="L163">            tx</span>
-<span class="fc" id="L164">                .dsl()</span>
-<span class="fc" id="L165">                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.CHUNK_DATA, UPLOAD.SUBMISSION_ID)</span>
-<span class="fc" id="L166">                .from(UPLOAD)</span>
-<span class="fc" id="L167">                .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L168">                .fetchSingle()</span>
-<span class="fc" id="L169">        val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!</span>
-<span class="fc" id="L170">        val navEksternRefId =</span>
+<span class="fc" id="L170">        val record =</span>
 <span class="fc" id="L171">            tx</span>
 <span class="fc" id="L172">                .dsl()</span>
-<span class="fc" id="L173">                .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
-<span class="fc" id="L174">                .from(SUBMISSION)</span>
-<span class="fc" id="L175">                .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L173">                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.GCS_KEY, UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L174">                .from(UPLOAD)</span>
+<span class="fc" id="L175">                .where(UPLOAD.ID.eq(uploadId))</span>
 <span class="fc" id="L176">                .fetchSingle()</span>
-<span class="fc" id="L177">                .get(SUBMISSION.NAV_EKSTERN_REF_ID)!!</span>
-<span class="fc" id="L178">        return UploadForProcessing(</span>
-<span class="fc" id="L179">            filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,</span>
-<span class="fc" id="L180">            chunkData = record.get(UPLOAD.CHUNK_DATA)!!,</span>
-<span class="fc" id="L181">            submissionId = submissionId,</span>
-<span class="fc" id="L182">            navEksternRefId = navEksternRefId,</span>
+<span class="fc" id="L177">        val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!</span>
+<span class="fc" id="L178">        val navEksternRefId =</span>
+<span class="fc" id="L179">            tx</span>
+<span class="fc" id="L180">                .dsl()</span>
+<span class="fc" id="L181">                .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L182">                .from(SUBMISSION)</span>
+<span class="fc" id="L183">                .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L184">                .fetchSingle()</span>
+<span class="fc" id="L185">                .get(SUBMISSION.NAV_EKSTERN_REF_ID)!!</span>
+<span class="fc" id="L186">        return UploadForProcessing(</span>
+<span class="fc" id="L187">            filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,</span>
+<span class="fc" id="L188">            gcsKey = record.get(UPLOAD.GCS_KEY)!!,</span>
+<span class="fc" id="L189">            submissionId = submissionId,</span>
+<span class="fc" id="L190">            navEksternRefId = navEksternRefId,</span>
         )
     }
 
@@ -191,164 +199,167 @@ enum class Status {
         mellomlagringStorrelse: Long,
         sha512: String,
     ) {
-<span class="fc" id="L194">        tx</span>
-<span class="fc" id="L195">            .dsl()</span>
-<span class="fc" id="L196">            .update(UPLOAD)</span>
-<span class="fc" id="L197">            .set(UPLOAD.FIL_ID, filId)</span>
-<span class="fc" id="L198">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
-<span class="fc" id="L199">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
-<span class="fc" id="L200">            .set(UPLOAD.SHA512, sha512)</span>
-<span class="fc" id="L201">            .set(UPLOAD.PROCESSING_STATUS, &quot;COMPLETE&quot;)</span>
+<span class="fc" id="L202">        tx</span>
+<span class="fc" id="L203">            .dsl()</span>
+<span class="fc" id="L204">            .update(UPLOAD)</span>
+<span class="fc" id="L205">            .set(UPLOAD.FIL_ID, filId)</span>
+<span class="fc" id="L206">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
+<span class="fc" id="L207">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
+<span class="fc" id="L208">            .set(UPLOAD.SHA512, sha512)</span>
+<span class="fc" id="L209">            .set(UPLOAD.PROCESSING_STATUS, &quot;COMPLETE&quot;)</span>
+<span class="fc" id="L210">            .setNull(UPLOAD.GCS_KEY)</span>
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
-<span class="fc" id="L203">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L204">            .execute()</span>
-<span class="fc" id="L205">    }</span>
+<span class="fc" id="L212">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L213">            .execute()</span>
+<span class="fc" id="L214">    }</span>
 
     fun markFailed(
         tx: Configuration,
         uploadId: UUID,
     ) {
-<span class="fc" id="L211">        tx</span>
-<span class="fc" id="L212">            .dsl()</span>
-<span class="fc" id="L213">            .update(UPLOAD)</span>
-<span class="fc" id="L214">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
-<span class="fc" id="L215">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
-<span class="fc" id="L216">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L217">            .execute()</span>
-<span class="fc" id="L218">    }</span>
+<span class="fc" id="L220">        tx</span>
+<span class="fc" id="L221">            .dsl()</span>
+<span class="fc" id="L222">            .update(UPLOAD)</span>
+<span class="fc" id="L223">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
+<span class="fc" id="L224">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
+<span class="fc" id="L225">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L226">            .execute()</span>
+<span class="fc" id="L227">    }</span>
 
     /**
      * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
-     * Returns the submission IDs that need SSE notification.
+     * Returns info needed for SSE notification and GCS cleanup.
      */
     fun markStaleProcessingAsFailed(
         tx: Configuration,
         cutoff: java.time.OffsetDateTime,
-    ): List&lt;UUID&gt; =
-<span class="fc" id="L228">        tx</span>
-<span class="fc" id="L229">            .dsl()</span>
-<span class="fc" id="L230">            .update(UPLOAD)</span>
-<span class="fc" id="L231">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
-<span class="fc" id="L232">            .setNull(UPLOAD.CHUNK_DATA)</span>
-<span class="fc" id="L233">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L234">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PROCESSING&quot;))</span>
-<span class="fc" id="L235">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
-<span class="fc" id="L236">            .returning(UPLOAD.SUBMISSION_ID)</span>
-<span class="fc" id="L237">            .fetch()</span>
-<span class="fc" id="L238">            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }</span>
+    ): List&lt;StaleUploadInfo&gt; =
+<span class="fc" id="L237">        tx</span>
+<span class="fc" id="L238">            .dsl()</span>
+<span class="fc" id="L239">            .update(UPLOAD)</span>
+<span class="fc" id="L240">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
+<span class="fc" id="L241">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L242">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PROCESSING&quot;))</span>
+<span class="fc" id="L243">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
+<span class="fc" id="L244">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L245">            .fetch()</span>
+<span class="fc" id="L246">            .mapNotNull { record -&gt;</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
+<span class="fc" id="L248">            }</span>
 
     /**
      * Finds PENDING uploads that have received at least one chunk but stalled since before [cutoff].
-     * Clears chunk_data and marks them FAILED.
-     * Returns the submission IDs that need SSE notification.
+     * Marks them FAILED. Returns info needed for SSE notification and GCS cleanup.
      */
     fun markHaltedPendingAsFailed(
         tx: Configuration,
         cutoff: OffsetDateTime,
-    ): List&lt;UUID&gt; =
-<span class="fc" id="L249">        tx</span>
-<span class="fc" id="L250">            .dsl()</span>
-<span class="fc" id="L251">            .update(UPLOAD)</span>
-<span class="fc" id="L252">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
-<span class="fc" id="L253">            .setNull(UPLOAD.CHUNK_DATA)</span>
-<span class="fc" id="L254">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L255">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
-<span class="fc" id="L256">            .and(UPLOAD.UPLOAD_OFFSET.gt(0L))</span>
-<span class="fc" id="L257">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
-<span class="fc" id="L258">            .returning(UPLOAD.SUBMISSION_ID)</span>
-<span class="fc" id="L259">            .fetch()</span>
-<span class="fc" id="L260">            .mapNotNull { it.get(UPLOAD.SUBMISSION_ID) }</span>
-
-    fun clearChunkData(
-        tx: Configuration,
-        uploadId: UUID,
-    ) {
-<span class="fc" id="L266">        tx</span>
-<span class="fc" id="L267">            .dsl()</span>
-<span class="fc" id="L268">            .update(UPLOAD)</span>
-<span class="fc" id="L269">            .setNull(UPLOAD.CHUNK_DATA)</span>
-<span class="fc" id="L270">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L271">            .execute()</span>
-<span class="fc" id="L272">    }</span>
+    ): List&lt;StaleUploadInfo&gt; =
+<span class="fc" id="L258">        tx</span>
+<span class="fc" id="L259">            .dsl()</span>
+<span class="fc" id="L260">            .update(UPLOAD)</span>
+<span class="fc" id="L261">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
+<span class="fc" id="L262">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L263">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
+<span class="fc" id="L264">            .and(UPLOAD.UPLOAD_OFFSET.gt(0L))</span>
+<span class="fc" id="L265">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
+<span class="fc" id="L266">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L267">            .fetch()</span>
+<span class="fc" id="L268">            .mapNotNull { record -&gt;</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
+<span class="fc" id="L270">            }</span>
 
     fun getUpload(
         tx: Configuration,
         uploadId: UUID,
-<span class="fc" id="L277">    ) = tx</span>
-<span class="fc" id="L278">        .dsl()</span>
-<span class="fc" id="L279">        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE, UPLOAD.PROCESSING_STATUS)</span>
-<span class="fc" id="L280">        .from(UPLOAD)</span>
-<span class="fc" id="L281">        .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
-<span class="fc" id="L282">        .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L283">        .fetchSingle()</span>
-<span class="fc" id="L284">        .let {</span>
-<span class="fc" id="L285">            Upload(</span>
-<span class="fc" id="L286">                id = it.get(UPLOAD.ID),</span>
-<span class="fc" id="L287">                originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),</span>
-<span class="fc" id="L288">                errors = emptyList(),</span>
-<span class="fc" id="L289">                filId = it.get(UPLOAD.FIL_ID),</span>
-<span class="fc" id="L290">                navEksternRefId = it.get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
-<span class="fc" id="L291">                mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
-<span class="fc" id="L292">                fileSize = it.get(UPLOAD.SIZE),</span>
-<span class="fc" id="L293">                mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
-<span class="pc bpc" id="L294" title="2 of 4 branches missed.">                status = it.get(UPLOAD.PROCESSING_STATUS)?.let { status -&gt; Status.valueOf(status) } ?: error(&quot;No processing status. Was it not selected?&quot;)</span>
-<span class="fc" id="L295">            )</span>
-<span class="fc" id="L296">        }</span>
+<span class="fc" id="L275">    ) = tx</span>
+<span class="fc" id="L276">        .dsl()</span>
+<span class="fc" id="L277">        .select(UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID, SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN, UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE, UPLOAD.PROCESSING_STATUS)</span>
+<span class="fc" id="L278">        .from(UPLOAD)</span>
+<span class="fc" id="L279">        .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L280">        .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L281">        .fetchSingle()</span>
+<span class="fc" id="L282">        .let {</span>
+<span class="fc" id="L283">            Upload(</span>
+<span class="fc" id="L284">                id = it.get(UPLOAD.ID),</span>
+<span class="fc" id="L285">                originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),</span>
+<span class="fc" id="L286">                errors = emptyList(),</span>
+<span class="fc" id="L287">                filId = it.get(UPLOAD.FIL_ID),</span>
+<span class="fc" id="L288">                navEksternRefId = it.get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
+<span class="fc" id="L289">                mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
+<span class="fc" id="L290">                fileSize = it.get(UPLOAD.SIZE),</span>
+<span class="fc" id="L291">                mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
+<span class="pc bpc" id="L292" title="2 of 4 branches missed.">                status = it.get(UPLOAD.PROCESSING_STATUS)?.let { status -&gt; Status.valueOf(status) } ?: error(&quot;No processing status. Was it not selected?&quot;)</span>
+<span class="fc" id="L293">            )</span>
+<span class="fc" id="L294">        }</span>
 
     fun getUploads(
         tx: Configuration,
         submissionId: UUID,
     ): List&lt;Upload&gt; =
-<span class="fc" id="L302">        tx</span>
-<span class="fc" id="L303">            .dsl()</span>
-<span class="fc" id="L304">            .select(</span>
-<span class="fc" id="L305">                UPLOAD.ID,</span>
-<span class="fc" id="L306">                UPLOAD.ORIGINAL_FILENAME,</span>
-<span class="fc" id="L307">                ERROR.CODE,</span>
-<span class="fc" id="L308">                UPLOAD.FIL_ID,</span>
-<span class="fc" id="L309">                SUBMISSION.NAV_EKSTERN_REF_ID,</span>
-<span class="fc" id="L310">                UPLOAD.MELLOMLAGRING_FILNAVN,</span>
-<span class="fc" id="L311">                UPLOAD.SIZE,</span>
-<span class="fc" id="L312">                UPLOAD.MELLOMLAGRING_STORRELSE,</span>
-<span class="fc" id="L313">                UPLOAD.PROCESSING_STATUS,</span>
-<span class="fc" id="L314">                UPLOAD.SHA512</span>
+<span class="fc" id="L300">        tx</span>
+<span class="fc" id="L301">            .dsl()</span>
+<span class="fc" id="L302">            .select(</span>
+<span class="fc" id="L303">                UPLOAD.ID,</span>
+<span class="fc" id="L304">                UPLOAD.ORIGINAL_FILENAME,</span>
+<span class="fc" id="L305">                ERROR.CODE,</span>
+<span class="fc" id="L306">                UPLOAD.FIL_ID,</span>
+<span class="fc" id="L307">                SUBMISSION.NAV_EKSTERN_REF_ID,</span>
+<span class="fc" id="L308">                UPLOAD.MELLOMLAGRING_FILNAVN,</span>
+<span class="fc" id="L309">                UPLOAD.SIZE,</span>
+<span class="fc" id="L310">                UPLOAD.MELLOMLAGRING_STORRELSE,</span>
+<span class="fc" id="L311">                UPLOAD.PROCESSING_STATUS,</span>
+<span class="fc" id="L312">                UPLOAD.SHA512</span>
             )
-<span class="fc" id="L316">            .from(UPLOAD)</span>
-<span class="fc" id="L317">            .leftJoin(ERROR)</span>
-<span class="fc" id="L318">            .on(ERROR.UPLOAD.eq(UPLOAD.ID))</span>
-<span class="fc" id="L319">            .join(SUBMISSION)</span>
-<span class="fc" id="L320">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
-<span class="fc" id="L321">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
-<span class="fc" id="L322">            .fetch()</span>
-<span class="fc" id="L323">            .groupBy { it.get(UPLOAD.ID) }</span>
-<span class="fc" id="L324">            .map { (id, records) -&gt;</span>
-<span class="fc" id="L325">                Upload(</span>
-<span class="fc" id="L326">                    id = id,</span>
-<span class="fc" id="L327">                    originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),</span>
-<span class="pc" id="L328">                    errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },</span>
-<span class="fc" id="L329">                    filId = records.first().get(UPLOAD.FIL_ID),</span>
-<span class="fc" id="L330">                    navEksternRefId = records.first().get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
-<span class="fc" id="L331">                    mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
-<span class="fc" id="L332">                    fileSize = records.first().get(UPLOAD.SIZE),</span>
-<span class="fc" id="L333">                    mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
-<span class="pc bpc" id="L334" title="2 of 4 branches missed.">                    status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error(&quot;No processing status. Was it not selected?&quot;),</span>
-<span class="fc" id="L335">                    sha512 = records.first().get(UPLOAD.SHA512)</span>
-<span class="fc" id="L336">                )</span>
-<span class="fc" id="L337">            }</span>
+<span class="fc" id="L314">            .from(UPLOAD)</span>
+<span class="fc" id="L315">            .leftJoin(ERROR)</span>
+<span class="fc" id="L316">            .on(ERROR.UPLOAD.eq(UPLOAD.ID))</span>
+<span class="fc" id="L317">            .join(SUBMISSION)</span>
+<span class="fc" id="L318">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L319">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
+<span class="fc" id="L320">            .fetch()</span>
+<span class="fc" id="L321">            .groupBy { it.get(UPLOAD.ID) }</span>
+<span class="fc" id="L322">            .map { (id, records) -&gt;</span>
+<span class="fc" id="L323">                Upload(</span>
+<span class="fc" id="L324">                    id = id,</span>
+<span class="fc" id="L325">                    originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),</span>
+<span class="pc" id="L326">                    errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },</span>
+<span class="fc" id="L327">                    filId = records.first().get(UPLOAD.FIL_ID),</span>
+<span class="fc" id="L328">                    navEksternRefId = records.first().get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
+<span class="fc" id="L329">                    mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
+<span class="fc" id="L330">                    fileSize = records.first().get(UPLOAD.SIZE),</span>
+<span class="fc" id="L331">                    mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
+<span class="pc bpc" id="L332" title="2 of 4 branches missed.">                    status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error(&quot;No processing status. Was it not selected?&quot;),</span>
+<span class="fc" id="L333">                    sha512 = records.first().get(UPLOAD.SHA512)</span>
+<span class="fc" id="L334">                )</span>
+<span class="fc" id="L335">            }</span>
+
+    fun getGcsKeysForSubmission(
+        tx: Configuration,
+        submissionId: UUID,
+    ): List&lt;String&gt; =
+<span class="fc" id="L341">        tx</span>
+<span class="fc" id="L342">            .dsl()</span>
+<span class="fc" id="L343">            .select(UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L344">            .from(UPLOAD)</span>
+<span class="fc" id="L345">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
+<span class="fc" id="L346">            .and(UPLOAD.GCS_KEY.isNotNull)</span>
+<span class="fc" id="L347">            .fetch()</span>
+<span class="pc" id="L348">            .mapNotNull { it.get(UPLOAD.GCS_KEY) }</span>
 
     fun deleteUpload(
         tx: Configuration,
         uploadId: UUID,
     ): Int {
-<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: error(&quot;No submissionId for upload&quot;)</span>
-<span class="fc" id="L344">        val deleted =</span>
-<span class="fc" id="L345">            tx</span>
-<span class="fc" id="L346">                .dsl()</span>
-<span class="fc" id="L347">                .delete(UPLOAD)</span>
-<span class="fc" id="L348">                .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L349">                .execute()</span>
-<span class="fc" id="L350">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
-<span class="fc" id="L351">        return deleted</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: error(&quot;No submissionId for upload&quot;)</span>
+<span class="fc" id="L355">        val deleted =</span>
+<span class="fc" id="L356">            tx</span>
+<span class="fc" id="L357">                .dsl()</span>
+<span class="fc" id="L358">                .delete(UPLOAD)</span>
+<span class="fc" id="L359">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L360">                .execute()</span>
+<span class="fc" id="L361">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
+<span class="fc" id="L362">        return deleted</span>
     }
 
     fun addErrors(
@@ -356,18 +367,18 @@ enum class Status {
         uploadId: UUID,
         validations: List&lt;Validation&gt;,
     ) {
-<span class="fc" id="L359">        validations.forEach {</span>
-<span class="fc" id="L360">            tx</span>
-<span class="fc" id="L361">                .dsl()</span>
-<span class="fc" id="L362">                .insertInto(ERROR)</span>
-<span class="fc" id="L363">                .set(ERROR.UPLOAD, uploadId)</span>
-<span class="fc" id="L364">                .set(ERROR.CODE, it.code.name)</span>
-<span class="fc" id="L365">                .set(ERROR.ID, UUID.randomUUID())</span>
-<span class="fc" id="L366">                .execute()</span>
-<span class="fc" id="L367">        }</span>
-<span class="fc" id="L368">        markFailed(tx, uploadId)</span>
-<span class="fc" id="L369">        notifyChange(tx, uploadId)</span>
-<span class="fc" id="L370">    }</span>
+<span class="fc" id="L370">        validations.forEach {</span>
+<span class="fc" id="L371">            tx</span>
+<span class="fc" id="L372">                .dsl()</span>
+<span class="fc" id="L373">                .insertInto(ERROR)</span>
+<span class="fc" id="L374">                .set(ERROR.UPLOAD, uploadId)</span>
+<span class="fc" id="L375">                .set(ERROR.CODE, it.code.name)</span>
+<span class="fc" id="L376">                .set(ERROR.ID, UUID.randomUUID())</span>
+<span class="fc" id="L377">                .execute()</span>
+<span class="fc" id="L378">        }</span>
+<span class="fc" id="L379">        markFailed(tx, uploadId)</span>
+<span class="fc" id="L380">        notifyChange(tx, uploadId)</span>
+<span class="fc" id="L381">    }</span>
 }
 
 

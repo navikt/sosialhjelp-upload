@@ -38,46 +38,51 @@ import org.jooq.impl.TableRecordImpl
 <span class="nc" id="L38">        set(value): Unit = set(4, value)</span>
 <span class="nc" id="L39">        get(): Long? = get(4) as Long?</span>
 
-    open var chunkData: ByteArray?
-<span class="nc" id="L42">        set(value): Unit = set(5, value)</span>
-<span class="nc" id="L43">        get(): ByteArray? = get(5) as ByteArray?</span>
-
     open var filId: UUID?
-<span class="nc" id="L46">        set(value): Unit = set(6, value)</span>
-<span class="nc" id="L47">        get(): UUID? = get(6) as UUID?</span>
+<span class="nc" id="L42">        set(value): Unit = set(5, value)</span>
+<span class="nc" id="L43">        get(): UUID? = get(5) as UUID?</span>
 
     open var mellomlagringFilnavn: String?
+<span class="nc" id="L46">        set(value): Unit = set(6, value)</span>
+<span class="nc" id="L47">        get(): String? = get(6) as String?</span>
+
+    open var processingStatus: String?
 <span class="nc" id="L50">        set(value): Unit = set(7, value)</span>
 <span class="nc" id="L51">        get(): String? = get(7) as String?</span>
 
-    open var processingStatus: String?
-<span class="nc" id="L54">        set(value): Unit = set(8, value)</span>
-<span class="nc" id="L55">        get(): String? = get(8) as String?</span>
-
     open var mellomlagringStorrelse: Long?
+<span class="nc" id="L54">        set(value): Unit = set(8, value)</span>
+<span class="nc" id="L55">        get(): Long? = get(8) as Long?</span>
+
+    open var sha512: String?
 <span class="nc" id="L58">        set(value): Unit = set(9, value)</span>
-<span class="nc" id="L59">        get(): Long? = get(9) as Long?</span>
+<span class="nc" id="L59">        get(): String? = get(9) as String?</span>
 
     open var updatedAt: OffsetDateTime?
 <span class="nc" id="L62">        set(value): Unit = set(10, value)</span>
 <span class="nc" id="L63">        get(): OffsetDateTime? = get(10) as OffsetDateTime?</span>
 
+    open var gcsKey: String?
+<span class="nc" id="L66">        set(value): Unit = set(11, value)</span>
+<span class="nc" id="L67">        get(): String? = get(11) as String?</span>
+
     /**
      * Create a detached, initialised UploadRecord
      */
-<span class="nc" id="L68">    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, chunkData: ByteArray? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, updatedAt: OffsetDateTime? = null): this() {</span>
-<span class="nc" id="L69">        this.id = id</span>
-<span class="nc" id="L70">        this.submissionId = submissionId</span>
-<span class="nc" id="L71">        this.originalFilename = originalFilename</span>
-<span class="nc" id="L72">        this.size = size</span>
-<span class="nc" id="L73">        this.uploadOffset = uploadOffset</span>
-<span class="nc" id="L74">        this.chunkData = chunkData</span>
-<span class="nc" id="L75">        this.filId = filId</span>
-<span class="nc" id="L76">        this.mellomlagringFilnavn = mellomlagringFilnavn</span>
-<span class="nc" id="L77">        this.processingStatus = processingStatus</span>
-<span class="nc" id="L78">        this.mellomlagringStorrelse = mellomlagringStorrelse</span>
-<span class="nc" id="L79">        this.updatedAt = updatedAt</span>
-<span class="nc" id="L80">        resetChangedOnNotNull()</span>
-<span class="nc" id="L81">    }</span>
+<span class="nc" id="L72">    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null): this() {</span>
+<span class="nc" id="L73">        this.id = id</span>
+<span class="nc" id="L74">        this.submissionId = submissionId</span>
+<span class="nc" id="L75">        this.originalFilename = originalFilename</span>
+<span class="nc" id="L76">        this.size = size</span>
+<span class="nc" id="L77">        this.uploadOffset = uploadOffset</span>
+<span class="nc" id="L78">        this.filId = filId</span>
+<span class="nc" id="L79">        this.mellomlagringFilnavn = mellomlagringFilnavn</span>
+<span class="nc" id="L80">        this.processingStatus = processingStatus</span>
+<span class="nc" id="L81">        this.mellomlagringStorrelse = mellomlagringStorrelse</span>
+<span class="nc" id="L82">        this.sha512 = sha512</span>
+<span class="nc" id="L83">        this.updatedAt = updatedAt</span>
+<span class="nc" id="L84">        this.gcsKey = gcsKey</span>
+<span class="nc" id="L85">        resetChangedOnNotNull()</span>
+<span class="nc" id="L86">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

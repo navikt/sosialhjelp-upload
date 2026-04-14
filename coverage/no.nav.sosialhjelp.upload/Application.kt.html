@@ -21,6 +21,10 @@ import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.SubmissionService
+import no.nav.sosialhjelp.upload.storage.ChunkStorage
+import no.nav.sosialhjelp.upload.storage.FileSystemStorage
+import no.nav.sosialhjelp.upload.storage.GcsBucketStorage
+import com.google.cloud.storage.StorageOptions
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
@@ -60,33 +64,40 @@ private fun migrateDatabase(dataSource: DataSource) {
         .dataSource(dataSource)
         .locations(&quot;db/migration&quot;)
         .validateMigrationNaming(true)
-        .cleanDisabled(false)
-        .load().also {
-            it.clean()
-            it.migrate()
-        }
+        .load()
+        .migrate()
 }
 
 fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource)
     val runtimeEnv = this@module.property&lt;String&gt;(&quot;runtimeEnv&quot;)
-    val isMock = runtimeEnv == &quot;mock&quot; || runtimeEnv == &quot;local&quot;
+    val isLocal = runtimeEnv == &quot;local&quot;
+    val isMock = runtimeEnv == &quot;mock&quot; || isLocal
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
+    val chunkStorage: ChunkStorage = if (isLocal) {
+        FileSystemStorage()
+    } else {
+        val bucketName = environment.config.property(&quot;gcs.bucketName&quot;).getString()
+        GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
+    }
     dependencies {
-<span class="nc" id="L78">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="fc" id="L79">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="nc" id="L80">        provide&lt;DataSource&gt; { dataSource }</span>
-<span class="fc" id="L81">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
-<span class="pc bpc" id="L82" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (isMock) {</span>
-<span class="fc" id="L84">                create(EncryptionServiceMock::class)</span>
+<span class="nc" id="L87">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="fc" id="L88">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="nc" id="L89">        provide&lt;DataSource&gt; { dataSource }</span>
+<span class="fc" id="L90">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
+<span class="pc bpc" id="L91" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (isMock) {</span>
+<span class="fc" id="L93">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L86">                create(EncryptionServiceImpl::class)</span>
-<span class="fc" id="L87">            }</span>
+<span class="nc" id="L95">                create(EncryptionServiceImpl::class)</span>
+<span class="fc" id="L96">            }</span>
         }
-<span class="fc" id="L89">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
+<span class="fc" id="L98">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
+<span class="fc" id="L99">        provide&lt;CoroutineScope&gt; { processingScope }</span>
+<span class="fc" id="L100">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
         provide(VirusScanner::class)
@@ -110,21 +121,21 @@ fun Application.module() {
 
     val recoveryService: UploadRecoveryService by dependencies
     val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="pc bpc" id="L113" title="2 of 3 branches missed.">    recoveryScope.launch {</span>
-<span class="fc" id="L114">        while (true) {</span>
-<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc" id="L116">            runCatching { recoveryService.recoverAll() }</span>
-<span class="nc bnc" id="L117" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+<span class="pc bpc" id="L124" title="3 of 4 branches missed.">    recoveryScope.launch {</span>
+<span class="fc" id="L125">        while (true) {</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
         }
     }
 
     val retentionService: RetentionService by dependencies
     val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="pc bpc" id="L123" title="3 of 4 branches missed.">    retentionScope.launch {</span>
-<span class="fc" id="L124">        while (true) {</span>
-<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc bnc" id="L126" title="All 2 branches missed.">            runCatching { retentionService.runRetention() }</span>
-<span class="nc bnc" id="L127" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+<span class="pc bpc" id="L134" title="3 of 4 branches missed.">    retentionScope.launch {</span>
+<span class="fc" id="L135">        while (true) {</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            runCatching { retentionService.runRetention() }</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
         }
     }
 }

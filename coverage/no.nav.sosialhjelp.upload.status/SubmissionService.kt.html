@@ -11,10 +11,10 @@ import org.jooq.DSLContext
 import java.util.*
 
 <span class="fc" id="L13">class SubmissionService(</span>
-<span class="pc" id="L14">    val uploadRepository: UploadRepository,</span>
-<span class="pc" id="L15">    val submissionRepository: SubmissionRepository,</span>
-<span class="pc" id="L16">    val dsl: DSLContext,</span>
-<span class="pc" id="L17">    val fiksClient: FiksClient,</span>
+<span class="fc" id="L14">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L15">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L16">    private val dsl: DSLContext,</span>
+<span class="fc" id="L17">    private val fiksClient: FiksClient,</span>
 ) {
     suspend fun getOrCreate(
         contextId: String,
@@ -23,7 +23,7 @@ import java.util.*
         fiksDigisosId: String?,
         userToken: String,
     ): UUID {
-<span class="pc bpc" id="L26" title="5 of 6 branches missed.">        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, userToken) } ?: error(&quot;Mangler både soknadId og fiksDigisosId&quot;)</span>
+<span class="nc bnc" id="L26" title="All 6 branches missed.">        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, userToken) } ?: error(&quot;Mangler både soknadId og fiksDigisosId&quot;)</span>
 <span class="nc" id="L27">        return withContext(Dispatchers.IO) {</span>
 <span class="nc" id="L28">            dsl.transactionResult { tx -&gt;</span>
 <span class="nc" id="L29">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent, navEksternRefId)</span>
