@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * Filesystem-backed chunk storage for local development.
- * Chunks are written to `{baseDir}/{key}`. No GCS credentials required.
+ * Chunks are written to `{baseDir}/{key}`.
  */
 class FileSystemStorage(
     baseDir: File = File(System.getProperty("java.io.tmpdir"), "sosialhjelp-upload"),

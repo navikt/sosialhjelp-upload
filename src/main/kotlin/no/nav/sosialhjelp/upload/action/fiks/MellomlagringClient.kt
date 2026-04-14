@@ -25,6 +25,9 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
 import io.micrometer.core.instrument.MeterRegistry
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -51,6 +54,12 @@ class MellomlagringClient(
         HttpClient(CIO) {
             expectSuccess = false
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) = this@MellomlagringClient.logger.info(message)
+                }
+                level = LogLevel.INFO
+            }
         }
     }
 

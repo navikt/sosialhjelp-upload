@@ -87,7 +87,7 @@ open class Submission(
     /**
      * The column <code>public.submission.nav_ekstern_ref_id</code>.
      */
-    val NAV_EKSTERN_REF_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("nav_ekstern_ref_id"), SQLDataType.VARCHAR(255).nullable(false), this, "")
+    val NAV_EKSTERN_REF_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("nav_ekstern_ref_id"), SQLDataType.VARCHAR(255).nullable(true), this, "")
 
     /**
      * The column <code>public.submission.created_at</code>.

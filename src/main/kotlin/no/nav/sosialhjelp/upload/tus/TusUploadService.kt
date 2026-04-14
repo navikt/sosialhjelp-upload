@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
@@ -29,6 +30,7 @@ class TusUploadService(
     private val dsl: DSLContext,
     private val validator: UploadValidator,
     private val gotenbergService: GotenbergService,
+    private val fiksClient: FiksClient,
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
     private val chunkStorage: ChunkStorage,
@@ -38,17 +40,35 @@ class TusUploadService(
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    fun create(
+    suspend fun create(
         contextId: String,
         filename: String,
         size: Long,
         personident: String,
+        token: String,
     ): UUID {
         return try {
-            dsl.transactionResult { tx ->
-                val submissionId = submissionRepository.getSubmission(tx, contextId, personident)
-                uploadRepository.create(tx, submissionId, filename, size)
-                    ?: error("Failed to create upload record")
+            val (submissionId, existingNavEksternRefId) = withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    val submissionId = submissionRepository.getSubmission(tx, contextId, personident)
+                    submissionId to submissionRepository.getNavEksternRefIdOrNull(tx, submissionId)
+                }
+            }
+
+            if (existingNavEksternRefId == null) {
+                val navEksternRefId = fiksClient.getNewNavEksternRefId(contextId, token)
+                withContext(ioDispatcher) {
+                    dsl.transaction { tx ->
+                        submissionRepository.setNavEksternRefId(tx, submissionId, navEksternRefId)
+                    }
+                }
+            }
+
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    uploadRepository.create(tx, submissionId, filename, size)
+                        ?: error("Failed to create upload record")
+                }
             }.also { meterRegistry.counter("upload.created").increment() }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")

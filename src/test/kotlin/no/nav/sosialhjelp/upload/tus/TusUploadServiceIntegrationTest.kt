@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
+import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
@@ -29,8 +30,8 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.junit.jupiter.api.assertThrows
 import java.util.UUID
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -47,6 +48,7 @@ class TusUploadServiceIntegrationTest {
     private lateinit var notificationService: SubmissionNotificationService
     private lateinit var virusScanner: VirusScanner
     private lateinit var gotenbergService: GotenbergService
+    private lateinit var fiksClient: FiksClient
     private val processingScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @BeforeAll
@@ -60,6 +62,7 @@ class TusUploadServiceIntegrationTest {
 
         virusScanner = mockk()
         gotenbergService = mockk()
+        fiksClient = mockk(relaxed = true)
         val validator = UploadValidator(virusScanner)
 
         mellomlagringClient = mockk()
@@ -73,6 +76,7 @@ class TusUploadServiceIntegrationTest {
                 dsl = dsl,
                 validator = validator,
                 gotenbergService = gotenbergService,
+                fiksClient = fiksClient,
                 mellomlagringClient = mellomlagringClient,
                 encryptionService = encryptionService,
                 chunkStorage = FileSystemStorage(),
@@ -91,46 +95,49 @@ class TusUploadServiceIntegrationTest {
     // region create
 
     @Test
-    fun `create should insert upload record and return UUID`() {
-        val externalId = UUID.randomUUID().toString()
-        val personident = "12345678910"
-        createMockSubmission(dsl, externalId)
+    fun `create should insert upload record and return UUID`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            createMockSubmission(dsl, externalId)
 
-        val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident)
+            val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident, "test-token")
 
-        val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
-        assertNotNull(row)
-        assertEquals("test.pdf", row[UPLOAD.ORIGINAL_FILENAME])
-        assertEquals(0L, row[UPLOAD.UPLOAD_OFFSET])
-    }
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            assertNotNull(row)
+            assertEquals("test.pdf", row[UPLOAD.ORIGINAL_FILENAME])
+            assertEquals(0L, row[UPLOAD.UPLOAD_OFFSET])
+        }
 
     @Test
-    fun `create with same externalId as different user should throw UploadForbiddenException`() {
-        val externalId = UUID.randomUUID().toString()
-        createMockSubmission(dsl, externalId, ownerIdent = "11111111111")
-        tusUploadService.create(externalId, "first.pdf", 50L, "11111111111")
+    fun `create with same externalId as different user should throw UploadForbiddenException`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, externalId, ownerIdent = "11111111111")
+            tusUploadService.create(externalId, "first.pdf", 50L, "11111111111", "test-token")
 
-        assertThrows<TusUploadService.UploadForbiddenException> {
-            tusUploadService.create(externalId, "second.pdf", 50L, "99999999999")
+            assertFailsWith<TusUploadService.UploadForbiddenException> {
+                tusUploadService.create(externalId, "second.pdf", 50L, "99999999999", "test-token")
+            }
         }
-    }
 
     // endregion
 
     // region getUploadInfo
 
     @Test
-    fun `getUploadInfo returns offset and totalSize`() {
-        val externalId = UUID.randomUUID().toString()
-        val personident = "12345678910"
-        createMockSubmission(dsl, externalId)
-        val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident)
+    fun `getUploadInfo returns offset and totalSize`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            createMockSubmission(dsl, externalId)
+            val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident, "test-token")
 
-        val (offset, total) = tusUploadService.getUploadInfo(uploadId)
+            val (offset, total) = tusUploadService.getUploadInfo(uploadId)
 
-        assertEquals(0L, offset)
-        assertEquals(42L, total)
-    }
+            assertEquals(0L, offset)
+            assertEquals(42L, total)
+        }
 
     // endregion
 
@@ -143,7 +150,7 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             val content = "hello world".toByteArray()
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident)
+            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident, "test-token")
 
             val newOffset = tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -164,7 +171,7 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident)
+            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident, "test-token")
             tusUploadService.appendChunk(uploadId, 0L, content)
 
             awaitUploadTerminal(dsl, uploadId)
@@ -189,6 +196,7 @@ class TusUploadServiceIntegrationTest {
                     "toobig.pdf",
                     (MAX_FILE_SIZE + 1).toLong(),
                     personident,
+                    "test-token",
                 )
             tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
 
@@ -219,6 +227,7 @@ class TusUploadServiceIntegrationTest {
                     "virus.pdf",
                     content.size.toLong(),
                     personident,
+                    "test-token",
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -253,7 +262,7 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident)
+            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, "test-token")
             tusUploadService.appendChunk(uploadId, 0L, content)
 
             awaitUploadTerminal(dsl, uploadId)
@@ -272,7 +281,7 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident)
+            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident, "test-token")
 
             tusUploadService.delete(uploadId)
 

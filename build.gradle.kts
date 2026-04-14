@@ -74,6 +74,7 @@ dependencies {
     implementation("io.ktor:ktor-client-cio-jvm:3.2.3")
     implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
     implementation("io.ktor:ktor-serialization-jackson:3.2.3")
+    implementation(libs.ktor.client.logging)
 
     implementation(libs.google.cloud.storage)
 

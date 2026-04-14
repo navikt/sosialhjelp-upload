@@ -40,6 +40,8 @@ fun Route.configureTusRoutes(basePath: String) {
     post {
         val personident = call.principal<JWTPrincipal>()?.subject
             ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val token = call.request.headers["Authorization"]?.removePrefix("Bearer ")
+            ?: return@post call.respond(HttpStatusCode.Unauthorized)
 
         val tusResumable = call.request.header("Tus-Resumable")
         if (tusResumable != TUS_RESUMABLE) {
@@ -56,7 +58,7 @@ fun Route.configureTusRoutes(basePath: String) {
 
         val uploadId =
             try {
-                tusUploadService.create(contextId, filename, uploadLength, personident)
+                tusUploadService.create(contextId, filename, uploadLength, personident, token)
             } catch (_: UploadForbiddenException) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }

@@ -12,6 +12,9 @@ import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -52,6 +55,12 @@ class FiksClient(
             install(ContentNegotiation) {
                 jackson()
             }
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) = this@FiksClient.logger.info(message)
+                }
+                level = LogLevel.INFO
+            }
         }
     }
 
@@ -60,6 +69,12 @@ class FiksClient(
             expectSuccess = false
             install(ContentNegotiation) {
                 json()
+            }
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) = this@FiksClient.logger.info(message)
+                }
+                level = LogLevel.INFO
             }
         }
     }
