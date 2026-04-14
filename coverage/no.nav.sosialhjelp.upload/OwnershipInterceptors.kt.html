@@ -10,6 +10,7 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.util.AttributeKey
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
@@ -18,77 +19,79 @@ import org.jooq.DSLContext
 import java.util.UUID
 
 /** Set by [verifyUploadOwnership] — the validated upload ID parsed from the path parameter. */
-<span class="fc" id="L21">val VerifiedUploadId = AttributeKey&lt;UUID&gt;(&quot;VerifiedUploadId&quot;)</span>
+<span class="fc" id="L22">val VerifiedUploadId = AttributeKey&lt;UUID&gt;(&quot;VerifiedUploadId&quot;)</span>
 
 /** Set by [verifySubmissionOwnership] — the validated submission ID parsed from the path parameter. */
-<span class="fc" id="L24">val VerifiedSubmissionId = AttributeKey&lt;UUID&gt;(&quot;VerifiedSubmissionId&quot;)</span>
+<span class="fc" id="L25">val VerifiedSubmissionId = AttributeKey&lt;UUID&gt;(&quot;VerifiedSubmissionId&quot;)</span>
 
 /** Set by [verifyUploadOwnership] or [verifySubmissionOwnership] — the authenticated user's personident. */
-<span class="fc" id="L27">val VerifiedPersonident = AttributeKey&lt;String&gt;(&quot;VerifiedPersonident&quot;)</span>
+<span class="fc" id="L28">val VerifiedPersonident = AttributeKey&lt;String&gt;(&quot;VerifiedPersonident&quot;)</span>
 
-private val VerifyUploadOwnershipPlugin = createRouteScopedPlugin(&quot;VerifyUploadOwnership&quot;) {
-<span class="fc" id="L30">    val dsl: DSLContext by application.dependencies</span>
-<span class="fc" id="L31">    val uploadRepository: UploadRepository by application.dependencies</span>
+<span class="nc" id="L30">private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
+<span class="fc" id="L31">    createRouteScopedPlugin(&quot;VerifyUploadOwnership&quot;) {</span>
+<span class="fc" id="L32">        val dsl: DSLContext by application.dependencies</span>
+<span class="fc" id="L33">        val uploadRepository: UploadRepository by application.dependencies</span>
 
-<span class="pc bpc" id="L33" title="5 of 6 branches missed.">    on(AuthenticationChecked) { call -&gt;</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (call.isHandled) return@on</span>
+<span class="pc bpc" id="L35" title="5 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
 
-<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (personident == null) {</span>
-<span class="nc" id="L38">            call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L39">            return@on</span>
-        }
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (personident == null) {</span>
+<span class="nc" id="L40">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L41">                return@on</span>
+            }
 
-<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        val uploadId = call.parameters[&quot;id&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
-<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (uploadId == null) {</span>
-<span class="nc" id="L44">            call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L45">            return@on</span>
-        }
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">            val uploadId = call.parameters[&quot;id&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (uploadId == null) {</span>
+<span class="nc" id="L46">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L47">                return@on</span>
+            }
 
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        val owned = withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L49">            dsl.transactionResult { tx -&gt; uploadRepository.isOwnedByUser(tx, uploadId, personident) }</span>
-        }
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (!owned) {</span>
-            // Return 404 rather than 403 to avoid leaking whether the resource exists.
-<span class="nc" id="L53">            call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L54">            return@on</span>
-        }
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
+<span class="fc" id="L51">                dsl.transactionResult { tx -&gt; uploadRepository.isOwnedByUser(tx, uploadId, personident) }</span>
+            }
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (!owned) {</span>
+                // Return 404 rather than 403 to avoid leaking whether the resource exists.
+<span class="nc" id="L55">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L56">                return@on</span>
+            }
 
-<span class="fc" id="L57">        call.attributes.put(VerifiedUploadId, uploadId)</span>
-<span class="fc" id="L58">        call.attributes.put(VerifiedPersonident, personident)</span>
-<span class="fc" id="L59">    }</span>
-<span class="fc" id="L60">}</span>
+<span class="fc" id="L59">            call.attributes.put(VerifiedUploadId, uploadId)</span>
+<span class="fc" id="L60">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc" id="L62">    }</span>
 
-private val VerifySubmissionOwnershipPlugin = createRouteScopedPlugin(&quot;VerifySubmissionOwnership&quot;) {
-<span class="fc" id="L63">    val submissionRepository: SubmissionRepository by application.dependencies</span>
+<span class="nc" id="L64">private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
+<span class="fc" id="L65">    createRouteScopedPlugin(&quot;VerifySubmissionOwnership&quot;) {</span>
+<span class="fc" id="L66">        val submissionRepository: SubmissionRepository by application.dependencies</span>
 
-<span class="pc bpc" id="L65" title="5 of 6 branches missed.">    on(AuthenticationChecked) { call -&gt;</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (call.isHandled) return@on</span>
+<span class="pc bpc" id="L68" title="5 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
 
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (personident == null) {</span>
-<span class="nc" id="L70">            call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L71">            return@on</span>
-        }
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (personident == null) {</span>
+<span class="nc" id="L73">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L74">                return@on</span>
+            }
 
-<span class="pc bpc" id="L74" title="2 of 4 branches missed.">        val submissionId = call.parameters[&quot;submissionId&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (submissionId == null) {</span>
-<span class="nc" id="L76">            call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L77">            return@on</span>
-        }
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">            val submissionId = call.parameters[&quot;submissionId&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (submissionId == null) {</span>
+<span class="nc" id="L79">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L80">                return@on</span>
+            }
 
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        val owned = withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L81">            submissionRepository.isOwnedByUser(submissionId, personident)</span>
-        }
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (!owned) {</span>
-<span class="nc" id="L84">            call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L85">            return@on</span>
-        }
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
+<span class="fc" id="L84">                submissionRepository.isOwnedByUser(submissionId, personident)</span>
+            }
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (!owned) {</span>
+<span class="nc" id="L87">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L88">                return@on</span>
+            }
 
-<span class="fc" id="L88">        call.attributes.put(VerifiedSubmissionId, submissionId)</span>
-<span class="fc" id="L89">        call.attributes.put(VerifiedPersonident, personident)</span>
-<span class="fc" id="L90">    }</span>
-<span class="fc" id="L91">}</span>
+<span class="fc" id="L91">            call.attributes.put(VerifiedSubmissionId, submissionId)</span>
+<span class="fc" id="L92">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="fc" id="L93">        }</span>
+<span class="fc" id="L94">    }</span>
 
 /**
  * Route-scoped ownership interceptor for upload resources.
@@ -106,9 +109,9 @@ private val VerifySubmissionOwnershipPlugin = createRouteScopedPlugin(&quot;Veri
  * On success, [VerifiedUploadId] and [VerifiedPersonident] are available in `call.attributes`.
  * On failure the pipeline is short-circuited via `call.respond` (404/401); the handler never runs.
  */
-fun Route.verifyUploadOwnership() {
-<span class="fc" id="L110">    install(VerifyUploadOwnershipPlugin)</span>
-<span class="fc" id="L111">}</span>
+<span class="fc" id="L112">fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
+<span class="fc" id="L113">    install(verifyUploadOwnershipPlugin(ioDispatcher))</span>
+<span class="fc" id="L114">}</span>
 
 /**
  * Route-scoped ownership interceptor for submission resources.
@@ -124,7 +127,7 @@ fun Route.verifyUploadOwnership() {
  * On success, [VerifiedSubmissionId] and [VerifiedPersonident] are available in `call.attributes`.
  * On failure the pipeline is short-circuited via `call.respond` (404/401); the handler never runs.
  */
-fun Route.verifySubmissionOwnership() {
-<span class="fc" id="L128">    install(VerifySubmissionOwnershipPlugin)</span>
-<span class="fc" id="L129">}</span>
+<span class="fc" id="L130">fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
+<span class="fc" id="L131">    install(verifySubmissionOwnershipPlugin(ioDispatcher))</span>
+<span class="fc" id="L132">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

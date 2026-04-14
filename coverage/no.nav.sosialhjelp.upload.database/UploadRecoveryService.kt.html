@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.StatusCode
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -13,15 +14,16 @@ import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
 
-<span class="fc" id="L16">class UploadRecoveryService(</span>
-<span class="fc" id="L17">    private val dsl: DSLContext,</span>
-<span class="fc" id="L18">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L19">    private val notificationService: SubmissionNotificationService,</span>
-<span class="fc" id="L20">    private val chunkStorage: ChunkStorage,</span>
-<span class="fc" id="L21">    private val meterRegistry: MeterRegistry,</span>
-) {
-<span class="fc" id="L23">    private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)</span>
-<span class="fc" id="L24">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
+<span class="pc" id="L17">class UploadRecoveryService(</span>
+<span class="fc" id="L18">    private val dsl: DSLContext,</span>
+<span class="fc" id="L19">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L20">    private val notificationService: SubmissionNotificationService,</span>
+<span class="fc" id="L21">    private val chunkStorage: ChunkStorage,</span>
+<span class="fc" id="L22">    private val meterRegistry: MeterRegistry,</span>
+<span class="pc" id="L23">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="nc" id="L24">) {</span>
+<span class="fc" id="L25">    private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)</span>
+<span class="fc" id="L26">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
 
     companion object {
         const val PROCESSING_TIMEOUT_MINUTES = 5L
@@ -29,92 +31,92 @@ import java.time.temporal.ChronoUnit
     }
 
     suspend fun recoverAll() {
-<span class="nc" id="L32">        val span = tracer.spanBuilder(&quot;upload.recovery&quot;).startSpan()</span>
-<span class="nc" id="L33">        val scope = span.makeCurrent()</span>
-<span class="nc" id="L34">        try {</span>
-<span class="nc" id="L35">            recoverStuckProcessing()</span>
-<span class="nc" id="L36">            recoverHaltedUploads()</span>
-<span class="nc" id="L37">        } catch (e: Exception) {</span>
-<span class="nc" id="L38">            span.recordException(e)</span>
-<span class="nc bnc" id="L39" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Recovery failed&quot;)</span>
-<span class="nc" id="L40">            throw e</span>
+<span class="nc" id="L34">        val span = tracer.spanBuilder(&quot;upload.recovery&quot;).startSpan()</span>
+<span class="nc" id="L35">        val scope = span.makeCurrent()</span>
+<span class="nc" id="L36">        try {</span>
+<span class="nc" id="L37">            recoverStuckProcessing()</span>
+<span class="nc" id="L38">            recoverHaltedUploads()</span>
+<span class="nc" id="L39">        } catch (e: Exception) {</span>
+<span class="nc" id="L40">            span.recordException(e)</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Recovery failed&quot;)</span>
+<span class="nc" id="L42">            throw e</span>
         } finally {
-<span class="nc" id="L42">            scope.close()</span>
-<span class="nc" id="L43">            span.end()</span>
+<span class="nc" id="L44">            scope.close()</span>
+<span class="nc" id="L45">            span.end()</span>
         }
-<span class="nc" id="L45">    }</span>
+<span class="nc" id="L47">    }</span>
 
-<span class="nc" id="L47">    private suspend fun recoverStuckProcessing() {</span>
-<span class="nc" id="L48">        val span = tracer.spanBuilder(&quot;upload.recovery.stuck_processing&quot;).startSpan()</span>
-<span class="nc" id="L49">        val scope = span.makeCurrent()</span>
-<span class="nc" id="L50">        try {</span>
-<span class="nc" id="L51">            val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)</span>
-<span class="nc" id="L52">            val staleUploads = withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L53">                dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L54">                    uploadRepository.markStaleProcessingAsFailed(tx, cutoff)</span>
-<span class="nc" id="L55">                }</span>
+<span class="nc" id="L49">    private suspend fun recoverStuckProcessing() {</span>
+<span class="nc" id="L50">        val span = tracer.spanBuilder(&quot;upload.recovery.stuck_processing&quot;).startSpan()</span>
+<span class="nc" id="L51">        val scope = span.makeCurrent()</span>
+<span class="nc" id="L52">        try {</span>
+<span class="nc" id="L53">            val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)</span>
+<span class="nc" id="L54">            val staleUploads = withContext(ioDispatcher) {</span>
+<span class="nc" id="L55">                dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L56">                    uploadRepository.markStaleProcessingAsFailed(tx, cutoff)</span>
+<span class="nc" id="L57">                }</span>
             }
-<span class="nc" id="L57">            span.setAttribute(&quot;upload.recovery.count&quot;, staleUploads.size.toLong())</span>
-<span class="nc bnc" id="L58" title="All 4 branches missed.">            if (staleUploads.isNotEmpty()) {</span>
-<span class="nc" id="L59">                log.warn(&quot;Recovered ${staleUploads.size} upload(s) stuck in PROCESSING (older than ${PROCESSING_TIMEOUT_MINUTES}m)&quot;)</span>
-<span class="nc" id="L60">                meterRegistry.counter(&quot;upload.recovery&quot;, &quot;reason&quot;, &quot;stuck_processing&quot;)</span>
-<span class="nc" id="L61">                    .increment(staleUploads.size.toDouble())</span>
-<span class="nc" id="L62">                staleUploads.forEach { info -&gt;</span>
-<span class="nc" id="L63">                    notificationService.notifyUpdate(info.submissionId)</span>
-<span class="nc bnc" id="L64" title="All 2 branches missed.">                    info.gcsKey?.let { cleanupGcsObjects(it) }</span>
-<span class="nc" id="L65">                }</span>
+<span class="nc" id="L59">            span.setAttribute(&quot;upload.recovery.count&quot;, staleUploads.size.toLong())</span>
+<span class="nc bnc" id="L60" title="All 4 branches missed.">            if (staleUploads.isNotEmpty()) {</span>
+<span class="nc" id="L61">                log.warn(&quot;Recovered ${staleUploads.size} upload(s) stuck in PROCESSING (older than ${PROCESSING_TIMEOUT_MINUTES}m)&quot;)</span>
+<span class="nc" id="L62">                meterRegistry.counter(&quot;upload.recovery&quot;, &quot;reason&quot;, &quot;stuck_processing&quot;)</span>
+<span class="nc" id="L63">                    .increment(staleUploads.size.toDouble())</span>
+<span class="nc" id="L64">                staleUploads.forEach { info -&gt;</span>
+<span class="nc" id="L65">                    notificationService.notifyUpdate(info.submissionId)</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                    info.gcsKey?.let { cleanupGcsObjects(it) }</span>
+<span class="nc" id="L67">                }</span>
             }
-<span class="nc" id="L67">        } catch (e: Exception) {</span>
-<span class="nc" id="L68">            span.recordException(e)</span>
-<span class="nc bnc" id="L69" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Failed&quot;)</span>
-<span class="nc" id="L70">            throw e</span>
+<span class="nc" id="L69">        } catch (e: Exception) {</span>
+<span class="nc" id="L70">            span.recordException(e)</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Failed&quot;)</span>
+<span class="nc" id="L72">            throw e</span>
         } finally {
-<span class="nc" id="L72">            scope.close()</span>
-<span class="nc" id="L73">            span.end()</span>
+<span class="nc" id="L74">            scope.close()</span>
+<span class="nc" id="L75">            span.end()</span>
         }
-<span class="nc" id="L75">    }</span>
+<span class="nc" id="L77">    }</span>
 
-<span class="nc" id="L77">    private suspend fun recoverHaltedUploads() {</span>
-<span class="nc" id="L78">        val span = tracer.spanBuilder(&quot;upload.recovery.halted_pending&quot;).startSpan()</span>
-<span class="nc" id="L79">        val scope = span.makeCurrent()</span>
-<span class="nc" id="L80">        try {</span>
-<span class="nc" id="L81">            val cutoff = OffsetDateTime.now().minus(PENDING_CHUNK_TIMEOUT_HOURS, ChronoUnit.HOURS)</span>
-<span class="nc" id="L82">            val staleUploads = withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L83">                dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L84">                    uploadRepository.markHaltedPendingAsFailed(tx, cutoff)</span>
-<span class="nc" id="L85">                }</span>
+<span class="nc" id="L79">    private suspend fun recoverHaltedUploads() {</span>
+<span class="nc" id="L80">        val span = tracer.spanBuilder(&quot;upload.recovery.halted_pending&quot;).startSpan()</span>
+<span class="nc" id="L81">        val scope = span.makeCurrent()</span>
+<span class="nc" id="L82">        try {</span>
+<span class="nc" id="L83">            val cutoff = OffsetDateTime.now().minus(PENDING_CHUNK_TIMEOUT_HOURS, ChronoUnit.HOURS)</span>
+<span class="nc" id="L84">            val staleUploads = withContext(ioDispatcher) {</span>
+<span class="nc" id="L85">                dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L86">                    uploadRepository.markHaltedPendingAsFailed(tx, cutoff)</span>
+<span class="nc" id="L87">                }</span>
             }
-<span class="nc" id="L87">            span.setAttribute(&quot;upload.recovery.count&quot;, staleUploads.size.toLong())</span>
-<span class="nc bnc" id="L88" title="All 4 branches missed.">            if (staleUploads.isNotEmpty()) {</span>
-<span class="nc" id="L89">                log.info(&quot;Cleaned up ${staleUploads.size} halted PENDING upload(s) (stalled for &gt;${PENDING_CHUNK_TIMEOUT_HOURS}h)&quot;)</span>
-<span class="nc" id="L90">                meterRegistry.counter(&quot;upload.recovery&quot;, &quot;reason&quot;, &quot;halted_pending&quot;)</span>
-<span class="nc" id="L91">                    .increment(staleUploads.size.toDouble())</span>
-<span class="nc" id="L92">                staleUploads.forEach { info -&gt;</span>
-<span class="nc" id="L93">                    notificationService.notifyUpdate(info.submissionId)</span>
-<span class="nc bnc" id="L94" title="All 2 branches missed.">                    info.gcsKey?.let { cleanupGcsObjects(it) }</span>
-<span class="nc" id="L95">                }</span>
+<span class="nc" id="L89">            span.setAttribute(&quot;upload.recovery.count&quot;, staleUploads.size.toLong())</span>
+<span class="nc bnc" id="L90" title="All 4 branches missed.">            if (staleUploads.isNotEmpty()) {</span>
+<span class="nc" id="L91">                log.info(&quot;Cleaned up ${staleUploads.size} halted PENDING upload(s) (stalled for &gt;${PENDING_CHUNK_TIMEOUT_HOURS}h)&quot;)</span>
+<span class="nc" id="L92">                meterRegistry.counter(&quot;upload.recovery&quot;, &quot;reason&quot;, &quot;halted_pending&quot;)</span>
+<span class="nc" id="L93">                    .increment(staleUploads.size.toDouble())</span>
+<span class="nc" id="L94">                staleUploads.forEach { info -&gt;</span>
+<span class="nc" id="L95">                    notificationService.notifyUpdate(info.submissionId)</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                    info.gcsKey?.let { cleanupGcsObjects(it) }</span>
+<span class="nc" id="L97">                }</span>
             }
-<span class="nc" id="L97">        } catch (e: Exception) {</span>
-<span class="nc" id="L98">            span.recordException(e)</span>
-<span class="nc bnc" id="L99" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Failed&quot;)</span>
-<span class="nc" id="L100">            throw e</span>
+<span class="nc" id="L99">        } catch (e: Exception) {</span>
+<span class="nc" id="L100">            span.recordException(e)</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Failed&quot;)</span>
+<span class="nc" id="L102">            throw e</span>
         } finally {
-<span class="nc" id="L102">            scope.close()</span>
-<span class="nc" id="L103">            span.end()</span>
+<span class="nc" id="L104">            scope.close()</span>
+<span class="nc" id="L105">            span.end()</span>
         }
-<span class="nc" id="L105">    }</span>
+<span class="nc" id="L107">    }</span>
 
     private suspend fun cleanupGcsObjects(gcsKey: String) {
-<span class="nc bnc" id="L108" title="All 4 branches missed.">        withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L109">            val chunkPrefix = &quot;$gcsKey-chunk-&quot;</span>
-<span class="nc" id="L110">            runCatching {</span>
-<span class="nc bnc" id="L111" title="All 2 branches missed.">                val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
-<span class="nc" id="L112">                (chunkKeys + listOf(gcsKey)).forEach { key -&gt;</span>
-<span class="nc bnc" id="L113" title="All 2 branches missed.">                    runCatching { chunkStorage.deleteObject(key) }</span>
-<span class="nc bnc" id="L114" title="All 2 branches missed.">                        .onFailure { log.warn(&quot;Failed to delete GCS object $key during recovery&quot;, it) }</span>
-<span class="nc" id="L115">                }</span>
-<span class="nc bnc" id="L116" title="All 2 branches missed.">            }.onFailure { log.warn(&quot;Failed to list/delete GCS objects for $gcsKey during recovery&quot;, it) }</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        withContext(ioDispatcher) {</span>
+<span class="nc" id="L111">            val chunkPrefix = &quot;$gcsKey-chunk-&quot;</span>
+<span class="nc" id="L112">            runCatching {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
+<span class="nc" id="L114">                (chunkKeys + listOf(gcsKey)).forEach { key -&gt;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                    runCatching { chunkStorage.deleteObject(key) }</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                        .onFailure { log.warn(&quot;Failed to delete GCS object $key during recovery&quot;, it) }</span>
+<span class="nc" id="L117">                }</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            }.onFailure { log.warn(&quot;Failed to list/delete GCS objects for $gcsKey during recovery&quot;, it) }</span>
         }
-<span class="nc" id="L118">    }</span>
+<span class="nc" id="L120">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

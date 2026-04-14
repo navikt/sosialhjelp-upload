@@ -3,6 +3,7 @@
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.StatusCode
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
@@ -13,77 +14,78 @@ import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
 
-<span class="fc" id="L16">class RetentionService(</span>
-<span class="fc" id="L17">    private val dsl: DSLContext,</span>
-<span class="fc" id="L18">    private val submissionRepository: SubmissionRepository,</span>
-<span class="fc" id="L19">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L20">    private val mellomlagringClient: MellomlagringClient,</span>
-<span class="fc" id="L21">    private val chunkStorage: ChunkStorage,</span>
-<span class="fc" id="L22">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L23">    private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),</span>
-<span class="fc" id="L24">) {</span>
-<span class="fc" id="L25">    private val log = LoggerFactory.getLogger(RetentionService::class.java)</span>
-<span class="fc" id="L26">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
+<span class="fc" id="L17">class RetentionService(</span>
+<span class="fc" id="L18">    private val dsl: DSLContext,</span>
+<span class="fc" id="L19">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L20">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L21">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L22">    private val chunkStorage: ChunkStorage,</span>
+<span class="fc" id="L23">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L24">    private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),</span>
+<span class="fc" id="L25">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L26">) {</span>
+<span class="fc" id="L27">    private val log = LoggerFactory.getLogger(RetentionService::class.java)</span>
+<span class="fc" id="L28">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
 
     companion object {
         const val RETENTION_TIMEOUT_HOURS = 1L
     }
 
-<span class="fc" id="L32">    suspend fun runRetention() {</span>
-<span class="fc" id="L33">        val span = tracer.spanBuilder(&quot;submission.retention&quot;).startSpan()</span>
-<span class="fc" id="L34">        val scope = span.makeCurrent()</span>
-<span class="fc" id="L35">        try {</span>
-<span class="fc" id="L36">            val cutoff = OffsetDateTime.now().minus(retentionTimeout)</span>
-<span class="fc" id="L37">            val staleSubmissions = withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L38">                dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L39">                    submissionRepository.getStaleSubmissions(tx, cutoff)</span>
-<span class="fc" id="L40">                }</span>
+<span class="fc" id="L34">    suspend fun runRetention() {</span>
+<span class="fc" id="L35">        val span = tracer.spanBuilder(&quot;submission.retention&quot;).startSpan()</span>
+<span class="fc" id="L36">        val scope = span.makeCurrent()</span>
+<span class="fc" id="L37">        try {</span>
+<span class="fc" id="L38">            val cutoff = OffsetDateTime.now().minus(retentionTimeout)</span>
+<span class="fc" id="L39">            val staleSubmissions = withContext(ioDispatcher) {</span>
+<span class="fc" id="L40">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L41">                    submissionRepository.getStaleSubmissions(tx, cutoff)</span>
+<span class="fc" id="L42">                }</span>
             }
-<span class="fc" id="L42">            span.setAttribute(&quot;submission.retention.count&quot;, staleSubmissions.size.toLong())</span>
-<span class="fc bfc" id="L43" title="All 4 branches covered.">            if (staleSubmissions.isNotEmpty()) {</span>
-<span class="fc" id="L44">                log.info(&quot;Found ${staleSubmissions.size} stale submission(s) to clean up (idle for &gt;${RETENTION_TIMEOUT_HOURS}h without being submitted)&quot;)</span>
+<span class="fc" id="L44">            span.setAttribute(&quot;submission.retention.count&quot;, staleSubmissions.size.toLong())</span>
+<span class="fc bfc" id="L45" title="All 4 branches covered.">            if (staleSubmissions.isNotEmpty()) {</span>
+<span class="fc" id="L46">                log.info(&quot;Found ${staleSubmissions.size} stale submission(s) to clean up (idle for &gt;${RETENTION_TIMEOUT_HOURS}h without being submitted)&quot;)</span>
             }
-<span class="fc bfc" id="L46" title="All 2 branches covered.">            for (submission in staleSubmissions) {</span>
-<span class="fc" id="L47">                deleteStaleSubmission(submission)</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (submission in staleSubmissions) {</span>
+<span class="fc" id="L49">                deleteStaleSubmission(submission)</span>
             }
-<span class="nc" id="L49">        } catch (e: Exception) {</span>
-<span class="nc" id="L50">            span.recordException(e)</span>
-<span class="nc bnc" id="L51" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Retention failed&quot;)</span>
-<span class="nc" id="L52">            throw e</span>
+<span class="nc" id="L51">        } catch (e: Exception) {</span>
+<span class="nc" id="L52">            span.recordException(e)</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            span.setStatus(StatusCode.ERROR, e.message ?: &quot;Retention failed&quot;)</span>
+<span class="nc" id="L54">            throw e</span>
         } finally {
-<span class="fc" id="L54">            scope.close()</span>
-<span class="fc" id="L55">            span.end()</span>
+<span class="fc" id="L56">            scope.close()</span>
+<span class="fc" id="L57">            span.end()</span>
         }
-<span class="fc" id="L57">    }</span>
+<span class="fc" id="L59">    }</span>
 
-<span class="pc" id="L59">    private suspend fun deleteStaleSubmission(submission: SubmissionRepository.StaleSubmission) {</span>
-<span class="fc" id="L60">        try {</span>
-<span class="fc" id="L61">            val gcsKeys = withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L62">                dsl.transactionResult { tx -&gt; uploadRepository.getGcsKeysForSubmission(tx, submission.id) }</span>
+<span class="pc" id="L61">    private suspend fun deleteStaleSubmission(submission: SubmissionRepository.StaleSubmission) {</span>
+<span class="fc" id="L62">        try {</span>
+<span class="fc" id="L63">            val gcsKeys = withContext(ioDispatcher) {</span>
+<span class="fc" id="L64">                dsl.transactionResult { tx -&gt; uploadRepository.getGcsKeysForSubmission(tx, submission.id) }</span>
             }
 
-<span class="fc" id="L65">            mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)</span>
-<span class="fc" id="L66">            withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L67">                dsl.transaction { tx -&gt; submissionRepository.cleanup(tx, submission.id) }</span>
-<span class="fc" id="L68">            }</span>
+<span class="fc" id="L67">            mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)</span>
+<span class="fc" id="L68">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L69">                dsl.transaction { tx -&gt; submissionRepository.cleanup(tx, submission.id) }</span>
+<span class="fc" id="L70">            }</span>
 
-<span class="fc" id="L70">            gcsKeys.forEach { gcsKey -&gt;</span>
-<span class="nc" id="L71">                val chunkPrefix = &quot;$gcsKey-chunk-&quot;</span>
-<span class="nc" id="L72">                runCatching {</span>
-<span class="nc" id="L73">                    val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
-<span class="nc" id="L74">                    (chunkKeys + listOf(gcsKey)).forEach { key -&gt;</span>
-<span class="nc" id="L75">                        runCatching { chunkStorage.deleteObject(key) }</span>
-<span class="nc bnc" id="L76" title="All 2 branches missed.">                            .onFailure { log.warn(&quot;Failed to delete GCS object $key during retention&quot;, it) }</span>
-<span class="nc" id="L77">                    }</span>
-<span class="nc bnc" id="L78" title="All 2 branches missed.">                }.onFailure { log.warn(&quot;Failed to list/delete GCS objects for $gcsKey during retention&quot;, it) }</span>
-<span class="nc" id="L79">            }</span>
+<span class="fc" id="L72">            gcsKeys.forEach { gcsKey -&gt;</span>
+<span class="nc" id="L73">                val chunkPrefix = &quot;$gcsKey-chunk-&quot;</span>
+<span class="nc" id="L74">                runCatching {</span>
+<span class="nc" id="L75">                    val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
+<span class="nc" id="L76">                    (chunkKeys + listOf(gcsKey)).forEach { key -&gt;</span>
+<span class="nc" id="L77">                        runCatching { chunkStorage.deleteObject(key) }</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                            .onFailure { log.warn(&quot;Failed to delete GCS object $key during retention&quot;, it) }</span>
+<span class="nc" id="L79">                    }</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                }.onFailure { log.warn(&quot;Failed to list/delete GCS objects for $gcsKey during retention&quot;, it) }</span>
+<span class="nc" id="L81">            }</span>
 
-<span class="fc" id="L81">            log.info(&quot;Deleted stale submission ${submission.id} (navEksternRefId=${submission.navEksternRefId})&quot;)</span>
-<span class="fc" id="L82">            meterRegistry.counter(&quot;submission.retention&quot;, &quot;result&quot;, &quot;success&quot;).increment()</span>
-<span class="nc" id="L83">        } catch (e: Exception) {</span>
-<span class="nc" id="L84">            log.warn(&quot;Failed to delete stale submission ${submission.id}&quot;, e)</span>
-<span class="nc" id="L85">            meterRegistry.counter(&quot;submission.retention&quot;, &quot;result&quot;, &quot;failure&quot;).increment()</span>
+<span class="fc" id="L83">            log.info(&quot;Deleted stale submission ${submission.id} (navEksternRefId=${submission.navEksternRefId})&quot;)</span>
+<span class="fc" id="L84">            meterRegistry.counter(&quot;submission.retention&quot;, &quot;result&quot;, &quot;success&quot;).increment()</span>
+<span class="nc" id="L85">        } catch (e: Exception) {</span>
+<span class="nc" id="L86">            log.warn(&quot;Failed to delete stale submission ${submission.id}&quot;, e)</span>
+<span class="nc" id="L87">            meterRegistry.counter(&quot;submission.retention&quot;, &quot;result&quot;, &quot;failure&quot;).increment()</span>
         }
-<span class="fc" id="L87">    }</span>
+<span class="fc" id="L89">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
