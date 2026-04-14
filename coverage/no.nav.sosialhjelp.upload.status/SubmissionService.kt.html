@@ -23,7 +23,7 @@ import java.util.*
         fiksDigisosId: String?,
         userToken: String,
     ): UUID {
-<span class="nc bnc" id="L26" title="All 6 branches missed.">        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, userToken) } ?: error(&quot;Mangler både soknadId og fiksDigisosId&quot;)</span>
+<span class="pc bpc" id="L26" title="5 of 6 branches missed.">        val navEksternRefId = if (soknadId !== null) soknadId else fiksDigisosId?.let { fiksClient.getNewNavEksternRefId(it, userToken) } ?: error(&quot;Mangler både soknadId og fiksDigisosId&quot;)</span>
 <span class="nc" id="L27">        return withContext(Dispatchers.IO) {</span>
 <span class="nc" id="L28">            dsl.transactionResult { tx -&gt;</span>
 <span class="nc" id="L29">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent, navEksternRefId)</span>
