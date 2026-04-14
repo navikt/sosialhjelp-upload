@@ -1,10 +1,8 @@
 [versions]
 bouncycastle = "1.82"
-checker = "3.51.1"
 coroutines = "1.10.2"
 fiks_kryptering = "2.0.8"
 flyway = "11.15.0"
-google-cloud = "26.70.0"
 jdbc = "42.7.8"
 jooq = "3.20.8"
 junit = "6.0.0"
@@ -19,16 +17,15 @@ prometheus = "1.15.5"
 sosialhjelp_common = "1.20250120.1009-d88048d"
 testcontainers = "1.21.3"
 tika = "3.2.3"
+opentelemetry = "1.46.0"
+google-cloud-storage = "2.51.0"
 
 [libraries]
 apache-tika = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
-checker = { module = "org.checkerframework:checker-qual", version.ref = "checker" }
 fiks-kryptering = { module = "no.ks.fiks:kryptering", version.ref = "fiks_kryptering" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
-google-cloud-bom = { module = "com.google.cloud:libraries-bom", version.ref = "google-cloud" }
-google-cloud-storage = { module = "com.google.cloud:google-cloud-storage" }
 jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
 jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
@@ -60,14 +57,17 @@ ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", versio
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "prometheus" }
+opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry" }
 mock-web-server = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "mockwebserver" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
-pdfbox-app = { module = "org.apache.pdfbox:pdfbox-app", version.ref = "pdfbox" }
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
+xmpbox = { module = "org.apache.pdfbox:xmpbox", version.ref = "pdfbox" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgres" }
 sosialhjelp-common-api = { module = "no.nav.sosialhjelp:sosialhjelp-common-api", version.ref = "sosialhjelp_common" }
-testcontainers-core = "org.testcontainers:testcontainers:2.0.1"
+testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "google-cloud-storage" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

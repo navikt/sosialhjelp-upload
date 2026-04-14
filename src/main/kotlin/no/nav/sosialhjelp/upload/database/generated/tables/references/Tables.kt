@@ -4,16 +4,16 @@
 package no.nav.sosialhjelp.upload.database.generated.tables.references
 
 
-import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Submission
 import no.nav.sosialhjelp.upload.database.generated.tables.Error
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
 
 
 /**
- * The table <code>public.document</code>.
+ * The table <code>public.submission</code>.
  */
-val DOCUMENT: Document = Document.DOCUMENT
+val SUBMISSION: Submission = Submission.SUBMISSION
 
 /**
  * The table <code>public.error</code>.

@@ -4,6 +4,7 @@
 package no.nav.sosialhjelp.upload.database.generated.tables.records
 
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
@@ -21,7 +22,7 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(0, value)
         get(): UUID? = get(0) as UUID?
 
-    open var documentId: UUID?
+    open var submissionId: UUID?
         set(value): Unit = set(1, value)
         get(): UUID? = get(1) as UUID?
 
@@ -29,28 +30,58 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(2, value)
         get(): String? = get(2) as String?
 
-    open var signedUrl: String?
-        set(value): Unit = set(3, value)
-        get(): String? = get(3) as String?
-
-    open var convertedFilename: String?
-        set(value): Unit = set(4, value)
-        get(): String? = get(4) as String?
-
     open var size: Long?
+        set(value): Unit = set(3, value)
+        get(): Long? = get(3) as Long?
+
+    open var uploadOffset: Long?
+        set(value): Unit = set(4, value)
+        get(): Long? = get(4) as Long?
+
+    open var filId: UUID?
         set(value): Unit = set(5, value)
-        get(): Long? = get(5) as Long?
+        get(): UUID? = get(5) as UUID?
+
+    open var mellomlagringFilnavn: String?
+        set(value): Unit = set(6, value)
+        get(): String? = get(6) as String?
+
+    open var processingStatus: String?
+        set(value): Unit = set(7, value)
+        get(): String? = get(7) as String?
+
+    open var mellomlagringStorrelse: Long?
+        set(value): Unit = set(8, value)
+        get(): Long? = get(8) as Long?
+
+    open var sha512: String?
+        set(value): Unit = set(9, value)
+        get(): String? = get(9) as String?
+
+    open var updatedAt: OffsetDateTime?
+        set(value): Unit = set(10, value)
+        get(): OffsetDateTime? = get(10) as OffsetDateTime?
+
+    open var gcsKey: String?
+        set(value): Unit = set(11, value)
+        get(): String? = get(11) as String?
 
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, documentId: UUID? = null, originalFilename: String? = null, signedUrl: String? = null, convertedFilename: String? = null, size: Long? = null): this() {
+    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null): this() {
         this.id = id
-        this.documentId = documentId
+        this.submissionId = submissionId
         this.originalFilename = originalFilename
-        this.signedUrl = signedUrl
-        this.convertedFilename = convertedFilename
         this.size = size
+        this.uploadOffset = uploadOffset
+        this.filId = filId
+        this.mellomlagringFilnavn = mellomlagringFilnavn
+        this.processingStatus = processingStatus
+        this.mellomlagringStorrelse = mellomlagringStorrelse
+        this.sha512 = sha512
+        this.updatedAt = updatedAt
+        this.gcsKey = gcsKey
         resetChangedOnNotNull()
     }
 }

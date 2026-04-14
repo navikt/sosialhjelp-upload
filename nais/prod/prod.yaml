@@ -41,7 +41,6 @@ spec:
     inbound:
       rules:
         - application: sosialhjelp-innsyn
-        - application: sosialhjelp-tusd
   gcp:
     sqlInstances:
       - type: POSTGRES_17
@@ -49,6 +48,9 @@ spec:
         databases:
           - name: sosialhjelp-upload
             envVarPrefix: POSTGRES
+    buckets:
+      - name: sosialhjelp-upload
+        cascadingDelete: false
   resources:
     limits:
       memory: 2Gi
@@ -63,7 +65,6 @@ spec:
   envFrom:
     - secret: fiks-integrasjon-secret
     - secret: idporten-sosialhjelp
-    - secret: gcs-credentials
   env:
     - name: FIKS_URL
       value: "https://api.fiks.ks.no"
@@ -75,5 +76,5 @@ spec:
       value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
     - name: RUNTIME_ENV
       value: "prod"
-    - name: BUCKET_NAME
+    - name: GCS_BUCKET_NAME
       value: "sosialhjelp-upload"

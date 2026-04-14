@@ -6,7 +6,7 @@ package no.nav.sosialhjelp.upload.database.generated
 
 import kotlin.collections.List
 
-import no.nav.sosialhjelp.upload.database.generated.tables.Document
+import no.nav.sosialhjelp.upload.database.generated.tables.Submission
 import no.nav.sosialhjelp.upload.database.generated.tables.Error
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
@@ -28,9 +28,9 @@ open class Public : SchemaImpl("public", null) {
     }
 
     /**
-     * The table <code>public.document</code>.
+     * The table <code>public.submission</code>.
      */
-    val DOCUMENT: Document get() = Document.DOCUMENT
+    val SUBMISSION: Submission get() = Submission.SUBMISSION
 
     /**
      * The table <code>public.error</code>.
@@ -43,7 +43,7 @@ open class Public : SchemaImpl("public", null) {
     val UPLOAD: Upload get() = Upload.UPLOAD
 
     override fun getTables(): List<Table<*>> = listOf(
-        Document.DOCUMENT,
+        Submission.SUBMISSION,
         Error.ERROR,
         Upload.UPLOAD
     )

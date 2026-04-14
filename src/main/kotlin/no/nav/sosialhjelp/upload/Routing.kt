@@ -3,17 +3,17 @@ package no.nav.sosialhjelp.upload
 import io.ktor.http.ContentType
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.http.content.*
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import no.nav.sosialhjelp.upload.action.configureActionRoutes
+import no.nav.sosialhjelp.upload.documents.configureDocumentRoutes
 import no.nav.sosialhjelp.upload.status.configureStatusRoutes
-import no.nav.sosialhjelp.upload.tusd.configureTusRoutes
-import java.io.File
+import no.nav.sosialhjelp.upload.tus.configureTusRoutes
+
+private const val TUS_BASE_PATH = "/tus/files"
 
 fun Application.configureRouting() {
-    val storageBasePath = environment.config.propertyOrNull("storage.basePath")?.getString()
     install(SSE)
     routing {
         route("/sosialhjelp/upload") {
@@ -24,23 +24,11 @@ fun Application.configureRouting() {
             }
             authenticate {
                 configureStatusRoutes()
+                configureDocumentRoutes()
                 configureActionRoutes()
-            }
-            if (environment.config
-                    .propertyOrNull("runtimeEnv")
-                    ?.getString() == "local"
-            ) {
-                if (storageBasePath != null) {
-                    staticFiles("/files", File(storageBasePath))
-                } else {
-                    environment.log.warn("runtimeEnv is local, but storage.basePath is not set. Files will not be served.")
+                route(TUS_BASE_PATH) {
+                    configureTusRoutes(TUS_BASE_PATH)
                 }
-            }
-        }
-
-        route("/tus-hooks") {
-            authenticate {
-                configureTusRoutes()
             }
         }
     }

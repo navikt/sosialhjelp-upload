@@ -1,17 +1,9 @@
 package no.nav.sosialhjelp.upload.validation
 
-import io.ktor.util.cio.readChannel
-import io.ktor.util.cio.use
-import io.ktor.util.cio.writeChannel
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.copyTo
-import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.fs.Storage
-import no.nav.sosialhjelp.upload.tusd.dto.HookRequest
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.io.RandomAccessReadBuffer
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -19,10 +11,8 @@ import org.apache.tika.Tika
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
-import kotlin.io.path.createTempFile
 
 // 10 MB
-// TODO: Er dette en begrensning hos oss, Fiks eller fagsystemene?
 const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
 val SUPPORTED_MIME_TYPES =
@@ -44,84 +34,67 @@ val SUPPORTED_MIME_TYPES =
 
 class UploadValidator(
     val virusScanner: VirusScanner,
-    val storage: Storage,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    fun retrieveFile(uploadId: String): ByteReadChannel = storage.retrieve(uploadId) ?: error("File not found: $uploadId")
-
-    suspend fun validate(request: HookRequest): List<Validation> {
-        // Fetch the file once and write to a temp file in /tmp
-        val uploadId = request.event.upload.id
-        val channel = retrieveFile(uploadId)
-        val tempFile = withContext(Dispatchers.IO) {
-            createTempFile(prefix = uploadId, suffix = ".tmp").toFile().also { tempFile ->
-                tempFile.writeChannel().use {
-                    channel.copyTo(this)
-                    flush()
-                }
-            }
+    suspend fun validate(
+        filename: String,
+        data: ByteArray,
+        fileSize: Long,
+    ): List<Validation> =
+        coroutineScope {
+            val virusScanValidation = async(Dispatchers.IO) { runVirusScan(data) }
+            val (mimeType, fileTypeValidation) = validateFileType(data)
+            listOfNotNull(
+                validateFileSize(fileSize),
+                validateFilename(Filename(filename)),
+                fileTypeValidation,
+                if (mimeType == "application/pdf") validatePdf(data) else null,
+                virusScanValidation.await(),
+            )
         }
-        try {
-            val validations =
-                coroutineScope {
-                    val virusScanValidation =
-                        async(Dispatchers.IO) {
-                            runVirusScan(tempFile.readChannel())
-                        }
-                    val (mimeType, fileTypeValidation) = validateFileType(tempFile.readChannel())
-                    listOfNotNull(
-                        validateFileSize(request.event.upload.size),
-                        validateFilename(Filename(request.event.upload.metadata.filename)),
-                        fileTypeValidation,
-                        if (mimeType == "application/pdf") validatePdf(tempFile.readChannel()) else null,
-                        virusScanValidation.await(),
-                    )
-                }
-            return validations
-        } finally {
-            tempFile.delete()
-        }
-    }
 
-    private suspend fun validatePdf(file: ByteReadChannel): Validation? = withContext(Dispatchers.IO) {
-        try {
-            file.toInputStream().use { inputStream ->
-                val randomAccessRead = RandomAccessReadBuffer(inputStream)
+    private suspend fun validatePdf(data: ByteArray): Validation? =
+        withContext(Dispatchers.IO) {
+            try {
+                val randomAccessRead = RandomAccessReadBuffer(data.inputStream())
                 Loader
                     .loadPDF(randomAccessRead)
                     .use { document ->
                         if (document.isEncrypted) {
                             EncryptedPdfValidation()
-                        } else null
+                        } else {
+                            null
+                        }
                     }
+            } catch (e: InvalidPasswordException) {
+                logger.warn(ValidationCode.ENCRYPTED_PDF.name + " " + e.message)
+                EncryptedPdfValidation()
+            } catch (e: IOException) {
+                logger.warn(ValidationCode.INVALID_PDF.name, e)
+                InvalidPdfValidation()
+            } catch (e: Exception) {
+                logger.warn(ValidationCode.INVALID_PDF.name + " " + e.message, e)
+                InvalidPdfValidation()
             }
-        } catch (e: InvalidPasswordException) {
-            logger.warn(ValidationCode.ENCRYPTED_PDF.name + " " + e.message)
-            EncryptedPdfValidation()
-        } catch (e: IOException) {
-            logger.warn(ValidationCode.INVALID_PDF.name, e)
-            InvalidPdfValidation()
-        } catch (e: Exception) {
-            logger.warn(ValidationCode.INVALID_PDF.name + " " + e.message, e)
-            InvalidPdfValidation()
         }
-    }
 
-    private suspend fun validateFileType(file: ByteReadChannel): Pair<String, Validation?> = withContext(Dispatchers.IO) {
-        val mimeType = file.toInputStream().use { Tika().detect(it) }
-        if (mimeType !in SUPPORTED_MIME_TYPES) {
-            println("Unsupported mime type: $mimeType")
-            return@withContext mimeType to FileTypeValidation()
+    private suspend fun validateFileType(data: ByteArray): Pair<String, Validation?> =
+        withContext(Dispatchers.IO) {
+            val mimeType = Tika().detect(data.inputStream())
+            if (mimeType !in SUPPORTED_MIME_TYPES) {
+                return@withContext mimeType to FileTypeValidation(actual = mimeType)
+            }
+            return@withContext mimeType to null
         }
-        println("Detected mime type: $mimeType")
-        return@withContext mimeType to null
-    }
 
-    private suspend fun runVirusScan(file: ByteReadChannel): Validation? =
-        when (virusScanner.scan(file)) {
+    private suspend fun runVirusScan(data: ByteArray): Validation? =
+        when (virusScanner.scan(data)) {
             Result.FOUND -> VirusValidation()
-            Result.ERROR -> TODO()
+            Result.ERROR -> {
+                logger.warn("Virus scanner returned ERROR, treating file as clean")
+                null
+            }
             Result.OK -> null
         }
 

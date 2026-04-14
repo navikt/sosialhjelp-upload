@@ -4,6 +4,7 @@
 package no.nav.sosialhjelp.upload.database.generated.tables
 
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 import kotlin.collections.Collection
@@ -74,9 +75,9 @@ open class Upload(
     val ID: TableField<UploadRecord, UUID?> = createField(DSL.name("id"), SQLDataType.UUID.nullable(false), this, "")
 
     /**
-     * The column <code>public.upload.document_id</code>.
+     * The column <code>public.upload.submission_id</code>.
      */
-    val DOCUMENT_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("document_id"), SQLDataType.UUID, this, "")
+    val SUBMISSION_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("submission_id"), SQLDataType.UUID, this, "")
 
     /**
      * The column <code>public.upload.original_filename</code>.
@@ -84,19 +85,48 @@ open class Upload(
     val ORIGINAL_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("original_filename"), SQLDataType.VARCHAR(255).nullable(false), this, "")
 
     /**
-     * The column <code>public.upload.signed_url</code>.
-     */
-    val SIGNED_URL: TableField<UploadRecord, String?> = createField(DSL.name("signed_url"), SQLDataType.VARCHAR, this, "")
-
-    /**
-     * The column <code>public.upload.converted_filename</code>.
-     */
-    val CONVERTED_FILENAME: TableField<UploadRecord, String?> = createField(DSL.name("converted_filename"), SQLDataType.VARCHAR(255), this, "")
-
-    /**
      * The column <code>public.upload.size</code>.
      */
     val SIZE: TableField<UploadRecord, Long?> = createField(DSL.name("size"), SQLDataType.BIGINT, this, "")
+
+    /**
+     * The column <code>public.upload.upload_offset</code>.
+     */
+    val UPLOAD_OFFSET: TableField<UploadRecord, Long?> = createField(DSL.name("upload_offset"), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline(0L)), this, "")
+
+    /**
+     * The column <code>public.upload.fil_id</code>.
+     */
+    val FIL_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("fil_id"), SQLDataType.UUID, this, "")
+
+    /**
+     * The column <code>public.upload.mellomlagring_filnavn</code>.
+     */
+    val MELLOMLAGRING_FILNAVN: TableField<UploadRecord, String?> = createField(DSL.name("mellomlagring_filnavn"), SQLDataType.VARCHAR(255), this, "")
+
+    /**
+     * The column <code>public.upload.processing_status</code>.
+     */
+    val PROCESSING_STATUS: TableField<UploadRecord, String> = createField(DSL.name("processing_status"), SQLDataType.VARCHAR(20).nullable(false).defaultValue(DSL.inline("PENDING")), this, "")
+
+    /**
+     * The column <code>public.upload.mellomlagring_storrelse</code>.
+     */
+    val MELLOMLAGRING_STORRELSE: TableField<UploadRecord, Long?> = createField(DSL.name("mellomlagring_storrelse"), SQLDataType.BIGINT, this, "")
+    /**
+     * The column <code>public.upload.sha512</code>.
+     */
+    val SHA512: TableField<UploadRecord, String?> = createField(DSL.name("sha512"), SQLDataType.VARCHAR, this, "")
+
+    /**
+     * The column <code>public.upload.updated_at</code>.
+     */
+    val UPDATED_AT: TableField<UploadRecord, OffsetDateTime?> = createField(DSL.name("updated_at"), SQLDataType.TIMESTAMPWITHTIMEZONE.nullable(false), this, "")
+
+    /**
+     * The column <code>public.upload.gcs_key</code>.
+     */
+    val GCS_KEY: TableField<UploadRecord, String?> = createField(DSL.name("gcs_key"), SQLDataType.VARCHAR(500), this, "")
 
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

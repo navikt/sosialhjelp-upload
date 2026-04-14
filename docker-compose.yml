@@ -1,27 +1,7 @@
 services:
-  tusd:
-    image: tusproject/tusd:latest
-    container_name: tusd_server
-    ports:
-      - "8084:8084"
-    volumes:
-      - "./tusd-data:/tusd-data"
-    entrypoint: ["tusd"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command:
-      - "-host=0.0.0.0"
-      - "-port=8084"
-      - "-hooks-http=http://host.docker.internal:3007/tus-hooks"
-      - "-hooks-http-forward-headers=Authorization"
-      - "-base-path=/sosialhjelp/tusd"
-      - "-hooks-enabled-events=pre-create,post-create,post-finish,pre-terminate,post-terminate,pre-finish"
-      - "-upload-dir=/tusd-data"
-      - "-behind-proxy"
-
   gotenberg:
     image: gotenberg/gotenberg:8
-    container_name: gotenberg
+    container_name: gotenberg-upload
     ports:
       - "3010:3000"
     volumes:

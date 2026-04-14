@@ -15,10 +15,6 @@ database:
   jdbcUrl: "$POSTGRES_JDBC_URL:jdbc:postgresql://localhost:54322/sosialhjelp-upload"
 gotenberg:
   url: "$GOTENBERG_URL:http://localhost:3010/forms/libreoffice/convert"
-storage:
-  basePath: "../digisos-docker-compose/tusd-data"
-  bucketName: "$BUCKET_NAME:sosialhjelp-upload-dev"
-  gcsCredentials: "$GCS_CREDENTIALS:"
 fiks:
   baseUrl: "$FIKS_URL:http://localhost:8989/sosialhjelp/mock-alt-api/fiks"
   integrasjonsid: "$INTEGRASJONSID_FIKS:id"
@@ -28,3 +24,5 @@ virus:
     url: "$CLAMAV_URL:"
 texas:
   url: "$NAIS_TOKEN_ENDPOINT:http://localhost:8081/api/v1/token"
+gcs:
+  bucketName: "$GCS_BUCKET_NAME:sosialhjelp-upload-dev"

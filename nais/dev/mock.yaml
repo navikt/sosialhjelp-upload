@@ -38,7 +38,6 @@ spec:
     inbound:
       rules:
         - application: sosialhjelp-innsyn-mock
-        - application: sosialhjelp-tusd-mock
   gcp:
     sqlInstances:
       - type: POSTGRES_17
@@ -46,14 +45,15 @@ spec:
         databases:
           - name: sosialhjelp-upload-mock
             envVarPrefix: POSTGRES
+    buckets:
+      - name: sosialhjelp-upload-mock
+        cascadingDelete: false
   resources:
     limits:
       memory: 2Gi
     requests:
       cpu: 10m
       memory: 512Mi
-  envFrom:
-    - secret: gcs-credentials
   env:
     - name: FIKS_URL
       value: "http://sosialhjelp-mock-alt-api-mock/sosialhjelp/mock-alt-api/fiks"
@@ -63,7 +63,7 @@ spec:
       value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
     - name: RUNTIME_ENV
       value: "mock"
-    - name: BUCKET_NAME
+    - name: GCS_BUCKET_NAME
       value: "sosialhjelp-upload-mock"
     - name: IDPORTEN_ISSUER
       value: "https://sosiauth2.ekstern.dev.nav.no/default"

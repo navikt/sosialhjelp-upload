@@ -36,13 +36,9 @@ repositories {
 
 dependencies {
     implementation(libs.fiks.kryptering)
-    implementation(platform(libs.google.cloud.bom))
-    implementation(libs.google.cloud.storage)
-    implementation("com.google.cloud:google-cloud-storage")
 
     // Common utilities
     implementation(libs.bouncycastle)
-    implementation(libs.checker)
     implementation(libs.apache.tika)
 
     implementation(libs.sosialhjelp.common.api)
@@ -54,11 +50,15 @@ dependencies {
     // Micrometer Prometheus
     implementation(libs.micrometer.registry.prometheus)
 
+    // OpenTelemetry API (SDK provided at runtime by NAIS auto-instrumentation agent)
+    implementation(libs.opentelemetry.api)
+
     // Database drivers
     implementation(libs.postgresql)
 
     // Dependency Injection and PDF generation
-    implementation(libs.pdfbox.app)
+    implementation(libs.pdfbox)
+    implementation(libs.xmpbox)
 
     // Other dependencies
     implementation(libs.kotlinx.coroutines.reactive)
@@ -75,9 +75,12 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
     implementation("io.ktor:ktor-serialization-jackson:3.2.3")
 
+    implementation(libs.google.cloud.storage)
+
     // For build time codegen
     jooqCodegen(libs.jooq.meta)
     jooqCodegen(libs.postgresql)
+
     // Test dependencies (added separately)
     testImplementation(libs.ktor.server.test.host)
 
@@ -92,6 +95,7 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
+    environment("DOCKER_API_VERSION", "1.47")
 }
 
 kotlin {

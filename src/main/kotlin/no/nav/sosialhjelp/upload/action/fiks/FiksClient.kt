@@ -4,7 +4,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -13,15 +12,16 @@ import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Serializer
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
-import no.nav.sosialhjelp.upload.action.Upload
-import no.nav.sosialhjelp.upload.action.VedleggSpesifikasjon
+import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
 import java.security.cert.CertificateException
@@ -40,7 +40,7 @@ class FiksClient(
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-    ) = "$fiksBaseUrl/digisos/api/v1/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId"
+    ) = "$fiksBaseUrl/digisos/api/v2/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId"
 
     private fun digisosSakUrl(fiksDigisosId: String) = "$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId"
 
@@ -62,7 +62,30 @@ class FiksClient(
         }
     }
 
+    private val certCacheTtlMs = 3_600_000L // 1 hour
+    private val certCacheMutex = Mutex()
+
+    @Volatile
+    private var cachedCert: Pair<X509Certificate, Long>? = null
+
     suspend fun fetchPublicKey(): X509Certificate {
+        val cached = cachedCert
+        if (cached != null && System.currentTimeMillis() - cached.second < certCacheTtlMs) {
+            return cached.first
+        }
+        return certCacheMutex.withLock {
+            // Re-check inside lock — another coroutine may have refreshed while we waited
+            val cachedNow = cachedCert
+            if (cachedNow != null && System.currentTimeMillis() - cachedNow.second < certCacheTtlMs) {
+                return@withLock cachedNow.first
+            }
+            val cert = fetchPublicKeyFromNetwork()
+            cachedCert = cert to System.currentTimeMillis()
+            cert
+        }
+    }
+
+    private suspend fun fetchPublicKeyFromNetwork(): X509Certificate {
         val publicKey =
             withContext(Dispatchers.IO) {
                 client
@@ -94,51 +117,34 @@ class FiksClient(
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-        files: List<Upload>,
         metadata: Metadata,
         token: String,
+        filer: List<Fil>,
     ): HttpResponse =
         withContext(Dispatchers.IO) {
-            val formData =
-                formData {
-                    val vedleggJson =
-                        VedleggSpesifikasjon(
+            val vedleggJson =
+                VedleggSpesifikasjon(
+                    vedlegg = listOf(
+                        Vedlegg(
                             type = metadata.type,
                             tilleggsinfo = metadata.tilleggsinfo,
-                            innsendelsesfrist = metadata.innsendelsesfrist,
-                            hendelsetype = metadata.hendelsetype,
-                            hendelsereferanse = metadata.hendelsereferanse,
+                            hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },
+                            hendelseReferanse = metadata.hendelsereferanse,
+                            status = Vedlegg.Status.LastetOpp,
+                            filer = filer,
+                            klageId = null
                         )
+                    )
+                )
+            val formData =
+                formData {
                     append(
                         "vedlegg.json",
                         Json.encodeToString(vedleggJson),
                         Headers.build {
-                            append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
+                            append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         },
                     )
-                    files.forEachIndexed { index, file ->
-                        val vedleggMetadata =
-                            VedleggMetadata(
-                                filnavn = file.filename,
-                                mimetype = file.fileType,
-                                storrelse = file.fileSize,
-                            )
-                        append(
-                            "vedleggSpesifikasjon:$index",
-                            Json.encodeToString(vedleggMetadata),
-                            Headers.build {
-                                append(HttpHeaders.ContentType, "text/plain;charset=UTF-8")
-                            },
-                        )
-                        append(
-                            "dokument:$index",
-                            ChannelProvider { file.file },
-                            Headers.build {
-                                append(HttpHeaders.ContentType, ContentType.Application.OctetStream)
-                                append(HttpHeaders.ContentDisposition, "filename=\"${file.filename}\"")
-                            },
-                        )
-                    }
                 }
             try {
                 client
@@ -169,22 +175,86 @@ class FiksClient(
         id: String,
         token: String,
     ): DigisosSak =
-        jacksonClient
-            .get(digisosSakUrl(id)) {
-                headers {
-                    integrasjonsid?.let {
-                        append("IntegrasjonId", integrasjonsid)
+        withContext(Dispatchers.IO) {
+            jacksonClient
+                .get(digisosSakUrl(id))
+                {
+                    headers {
+                        integrasjonsid?.let {
+                            append("IntegrasjonId", integrasjonsid)
+                        }
+                        integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
                     }
-                    integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+                    accept(ContentType.Application.Json)
+                    bearerAuth(token)
+                }.body()
+        }
+
+    suspend fun getNewNavEksternRefId(fiksDigisosId: String, token: String): String {
+        val digisosSak = getSak(fiksDigisosId, token)
+        return lagNavEksternRefId(digisosSak)
+    }
+}
+
+private const val COUNTER_SUFFIX_LENGTH = 4
+
+private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
+    val previousId: String =
+        digisosSak.ettersendtInfoNAV
+            ?.ettersendelser
+            ?.map { it.navEksternRefId }
+            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }
+            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus("0000")
+            ?: digisosSak.fiksDigisosId.plus("0000")
+
+    val nesteSuffix = lagIdSuffix(previousId)
+    return (previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix))
+}
+
+private fun lagIdSuffix(previousId: String): String {
+    val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1
+    return suffix.toString().padStart(4, '0')
+}
+
+
+@Serializable
+data class Fil(val filnavn: String, val sha512: String)
+
+// AKA metadata
+@Serializable
+data class Vedlegg(
+    val type: String,
+    val tilleggsinfo: String,
+    val klageId: String? = null,
+    val status: Status?,
+    val filer: List<Fil>,
+    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,
+    val hendelseReferanse: String?,
+) {
+    enum class Status {
+        LastetOpp, VedleggKreves, VedleggAlleredeSendt
+    }
+
+    enum class HendelseType(val value: String) {
+        DOKUMENTASJON_ETTERSPURT("dokumentasjonEtterspurt"),
+        DOKUMENTASJONKRAV("dokumentasjonkrav"),
+        SOKNAD("soknad"),
+        BRUKER("bruker");
+
+        companion object {
+            fun fromValue(value: String): HendelseType =
+                when (value) {
+                    "dokumentasjonEtterspurt" -> DOKUMENTASJON_ETTERSPURT
+                    "dokumentasjonkrav" -> DOKUMENTASJONKRAV
+                    "soknad" -> SOKNAD
+                    "bruker" -> BRUKER
+                    else -> error("Unknown hendelse type: $value")
                 }
-                accept(ContentType.Application.Json)
-                bearerAuth(token)
-            }.body()
+        }
+    }
 }
 
 @Serializable
-private data class VedleggMetadata(
-    val filnavn: String?,
-    val mimetype: String?,
-    val storrelse: Long,
+data class VedleggSpesifikasjon(
+    val vedlegg: List<Vedlegg>,
 )
