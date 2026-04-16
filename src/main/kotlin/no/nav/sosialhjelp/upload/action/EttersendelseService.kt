@@ -13,6 +13,8 @@ import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
+import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
 import org.jooq.DSLContext
@@ -50,8 +52,13 @@ class EttersendelseService(
             dsl.transactionResult { tx ->
                 uploadRepository.getUploads(tx, submissionId)
             }
-
         }
+
+        val violations = validateSubmissionUploads(uploads)
+        if (violations.isNotEmpty()) {
+            throw SubmissionValidationException(violations)
+        }
+
         val ettersendelsePdf = EttersendelsePdfGenerator.generate(PdfMetadata(metadata.type, uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } }), personIdent)
         mellomlagringClient.uploadFile(navEksternRefId, "ettersendelse.pdf", "application/pdf", encryptionService.encryptBytes(ettersendelsePdf))
 

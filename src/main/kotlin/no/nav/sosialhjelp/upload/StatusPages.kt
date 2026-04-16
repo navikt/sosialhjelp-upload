@@ -4,14 +4,20 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.uri
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
         exception<ChannelWriteException> { call, _ ->
             // Client disconnected (tab closed, navigated away, network drop) — normal for SSE
             this@configureStatusPages.environment.log.debug("Client disconnected from ${call.request.uri}")
+        }
+        exception<SubmissionValidationException> { call, cause ->
+            call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))
         }
         exception<Throwable> { call, cause ->
             this@configureStatusPages.environment.log.error("Got error on call to ${call.request.uri}", cause)
