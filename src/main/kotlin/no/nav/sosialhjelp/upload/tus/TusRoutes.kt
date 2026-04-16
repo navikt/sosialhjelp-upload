@@ -55,10 +55,13 @@ fun Route.configureTusRoutes(basePath: String) {
         val metadata = parseMetadata(call.request.header("Upload-Metadata"))
         val filename = metadata["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler filename")
         val contextId = metadata["contextId"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
+        val fiksDigisosId = metadata["fiksDigisosId"]
+        val navEksternRefId = metadata["navEksternRefId"]
+        if (fiksDigisosId == null && navEksternRefId == null) return@post call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller navEksternRefId")
 
         val uploadId =
             try {
-                tusUploadService.create(contextId, filename, uploadLength, personident, token)
+                tusUploadService.create(contextId, filename, uploadLength, personident, token, fiksDigisosId, navEksternRefId)
             } catch (_: UploadForbiddenException) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }

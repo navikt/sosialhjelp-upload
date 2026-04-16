@@ -46,30 +46,23 @@ class TusUploadService(
         size: Long,
         personident: String,
         token: String,
+        fiksDigisosId: String? = null,
+        navEksternRefId: String? = null,
     ): UUID {
+        val eksternRef = navEksternRefId ?: fiksDigisosId?.let {
+            fiksClient.getNewNavEksternRefId(it, token)
+        } ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
         return try {
-            val (submissionId, existingNavEksternRefId) = withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    val submissionId = submissionRepository.getSubmission(tx, contextId, personident)
-                    submissionId to submissionRepository.getNavEksternRefIdOrNull(tx, submissionId)
-                }
-            }
-
-            if (existingNavEksternRefId == null) {
-                val navEksternRefId = fiksClient.getNewNavEksternRefId(contextId, token)
-                withContext(ioDispatcher) {
-                    dsl.transaction { tx ->
-                        submissionRepository.setNavEksternRefId(tx, submissionId, navEksternRefId)
-                    }
-                }
-            }
-
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    uploadRepository.create(tx, submissionId, filename, size)
+                    val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident)
+                    submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)
+                    uploadRepository
+                        .create(tx, submissionId, filename, size)
+                        .also { meterRegistry.counter("upload.created").increment() }
                         ?: error("Failed to create upload record")
                 }
-            }.also { meterRegistry.counter("upload.created").increment() }
+            }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")
         }

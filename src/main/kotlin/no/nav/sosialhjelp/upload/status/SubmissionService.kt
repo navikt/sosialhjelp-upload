@@ -19,9 +19,6 @@ class SubmissionService(
     suspend fun getOrCreate(
         contextId: String,
         personIdent: String,
-        soknadId: String?,
-        fiksDigisosId: String?,
-        userToken: String,
     ): UUID {
         return withContext(ioDispatcher) {
             val existing = dsl.transactionResult { tx ->
@@ -30,7 +27,7 @@ class SubmissionService(
             if (existing != null) return@withContext existing
 
             dsl.transactionResult { tx ->
-                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent, soknadId)
+                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent)
             }
         }
     }

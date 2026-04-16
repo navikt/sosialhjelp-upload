@@ -31,22 +31,6 @@ class SubmissionRepository(
             ?.get(SUBMISSION.ID)
     }
 
-    fun getSubmission(tx: Configuration, contextId: String, personIdent: String): UUID {
-        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
-            throw SubmissionOwnedByAnotherUserException()
-        }
-        return tx
-            .dsl()
-            .select(SUBMISSION.ID)
-            .from(SUBMISSION)
-            .where(
-                SUBMISSION.CONTEXT_ID
-                    .eq(contextId)
-                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
-            ).fetchOne()
-            ?.get(SUBMISSION.ID) ?: error("Could not find or create submission")
-    }
-
     fun getNavEksternRefId(tx: Configuration, submissionId: UUID, personIdent: String): String {
         return tx
             .dsl()
@@ -59,15 +43,6 @@ class SubmissionRepository(
             ).fetchOne()
             ?.get(SUBMISSION.NAV_EKSTERN_REF_ID) ?: error("Could not find or create submission")
     }
-
-    fun getNavEksternRefIdOrNull(tx: Configuration, submissionId: UUID): String? =
-        tx
-            .dsl()
-            .select(SUBMISSION.NAV_EKSTERN_REF_ID)
-            .from(SUBMISSION)
-            .where(SUBMISSION.ID.eq(submissionId))
-            .fetchOne()
-            ?.get(SUBMISSION.NAV_EKSTERN_REF_ID)
 
     fun setNavEksternRefId(tx: Configuration, submissionId: UUID, navEksternRefId: String) {
         tx
@@ -82,7 +57,6 @@ class SubmissionRepository(
         tx: Configuration,
         contextId: String,
         personIdent: String,
-        navEksternRefId: String?,
     ): UUID {
         if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
             throw SubmissionOwnedByAnotherUserException()
@@ -95,7 +69,6 @@ class SubmissionRepository(
                 .set(SUBMISSION.ID, UUID.randomUUID())
                 .set(SUBMISSION.OWNER_IDENT, personIdent)
                 .set(SUBMISSION.CONTEXT_ID, contextId)
-                .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
                 .onDuplicateKeyIgnore()
                 .returning(SUBMISSION.ID)
                 .fetchOne()

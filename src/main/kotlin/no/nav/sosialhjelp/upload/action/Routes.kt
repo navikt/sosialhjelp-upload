@@ -39,8 +39,7 @@ fun Route.configureActionRoutes() {
                 ?: return@post call.respondText("fiksDigisosId is required", status = HttpStatusCode.BadRequest)
 
             val result =
-                ettersendelseService.
-                upload(
+                ettersendelseService.upload(
                     input.metadata,
                     fiksDigisosId = fiksDigisosId,
                     call.request.header("Authorization")?.removePrefix("Bearer ")

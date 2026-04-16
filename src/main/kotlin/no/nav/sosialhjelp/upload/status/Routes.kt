@@ -32,11 +32,7 @@ fun Route.configureStatusRoutes() {
         Default.encodeToString(serializer, value)
     }) {
         activeConnections.incrementAndGet()
-        val queryParams = call.request.queryParameters
-        val soknadId = queryParams["soknadId"]
-        val fiksDigisosId = queryParams["fiksDigisosId"]
         try {
-            if (soknadId == null && fiksDigisosId == null) return@sse call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller soknadId")
             val personident = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
 
             heartbeat {
@@ -44,13 +40,13 @@ fun Route.configureStatusRoutes() {
                 event = ServerSentEvent("""{"heartbeat": "ドキドキ"}""")
             }
 
-            val rawId = call.parameters["id"].orEmpty()
-            if (rawId.isBlank()) {
+            val id = call.parameters["id"].orEmpty()
+            if (id.isBlank()) {
                 error("id parameter is required")
             }
             val userToken = call.request.headers["Authorization"]?.removePrefix("Bearer ") ?: error("Authorization header is required")
 
-            val submissionId = submissionService.getOrCreate(rawId, personident, soknadId, fiksDigisosId, userToken)
+            val submissionId = submissionService.getOrCreate(id, personident)
 
             send(submissionService.getSubmissionStatus(submissionId))
 
