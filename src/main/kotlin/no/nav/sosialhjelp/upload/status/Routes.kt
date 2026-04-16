@@ -37,7 +37,7 @@ fun Route.configureStatusRoutes() {
 
             heartbeat {
                 period = 10.seconds
-                event = ServerSentEvent("""{"heartbeat": "ドキドキ"}""")
+                event = ServerSentEvent("""{"heartbeat": "Beating"}""")
             }
 
             val id = call.parameters["id"].orEmpty()

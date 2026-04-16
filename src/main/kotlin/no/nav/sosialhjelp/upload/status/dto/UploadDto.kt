@@ -15,7 +15,8 @@ data class UploadDto(
     val filId: UUID?,
     val url: String?,
     val finalFilename: String?,
-    val status: Status
+    val status: Status,
+    val size: Long?,
 ) {
     enum class Status {
         COMPLETE, PROCESSING, FAILED, PENDING

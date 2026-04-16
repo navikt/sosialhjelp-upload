@@ -46,7 +46,8 @@ class SubmissionService(
                                 upload.filId,
                                 url = upload.filId?.let { "/upload/${upload.id}" },
                                 finalFilename = upload.mellomlagringFilnavn,
-                                status = UploadDto.Status.valueOf(upload.status.name)
+                                status = UploadDto.Status.valueOf(upload.status.name),
+                                upload.fileSize
                             )
                         }
                 }
