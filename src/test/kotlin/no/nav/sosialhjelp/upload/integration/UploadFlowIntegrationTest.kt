@@ -134,7 +134,7 @@ class UploadFlowIntegrationTest {
             header("Authorization", "Bearer $token")
             header("Tus-Resumable", "1.0.0")
             header("Upload-Length", data.size.toString())
-            header("Upload-Metadata", "filename ${base64(filename)}, contextId ${base64(contextId)}")
+            header("Upload-Metadata", "filename ${base64(filename)}, contextId ${base64(contextId)}, fiksDigisosId ${base64(UUID.randomUUID().toString())}")
         }
         assertEquals(HttpStatusCode.Created, createResp.status, "TUS POST should return 201")
 
@@ -164,7 +164,7 @@ class UploadFlowIntegrationTest {
 
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
 
-        no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
 
         val row = PostgresTestContainer.dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
         assertNotNull(row, "Upload row should exist in DB")
@@ -239,7 +239,7 @@ class UploadFlowIntegrationTest {
             header("Authorization", "Bearer $token")
             header("Tus-Resumable", "1.0.0")
             header("Upload-Length", "100")
-            header("Upload-Metadata", "filename ${base64("test.pdf")}, contextId ${base64(contextId)}")
+            header("Upload-Metadata", "filename ${base64("test.pdf")}, contextId ${base64(contextId)}, fiksDigisosId ${base64(UUID.randomUUID().toString())}")
         }
         assertEquals(HttpStatusCode.Forbidden, resp.status)
     }

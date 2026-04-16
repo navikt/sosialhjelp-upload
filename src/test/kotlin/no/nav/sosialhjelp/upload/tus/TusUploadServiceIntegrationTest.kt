@@ -101,7 +101,7 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             createMockSubmission(dsl, externalId)
 
-            val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident, "test-token")
+            val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident, "test-token", null, "id")
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertNotNull(row)
@@ -114,10 +114,10 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             createMockSubmission(dsl, externalId, ownerIdent = "11111111111")
-            tusUploadService.create(externalId, "first.pdf", 50L, "11111111111", "test-token")
+            tusUploadService.create(externalId, "first.pdf", 50L, "11111111111", "test-token", null, "id")
 
             assertFailsWith<TusUploadService.UploadForbiddenException> {
-                tusUploadService.create(externalId, "second.pdf", 50L, "99999999999", "test-token")
+                tusUploadService.create(externalId, "second.pdf", 50L, "99999999999", "test-token", null, "id")
             }
         }
 
@@ -131,7 +131,7 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident, "test-token")
+            val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident, "test-token", null, "id")
 
             val (offset, total) = tusUploadService.getUploadInfo(uploadId)
 
@@ -150,7 +150,7 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             val content = "hello world".toByteArray()
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident, "test-token")
+            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident, "test-token", null, "id")
 
             val newOffset = tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -171,7 +171,7 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident, "test-token")
+            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident, "test-token", null, "id")
             tusUploadService.appendChunk(uploadId, 0L, content)
 
             awaitUploadTerminal(dsl, uploadId)
@@ -197,6 +197,7 @@ class TusUploadServiceIntegrationTest {
                     (MAX_FILE_SIZE + 1).toLong(),
                     personident,
                     "test-token",
+                    null, "id"
                 )
             tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
 
@@ -227,7 +228,7 @@ class TusUploadServiceIntegrationTest {
                     "virus.pdf",
                     content.size.toLong(),
                     personident,
-                    "test-token",
+                    "test-token", null, "id"
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -262,7 +263,7 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, "test-token")
+            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, "test-token", null, "id")
             tusUploadService.appendChunk(uploadId, 0L, content)
 
             awaitUploadTerminal(dsl, uploadId)
@@ -281,7 +282,7 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident, "test-token")
+            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident, "test-token", null, "")
 
             tusUploadService.delete(uploadId)
 

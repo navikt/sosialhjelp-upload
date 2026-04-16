@@ -46,8 +46,8 @@ class TusUploadService(
         size: Long,
         personident: String,
         token: String,
-        fiksDigisosId: String? = null,
-        navEksternRefId: String? = null,
+        fiksDigisosId: String?,
+        navEksternRefId: String?,
     ): UUID {
         val eksternRef = navEksternRefId ?: fiksDigisosId?.let {
             fiksClient.getNewNavEksternRefId(it, token)
