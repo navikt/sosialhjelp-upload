@@ -31,88 +31,61 @@ import java.util.*
 <span class="nc bnc" id="L31" title="All 2 branches missed.">            ?.get(SUBMISSION.ID)</span>
     }
 
-    fun getSubmission(tx: Configuration, contextId: String, personIdent: String): UUID {
-<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {</span>
-<span class="fc" id="L36">            throw SubmissionOwnedByAnotherUserException()</span>
-        }
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        return tx</span>
-<span class="fc" id="L39">            .dsl()</span>
-<span class="fc" id="L40">            .select(SUBMISSION.ID)</span>
-<span class="fc" id="L41">            .from(SUBMISSION)</span>
-<span class="fc" id="L42">            .where(</span>
-<span class="fc" id="L43">                SUBMISSION.CONTEXT_ID</span>
-<span class="fc" id="L44">                    .eq(contextId)</span>
-<span class="fc" id="L45">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-<span class="fc" id="L46">            ).fetchOne()</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            ?.get(SUBMISSION.ID) ?: error(&quot;Could not find or create submission&quot;)</span>
-    }
-
     fun getNavEksternRefId(tx: Configuration, submissionId: UUID, personIdent: String): String {
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        return tx</span>
-<span class="fc" id="L52">            .dsl()</span>
-<span class="fc" id="L53">            .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
-<span class="fc" id="L54">            .from(SUBMISSION)</span>
-<span class="fc" id="L55">            .where(</span>
-<span class="fc" id="L56">                SUBMISSION.ID</span>
-<span class="fc" id="L57">                    .eq(submissionId)</span>
-<span class="fc" id="L58">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-<span class="fc" id="L59">            ).fetchOne()</span>
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            ?.get(SUBMISSION.NAV_EKSTERN_REF_ID) ?: error(&quot;Could not find or create submission&quot;)</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        return tx</span>
+<span class="fc" id="L36">            .dsl()</span>
+<span class="fc" id="L37">            .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L38">            .from(SUBMISSION)</span>
+<span class="fc" id="L39">            .where(</span>
+<span class="fc" id="L40">                SUBMISSION.ID</span>
+<span class="fc" id="L41">                    .eq(submissionId)</span>
+<span class="fc" id="L42">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L43">            ).fetchOne()</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            ?.get(SUBMISSION.NAV_EKSTERN_REF_ID) ?: error(&quot;Could not find or create submission&quot;)</span>
     }
-
-    fun getNavEksternRefIdOrNull(tx: Configuration, submissionId: UUID): String? =
-<span class="fc" id="L64">        tx</span>
-<span class="fc" id="L65">            .dsl()</span>
-<span class="fc" id="L66">            .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
-<span class="fc" id="L67">            .from(SUBMISSION)</span>
-<span class="fc" id="L68">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L69">            .fetchOne()</span>
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            ?.get(SUBMISSION.NAV_EKSTERN_REF_ID)</span>
 
     fun setNavEksternRefId(tx: Configuration, submissionId: UUID, navEksternRefId: String) {
-<span class="nc" id="L73">        tx</span>
-<span class="nc" id="L74">            .dsl()</span>
-<span class="nc" id="L75">            .update(SUBMISSION)</span>
-<span class="nc" id="L76">            .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)</span>
-<span class="nc" id="L77">            .where(SUBMISSION.ID.eq(submissionId).and(SUBMISSION.NAV_EKSTERN_REF_ID.isNull))</span>
-<span class="nc" id="L78">            .execute()</span>
-<span class="nc" id="L79">    }</span>
+<span class="fc" id="L48">        tx</span>
+<span class="fc" id="L49">            .dsl()</span>
+<span class="fc" id="L50">            .update(SUBMISSION)</span>
+<span class="fc" id="L51">            .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)</span>
+<span class="fc" id="L52">            .where(SUBMISSION.ID.eq(submissionId).and(SUBMISSION.NAV_EKSTERN_REF_ID.isNull))</span>
+<span class="fc" id="L53">            .execute()</span>
+<span class="fc" id="L54">    }</span>
 
     fun getOrCreateSubmission(
         tx: Configuration,
         contextId: String,
         personIdent: String,
-        navEksternRefId: String?,
     ): UUID {
-<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {</span>
-<span class="fc" id="L88">            throw SubmissionOwnedByAnotherUserException()</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {</span>
+<span class="fc" id="L62">            throw SubmissionOwnedByAnotherUserException()</span>
         }
 
-<span class="fc" id="L91">        val insertedId =</span>
-<span class="fc" id="L92">            tx</span>
-<span class="fc" id="L93">                .dsl()</span>
-<span class="fc" id="L94">                .insertInto(SUBMISSION)</span>
-<span class="fc" id="L95">                .set(SUBMISSION.ID, UUID.randomUUID())</span>
-<span class="fc" id="L96">                .set(SUBMISSION.OWNER_IDENT, personIdent)</span>
-<span class="fc" id="L97">                .set(SUBMISSION.CONTEXT_ID, contextId)</span>
-<span class="fc" id="L98">                .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)</span>
-<span class="fc" id="L99">                .onDuplicateKeyIgnore()</span>
-<span class="fc" id="L100">                .returning(SUBMISSION.ID)</span>
-<span class="fc" id="L101">                .fetchOne()</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">                ?.get(SUBMISSION.ID)</span>
+<span class="fc" id="L65">        val insertedId =</span>
+<span class="fc" id="L66">            tx</span>
+<span class="fc" id="L67">                .dsl()</span>
+<span class="fc" id="L68">                .insertInto(SUBMISSION)</span>
+<span class="fc" id="L69">                .set(SUBMISSION.ID, UUID.randomUUID())</span>
+<span class="fc" id="L70">                .set(SUBMISSION.OWNER_IDENT, personIdent)</span>
+<span class="fc" id="L71">                .set(SUBMISSION.CONTEXT_ID, contextId)</span>
+<span class="fc" id="L72">                .onDuplicateKeyIgnore()</span>
+<span class="fc" id="L73">                .returning(SUBMISSION.ID)</span>
+<span class="fc" id="L74">                .fetchOne()</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                ?.get(SUBMISSION.ID)</span>
 
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (insertedId != null) return insertedId</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (insertedId != null) return insertedId</span>
 
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        return tx</span>
-<span class="fc" id="L107">            .dsl()</span>
-<span class="fc" id="L108">            .select(SUBMISSION.ID)</span>
-<span class="fc" id="L109">            .from(SUBMISSION)</span>
-<span class="fc" id="L110">            .where(</span>
-<span class="fc" id="L111">                SUBMISSION.CONTEXT_ID</span>
-<span class="fc" id="L112">                    .eq(contextId)</span>
-<span class="fc" id="L113">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-<span class="fc" id="L114">            ).fetchOne()</span>
-<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            ?.get(SUBMISSION.ID) ?: error(&quot;Could not find or create submission&quot;)</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        return tx</span>
+<span class="fc" id="L80">            .dsl()</span>
+<span class="fc" id="L81">            .select(SUBMISSION.ID)</span>
+<span class="fc" id="L82">            .from(SUBMISSION)</span>
+<span class="fc" id="L83">            .where(</span>
+<span class="fc" id="L84">                SUBMISSION.CONTEXT_ID</span>
+<span class="fc" id="L85">                    .eq(contextId)</span>
+<span class="fc" id="L86">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L87">            ).fetchOne()</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            ?.get(SUBMISSION.ID) ?: error(&quot;Could not find or create submission&quot;)</span>
     }
 
     private fun isOwnedByAnotherUser(
@@ -120,67 +93,67 @@ import java.util.*
         contextId: String,
         personIdent: String,
     ): Boolean {
-<span class="fc" id="L123">        val count =</span>
-<span class="fc" id="L124">            tx</span>
-<span class="fc" id="L125">                .dsl()</span>
-<span class="fc" id="L126">                .selectCount()</span>
-<span class="fc" id="L127">                .from(SUBMISSION)</span>
-<span class="fc" id="L128">                .where(</span>
-<span class="fc" id="L129">                    SUBMISSION.CONTEXT_ID</span>
-<span class="fc" id="L130">                        .eq(contextId)</span>
-<span class="fc" id="L131">                        .and(SUBMISSION.OWNER_IDENT.ne(personIdent)),</span>
-<span class="fc" id="L132">                ).fetchSingle()</span>
-<span class="fc" id="L133">                .value1()</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        return count &gt; 0</span>
+<span class="fc" id="L96">        val count =</span>
+<span class="fc" id="L97">            tx</span>
+<span class="fc" id="L98">                .dsl()</span>
+<span class="fc" id="L99">                .selectCount()</span>
+<span class="fc" id="L100">                .from(SUBMISSION)</span>
+<span class="fc" id="L101">                .where(</span>
+<span class="fc" id="L102">                    SUBMISSION.CONTEXT_ID</span>
+<span class="fc" id="L103">                        .eq(contextId)</span>
+<span class="fc" id="L104">                        .and(SUBMISSION.OWNER_IDENT.ne(personIdent)),</span>
+<span class="fc" id="L105">                ).fetchSingle()</span>
+<span class="fc" id="L106">                .value1()</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        return count &gt; 0</span>
     }
 
     fun isOwnedByUser(
         id: UUID,
         personIdent: String,
     ): Boolean {
-<span class="fc" id="L141">        val count =</span>
-<span class="fc" id="L142">            dsl</span>
-<span class="fc" id="L143">                .selectCount()</span>
-<span class="fc" id="L144">                .from(SUBMISSION)</span>
-<span class="fc" id="L145">                .where(</span>
-<span class="fc" id="L146">                    SUBMISSION.ID</span>
-<span class="fc" id="L147">                        .eq(id)</span>
-<span class="fc" id="L148">                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-<span class="fc" id="L149">                ).fetchOne()</span>
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                ?.value1()</span>
-<span class="pc bpc" id="L151" title="2 of 4 branches missed.">        return count != 0</span>
+<span class="fc" id="L114">        val count =</span>
+<span class="fc" id="L115">            dsl</span>
+<span class="fc" id="L116">                .selectCount()</span>
+<span class="fc" id="L117">                .from(SUBMISSION)</span>
+<span class="fc" id="L118">                .where(</span>
+<span class="fc" id="L119">                    SUBMISSION.ID</span>
+<span class="fc" id="L120">                        .eq(id)</span>
+<span class="fc" id="L121">                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L122">                ).fetchOne()</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                ?.value1()</span>
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">        return count != 0</span>
     }
 
     fun cleanup(
         tx: Configuration,
         submissionId: UUID,
     ): Int =
-<span class="fc" id="L158">        tx</span>
-<span class="fc" id="L159">            .dsl()</span>
-<span class="fc" id="L160">            .deleteFrom(SUBMISSION)</span>
-<span class="fc" id="L161">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L162">            .execute()</span>
+<span class="fc" id="L131">        tx</span>
+<span class="fc" id="L132">            .dsl()</span>
+<span class="fc" id="L133">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L134">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L135">            .execute()</span>
 
     fun getStaleSubmissions(
         tx: Configuration,
         cutoff: OffsetDateTime,
     ): List&lt;StaleSubmission&gt; =
-<span class="fc" id="L168">        tx</span>
-<span class="fc" id="L169">            .dsl()</span>
-<span class="fc" id="L170">            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
-<span class="fc" id="L171">            .from(SUBMISSION)</span>
-<span class="fc" id="L172">            .join(UPLOAD).on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))</span>
-<span class="fc" id="L173">            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
-<span class="fc" id="L174">            .having(</span>
-<span class="fc" id="L175">                DSL.max(UPLOAD.UPDATED_AT).lt(cutoff)</span>
-<span class="fc" id="L176">                    .and(</span>
-<span class="fc" id="L177">                        DSL.count().filterWhere(</span>
-<span class="fc" id="L178">                            UPLOAD.PROCESSING_STATUS.`in`(&quot;PENDING&quot;, &quot;PROCESSING&quot;),</span>
-<span class="fc" id="L179">                        ).eq(0),</span>
+<span class="fc" id="L141">        tx</span>
+<span class="fc" id="L142">            .dsl()</span>
+<span class="fc" id="L143">            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L144">            .from(SUBMISSION)</span>
+<span class="fc" id="L145">            .join(UPLOAD).on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))</span>
+<span class="fc" id="L146">            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L147">            .having(</span>
+<span class="fc" id="L148">                DSL.max(UPLOAD.UPDATED_AT).lt(cutoff)</span>
+<span class="fc" id="L149">                    .and(</span>
+<span class="fc" id="L150">                        DSL.count().filterWhere(</span>
+<span class="fc" id="L151">                            UPLOAD.PROCESSING_STATUS.`in`(&quot;PENDING&quot;, &quot;PROCESSING&quot;),</span>
+<span class="fc" id="L152">                        ).eq(0),</span>
                     ),
             )
-<span class="fc" id="L182">            .fetch()</span>
-<span class="fc" id="L183">            .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }</span>
+<span class="fc" id="L155">            .fetch()</span>
+<span class="fc" id="L156">            .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }</span>
 }
 
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

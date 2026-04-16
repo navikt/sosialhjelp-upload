@@ -30,36 +30,32 @@ fun Route.configureStatusRoutes() {
 <span class="fc" id="L30">    sse(&quot;/status/{id}&quot;, serialize = { typeInfo: TypeInfo, value: Any -&gt;</span>
 <span class="nc" id="L31">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
 <span class="nc" id="L32">        Default.encodeToString(serializer, value)</span>
-<span class="nc bnc" id="L33" title="All 6 branches missed.">    }) {</span>
+<span class="nc bnc" id="L33" title="All 5 branches missed.">    }) {</span>
 <span class="nc" id="L34">        activeConnections.incrementAndGet()</span>
-<span class="nc" id="L35">        val queryParams = call.request.queryParameters</span>
-<span class="nc" id="L36">        val soknadId = queryParams[&quot;soknadId&quot;]</span>
-<span class="nc" id="L37">        val fiksDigisosId = queryParams[&quot;fiksDigisosId&quot;]</span>
-<span class="nc" id="L38">        try {</span>
-<span class="nc bnc" id="L39" title="All 4 branches missed.">            if (soknadId == null &amp;&amp; fiksDigisosId == null) return@sse call.respond(HttpStatusCode.BadRequest, &quot;Mangler fiksDigisosId eller soknadId&quot;)</span>
-<span class="nc bnc" id="L40" title="All 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
+<span class="nc" id="L35">        try {</span>
+<span class="nc bnc" id="L36" title="All 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
 
-<span class="nc" id="L42">            heartbeat {</span>
-<span class="nc" id="L43">                period = 10.seconds</span>
-<span class="nc" id="L44">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;ドキドキ&quot;}&quot;&quot;&quot;)</span>
-<span class="nc" id="L45">            }</span>
+<span class="nc" id="L38">            heartbeat {</span>
+<span class="nc" id="L39">                period = 10.seconds</span>
+<span class="nc" id="L40">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;Beating&quot;}&quot;&quot;&quot;)</span>
+<span class="nc" id="L41">            }</span>
 
-<span class="nc bnc" id="L47" title="All 2 branches missed.">            val rawId = call.parameters[&quot;id&quot;].orEmpty()</span>
-<span class="nc bnc" id="L48" title="All 2 branches missed.">            if (rawId.isBlank()) {</span>
-<span class="nc" id="L49">                error(&quot;id parameter is required&quot;)</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            val id = call.parameters[&quot;id&quot;].orEmpty()</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">            if (id.isBlank()) {</span>
+<span class="nc" id="L45">                error(&quot;id parameter is required&quot;)</span>
             }
-<span class="nc bnc" id="L51" title="All 4 branches missed.">            val userToken = call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
+<span class="nc bnc" id="L47" title="All 4 branches missed.">            call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
 
-<span class="nc bnc" id="L53" title="All 2 branches missed.">            val submissionId = submissionService.getOrCreate(rawId, personident, soknadId, fiksDigisosId, userToken)</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            val submissionId = submissionService.getOrCreate(id, personident)</span>
 
-<span class="nc" id="L55">            send(submissionService.getSubmissionStatus(submissionId))</span>
+<span class="nc" id="L51">            send(submissionService.getSubmissionStatus(submissionId))</span>
 
-<span class="nc bnc" id="L57" title="All 2 branches missed.">            statusChannelFactory.getSubmissionFlow(submissionId).collect {</span>
-<span class="nc" id="L58">                send(submissionService.getSubmissionStatus(submissionId))</span>
-<span class="nc" id="L59">            }</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            statusChannelFactory.getSubmissionFlow(submissionId).collect {</span>
+<span class="nc" id="L54">                send(submissionService.getSubmissionStatus(submissionId))</span>
+<span class="nc" id="L55">            }</span>
         } finally {
-<span class="nc" id="L61">            activeConnections.decrementAndGet()</span>
+<span class="nc" id="L57">            activeConnections.decrementAndGet()</span>
         }
-<span class="nc" id="L63">    }</span>
-<span class="fc" id="L64">}</span>
+<span class="nc" id="L59">    }</span>
+<span class="fc" id="L60">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

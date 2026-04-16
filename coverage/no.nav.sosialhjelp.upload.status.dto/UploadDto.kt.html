@@ -15,10 +15,11 @@ import java.util.UUID
 <span class="nc" id="L15">    val filId: UUID?,</span>
 <span class="pc" id="L16">    val url: String?,</span>
 <span class="pc" id="L17">    val finalFilename: String?,</span>
-<span class="pc" id="L18">    val status: Status</span>
-<span class="nc" id="L19">) {</span>
+<span class="pc" id="L18">    val status: Status,</span>
+<span class="pc" id="L19">    val size: Long?,</span>
+<span class="nc" id="L20">) {</span>
     enum class Status {
-<span class="fc" id="L21">        COMPLETE, PROCESSING, FAILED, PENDING</span>
+<span class="fc" id="L22">        COMPLETE, PROCESSING, FAILED, PENDING</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

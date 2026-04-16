@@ -4,19 +4,25 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.uri
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 
 fun Application.configureStatusPages() {
-<span class="fc" id="L11">    install(StatusPages) {</span>
-<span class="pc bnc" id="L12" title="All 2 branches missed.">        exception&lt;ChannelWriteException&gt; { call, _ -&gt;</span>
+<span class="fc" id="L14">    install(StatusPages) {</span>
+<span class="pc bnc" id="L15" title="All 2 branches missed.">        exception&lt;ChannelWriteException&gt; { call, _ -&gt;</span>
             // Client disconnected (tab closed, navigated away, network drop) — normal for SSE
-<span class="nc" id="L14">            this@configureStatusPages.environment.log.debug(&quot;Client disconnected from ${call.request.uri}&quot;)</span>
-<span class="nc" id="L15">        }</span>
-<span class="pc bnc" id="L16" title="All 3 branches missed.">        exception&lt;Throwable&gt; { call, cause -&gt;</span>
-<span class="nc" id="L17">            this@configureStatusPages.environment.log.error(&quot;Got error on call to ${call.request.uri}&quot;, cause)</span>
-<span class="nc bnc" id="L18" title="All 2 branches missed.">            call.respondText(text = &quot;500: $cause&quot;, status = HttpStatusCode.InternalServerError)</span>
-<span class="nc" id="L19">        }</span>
-<span class="fc" id="L20">    }</span>
-<span class="fc" id="L21">}</span>
+<span class="nc" id="L17">            this@configureStatusPages.environment.log.debug(&quot;Client disconnected from ${call.request.uri}&quot;)</span>
+<span class="nc" id="L18">        }</span>
+<span class="pc bnc" id="L19" title="All 3 branches missed.">        exception&lt;SubmissionValidationException&gt; { call, cause -&gt;</span>
+<span class="nc" id="L20">            call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))</span>
+<span class="nc" id="L21">        }</span>
+<span class="pc bnc" id="L22" title="All 3 branches missed.">        exception&lt;Throwable&gt; { call, cause -&gt;</span>
+<span class="nc" id="L23">            this@configureStatusPages.environment.log.error(&quot;Got error on call to ${call.request.uri}&quot;, cause)</span>
+<span class="nc bnc" id="L24" title="All 2 branches missed.">            call.respondText(text = &quot;500: $cause&quot;, status = HttpStatusCode.InternalServerError)</span>
+<span class="nc" id="L25">        }</span>
+<span class="fc" id="L26">    }</span>
+<span class="fc" id="L27">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

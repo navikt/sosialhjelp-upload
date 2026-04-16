@@ -39,19 +39,18 @@ fun Route.configureActionRoutes() {
 <span class="nc bnc" id="L39" title="All 2 branches missed.">                ?: return@post call.respondText(&quot;fiksDigisosId is required&quot;, status = HttpStatusCode.BadRequest)</span>
 
 <span class="fc" id="L41">            val result =</span>
-<span class="fc" id="L42">                ettersendelseService.</span>
-<span class="pc bpc" id="L43" title="1 of 2 branches missed.">                upload(</span>
-<span class="fc" id="L44">                    input.metadata,</span>
-<span class="fc" id="L45">                    fiksDigisosId = fiksDigisosId,</span>
-<span class="pc bpc" id="L46" title="2 of 4 branches missed.">                    call.request.header(&quot;Authorization&quot;)?.removePrefix(&quot;Bearer &quot;)</span>
-<span class="nc" id="L47">                        ?: return@post call.respond(HttpStatusCode.Unauthorized),</span>
-<span class="fc" id="L48">                    submissionId,</span>
-<span class="fc" id="L49">                    personIdent = call.attributes[VerifiedPersonident],</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                ettersendelseService.upload(</span>
+<span class="fc" id="L43">                    input.metadata,</span>
+<span class="fc" id="L44">                    fiksDigisosId = fiksDigisosId,</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">                    call.request.header(&quot;Authorization&quot;)?.removePrefix(&quot;Bearer &quot;)</span>
+<span class="nc" id="L46">                        ?: return@post call.respond(HttpStatusCode.Unauthorized),</span>
+<span class="fc" id="L47">                    submissionId,</span>
+<span class="fc" id="L48">                    personIdent = call.attributes[VerifiedPersonident],</span>
                 )
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (result) {</span>
-<span class="fc" id="L52">                return@post call.respond(HttpStatusCode.Created)</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (result) {</span>
+<span class="fc" id="L51">                return@post call.respond(HttpStatusCode.Created)</span>
             }
-<span class="nc" id="L54">        }</span>
-<span class="fc" id="L55">    }</span>
-<span class="fc" id="L56">}</span>
+<span class="nc" id="L53">        }</span>
+<span class="fc" id="L54">    }</span>
+<span class="fc" id="L55">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
