@@ -256,7 +256,7 @@ class TusUploadServiceIntegrationTest {
             coEvery {
                 mellomlagringClient.uploadFile(
                     navEksternRefId = any(),
-                    filename = "document.pdf",
+                    filename = match { it.startsWith("document-") && it.endsWith(".pdf") },
                     contentType = any(),
                     data = any(),
                 )

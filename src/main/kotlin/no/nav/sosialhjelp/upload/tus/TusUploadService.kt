@@ -147,6 +147,7 @@ class TusUploadService(
         }
 
         val (finalFilename, finalData) = convertIfNeeded(upload.filename, chunkData)
+        val mellomlagringFilnavn = makeUniqueMellomlagringFilename(finalFilename, uploadId)
         val encrypted = encryptionService.encryptBytes(finalData)
 
         val contentType =
@@ -154,12 +155,12 @@ class TusUploadService(
                 .defaultForFile(File(finalFilename))
                 .toString()
 
-        logger.info("Uploading $finalFilename (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}")
+        logger.info("Uploading $mellomlagringFilnavn (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}")
         val filId =
             try {
                 mellomlagringClient.uploadFile(
                     navEksternRefId = upload.navEksternRefId,
-                    filename = finalFilename,
+                    filename = mellomlagringFilnavn,
                     contentType = contentType,
                     data = encrypted,
                 )
@@ -180,7 +181,7 @@ class TusUploadService(
 
         withContext(ioDispatcher) {
             dsl.transaction { tx ->
-                uploadRepository.setFilId(tx, uploadId, filId, finalFilename, finalData.size.toLong(), getSha512(finalData))
+                uploadRepository.setFilId(tx, uploadId, filId, mellomlagringFilnavn, finalData.size.toLong(), getSha512(finalData))
                 uploadRepository.notifyChange(tx, uploadId)
             }
             deleteGcsObjects(uploadId)
@@ -246,4 +247,21 @@ fun getSha512(data: ByteArray): String {
     md.update(data)
     val digest = md.digest()
     return digest.fold("") { str, it -> str + "%02x".format(it) }
+}
+
+/**
+ * Generates a unique mellomlagring filename by appending the first segment of [uploadId]
+ * (8 hex characters) before the extension. The base name is truncated to 50 characters
+ * to keep total filenames manageable.
+ *
+ * Examples:
+ *   "document.pdf"  + UUID b1f7f6d1-... → "document-b1f7f6d1.pdf"
+ *   "a".repeat(60) + ".pdf" → "a".repeat(50) + "-b1f7f6d1.pdf"
+ */
+internal fun makeUniqueMellomlagringFilename(filename: String, uploadId: UUID): String {
+    val file = File(filename)
+    val extension = file.extension
+    val baseName = file.nameWithoutExtension.take(50)
+    val uuidSuffix = uploadId.toString().substringBefore('-')
+    return if (extension.isNotEmpty()) "$baseName-$uuidSuffix.$extension" else "$baseName-$uuidSuffix"
 }

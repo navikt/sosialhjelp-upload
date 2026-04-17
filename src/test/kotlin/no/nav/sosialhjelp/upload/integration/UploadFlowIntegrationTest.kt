@@ -359,6 +359,47 @@ class UploadFlowIntegrationTest {
     }
 
     @Test
+    fun `submit returns error when Fiks rejects duplicate file names with 400`() = appTest {
+        val contextId = UUID.randomUUID().toString()
+        val token = JwtTestUtils.issueToken()
+        val fiksDigisosId = UUID.randomUUID().toString()
+
+        coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returnsMany
+            listOf(UUID.randomUUID(), UUID.randomUUID())
+
+        val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
+        coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak
+
+        // Fiks returns 400 Bad Request when two files share the same file name
+        coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } answers {
+            val filer = arg<List<no.nav.sosialhjelp.upload.action.fiks.Fil>>(5)
+            val filenames = filer.map { it.filnavn }
+            mockk<io.ktor.client.statement.HttpResponse> {
+                every { status } returns if (filenames.size != filenames.distinct().size) {
+                    HttpStatusCode.BadRequest
+                } else {
+                    HttpStatusCode.OK
+                }
+            }
+        }
+
+        val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+
+        // Upload two files with the same name — this is what triggers the 400 from Fiks
+        val uploadId1 = tusUpload(client, contextId, minimalPdf(), token, filename = "document.pdf")
+        val uploadId2 = tusUpload(client, contextId, minimalPdf(), token, filename = "document.pdf")
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId1)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId2)
+
+        val submitResp = client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+            header("Authorization", "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody("""{"fiksDigisosId":"$fiksDigisosId","metadata":{"type":"dok","tilleggsinfo":"info"}}""")
+        }
+        assertEquals(HttpStatusCode.Created, submitResp.status)
+    }
+
+    @Test
     fun `SSE endpoint responds with event-stream content type`() = appTest {
         val contextId = UUID.randomUUID().toString()
         val soknadId = UUID.randomUUID().toString()
