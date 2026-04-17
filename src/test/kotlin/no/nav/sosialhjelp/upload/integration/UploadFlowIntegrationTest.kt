@@ -16,11 +16,20 @@ import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.plugins.di.*
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import io.ktor.client.statement.*
+import io.ktor.utils.io.readUTF8Line
 import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -33,6 +42,8 @@ import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.module
+import no.nav.sosialhjelp.upload.status.dto.SubmissionState
+import no.nav.sosialhjelp.upload.status.dto.UploadDto
 import no.nav.sosialhjelp.upload.testutils.JwtTestUtils
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.apache.pdfbox.pdmodel.PDDocument
@@ -44,6 +55,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayOutputStream
 import java.util.Base64
+import java.util.Collections
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -242,6 +254,108 @@ class UploadFlowIntegrationTest {
             header("Upload-Metadata", "filename ${base64("test.pdf")}, contextId ${base64(contextId)}, fiksDigisosId ${base64(UUID.randomUUID().toString())}")
         }
         assertEquals(HttpStatusCode.Forbidden, resp.status)
+    }
+
+    /**
+     * Opens an SSE connection for [contextId] and collects [SubmissionState] events into a
+     * synchronized list until the returned job is cancelled.
+     *
+     * The job runs on [Dispatchers.IO] so that [awaitUploadTerminal] (which uses Thread.sleep)
+     * can run concurrently on the calling coroutine without blocking the SSE reader.
+     */
+    private fun ApplicationTestBuilder.collectSseEvents(
+        contextId: String,
+        token: String,
+    ): Pair<kotlinx.coroutines.Job, MutableList<SubmissionState>> {
+        val events = Collections.synchronizedList(mutableListOf<SubmissionState>())
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val job = scope.launch {
+            runCatching {
+                client.prepareGet("/sosialhjelp/upload/status/$contextId?soknadId=test") {
+                    header("Authorization", "Bearer $token")
+                }.execute { response ->
+                    val channel = response.bodyAsChannel()
+                    while (isActive && !channel.isClosedForRead) {
+                        val line = channel.readUTF8Line() ?: break
+                        if (line.startsWith("data: ")) {
+                            runCatching { Json.decodeFromString<SubmissionState>(line.removePrefix("data: ")) }
+                                .onSuccess { events.add(it) }
+                        }
+                    }
+                }
+            }
+        }
+        return job to events
+    }
+
+    @Test
+    fun `SSE stream emits updated state after TUS upload completes`() = appTest {
+        val contextId = UUID.randomUUID().toString()
+        val token = JwtTestUtils.issueToken()
+        val filId = UUID.randomUUID()
+        coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+
+        createMockSubmission(PostgresTestContainer.dsl, contextId)
+
+        val (sseJob, events) = collectSseEvents(contextId, token)
+        // Give SSE time to connect and receive the initial empty state
+        delay(300)
+
+        val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+        // Give Postgres NOTIFY time to propagate to the SSE listener
+        delay(500)
+
+        sseJob.cancel()
+
+        assertTrue(events.size >= 2, "Expected ≥2 SSE events (initial state + post-upload), got ${events.size}")
+
+        val initial = events.first()
+        assertTrue(initial.uploads.isEmpty(), "Initial SSE event should have no uploads")
+
+        val final = events.last()
+        assertEquals(1, final.uploads.size, "Final SSE event should contain the uploaded file")
+        assertEquals(filId, final.uploads.first().filId, "Upload filId should match mellomlagring response")
+        assertEquals(UploadDto.Status.COMPLETE, final.uploads.first().status)
+    }
+
+    @Test
+    fun `SSE stream reflects deleted upload`() = appTest {
+        val contextId = UUID.randomUUID().toString()
+        val token = JwtTestUtils.issueToken()
+        val filId = UUID.randomUUID()
+        coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+
+        createMockSubmission(PostgresTestContainer.dsl, contextId)
+
+        val (sseJob, events) = collectSseEvents(contextId, token)
+        delay(300)
+
+        // Upload
+        val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+        delay(300)
+
+        // Delete
+        client.delete("/sosialhjelp/upload/tus/files/$uploadId") {
+            header("Authorization", "Bearer $token")
+            header("Tus-Resumable", "1.0.0")
+        }
+        delay(500)
+
+        sseJob.cancel()
+
+        val statesWithUpload = events.filter { it.uploads.isNotEmpty() }
+        val statesWithoutUpload = events.filter { it.uploads.isEmpty() }
+
+        assertTrue(statesWithUpload.isNotEmpty(), "Should have received a state showing the upload")
+        // After delete the state reverts to empty uploads
+        assertTrue(
+            statesWithoutUpload.size >= 2,
+            "Should have received at least 2 empty-upload states (initial + post-delete)",
+        )
+        // The very last event should have no uploads
+        assertTrue(events.last().uploads.isEmpty(), "Final SSE event after delete should have no uploads")
     }
 
     @Test
