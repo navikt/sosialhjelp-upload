@@ -37,7 +37,7 @@ fun Route.configureDocumentRoutes() {
         checkNotNull(upload.mellomlagringFilnavn) { "Mangler originalFilename. Er ikke fil ferdig opplastet?" }
 
 
-        call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"${upload.mellomlagringFilnavn}\"")
+        call.response.header(HttpHeaders.ContentDisposition, "inline; filename=\"${upload.mellomlagringFilnavn}\"")
         call.respondBytes(mellomlagringClient.getFile(upload.navEksternRefId, upload.filId), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))
     }
 }
