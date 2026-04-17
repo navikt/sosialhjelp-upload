@@ -6,11 +6,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.util.UUID
 
-<span class="nc" id="L9">class UUIDSerializer : KSerializer&lt;UUID&gt; {</span>
-<span class="nc" id="L10">    override val descriptor = PrimitiveSerialDescriptor(&quot;UUID&quot;, kotlinx.serialization.descriptors.PrimitiveKind.STRING)</span>
-<span class="nc" id="L11">    override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())</span>
+<span class="fc" id="L9">class UUIDSerializer : KSerializer&lt;UUID&gt; {</span>
+<span class="fc" id="L10">    override val descriptor = PrimitiveSerialDescriptor(&quot;UUID&quot;, kotlinx.serialization.descriptors.PrimitiveKind.STRING)</span>
+<span class="fc" id="L11">    override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())</span>
 
-<span class="nc" id="L13">    override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())</span>
+<span class="fc" id="L13">    override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())</span>
 
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

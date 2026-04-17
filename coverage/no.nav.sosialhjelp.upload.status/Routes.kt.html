@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 fun Route.configureStatusRoutes() {
-<span class="pc" id="L21">    val statusChannelFactory: SubmissionNotificationService by application.dependencies</span>
+<span class="fc" id="L21">    val statusChannelFactory: SubmissionNotificationService by application.dependencies</span>
 <span class="fc" id="L22">    val submissionService: SubmissionService by application.dependencies</span>
 <span class="fc" id="L23">    val meterRegistry: MeterRegistry by application.dependencies</span>
 
@@ -28,9 +28,9 @@ fun Route.configureStatusRoutes() {
 
 
 <span class="fc" id="L30">    sse(&quot;/status/{id}&quot;, serialize = { typeInfo: TypeInfo, value: Any -&gt;</span>
-<span class="nc" id="L31">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
-<span class="nc" id="L32">        Default.encodeToString(serializer, value)</span>
-<span class="pc bpc" id="L33" title="4 of 5 branches missed.">    }) {</span>
+<span class="fc" id="L31">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
+<span class="fc" id="L32">        Default.encodeToString(serializer, value)</span>
+<span class="pc bpc" id="L33" title="3 of 5 branches missed.">    }) {</span>
 <span class="fc" id="L34">        activeConnections.incrementAndGet()</span>
 <span class="fc" id="L35">        try {</span>
 <span class="pc bpc" id="L36" title="2 of 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
@@ -46,13 +46,13 @@ fun Route.configureStatusRoutes() {
             }
 <span class="pc bpc" id="L47" title="2 of 4 branches missed.">            call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
 
-<span class="nc bnc" id="L49" title="All 2 branches missed.">            val submissionId = submissionService.getOrCreate(id, personident)</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            val submissionId = submissionService.getOrCreate(id, personident)</span>
 
-<span class="nc" id="L51">            send(submissionService.getSubmissionStatus(submissionId))</span>
+<span class="fc" id="L51">            send(submissionService.getSubmissionStatus(submissionId))</span>
 
-<span class="nc bnc" id="L53" title="All 2 branches missed.">            statusChannelFactory.getSubmissionFlow(submissionId).collect {</span>
-<span class="nc" id="L54">                send(submissionService.getSubmissionStatus(submissionId))</span>
-<span class="nc" id="L55">            }</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            statusChannelFactory.getSubmissionFlow(submissionId).collect {</span>
+<span class="fc" id="L54">                send(submissionService.getSubmissionStatus(submissionId))</span>
+<span class="fc" id="L55">            }</span>
         } finally {
 <span class="pc" id="L57">            activeConnections.decrementAndGet()</span>
         }

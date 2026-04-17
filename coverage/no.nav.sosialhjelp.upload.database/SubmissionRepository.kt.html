@@ -16,19 +16,19 @@ import java.util.*
 <span class="fc" id="L16">    data class StaleSubmission(val id: UUID, val navEksternRefId: String)</span>
 
     fun findSubmission(tx: Configuration, contextId: String, personIdent: String): UUID? {
-<span class="nc bnc" id="L19" title="All 2 branches missed.">        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (isOwnedByAnotherUser(tx, contextId, personIdent)) {</span>
 <span class="nc" id="L20">            throw SubmissionOwnedByAnotherUserException()</span>
         }
-<span class="nc" id="L22">        return tx</span>
-<span class="nc" id="L23">            .dsl()</span>
-<span class="nc" id="L24">            .select(SUBMISSION.ID)</span>
-<span class="nc" id="L25">            .from(SUBMISSION)</span>
-<span class="nc" id="L26">            .where(</span>
-<span class="nc" id="L27">                SUBMISSION.CONTEXT_ID</span>
-<span class="nc" id="L28">                    .eq(contextId)</span>
-<span class="nc" id="L29">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-<span class="nc" id="L30">            ).fetchOne()</span>
-<span class="nc bnc" id="L31" title="All 2 branches missed.">            ?.get(SUBMISSION.ID)</span>
+<span class="fc" id="L22">        return tx</span>
+<span class="fc" id="L23">            .dsl()</span>
+<span class="fc" id="L24">            .select(SUBMISSION.ID)</span>
+<span class="fc" id="L25">            .from(SUBMISSION)</span>
+<span class="fc" id="L26">            .where(</span>
+<span class="fc" id="L27">                SUBMISSION.CONTEXT_ID</span>
+<span class="fc" id="L28">                    .eq(contextId)</span>
+<span class="fc" id="L29">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L30">            ).fetchOne()</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            ?.get(SUBMISSION.ID)</span>
     }
 
     fun getNavEksternRefId(tx: Configuration, submissionId: UUID, personIdent: String): String {

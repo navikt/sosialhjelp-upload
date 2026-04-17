@@ -20,15 +20,15 @@ import java.util.*
         contextId: String,
         personIdent: String,
     ): UUID {
-<span class="nc" id="L23">        return withContext(ioDispatcher) {</span>
-<span class="nc" id="L24">            val existing = dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L25">                submissionRepository.findSubmission(tx, contextId, personIdent)</span>
+<span class="fc" id="L23">        return withContext(ioDispatcher) {</span>
+<span class="fc" id="L24">            val existing = dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L25">                submissionRepository.findSubmission(tx, contextId, personIdent)</span>
             }
-<span class="nc bnc" id="L27" title="All 2 branches missed.">            if (existing != null) return@withContext existing</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (existing != null) return@withContext existing</span>
 
-<span class="nc" id="L29">            dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L30">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent)</span>
-<span class="nc" id="L31">            }</span>
+<span class="fc" id="L29">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L30">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent)</span>
+<span class="fc" id="L31">            }</span>
         }
     }
 
@@ -44,7 +44,7 @@ import java.util.*
 <span class="pc bpc" id="L44" title="1 of 2 branches missed.">                                upload.originalFilename ?: &quot;Ukjent fil&quot;,</span>
 <span class="fc" id="L45">                                upload.errors,</span>
 <span class="fc" id="L46">                                upload.filId,</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
 <span class="fc" id="L48">                                finalFilename = upload.mellomlagringFilnavn,</span>
 <span class="fc" id="L49">                                status = UploadDto.Status.valueOf(upload.status.name),</span>
 <span class="fc" id="L50">                                upload.fileSize</span>

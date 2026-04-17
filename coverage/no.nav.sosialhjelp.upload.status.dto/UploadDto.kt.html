@@ -5,17 +5,17 @@ import no.nav.sosialhjelp.upload.contentnegotiation.UUIDSerializer
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import java.util.UUID
 
-<span class="pc bnc" id="L8" title="All 10 branches missed.">@Serializable</span>
+<span class="pc bpc" id="L8" title="5 of 10 branches missed.">@Serializable</span>
 <span class="pc" id="L9">data class UploadDto(</span>
 <span class="fc" id="L10">    @property:Serializable(with = UUIDSerializer::class)</span>
 <span class="fc" id="L11">    val id: UUID?,</span>
 <span class="fc" id="L12">    val originalFilename: String,</span>
 <span class="pc" id="L13">    val validations: List&lt;ValidationCode&gt; = emptyList(),</span>
 <span class="fc" id="L14">    @property:Serializable(with = UUIDSerializer::class)</span>
-<span class="nc" id="L15">    val filId: UUID?,</span>
+<span class="fc" id="L15">    val filId: UUID?,</span>
 <span class="pc" id="L16">    val url: String?,</span>
 <span class="pc" id="L17">    val finalFilename: String?,</span>
-<span class="pc" id="L18">    val status: Status,</span>
+<span class="fc" id="L18">    val status: Status,</span>
 <span class="pc" id="L19">    val size: Long?,</span>
 <span class="nc" id="L20">) {</span>
     enum class Status {
