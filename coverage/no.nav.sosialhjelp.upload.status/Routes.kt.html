@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.seconds
 
 fun Route.configureStatusRoutes() {
 <span class="pc" id="L21">    val statusChannelFactory: SubmissionNotificationService by application.dependencies</span>
-<span class="pc" id="L22">    val submissionService: SubmissionService by application.dependencies</span>
+<span class="fc" id="L22">    val submissionService: SubmissionService by application.dependencies</span>
 <span class="fc" id="L23">    val meterRegistry: MeterRegistry by application.dependencies</span>
 
 <span class="fc" id="L25">    val activeConnections = AtomicInteger(0)</span>
@@ -30,21 +30,21 @@ fun Route.configureStatusRoutes() {
 <span class="fc" id="L30">    sse(&quot;/status/{id}&quot;, serialize = { typeInfo: TypeInfo, value: Any -&gt;</span>
 <span class="nc" id="L31">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
 <span class="nc" id="L32">        Default.encodeToString(serializer, value)</span>
-<span class="nc bnc" id="L33" title="All 5 branches missed.">    }) {</span>
-<span class="nc" id="L34">        activeConnections.incrementAndGet()</span>
-<span class="nc" id="L35">        try {</span>
-<span class="nc bnc" id="L36" title="All 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
+<span class="pc bpc" id="L33" title="4 of 5 branches missed.">    }) {</span>
+<span class="fc" id="L34">        activeConnections.incrementAndGet()</span>
+<span class="fc" id="L35">        try {</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
 
-<span class="nc" id="L38">            heartbeat {</span>
-<span class="nc" id="L39">                period = 10.seconds</span>
-<span class="nc" id="L40">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;Beating&quot;}&quot;&quot;&quot;)</span>
-<span class="nc" id="L41">            }</span>
+<span class="fc" id="L38">            heartbeat {</span>
+<span class="fc" id="L39">                period = 10.seconds</span>
+<span class="fc" id="L40">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;Beating&quot;}&quot;&quot;&quot;)</span>
+<span class="fc" id="L41">            }</span>
 
-<span class="nc bnc" id="L43" title="All 2 branches missed.">            val id = call.parameters[&quot;id&quot;].orEmpty()</span>
-<span class="nc bnc" id="L44" title="All 2 branches missed.">            if (id.isBlank()) {</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            val id = call.parameters[&quot;id&quot;].orEmpty()</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (id.isBlank()) {</span>
 <span class="nc" id="L45">                error(&quot;id parameter is required&quot;)</span>
             }
-<span class="nc bnc" id="L47" title="All 4 branches missed.">            call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">            call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
 
 <span class="nc bnc" id="L49" title="All 2 branches missed.">            val submissionId = submissionService.getOrCreate(id, personident)</span>
 
@@ -54,7 +54,7 @@ fun Route.configureStatusRoutes() {
 <span class="nc" id="L54">                send(submissionService.getSubmissionStatus(submissionId))</span>
 <span class="nc" id="L55">            }</span>
         } finally {
-<span class="nc" id="L57">            activeConnections.decrementAndGet()</span>
+<span class="pc" id="L57">            activeConnections.decrementAndGet()</span>
         }
 <span class="nc" id="L59">    }</span>
 <span class="fc" id="L60">}</span>

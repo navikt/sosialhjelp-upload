@@ -37,7 +37,7 @@ fun Route.configureDocumentRoutes() {
 <span class="nc bnc" id="L37" title="All 2 branches missed.">        checkNotNull(upload.mellomlagringFilnavn) { &quot;Mangler originalFilename. Er ikke fil ferdig opplastet?&quot; }</span>
 
 
-<span class="nc" id="L40">        call.response.header(HttpHeaders.ContentDisposition, &quot;attachment; filename=\&quot;${upload.mellomlagringFilnavn}\&quot;&quot;)</span>
+<span class="nc" id="L40">        call.response.header(HttpHeaders.ContentDisposition, &quot;inline; filename=\&quot;${upload.mellomlagringFilnavn}\&quot;&quot;)</span>
 <span class="nc bnc" id="L41" title="All 4 branches missed.">        call.respondBytes(mellomlagringClient.getFile(upload.navEksternRefId, upload.filId), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))</span>
 <span class="nc" id="L42">    }</span>
 <span class="fc" id="L43">}</span>
