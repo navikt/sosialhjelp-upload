@@ -7,63 +7,70 @@ import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
+import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.DSLContext
 import java.io.File
 import java.util.*
 
-<span class="fc" id="L14">class SubmissionService(</span>
-<span class="fc" id="L15">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L16">    private val submissionRepository: SubmissionRepository,</span>
-<span class="fc" id="L17">    private val dsl: DSLContext,</span>
-<span class="fc" id="L18">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L19">) {</span>
+<span class="fc" id="L15">class SubmissionService(</span>
+<span class="fc" id="L16">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L17">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L18">    private val dsl: DSLContext,</span>
+<span class="fc" id="L19">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L20">) {</span>
     suspend fun getOrCreate(
         contextId: String,
         personIdent: String,
     ): UUID {
-<span class="fc" id="L24">        return withContext(ioDispatcher) {</span>
-<span class="fc" id="L25">            val existing = dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L26">                submissionRepository.findSubmission(tx, contextId, personIdent)</span>
+<span class="fc" id="L25">        return withContext(ioDispatcher) {</span>
+<span class="fc" id="L26">            val existing = dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L27">                submissionRepository.findSubmission(tx, contextId, personIdent)</span>
             }
-<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (existing != null) return@withContext existing</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            if (existing != null) return@withContext existing</span>
 
-<span class="fc" id="L30">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L31">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent)</span>
-<span class="fc" id="L32">            }</span>
+<span class="fc" id="L31">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L32">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent)</span>
+<span class="fc" id="L33">            }</span>
         }
     }
 
     fun getSubmissionStatus(submissionId: UUID): SubmissionState =
-<span class="fc" id="L37">        dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L38">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
-<span class="fc" id="L39">            val uploads =</span>
-<span class="fc" id="L40">                filenamesByUpload.mapNotNull { upload -&gt;</span>
-<span class="fc" id="L41">                    upload.id</span>
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                        ?.let {</span>
-<span class="fc" id="L43">                            UploadDto(</span>
-<span class="fc" id="L44">                                upload.id,</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                                upload.originalFilename ?: &quot;Ukjent fil&quot;,</span>
-<span class="fc" id="L46">                                upload.errors,</span>
-<span class="fc" id="L47">                                upload.filId,</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
-<span class="fc bfc" id="L49" title="All 2 branches covered.">                                finalFilename = upload.mellomlagringFilnavn?.let { mellomlagringFilnavn -&gt;</span>
+<span class="fc" id="L38">        dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L39">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
+<span class="fc" id="L40">            val uploads =</span>
+<span class="fc" id="L41">                filenamesByUpload.mapNotNull { upload -&gt;</span>
+<span class="fc" id="L42">                    upload.id</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">                        ?.let {</span>
+<span class="fc" id="L44">                            UploadDto(</span>
+<span class="fc" id="L45">                                upload.id,</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">                                upload.originalFilename ?: &quot;Ukjent fil&quot;,</span>
+<span class="fc" id="L47">                                upload.errors,</span>
+<span class="fc" id="L48">                                upload.filId,</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                                finalFilename = upload.mellomlagringFilnavn?.let { mellomlagringFilnavn -&gt;</span>
                                     // Derive the user-facing name from the original filename, using the
                                     // mellomlagring extension (which may differ if the file was converted to PDF).
                                     // This hides the UUID suffix added for mellomlagring uniqueness.
-<span class="fc" id="L53">                                    val ext = File(mellomlagringFilnavn).extension</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                                    val originalBase = File(upload.originalFilename ?: &quot;&quot;).nameWithoutExtension</span>
-<span class="pc bpc" id="L55" title="2 of 4 branches missed.">                                    if (ext.isNotEmpty()) &quot;$originalBase.$ext&quot; else originalBase</span>
+<span class="fc" id="L54">                                    val ext = File(mellomlagringFilnavn).extension</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                                    val originalBase = File(upload.originalFilename ?: &quot;&quot;).nameWithoutExtension</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">                                    if (ext.isNotEmpty()) &quot;$originalBase.$ext&quot; else originalBase</span>
                                 },
-<span class="fc" id="L57">                                status = UploadDto.Status.valueOf(upload.status.name),</span>
-<span class="fc" id="L58">                                upload.fileSize</span>
-<span class="fc" id="L59">                            )</span>
-<span class="fc" id="L60">                        }</span>
+<span class="fc" id="L58">                                status = UploadDto.Status.valueOf(upload.status.name),</span>
+<span class="fc" id="L59">                                upload.fileSize</span>
+<span class="fc" id="L60">                            )</span>
+<span class="fc" id="L61">                        }</span>
                 }
 
-<span class="fc" id="L63">            SubmissionState(</span>
-<span class="fc" id="L64">                submissionId.toString(),</span>
-<span class="fc" id="L65">                uploads.toList(),</span>
-<span class="fc" id="L66">            )</span>
-<span class="fc" id="L67">        }</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            val tooManyFiles = uploads.size &gt; 30</span>
+<span class="pc bpc" id="L65" title="1 of 6 branches missed.">            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } &gt; 150 * 1024 * 1024</span>
+<span class="fc" id="L66">            SubmissionState(</span>
+<span class="fc" id="L67">                submissionId.toString(),</span>
+<span class="fc" id="L68">                uploads.toList(),</span>
+<span class="fc" id="L69">                validations = listOfNotNull(</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                    if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                    if (totalTooLarge) ValidationCode.TOTAL_TOO_LARGE else null,</span>
+                ),
+<span class="fc" id="L73">            )</span>
+<span class="fc" id="L74">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

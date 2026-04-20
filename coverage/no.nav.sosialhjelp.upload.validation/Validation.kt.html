@@ -2,7 +2,7 @@
 
 import kotlinx.serialization.Serializable
 
-<span class="pc" id="L5">@Serializable</span>
+@Serializable
 enum class ValidationCode {
 <span class="fc" id="L7">    FILE_TOO_LARGE,</span>
 <span class="fc" id="L8">    INVALID_FILENAME,</span>
@@ -10,40 +10,47 @@ enum class ValidationCode {
 <span class="fc" id="L10">    FILETYPE_NOT_SUPPORTED,</span>
 <span class="fc" id="L11">    ENCRYPTED_PDF,</span>
 <span class="fc" id="L12">    INVALID_PDF,</span>
-<span class="fc" id="L13">}</span>
+<span class="fc" id="L13">    TOTAL_TOO_LARGE,</span>
+<span class="fc" id="L14">    TOO_MANY_FILES,</span>
+    ;
+
+<span class="fc" id="L17">    companion object {</span>
+
+<span class="fc" id="L19">    }</span>
+}
 
 interface Validation {
     val message: String
     val code: ValidationCode
 }
 
-<span class="fc" id="L20">class FileSizeValidation : Validation {</span>
-<span class="pc" id="L21">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
-<span class="fc" id="L22">    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE</span>
+<span class="fc" id="L27">class FileSizeValidation : Validation {</span>
+<span class="pc" id="L28">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
+<span class="fc" id="L29">    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE</span>
 }
 
-<span class="nc" id="L25">class FilenameValidation : Validation {</span>
-<span class="nc" id="L26">    override val message: String = &quot;Filename contains illegal characters.&quot;</span>
-<span class="nc" id="L27">    override val code: ValidationCode = ValidationCode.INVALID_FILENAME</span>
+<span class="nc" id="L32">class FilenameValidation : Validation {</span>
+<span class="nc" id="L33">    override val message: String = &quot;Filename contains illegal characters.&quot;</span>
+<span class="nc" id="L34">    override val code: ValidationCode = ValidationCode.INVALID_FILENAME</span>
 }
 
-<span class="fc" id="L30">class VirusValidation : Validation {</span>
-<span class="pc" id="L31">    override val message: String = &quot;File may contain virus.&quot;</span>
-<span class="fc" id="L32">    override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED</span>
+<span class="fc" id="L37">class VirusValidation : Validation {</span>
+<span class="pc" id="L38">    override val message: String = &quot;File may contain virus.&quot;</span>
+<span class="fc" id="L39">    override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED</span>
 }
 
-<span class="fc" id="L35">class FileTypeValidation(actual: String) : Validation {</span>
-<span class="pc" id="L36">    override val message: String = &quot;File type is not supported. Was $actual.&quot;</span>
-<span class="fc" id="L37">    override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED</span>
+<span class="fc" id="L42">class FileTypeValidation(actual: String) : Validation {</span>
+<span class="pc" id="L43">    override val message: String = &quot;File type is not supported. Was $actual.&quot;</span>
+<span class="fc" id="L44">    override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED</span>
 }
 
-<span class="nc" id="L40">class EncryptedPdfValidation : Validation {</span>
-<span class="nc" id="L41">    override val message: String = &quot;PDF is encrypted.&quot;</span>
-<span class="nc" id="L42">    override val code: ValidationCode = ValidationCode.ENCRYPTED_PDF</span>
+<span class="nc" id="L47">class EncryptedPdfValidation : Validation {</span>
+<span class="nc" id="L48">    override val message: String = &quot;PDF is encrypted.&quot;</span>
+<span class="nc" id="L49">    override val code: ValidationCode = ValidationCode.ENCRYPTED_PDF</span>
 }
 
-<span class="nc" id="L45">class InvalidPdfValidation : Validation {</span>
-<span class="nc" id="L46">    override val message: String = &quot;Could not load PDF document.&quot;</span>
-<span class="nc" id="L47">    override val code: ValidationCode = ValidationCode.INVALID_PDF</span>
+<span class="nc" id="L52">class InvalidPdfValidation : Validation {</span>
+<span class="nc" id="L53">    override val message: String = &quot;Could not load PDF document.&quot;</span>
+<span class="nc" id="L54">    override val code: ValidationCode = ValidationCode.INVALID_PDF</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
