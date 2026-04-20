@@ -7,6 +7,7 @@ import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
+import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.DSLContext
 import java.io.File
 import java.util.*
@@ -60,9 +61,15 @@ class SubmissionService(
                         }
                 }
 
+            val tooManyFiles = uploads.size > 30
+            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } > 150 * 1024 * 1024
             SubmissionState(
                 submissionId.toString(),
                 uploads.toList(),
+                validations = listOfNotNull(
+                    if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,
+                    if (totalTooLarge) ValidationCode.TOTAL_TOO_LARGE else null,
+                ),
             )
         }
 }

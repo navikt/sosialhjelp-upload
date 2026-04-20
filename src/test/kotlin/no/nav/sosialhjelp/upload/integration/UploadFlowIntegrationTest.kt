@@ -2,7 +2,6 @@ package no.nav.sosialhjelp.upload.integration
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
-import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
@@ -220,7 +219,7 @@ class UploadFlowIntegrationTest {
 
         val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
         coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak
-        val fiksResponse = mockk<io.ktor.client.statement.HttpResponse> {
+        val fiksResponse = mockk<HttpResponse> {
             every { status } returns HttpStatusCode.OK
         }
         coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } returns fiksResponse
@@ -228,7 +227,7 @@ class UploadFlowIntegrationTest {
         val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
 
-        no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
 
         val submitResp = client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
             header("Authorization", "Bearer $token")

@@ -10,6 +10,13 @@ enum class ValidationCode {
     FILETYPE_NOT_SUPPORTED,
     ENCRYPTED_PDF,
     INVALID_PDF,
+    TOTAL_TOO_LARGE,
+    TOO_MANY_FILES,
+    ;
+
+    companion object {
+
+    }
 }
 
 interface Validation {

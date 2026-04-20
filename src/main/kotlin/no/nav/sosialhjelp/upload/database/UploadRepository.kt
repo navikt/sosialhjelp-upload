@@ -39,6 +39,7 @@ class UploadRepository {
     class OffsetMismatchException(message: String) : RuntimeException(message)
 
     data class StaleUploadInfo(val submissionId: UUID, val gcsKey: String?)
+
     fun create(
         tx: Configuration,
         submissionId: UUID,
