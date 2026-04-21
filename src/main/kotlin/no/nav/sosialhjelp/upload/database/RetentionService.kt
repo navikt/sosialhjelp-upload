@@ -64,10 +64,12 @@ class RetentionService(
                 dsl.transactionResult { tx -> uploadRepository.getGcsKeysForSubmission(tx, submission.id) }
             }
 
-            mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)
+            // Delete from DB first so that a crash leaves orphaned remote data rather than
+            // a dangling DB row that would cause repeated failed deletions on retry.
             withContext(ioDispatcher) {
                 dsl.transaction { tx -> submissionRepository.cleanup(tx, submission.id) }
             }
+            mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)
 
             gcsKeys.forEach { gcsKey ->
                 val chunkPrefix = "$gcsKey-chunk-"

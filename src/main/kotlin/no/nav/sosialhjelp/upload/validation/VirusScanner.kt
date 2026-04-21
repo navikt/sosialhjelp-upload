@@ -22,7 +22,7 @@ class VirusScanner(
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    val httpClient =
+    private val httpClient =
         HttpClient(CIO) {
             expectSuccess = true
             install(ContentNegotiation) {
@@ -47,9 +47,9 @@ class VirusScanner(
             }
             return Result.FOUND
         } catch (e: Exception) {
-            logger.warn("Virus scanner error: ${e.message}, assuming file is clean", e)
+            logger.warn("Virus scanner error: ${e.message}, treating file as unverified", e)
             meterRegistry.counter("virus.scan.skipped", "reason", "error").increment()
-            return Result.OK
+            return Result.ERROR
         }
     }
 }

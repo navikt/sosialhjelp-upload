@@ -158,10 +158,10 @@ class UploadRepository {
         tx
             .dsl()
             .update(UPLOAD)
-            .set(UPLOAD.PROCESSING_STATUS, "PROCESSING")
+            .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)
             .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
-            .and(UPLOAD.PROCESSING_STATUS.eq("PENDING"))
+            .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
             .execute() > 0
 
     fun getUploadForProcessing(
@@ -207,7 +207,7 @@ class UploadRepository {
             .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)
             .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)
             .set(UPLOAD.SHA512, sha512)
-            .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
+            .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)
             .setNull(UPLOAD.GCS_KEY)
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
             .where(UPLOAD.ID.eq(uploadId))
@@ -221,7 +221,7 @@ class UploadRepository {
         tx
             .dsl()
             .update(UPLOAD)
-            .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)
             .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
@@ -238,9 +238,9 @@ class UploadRepository {
         tx
             .dsl()
             .update(UPLOAD)
-            .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
-            .where(UPLOAD.PROCESSING_STATUS.eq("PROCESSING"))
+            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name))
             .and(UPLOAD.UPDATED_AT.lt(cutoff))
             .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)
             .fetch()
@@ -259,9 +259,9 @@ class UploadRepository {
         tx
             .dsl()
             .update(UPLOAD)
-            .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
-            .where(UPLOAD.PROCESSING_STATUS.eq("PENDING"))
+            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
             .and(UPLOAD.UPLOAD_OFFSET.gt(0L))
             .and(UPLOAD.UPDATED_AT.lt(cutoff))
             .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)

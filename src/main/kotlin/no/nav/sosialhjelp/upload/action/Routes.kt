@@ -49,6 +49,8 @@ fun Route.configureActionRoutes() {
                 )
             if (result) {
                 return@post call.respond(HttpStatusCode.Created)
+            } else {
+                return@post call.respond(HttpStatusCode.BadGateway, "Submission rejected by Fiks")
             }
         }
     }

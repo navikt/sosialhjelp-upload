@@ -43,4 +43,23 @@ object TestUtils {
         }
         error("Upload $uploadId did not reach COMPLETE or FAILED within ${timeoutMs}ms")
     }
+
+    /**
+     * Blocks until [events] contains at least [minCount] entries, or throws if [timeoutMs] elapses.
+     * Use this instead of fixed `delay()` calls when waiting for SSE events to arrive.
+     */
+    fun <T> awaitSseEventCount(
+        events: List<T>,
+        minCount: Int,
+        timeoutMs: Long = 10_000L,
+        description: String = "events",
+    ) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (events.size >= minCount) return
+            Thread.sleep(50)
+        }
+        error("Expected at least $minCount $description within ${timeoutMs}ms, but only got ${events.size}")
+    }
 }
+

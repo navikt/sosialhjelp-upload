@@ -215,12 +215,12 @@ class FiksClient(
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-private fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null): String {
+internal fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null): String {
     val remoteMax: String? =
         digisosSak.ettersendtInfoNAV
             ?.ettersendelser
             ?.map { it.navEksternRefId }
-            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }
+            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L }
 
     // Take the highest counter across remote Fiks state and local in-flight submissions.
     // This ensures concurrent submissions that haven't been submitted to Fiks yet (and
@@ -235,8 +235,8 @@ private fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null)
     return previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix)
 }
 
-private fun lagIdSuffix(previousId: String): String {
-    val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1
+internal fun lagIdSuffix(previousId: String): String {
+    val suffix = (previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L) + 1
     return suffix.toString().padStart(4, '0')
 }
 

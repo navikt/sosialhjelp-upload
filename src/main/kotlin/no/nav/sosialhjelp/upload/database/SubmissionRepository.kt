@@ -179,7 +179,7 @@ class SubmissionRepository(
                         .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
                 ).fetchOne()
                 ?.value1()
-        return count != 0
+        return (count ?: 0) != 0
     }
 
     fun cleanup(

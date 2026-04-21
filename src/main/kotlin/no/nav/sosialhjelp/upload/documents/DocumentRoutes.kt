@@ -26,11 +26,17 @@ fun Route.configureDocumentRoutes() {
 
     get("/upload/{uploadId}") {
         val id = call.parameters["uploadId"] ?: error("uploadId is required")
-        call.principal<JWTPrincipal>()?.subject
+        val subject = call.principal<JWTPrincipal>()?.subject
             ?: return@get call.respond(HttpStatusCode.Unauthorized, "Missing subject in token")
 
+        val uploadId = UUID.fromString(id)
+        val owned = dsl.transactionResult { tx ->
+            uploadRepository.isOwnedByUser(tx, uploadId, subject)
+        }
+        if (!owned) return@get call.respond(HttpStatusCode.Forbidden, "Access denied")
+
         val upload = dsl.transactionResult { tx ->
-            uploadRepository.getUpload(tx, UUID.fromString(id))
+            uploadRepository.getUpload(tx, uploadId)
         }
         checkNotNull(upload.navEksternRefId) { "Mangler navEksternRefId. Er ikke fil ferdig opplastet?" }
         checkNotNull(upload.filId) { "Mangler filId. Er ikke fil ferdig opplastet?" }

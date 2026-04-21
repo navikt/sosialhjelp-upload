@@ -33,6 +33,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.minutes
@@ -40,7 +41,8 @@ import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
-import org.postgresql.ds.PGSimpleDataSource
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import javax.sql.DataSource
 
 fun main(args: Array<String>) {
@@ -52,11 +54,18 @@ private fun getDataSource(config: ApplicationConfig): DataSource {
     val user = config.property("database.user").getString()
     val password = config.property("database.password").getString()
     val jdbcUrl = config.property("database.jdbcUrl").getString()
-    return PGSimpleDataSource().apply {
-        setUrl(jdbcUrl)
-        setUser(user)
-        setPassword(password)
-    }
+    return HikariDataSource(
+        HikariConfig().apply {
+            this.jdbcUrl = jdbcUrl
+            this.username = user
+            this.password = password
+            this.maximumPoolSize = 10
+            this.minimumIdle = 2
+            this.connectionTimeout = 30_000
+            this.idleTimeout = 600_000
+            this.maxLifetime = 1_800_000
+        },
+    )
 }
 
 private fun migrateDatabase(dataSource: DataSource, clean: Boolean) {
@@ -149,5 +158,12 @@ fun Application.module() {
             runCatching { retentionService.runRetention() }
                 .onFailure { log.warn("Retention sweep failed", it) }
         }
+    }
+
+    environment.monitor.subscribe(ApplicationStopped) {
+        processingScope.cancel()
+        notificationScope.cancel()
+        recoveryScope.cancel()
+        retentionScope.cancel()
     }
 }

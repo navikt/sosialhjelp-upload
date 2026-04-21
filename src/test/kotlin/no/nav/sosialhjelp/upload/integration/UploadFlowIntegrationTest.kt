@@ -36,6 +36,7 @@ import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.TestUtils.awaitSseEventCount
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
@@ -298,13 +299,13 @@ class UploadFlowIntegrationTest {
         createMockSubmission(PostgresTestContainer.dsl, contextId)
 
         val (sseJob, events) = collectSseEvents(contextId, token)
-        // Give SSE time to connect and receive the initial empty state
-        delay(300)
+        // Wait for SSE to connect and receive the initial empty state
+        awaitSseEventCount(events, 1, description = "initial SSE event")
 
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
         awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
-        // Give Postgres NOTIFY time to propagate to the SSE listener
-        delay(500)
+        // Wait for Postgres NOTIFY to propagate to the SSE listener
+        awaitSseEventCount(events, 2, description = "post-upload SSE event")
 
         sseJob.cancel()
 
