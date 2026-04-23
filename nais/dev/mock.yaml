@@ -35,6 +35,7 @@ spec:
       rules:
         - application: sosialhjelp-mock-alt-api-mock
         - application: sosialhjelp-konvertering-til-pdf
+        - application: sosialhjelp-texas-mock
     inbound:
       rules:
         - application: sosialhjelp-innsyn-mock
@@ -57,8 +58,6 @@ spec:
   env:
     - name: FIKS_URL
       value: "http://sosialhjelp-mock-alt-api-mock/sosialhjelp/mock-alt-api/fiks"
-    - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
-      value: "http://sosialhjelp-mock-alt-api-mock/sosialhjelp/mock-alt-api/fiks/dokumentlager"
     - name: GOTENBERG_URL
       value: "http://sosialhjelp-konvertering-til-pdf/forms/libreoffice/convert"
     - name: RUNTIME_ENV
@@ -71,4 +70,6 @@ spec:
       value: "https://sosiauth2.ekstern.dev.nav.no/default/jwks"
     - name: CLEAN_ON_START
       value: "true"
+    - name: NAIS_TOKEN_ENDPOINT
+      value: http://sosialhjelp-texas-mock/api/v1/token
 

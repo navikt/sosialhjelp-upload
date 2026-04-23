@@ -50,7 +50,6 @@ spec:
             envVarPrefix: POSTGRES
     buckets:
       - name: sosialhjelp-upload
-
         cascadingDelete: false
   resources:
     limits:
@@ -69,8 +68,6 @@ spec:
   env:
     - name: FIKS_URL
       value: "https://api.fiks.ks.no"
-    - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
-      value: "https://minside.fiks.ks.no"
     - name: CLAMAV_URL
       value: "http://clamav.nais-system/scan"
     - name: GOTENBERG_URL

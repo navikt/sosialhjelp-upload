@@ -69,8 +69,6 @@ spec:
   env:
     - name: FIKS_URL
       value: "https://api.fiks.test.ks.no"
-    - name: FIKS_DOKUMENTLAGER_ENDPOINT_URL
-      value: "https://minside.fiks.test.ks.no"
     - name: CLAMAV_URL
       value: "http://clamav.nais-system/scan"
     - name: GOTENBERG_URL
