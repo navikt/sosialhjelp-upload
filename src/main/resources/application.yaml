@@ -13,6 +13,7 @@ database:
   user: "$POSTGRES_USERNAME:postgres"
   password: "$POSTGRES_PASSWORD:postgres"
   jdbcUrl: "$POSTGRES_JDBC_URL:jdbc:postgresql://localhost:54322/sosialhjelp-upload"
+  cleanOnStart: "$CLEAN_ON_START:false"
 gotenberg:
   url: "$GOTENBERG_URL:http://localhost:3010/forms/libreoffice/convert"
 fiks:

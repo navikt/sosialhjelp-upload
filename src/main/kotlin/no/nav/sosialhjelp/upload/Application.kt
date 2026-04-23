@@ -59,19 +59,29 @@ private fun getDataSource(config: ApplicationConfig): DataSource {
     }
 }
 
-private fun migrateDatabase(dataSource: DataSource) {
+private fun migrateDatabase(dataSource: DataSource, clean: Boolean) {
     Flyway
         .configure()
         .dataSource(dataSource)
         .locations("db/migration")
         .validateMigrationNaming(true)
+        .also {
+            if (clean) {
+                it.cleanDisabled(false)
+            }
+        }
         .load()
+        .also {
+            if (clean) {
+                it.clean()
+            }
+        }
         .migrate()
 }
 
 fun Application.module() {
     val dataSource = getDataSource(environment.config)
-    migrateDatabase(dataSource)
+    migrateDatabase(dataSource, clean = environment.config.property("database.cleanOnStart").getString() == "true")
     val runtimeEnv = this@module.property<String>("runtimeEnv")
     val isLocal = runtimeEnv == "local"
     val isMock = runtimeEnv == "mock" || isLocal

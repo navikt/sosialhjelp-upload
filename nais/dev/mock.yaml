@@ -69,4 +69,6 @@ spec:
       value: "https://sosiauth2.ekstern.dev.nav.no/default"
     - name: IDPORTEN_JWKS_URI
       value: "https://sosiauth2.ekstern.dev.nav.no/default/jwks"
+    - name: CLEAN_ON_START
+      value: "true"
 

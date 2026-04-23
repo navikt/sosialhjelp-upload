@@ -50,6 +50,7 @@ spec:
             envVarPrefix: POSTGRES
     buckets:
       - name: sosialhjelp-upload
+
         cascadingDelete: false
   resources:
     limits:
