@@ -10,7 +10,6 @@ import javax.sql.DataSource
 
 object PostgresTestContainer {
     private val instance: PostgreSQLContainer<*> by lazy {
-            System.setProperty("api.version", "1.44");
             PostgreSQLContainer("postgres:17").apply {
                 withDatabaseName("testdb")
                 withUsername("test")
