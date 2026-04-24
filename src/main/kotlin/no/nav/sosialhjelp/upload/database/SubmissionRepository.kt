@@ -120,6 +120,20 @@ class SubmissionRepository(
 
         if (insertedId != null) return insertedId
 
+        // update fiksDigisosId if not set
+        if (fiksDigisosId != null) {
+            tx
+                .dsl()
+                .update(SUBMISSION)
+                .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
+                .where(
+                    SUBMISSION.CONTEXT_ID
+                        .eq(contextId)
+                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
+                        .and(SUBMISSION.FIKS_DIGISOS_ID.isNull),
+                ).execute()
+        }
+
         return tx
             .dsl()
             .select(SUBMISSION.ID)
