@@ -29,6 +29,7 @@ flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", versio
 jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
 jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
+jooq-kotlin-coroutines = { module = "org.jooq:jooq-kotlin-coroutines", version.ref = "jooq" }
 jooq-meta = { module = "org.jooq:jooq-meta", version.ref = "jooq" }
 junit-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -78,6 +79,7 @@ ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 jooq = [
     "jooq",
     "jooq-kotlin",
+    "jooq-kotlin-coroutines",
 ]
 junit = [
     "junit-api",

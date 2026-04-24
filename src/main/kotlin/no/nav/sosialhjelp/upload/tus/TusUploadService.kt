@@ -18,6 +18,7 @@ import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
+import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.security.MessageDigest
@@ -49,19 +50,43 @@ class TusUploadService(
         fiksDigisosId: String?,
         navEksternRefId: String?,
     ): UUID {
-        val eksternRef = navEksternRefId ?: fiksDigisosId?.let {
-            fiksClient.getNewNavEksternRefId(it, token)
-        } ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
         return try {
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident)
-                    submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)
-                    uploadRepository
-                        .create(tx, submissionId, filename, size)
-                        .also { meterRegistry.counter("upload.created").increment() }
-                        ?: error("Failed to create upload record")
+            dsl.transactionCoroutine { tx ->
+                // Acquire a per-fiksDigisosId advisory lock before deriving navEksternRefId.
+                // This serializes concurrent upload creations for the same case across all
+                // service instances, preventing two submissions from reading the same Fiks
+                // state and deriving the same navEksternRefId.
+                if (fiksDigisosId != null) {
+                    submissionRepository.acquireAdvisoryLock(tx, fiksDigisosId)
                 }
+
+                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId)
+
+                val eksternRef =
+                    // If navEksternRefId is already set on this submission (e.g. a second
+                    // upload on the same contextId), reuse it without calling Fiks.
+                    submissionRepository.getNavEksternRefIdByContextId(tx, contextId)
+                        ?: navEksternRefId
+                        ?: fiksDigisosId?.let {
+                            // Read the highest navEksternRefId stored locally for this
+                            // fiksDigisosId. This accounts for other in-flight submissions
+                            // that have been created locally but not yet submitted to Fiks,
+                            // and therefore don't appear in ettersendtInfoNAV.ettersendelser.
+                            val localMax = submissionRepository.getMaxNavEksternRefIdForFiksDigisosId(tx, it)
+                            // We intentionally call Fiks inside a DB transaction to keep the
+                            // lock → read-from-Fiks → write sequence atomic. The risk of
+                            // holding a DB connection across a network call is accepted here
+                            // because contention on the same fiksDigisosId is expected to be
+                            // near zero in practice (fiksDigisosId is unique per application).
+                            fiksClient.getNewNavEksternRefId(it, token, localMax)
+                        }
+                        ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
+
+                submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)
+                uploadRepository
+                    .create(tx, submissionId, filename, size)
+                    .also { meterRegistry.counter("upload.created").increment() }
+                    ?: error("Failed to create upload record")
             }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")

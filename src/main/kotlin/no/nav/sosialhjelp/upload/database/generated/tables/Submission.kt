@@ -90,6 +90,11 @@ open class Submission(
     val NAV_EKSTERN_REF_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("nav_ekstern_ref_id"), SQLDataType.VARCHAR(255).nullable(true), this, "")
 
     /**
+     * The column <code>public.submission.fiks_digisos_id</code>.
+     */
+    val FIKS_DIGISOS_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("fiks_digisos_id"), SQLDataType.VARCHAR(255).nullable(true), this, "")
+
+    /**
      * The column <code>public.submission.created_at</code>.
      */
     val CREATED_AT: TableField<SubmissionRecord, OffsetDateTime?> = createField(DSL.name("created_at"), SQLDataType.TIMESTAMPWITHTIMEZONE.nullable(false), this, "")

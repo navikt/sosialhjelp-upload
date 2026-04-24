@@ -207,25 +207,32 @@ class FiksClient(
                 }.body()
         }
 
-    suspend fun getNewNavEksternRefId(fiksDigisosId: String, token: String): String {
+    suspend fun getNewNavEksternRefId(fiksDigisosId: String, token: String, localMax: String? = null): String {
         val digisosSak = getSak(fiksDigisosId, token)
-        return lagNavEksternRefId(digisosSak)
+        return lagNavEksternRefId(digisosSak, localMax)
     }
 }
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
-    val previousId: String =
+private fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null): String {
+    val remoteMax: String? =
         digisosSak.ettersendtInfoNAV
             ?.ettersendelser
             ?.map { it.navEksternRefId }
             ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }
+
+    // Take the highest counter across remote Fiks state and local in-flight submissions.
+    // This ensures concurrent submissions that haven't been submitted to Fiks yet (and
+    // therefore don't appear in ettersendtInfoNAV.ettersendelser) are still accounted for.
+    val previousId: String =
+        listOfNotNull(remoteMax, localMax)
+            .maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }
             ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus("0000")
             ?: digisosSak.fiksDigisosId.plus("0000")
 
     val nesteSuffix = lagIdSuffix(previousId)
-    return (previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix))
+    return previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix)
 }
 
 private fun lagIdSuffix(previousId: String): String {

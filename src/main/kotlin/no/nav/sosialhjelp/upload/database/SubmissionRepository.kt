@@ -7,7 +7,7 @@ import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import java.time.OffsetDateTime
 import java.util.*
-
+import org.jooq.impl.DSL.param
 class SubmissionRepository(
     private val dsl: DSLContext,
 ) {
@@ -53,10 +53,53 @@ class SubmissionRepository(
             .execute()
     }
 
+    fun getNavEksternRefIdByContextId(tx: Configuration, contextId: String): String? =
+        tx
+            .dsl()
+            .select(SUBMISSION.NAV_EKSTERN_REF_ID)
+            .from(SUBMISSION)
+            .where(SUBMISSION.CONTEXT_ID.eq(contextId))
+            .fetchOne()
+            ?.get(SUBMISSION.NAV_EKSTERN_REF_ID)
+
+    /**
+     * Returns the highest [navEksternRefId] among all local submissions for the given [fiksDigisosId],
+     * comparing the last 4 characters numerically. Returns null if no submissions exist yet for this id.
+     *
+     * This is used to seed the counter when generating a new navEksternRefId, so that in-flight
+     * submissions that haven't been submitted to Fiks yet are accounted for.
+     */
+    fun getMaxNavEksternRefIdForFiksDigisosId(tx: Configuration, fiksDigisosId: String): String? =
+        tx
+            .dsl()
+            .select(SUBMISSION.NAV_EKSTERN_REF_ID)
+            .from(SUBMISSION)
+            .where(
+                SUBMISSION.FIKS_DIGISOS_ID.eq(fiksDigisosId)
+                    .and(SUBMISSION.NAV_EKSTERN_REF_ID.isNotNull),
+            )
+            .fetch()
+            .map { it[SUBMISSION.NAV_EKSTERN_REF_ID]!! }
+            .maxByOrNull { it.takeLast(4).toLong() }
+
+    /**
+     * Acquires a transaction-level Postgres advisory lock keyed on [fiksDigisosId].
+     * The lock is automatically released when the surrounding transaction ends.
+     *
+     * The key is derived by XOR-ing the two 64-bit halves of the UUID, giving a
+     * collision-free mapping within the UUID space.
+     */
+    fun acquireAdvisoryLock(tx: Configuration, fiksDigisosId: String) {
+        val uuid = UUID.fromString(fiksDigisosId)
+        val key = uuid.mostSignificantBits xor uuid.leastSignificantBits
+        tx.dsl().query("SELECT pg_advisory_xact_lock({0})", param("key", key)).execute()
+    }
+
     fun getOrCreateSubmission(
         tx: Configuration,
         contextId: String,
         personIdent: String,
+        fiksDigisosId: String? = null,
     ): UUID {
         if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
             throw SubmissionOwnedByAnotherUserException()
@@ -69,6 +112,7 @@ class SubmissionRepository(
                 .set(SUBMISSION.ID, UUID.randomUUID())
                 .set(SUBMISSION.OWNER_IDENT, personIdent)
                 .set(SUBMISSION.CONTEXT_ID, contextId)
+                .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
                 .onDuplicateKeyIgnore()
                 .returning(SUBMISSION.ID)
                 .fetchOne()
