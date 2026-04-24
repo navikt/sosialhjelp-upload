@@ -207,72 +207,79 @@ import java.security.cert.X509Certificate
 <span class="nc" id="L207">                }.body()</span>
 <span class="nc" id="L208">        }</span>
 
-<span class="nc" id="L210">    suspend fun getNewNavEksternRefId(fiksDigisosId: String, token: String): String {</span>
+<span class="nc" id="L210">    suspend fun getNewNavEksternRefId(fiksDigisosId: String, token: String, localMax: String? = null): String {</span>
 <span class="nc" id="L211">        val digisosSak = getSak(fiksDigisosId, token)</span>
-<span class="nc" id="L212">        return lagNavEksternRefId(digisosSak)</span>
+<span class="nc" id="L212">        return lagNavEksternRefId(digisosSak, localMax)</span>
     }
 }
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-private fun lagNavEksternRefId(digisosSak: DigisosSak): String {
-<span class="nc" id="L219">    val previousId: String =</span>
-<span class="nc bnc" id="L220" title="All 2 branches missed.">        digisosSak.ettersendtInfoNAV</span>
+<span class="nc" id="L218">private fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null): String {</span>
+<span class="nc" id="L219">    val remoteMax: String? =</span>
+<span class="nc" id="L220">        digisosSak.ettersendtInfoNAV</span>
 <span class="nc bnc" id="L221" title="All 2 branches missed.">            ?.ettersendelser</span>
 <span class="nc bnc" id="L222" title="All 2 branches missed.">            ?.map { it.navEksternRefId }</span>
 <span class="nc" id="L223">            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
-<span class="nc bnc" id="L224" title="All 4 branches missed.">            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
-<span class="nc" id="L225">            ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
 
-<span class="nc" id="L227">    val nesteSuffix = lagIdSuffix(previousId)</span>
-<span class="nc" id="L228">    return (previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix))</span>
+    // Take the highest counter across remote Fiks state and local in-flight submissions.
+    // This ensures concurrent submissions that haven't been submitted to Fiks yet (and
+    // therefore don't appear in ettersendtInfoNAV.ettersendelser) are still accounted for.
+<span class="nc" id="L228">    val previousId: String =</span>
+<span class="nc bnc" id="L229" title="All 4 branches missed.">        listOfNotNull(remoteMax, localMax)</span>
+<span class="nc" id="L230">            .maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
+<span class="nc bnc" id="L231" title="All 4 branches missed.">            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
+<span class="nc" id="L232">            ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
+
+<span class="nc" id="L234">    val nesteSuffix = lagIdSuffix(previousId)</span>
+<span class="nc" id="L235">    return previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix)</span>
 }
 
 private fun lagIdSuffix(previousId: String): String {
-<span class="nc" id="L232">    val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1</span>
-<span class="nc" id="L233">    return suffix.toString().padStart(4, '0')</span>
+<span class="nc" id="L239">    val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1</span>
+<span class="nc" id="L240">    return suffix.toString().padStart(4, '0')</span>
 }
 
 
-<span class="pc bnc" id="L237" title="All 2 branches missed.">@Serializable</span>
-<span class="pc" id="L238">data class Fil(val filnavn: String, val sha512: String)</span>
+<span class="pc bnc" id="L244" title="All 2 branches missed.">@Serializable</span>
+<span class="pc" id="L245">data class Fil(val filnavn: String, val sha512: String)</span>
 
 // AKA metadata
-<span class="nc bnc" id="L241" title="All 10 branches missed.">@Serializable</span>
-<span class="nc" id="L242">data class Vedlegg(</span>
-<span class="nc" id="L243">    val type: String,</span>
-<span class="nc" id="L244">    val tilleggsinfo: String,</span>
-<span class="nc" id="L245">    val klageId: String? = null,</span>
-<span class="nc" id="L246">    val status: Status?,</span>
-<span class="nc" id="L247">    val filer: List&lt;Fil&gt;,</span>
-<span class="nc" id="L248">    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,</span>
-<span class="nc" id="L249">    val hendelseReferanse: String?,</span>
-<span class="nc" id="L250">) {</span>
+<span class="nc bnc" id="L248" title="All 10 branches missed.">@Serializable</span>
+<span class="nc" id="L249">data class Vedlegg(</span>
+<span class="nc" id="L250">    val type: String,</span>
+<span class="nc" id="L251">    val tilleggsinfo: String,</span>
+<span class="nc" id="L252">    val klageId: String? = null,</span>
+<span class="nc" id="L253">    val status: Status?,</span>
+<span class="nc" id="L254">    val filer: List&lt;Fil&gt;,</span>
+<span class="nc" id="L255">    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,</span>
+<span class="nc" id="L256">    val hendelseReferanse: String?,</span>
+<span class="nc" id="L257">) {</span>
     enum class Status {
-<span class="nc" id="L252">        LastetOpp, VedleggKreves, VedleggAlleredeSendt</span>
+<span class="nc" id="L259">        LastetOpp, VedleggKreves, VedleggAlleredeSendt</span>
     }
 
-<span class="nc" id="L255">    enum class HendelseType(val value: String) {</span>
-<span class="nc" id="L256">        DOKUMENTASJON_ETTERSPURT(&quot;dokumentasjonEtterspurt&quot;),</span>
-<span class="nc" id="L257">        DOKUMENTASJONKRAV(&quot;dokumentasjonkrav&quot;),</span>
-<span class="nc" id="L258">        SOKNAD(&quot;soknad&quot;),</span>
-<span class="nc" id="L259">        BRUKER(&quot;bruker&quot;);</span>
+<span class="nc" id="L262">    enum class HendelseType(val value: String) {</span>
+<span class="nc" id="L263">        DOKUMENTASJON_ETTERSPURT(&quot;dokumentasjonEtterspurt&quot;),</span>
+<span class="nc" id="L264">        DOKUMENTASJONKRAV(&quot;dokumentasjonkrav&quot;),</span>
+<span class="nc" id="L265">        SOKNAD(&quot;soknad&quot;),</span>
+<span class="nc" id="L266">        BRUKER(&quot;bruker&quot;);</span>
 
         companion object {
             fun fromValue(value: String): HendelseType =
-<span class="nc bnc" id="L263" title="All 5 branches missed.">                when (value) {</span>
-<span class="nc" id="L264">                    &quot;dokumentasjonEtterspurt&quot; -&gt; DOKUMENTASJON_ETTERSPURT</span>
-<span class="nc" id="L265">                    &quot;dokumentasjonkrav&quot; -&gt; DOKUMENTASJONKRAV</span>
-<span class="nc" id="L266">                    &quot;soknad&quot; -&gt; SOKNAD</span>
-<span class="nc" id="L267">                    &quot;bruker&quot; -&gt; BRUKER</span>
-<span class="nc" id="L268">                    else -&gt; error(&quot;Unknown hendelse type: $value&quot;)</span>
-<span class="nc" id="L269">                }</span>
+<span class="nc bnc" id="L270" title="All 5 branches missed.">                when (value) {</span>
+<span class="nc" id="L271">                    &quot;dokumentasjonEtterspurt&quot; -&gt; DOKUMENTASJON_ETTERSPURT</span>
+<span class="nc" id="L272">                    &quot;dokumentasjonkrav&quot; -&gt; DOKUMENTASJONKRAV</span>
+<span class="nc" id="L273">                    &quot;soknad&quot; -&gt; SOKNAD</span>
+<span class="nc" id="L274">                    &quot;bruker&quot; -&gt; BRUKER</span>
+<span class="nc" id="L275">                    else -&gt; error(&quot;Unknown hendelse type: $value&quot;)</span>
+<span class="nc" id="L276">                }</span>
         }
     }
 }
 
-<span class="nc bnc" id="L274" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L275">data class VedleggSpesifikasjon(</span>
-<span class="nc" id="L276">    val vedlegg: List&lt;Vedlegg&gt;,</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L282">data class VedleggSpesifikasjon(</span>
+<span class="nc" id="L283">    val vedlegg: List&lt;Vedlegg&gt;,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
