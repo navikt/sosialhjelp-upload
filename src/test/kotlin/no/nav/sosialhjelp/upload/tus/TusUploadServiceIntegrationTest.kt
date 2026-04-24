@@ -290,5 +290,30 @@ class TusUploadServiceIntegrationTest {
             assertNull(row)
         }
 
+    @Test
+    fun `concurrent uploads on different contextIds with same fiksDigisosId get different navEksternRefIds`() =
+        runTest {
+            val fiksDigisosId = UUID.randomUUID().toString()
+            val contextId1 = UUID.randomUUID().toString()
+            val contextId2 = UUID.randomUUID().toString()
+            val personident = "12345678910"
+
+            // Both calls return the same remote Fiks state — simulating the real race where
+            // neither submission has been submitted to Fiks yet, so ettersendtInfoNAV.ettersendelser
+            // has not advanced. The fix must derive different IDs using the local DB counter.
+            coEvery { fiksClient.getNewNavEksternRefId(fiksDigisosId, any(), null) } returns "base-ref-0001"
+            coEvery { fiksClient.getNewNavEksternRefId(fiksDigisosId, any(), "base-ref-0001") } returns "base-ref-0002"
+
+            tusUploadService.create(contextId1, "file1.pdf", 100L, personident, "token", fiksDigisosId, null)
+            tusUploadService.create(contextId2, "file2.pdf", 100L, personident, "token", fiksDigisosId, null)
+
+            val ref1 = submissionRepository.getNavEksternRefIdByContextId(dsl.configuration(), contextId1)
+            val ref2 = submissionRepository.getNavEksternRefIdByContextId(dsl.configuration(), contextId2)
+
+            assertNotNull(ref1)
+            assertNotNull(ref2)
+            assertTrue(ref1 != ref2, "Expected different navEksternRefIds for different submissions, but both got: $ref1")
+        }
+
     // endregion
 }

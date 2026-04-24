@@ -38,15 +38,20 @@ open class SubmissionRecord() : TableRecordImpl<SubmissionRecord>(Submission.SUB
         set(value): Unit = set(4, value)
         get(): OffsetDateTime? = get(4) as OffsetDateTime?
 
+    open var fiksDigisosId: String?
+        set(value): Unit = set(5, value)
+        get(): String? = get(5) as String?
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null): this() {
+    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null): this() {
         this.id = id
         this.contextId = contextId
         this.ownerIdent = ownerIdent
         this.navEksternRefId = navEksternRefId
         this.createdAt = createdAt
+        this.fiksDigisosId = fiksDigisosId
         resetChangedOnNotNull()
     }
 }

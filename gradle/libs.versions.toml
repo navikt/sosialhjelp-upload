@@ -15,7 +15,7 @@ pdfbox = "3.0.6"
 postgres = "42.7.7"
 prometheus = "1.15.5"
 sosialhjelp_common = "1.20250120.1009-d88048d"
-testcontainers = "1.21.3"
+testcontainers = "2.0.5"
 tika = "3.2.3"
 opentelemetry = "1.46.0"
 google-cloud-storage = "2.51.0"
@@ -29,6 +29,7 @@ flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", versio
 jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
 jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
+jooq-kotlin-coroutines = { module = "org.jooq:jooq-kotlin-coroutines", version.ref = "jooq" }
 jooq-meta = { module = "org.jooq:jooq-meta", version.ref = "jooq" }
 junit-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -64,9 +65,8 @@ pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 xmpbox = { module = "org.apache.pdfbox:xmpbox", version.ref = "pdfbox" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgres" }
 sosialhjelp-common-api = { module = "no.nav.sosialhjelp:sosialhjelp-common-api", version.ref = "sosialhjelp_common" }
-testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
-testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
-testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "google-cloud-storage" }
 
 [plugins]
@@ -78,6 +78,7 @@ ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 jooq = [
     "jooq",
     "jooq-kotlin",
+    "jooq-kotlin-coroutines",
 ]
 junit = [
     "junit-api",
@@ -106,7 +107,6 @@ ktor = [
     "ktor-server-test-host",
 ]
 testcontainers = [
-    "testcontainers-core",
     "testcontainers-junit-jupiter",
     "testcontainers-postgresql",
 ]

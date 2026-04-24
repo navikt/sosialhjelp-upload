@@ -45,6 +45,19 @@ In CI they are set as `ORG_GRADLE_PROJECT_githubUser` and `ORG_GRADLE_PROJECT_gi
 
 All routes are under `/sosialhjelp/upload/` and protected by JWT (via Wonderwall), except `/internal/isAlive`.
 
+### Concurrent submissions
+
+Submissions can be created and have files uploaded concurrently. The `navEksternRefId` is assigned at **upload creation time** in `TusUploadService.create()`: if the caller does not supply a `navEksternRefId`, one is derived from Fiks via `FiksClient.getNewNavEksternRefId()` and immediately stored on the submission. It is reused for all subsequent uploads on the same submission without calling Fiks again.
+
+**The race condition and fix:** Without coordination, two uploads created in parallel for different `contextId`s but the same `fiksDigisosId` would both call `getNewNavEksternRefId()` against the same Fiks snapshot and receive the same `navEksternRefId` — because `ettersendtInfoNAV.ettersendelser` on the Fiks side only advances when an ettersendelse is actually *submitted*, not when uploads are created locally. This would cause files from both submissions to land on the same mellomlagring URL, corrupting data on the Fiks side.
+
+The fix uses two mechanisms together:
+
+1. **Postgres transaction-level advisory lock** (`pg_advisory_xact_lock`, keyed on `fiksDigisosId`) — serializes upload creations for the same case across all service instances.
+2. **Hybrid local + remote counter** — `getNewNavEksternRefId` takes an optional `localMax: String?` (the highest `navEksternRefId` already stored locally for this `fiksDigisosId`). The counter is derived from the max of the remote Fiks state and the local DB state, so in-flight submissions that haven't been submitted to Fiks yet are accounted for.
+
+`fiksDigisosId` is stored on the `submission` row at creation time to support the local counter query. Unused counter slots (submissions created but never submitted) are acceptable.
+
 ### Upload lifecycle
 
 1. Client POSTs to `/tus/files` → `TusRoutes` → `TusUploadService.create()` creates a DB record
