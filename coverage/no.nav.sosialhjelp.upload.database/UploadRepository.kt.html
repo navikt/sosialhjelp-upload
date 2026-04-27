@@ -77,7 +77,7 @@ enum class Status {
         uploadId: UUID,
         ownerIdent: String,
     ): Boolean =
-<span class="fc bfc" id="L80" title="All 2 branches covered.">        tx</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        tx</span>
 <span class="fc" id="L81">            .dsl()</span>
 <span class="fc" id="L82">            .selectCount()</span>
 <span class="fc" id="L83">            .from(UPLOAD)</span>
@@ -158,10 +158,10 @@ enum class Status {
 <span class="pc bpc" id="L158" title="1 of 2 branches missed.">        tx</span>
 <span class="fc" id="L159">            .dsl()</span>
 <span class="fc" id="L160">            .update(UPLOAD)</span>
-<span class="fc" id="L161">            .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)</span>
+<span class="fc" id="L161">            .set(UPLOAD.PROCESSING_STATUS, &quot;PROCESSING&quot;)</span>
 <span class="fc" id="L162">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
 <span class="fc" id="L163">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L164">            .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))</span>
+<span class="fc" id="L164">            .and(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
 <span class="fc" id="L165">            .execute() &gt; 0</span>
 
     fun getUploadForProcessing(
@@ -207,7 +207,7 @@ enum class Status {
 <span class="fc" id="L207">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
 <span class="fc" id="L208">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
 <span class="fc" id="L209">            .set(UPLOAD.SHA512, sha512)</span>
-<span class="fc" id="L210">            .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)</span>
+<span class="fc" id="L210">            .set(UPLOAD.PROCESSING_STATUS, &quot;COMPLETE&quot;)</span>
 <span class="fc" id="L211">            .setNull(UPLOAD.GCS_KEY)</span>
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
 <span class="fc" id="L213">            .where(UPLOAD.ID.eq(uploadId))</span>
@@ -221,7 +221,7 @@ enum class Status {
 <span class="fc" id="L221">        tx</span>
 <span class="fc" id="L222">            .dsl()</span>
 <span class="fc" id="L223">            .update(UPLOAD)</span>
-<span class="fc" id="L224">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
+<span class="fc" id="L224">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
 <span class="fc" id="L225">            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())</span>
 <span class="fc" id="L226">            .where(UPLOAD.ID.eq(uploadId))</span>
 <span class="fc" id="L227">            .execute()</span>
@@ -238,9 +238,9 @@ enum class Status {
 <span class="fc" id="L238">        tx</span>
 <span class="fc" id="L239">            .dsl()</span>
 <span class="fc" id="L240">            .update(UPLOAD)</span>
-<span class="fc" id="L241">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
+<span class="fc" id="L241">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
 <span class="fc" id="L242">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L243">            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name))</span>
+<span class="fc" id="L243">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PROCESSING&quot;))</span>
 <span class="fc" id="L244">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
 <span class="fc" id="L245">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
 <span class="fc" id="L246">            .fetch()</span>
@@ -259,9 +259,9 @@ enum class Status {
 <span class="fc" id="L259">        tx</span>
 <span class="fc" id="L260">            .dsl()</span>
 <span class="fc" id="L261">            .update(UPLOAD)</span>
-<span class="fc" id="L262">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
+<span class="fc" id="L262">            .set(UPLOAD.PROCESSING_STATUS, &quot;FAILED&quot;)</span>
 <span class="fc" id="L263">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L264">            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))</span>
+<span class="fc" id="L264">            .where(UPLOAD.PROCESSING_STATUS.eq(&quot;PENDING&quot;))</span>
 <span class="fc" id="L265">            .and(UPLOAD.UPLOAD_OFFSET.gt(0L))</span>
 <span class="fc" id="L266">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
 <span class="fc" id="L267">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>

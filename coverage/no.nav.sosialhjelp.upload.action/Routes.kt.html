@@ -32,7 +32,7 @@ fun Route.configureActionRoutes() {
 <span class="fc" id="L32">    route(&quot;/submission/{submissionId}&quot;) {</span>
 <span class="fc" id="L33">        verifySubmissionOwnership()</span>
 
-<span class="pc bpc" id="L35" title="7 of 8 branches missed.">        post(&quot;/submit&quot;) {</span>
+<span class="pc bpc" id="L35" title="6 of 7 branches missed.">        post(&quot;/submit&quot;) {</span>
 <span class="fc" id="L36">            val submissionId = call.attributes[VerifiedSubmissionId]</span>
 <span class="fc" id="L37">            val input = call.receive&lt;SubmitInput&gt;()</span>
 <span class="pc bpc" id="L38" title="1 of 2 branches missed.">            val fiksDigisosId = input.fiksDigisosId</span>
@@ -49,10 +49,8 @@ fun Route.configureActionRoutes() {
                 )
 <span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (result) {</span>
 <span class="fc" id="L51">                return@post call.respond(HttpStatusCode.Created)</span>
-            } else {
-<span class="nc" id="L53">                return@post call.respond(HttpStatusCode.BadGateway, &quot;Submission rejected by Fiks&quot;)</span>
             }
-        }
-<span class="fc" id="L56">    }</span>
-<span class="fc" id="L57">}</span>
+<span class="nc" id="L53">        }</span>
+<span class="fc" id="L54">    }</span>
+<span class="fc" id="L55">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
