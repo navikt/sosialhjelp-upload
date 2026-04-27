@@ -81,6 +81,7 @@ class DocumentRoutesTest {
         "fiks.integrasjonspassord" to "test-pass",
         "virus.scanner.url" to "",
         "texas.url" to "http://unused",
+        "database.cleanOnStart" to "true",
     )
 
     private fun appTest(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {

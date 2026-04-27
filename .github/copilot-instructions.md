@@ -115,15 +115,16 @@ When `runtimeEnv` is `local` or `mock`, `EncryptionServiceMock` is used instead 
 
 `src/main/resources/application.yaml` uses `$VAR:fallback` syntax for environment variable injection. Key variables:
 
-| Variable | Purpose |
-|----------|---------|
-| `RUNTIME_ENV` | `local`/`mock`/`dev`/`prod` — controls mock vs. real encryption |
-| `POSTGRES_JDBC_URL`, `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database |
-| `IDPORTEN_CLIENT_ID`, `IDPORTEN_ISSUER`, `IDPORTEN_JWKS_URI` | JWT auth |
-| `GOTENBERG_URL` | PDF conversion service |
-| `FIKS_URL`, `INTEGRASJONSID_FIKS`, `INTEGRASJONPASSORD_FIKS` | KS Fiks integration |
-| `CLAMAV_URL` | Virus scanning |
-| `NAIS_TOKEN_ENDPOINT` | Texas Maskinporten token endpoint |
+| Variable                                                      | Purpose                                                         |
+|---------------------------------------------------------------|-----------------------------------------------------------------|
+| `RUNTIME_ENV`                                                 | `local`/`mock`/`dev`/`prod` — controls mock vs. real encryption |
+| `POSTGRES_JDBC_URL`, `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database                                                        |
+| `IDPORTEN_CLIENT_ID`, `IDPORTEN_ISSUER`, `IDPORTEN_JWKS_URI`  | JWT auth                                                        |
+| `GOTENBERG_URL`                                               | PDF conversion service                                          |
+| `FIKS_URL`, `INTEGRASJONSID_FIKS`, `INTEGRASJONPASSORD_FIKS`  | KS Fiks integration                                             |
+| `CLAMAV_URL`                                                  | Virus scanning                                                  |
+| `NAIS_TOKEN_ENDPOINT`                                         | Texas Maskinporten token endpoint                               |
+| `CLEAN_ON_START`                                              | Whether or not to clean database on startup                     |
 
 ## Security
 

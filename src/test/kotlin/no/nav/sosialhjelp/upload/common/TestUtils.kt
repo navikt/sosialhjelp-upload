@@ -61,5 +61,22 @@ object TestUtils {
         }
         error("Expected at least $minCount $description within ${timeoutMs}ms, but only got ${events.size}")
     }
+
+    /**
+     * Blocks until [events] contains at least one entry matching [predicate], or throws if [timeoutMs] elapses.
+     */
+    fun <T> awaitSseEvent(
+        events: List<T>,
+        timeoutMs: Long = 10_000L,
+        description: String = "matching event",
+        predicate: (T) -> Boolean,
+    ) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (events.any(predicate)) return
+            Thread.sleep(50)
+        }
+        error("No $description arrived within ${timeoutMs}ms (got ${events.size} events)")
+    }
 }
 
