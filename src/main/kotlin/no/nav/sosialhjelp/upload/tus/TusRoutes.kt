@@ -144,7 +144,7 @@ fun Route.configureTusRoutes(basePath: String) {
  * Parses the Upload-Metadata header.
  * Format: "key base64value, key base64value"
  */
-private fun parseMetadata(header: String?): Map<String, String> {
+internal fun parseMetadata(header: String?): Map<String, String> {
     if (header.isNullOrBlank()) return emptyMap()
     return header
         .split(",")

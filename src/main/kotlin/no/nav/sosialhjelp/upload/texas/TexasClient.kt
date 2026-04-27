@@ -15,6 +15,7 @@ import io.ktor.server.plugins.di.annotations.Property
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
+import java.time.Instant
 
 class TexasClient(
     @Property("texas.url") val texasUrl: String,
@@ -29,7 +30,18 @@ class TexasClient(
         }
     }
 
+    @Volatile private var cachedToken: String? = null
+    @Volatile private var tokenExpiresAt: Instant = Instant.MIN
+
     suspend fun getMaskinportenToken(): String {
+        val now = Instant.now()
+        cachedToken?.let { token ->
+            if (now.isBefore(tokenExpiresAt)) return token
+        }
+        return fetchAndCacheToken()
+    }
+
+    private suspend fun fetchAndCacheToken(): String {
         val response =
             client
                 .post(texasUrl) {
@@ -44,6 +56,9 @@ class TexasClient(
                 response.body<TokenResponse.Error>()
             }
         if (body is TokenResponse.Success) {
+            cachedToken = body.accessToken
+            // Subtract 30s buffer to avoid using a token that expires in transit
+            tokenExpiresAt = Instant.now().plusSeconds(body.expiresInSeconds.toLong() - 30)
             return body.accessToken
         } else {
             logger.error("Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}")

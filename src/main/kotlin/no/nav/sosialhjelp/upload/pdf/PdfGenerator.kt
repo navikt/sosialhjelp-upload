@@ -13,6 +13,7 @@ import org.apache.pdfbox.pdmodel.graphics.color.PDOutputIntent
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
 import org.apache.xmpbox.XMPMetadata
 import org.apache.xmpbox.xml.XmpSerializer
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
@@ -20,6 +21,7 @@ import java.io.InputStream
 class PdfGenerator internal constructor(
     private var document: PDDocument,
 ) {
+    private val logger = LoggerFactory.getLogger(PdfGenerator::class.java)
     private var currentPage = PDPage(PDRectangle.A4)
     private var currentStream: PDPageContentStream
     private var y: Float
@@ -203,9 +205,8 @@ class PdfGenerator internal constructor(
             if (inputStream != null) {
                 return inputStream.use { it.readAllBytes() }
             }
-        } catch (e: IOException) {
-            // FIXME: Handle it
-            e.printStackTrace()
+    } catch (e: IOException) {
+            logger.error("Failed to load NAV logo from resources", e)
         }
         return ByteArray(0)
     }

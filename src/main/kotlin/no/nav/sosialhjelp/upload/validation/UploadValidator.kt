@@ -38,6 +38,7 @@ class UploadValidator(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val tika = Tika()
 
     suspend fun validate(
         filename: String,
@@ -83,7 +84,7 @@ class UploadValidator(
 
     private suspend fun validateFileType(data: ByteArray): Pair<String, Validation?> =
         withContext(ioDispatcher) {
-            val mimeType = Tika().detect(data.inputStream())
+            val mimeType = tika.detect(data.inputStream())
             if (mimeType !in SUPPORTED_MIME_TYPES) {
                 return@withContext mimeType to FileTypeValidation(actual = mimeType)
             }

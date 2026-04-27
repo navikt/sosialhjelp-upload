@@ -21,7 +21,7 @@ fun Application.configureStatusPages() {
         }
         exception<Throwable> { call, cause ->
             this@configureStatusPages.environment.log.error("Got error on call to ${call.request.uri}", cause)
-            call.respondText(text = "500: $cause", status = HttpStatusCode.InternalServerError)
+            call.respondText(text = "Internal Server Error", status = HttpStatusCode.InternalServerError)
         }
     }
 }

@@ -36,6 +36,8 @@ import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.TestUtils.awaitSseEvent
+import no.nav.sosialhjelp.upload.common.TestUtils.awaitSseEventCount
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
@@ -60,6 +62,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UploadFlowIntegrationTest {
@@ -298,13 +301,15 @@ class UploadFlowIntegrationTest {
         createMockSubmission(PostgresTestContainer.dsl, contextId)
 
         val (sseJob, events) = collectSseEvents(contextId, token)
-        // Give SSE time to connect and receive the initial empty state
-        delay(300)
+        // Wait for SSE to connect and receive the initial empty state
+        awaitSseEventCount(events, 1, description = "initial SSE event")
 
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
         awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
-        // Give Postgres NOTIFY time to propagate to the SSE listener
-        delay(500)
+        // Wait for Postgres NOTIFY to propagate to the SSE listener with COMPLETE status
+        awaitSseEvent(events, description = "COMPLETE SSE event") { event ->
+            event.uploads.any { it.status == UploadDto.Status.COMPLETE }
+        }
 
         sseJob.cancel()
 
@@ -313,7 +318,7 @@ class UploadFlowIntegrationTest {
         val initial = events.first()
         assertTrue(initial.uploads.isEmpty(), "Initial SSE event should have no uploads")
 
-        val final = events.last()
+        val final = events.last { it.uploads.any { u -> u.status == UploadDto.Status.COMPLETE } }
         assertEquals(1, final.uploads.size, "Final SSE event should contain the uploaded file")
         assertEquals(filId, final.uploads.first().filId, "Upload filId should match mellomlagring response")
         assertEquals(UploadDto.Status.COMPLETE, final.uploads.first().status)
@@ -329,19 +334,19 @@ class UploadFlowIntegrationTest {
         createMockSubmission(PostgresTestContainer.dsl, contextId)
 
         val (sseJob, events) = collectSseEvents(contextId, token)
-        delay(300)
+        delay(300.milliseconds)
 
         // Upload
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
         awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
-        delay(300)
+        delay(300.milliseconds)
 
         // Delete
         client.delete("/sosialhjelp/upload/tus/files/$uploadId") {
             header("Authorization", "Bearer $token")
             header("Tus-Resumable", "1.0.0")
         }
-        delay(500)
+        delay(500.milliseconds)
 
         sseJob.cancel()
 
@@ -374,7 +379,7 @@ class UploadFlowIntegrationTest {
         coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } answers {
             val filer = arg<List<no.nav.sosialhjelp.upload.action.fiks.Fil>>(5)
             val filenames = filer.map { it.filnavn }
-            mockk<io.ktor.client.statement.HttpResponse> {
+            mockk<HttpResponse> {
                 every { status } returns if (filenames.size != filenames.distinct().size) {
                     HttpStatusCode.BadRequest
                 } else {
@@ -416,9 +421,6 @@ class UploadFlowIntegrationTest {
         }
 
         assertEquals(HttpStatusCode.OK, statusCode)
-        assertTrue(
-            contentTypeHeader?.contains("text/event-stream") == true,
-            "Expected text/event-stream but got: $contentTypeHeader",
-        )
+        assertEquals(contentTypeHeader?.contains("text/event-stream"), true, "Expected text/event-stream but got: $contentTypeHeader")
     }
 }

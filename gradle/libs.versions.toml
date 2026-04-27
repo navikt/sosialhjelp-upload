@@ -4,6 +4,7 @@ coroutines = "1.10.2"
 fiks_kryptering = "2.2.2"
 flyway = "12.4.0"
 google-cloud-storage = "2.67.0"
+hikari = "6.3.0"
 jdbc = "42.7.8"
 jooq = "3.21.2"
 junit = "6.0.3"
@@ -26,6 +27,7 @@ bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "boun
 fiks-kryptering = { module = "no.ks.fiks:kryptering", version.ref = "fiks_kryptering" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "google-cloud-storage" }
 jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
@@ -39,9 +41,11 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "coroutines" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-serialization-jackson = { module = "io.ktor:ktor-serialization-jackson", version.ref = "ktor" }
 ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
 ktor-server-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
 ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
@@ -86,7 +90,7 @@ junit = [
     "junit-jupiter",
 ]
 ktor = [
-    "ktor-client-cio",
+    "ktor-client-content-negotiation",
     "ktor-client-core",
     "ktor-client-logging",
     "ktor-serialization-kotlinx-json",

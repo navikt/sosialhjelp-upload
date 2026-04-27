@@ -7,7 +7,7 @@ plugins {
     id("nl.littlerobots.version-catalog-update") version "1.0.0"
     id("org.jooq.jooq-codegen-gradle") version libs.versions.jooq
     id("jacoco")
-    id("org.sonarqube") version "3.5.0.2730"
+    id("org.sonarqube") version "7.2.3.7755"
 }
 
 group = "no.nav.sosialhjelp"
@@ -69,11 +69,12 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.postgresql)
     implementation(libs.jdbc.postgresql)
+    implementation(libs.hikari)
 
     implementation(libs.bundles.jooq)
-    implementation("io.ktor:ktor-client-cio-jvm:3.2.3")
-    implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
-    implementation("io.ktor:ktor-serialization-jackson:3.2.3")
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.jackson)
     implementation(libs.ktor.client.logging)
 
     implementation(libs.google.cloud.storage)
