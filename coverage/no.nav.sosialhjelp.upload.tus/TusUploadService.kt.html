@@ -271,7 +271,9 @@ fun getSha512(data: ByteArray): String {
 <span class="fc" id="L271">    val md = MessageDigest.getInstance(&quot;SHA-512&quot;)</span>
 <span class="fc" id="L272">    md.update(data)</span>
 <span class="fc" id="L273">    val digest = md.digest()</span>
-<span class="fc" id="L274">    return digest.fold(&quot;&quot;) { str, it -&gt; str + &quot;%02x&quot;.format(it) }</span>
+<span class="fc" id="L274">    return buildString(digest.size * 2) {</span>
+<span class="fc" id="L275">        digest.forEach { append(&quot;%02x&quot;.format(it)) }</span>
+<span class="fc" id="L276">    }</span>
 }
 
 /**
@@ -284,10 +286,10 @@ fun getSha512(data: ByteArray): String {
  *   &quot;a&quot;.repeat(60) + &quot;.pdf&quot; → &quot;a&quot;.repeat(50) + &quot;-b1f7f6d1.pdf&quot;
  */
 internal fun makeUniqueMellomlagringFilename(filename: String, uploadId: UUID): String {
-<span class="fc" id="L287">    val file = File(filename)</span>
-<span class="fc" id="L288">    val extension = file.extension</span>
-<span class="fc" id="L289">    val baseName = file.nameWithoutExtension.take(50)</span>
-<span class="fc" id="L290">    val uuidSuffix = uploadId.toString().substringBefore('-')</span>
-<span class="pc bpc" id="L291" title="2 of 4 branches missed.">    return if (extension.isNotEmpty()) &quot;$baseName-$uuidSuffix.$extension&quot; else &quot;$baseName-$uuidSuffix&quot;</span>
+<span class="fc" id="L289">    val file = File(filename)</span>
+<span class="fc" id="L290">    val extension = file.extension</span>
+<span class="fc" id="L291">    val baseName = file.nameWithoutExtension.take(50)</span>
+<span class="fc" id="L292">    val uuidSuffix = uploadId.toString().substringBefore('-')</span>
+<span class="pc bpc" id="L293" title="2 of 4 branches missed.">    return if (extension.isNotEmpty()) &quot;$baseName-$uuidSuffix.$extension&quot; else &quot;$baseName-$uuidSuffix&quot;</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

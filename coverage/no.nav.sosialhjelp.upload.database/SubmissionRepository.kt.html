@@ -179,7 +179,7 @@ import org.jooq.impl.DSL.param
 <span class="fc" id="L179">                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
 <span class="fc" id="L180">                ).fetchOne()</span>
 <span class="pc bpc" id="L181" title="1 of 2 branches missed.">                ?.value1()</span>
-<span class="pc bpc" id="L182" title="2 of 4 branches missed.">        return count != 0</span>
+<span class="pc bpc" id="L182" title="2 of 4 branches missed.">        return (count ?: 0) != 0</span>
     }
 
     fun cleanup(

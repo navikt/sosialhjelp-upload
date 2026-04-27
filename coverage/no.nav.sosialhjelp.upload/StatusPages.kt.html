@@ -21,7 +21,7 @@ fun Application.configureStatusPages() {
 <span class="nc" id="L21">        }</span>
 <span class="pc bnc" id="L22" title="All 3 branches missed.">        exception&lt;Throwable&gt; { call, cause -&gt;</span>
 <span class="nc" id="L23">            this@configureStatusPages.environment.log.error(&quot;Got error on call to ${call.request.uri}&quot;, cause)</span>
-<span class="nc bnc" id="L24" title="All 2 branches missed.">            call.respondText(text = &quot;500: $cause&quot;, status = HttpStatusCode.InternalServerError)</span>
+<span class="nc bnc" id="L24" title="All 2 branches missed.">            call.respondText(text = &quot;Internal Server Error&quot;, status = HttpStatusCode.InternalServerError)</span>
 <span class="nc" id="L25">        }</span>
 <span class="fc" id="L26">    }</span>
 <span class="fc" id="L27">}</span>

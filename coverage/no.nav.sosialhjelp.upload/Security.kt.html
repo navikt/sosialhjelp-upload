@@ -36,7 +36,7 @@ fun Application.configureSecurity() {
 <span class="fc" id="L36">                        .asString()</span>
 <span class="fc" id="L37">                        .lowercase()</span>
                 ) {
-<span class="nc" id="L39">                    this@configureSecurity.log.warn(&quot;Wrong acr in JWT. Was ${credential.payload.getClaim(&quot;acr&quot;).asString()}&quot;)</span>
+<span class="nc" id="L39">                    this@configureSecurity.log.warn(&quot;Wrong acr level in JWT&quot;)</span>
 <span class="nc" id="L40">                    return@validate null</span>
                 }
 <span class="fc" id="L42">                val subject = credential.payload.subject</span>
