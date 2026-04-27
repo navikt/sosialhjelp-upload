@@ -215,29 +215,29 @@ import java.security.cert.X509Certificate
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-<span class="nc" id="L218">private fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null): String {</span>
-<span class="nc" id="L219">    val remoteMax: String? =</span>
-<span class="nc" id="L220">        digisosSak.ettersendtInfoNAV</span>
-<span class="nc bnc" id="L221" title="All 2 branches missed.">            ?.ettersendelser</span>
-<span class="nc bnc" id="L222" title="All 2 branches missed.">            ?.map { it.navEksternRefId }</span>
-<span class="nc" id="L223">            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
+<span class="fc" id="L218">internal fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null): String {</span>
+<span class="fc" id="L219">    val remoteMax: String? =</span>
+<span class="fc" id="L220">        digisosSak.ettersendtInfoNAV</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            ?.ettersendelser</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            ?.map { it.navEksternRefId }</span>
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L }</span>
 
     // Take the highest counter across remote Fiks state and local in-flight submissions.
     // This ensures concurrent submissions that haven't been submitted to Fiks yet (and
     // therefore don't appear in ettersendtInfoNAV.ettersendelser) are still accounted for.
-<span class="nc" id="L228">    val previousId: String =</span>
-<span class="nc bnc" id="L229" title="All 4 branches missed.">        listOfNotNull(remoteMax, localMax)</span>
-<span class="nc" id="L230">            .maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
-<span class="nc bnc" id="L231" title="All 4 branches missed.">            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
-<span class="nc" id="L232">            ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
+<span class="fc" id="L228">    val previousId: String =</span>
+<span class="fc bfc" id="L229" title="All 4 branches covered.">        listOfNotNull(remoteMax, localMax)</span>
+<span class="pc" id="L230">            .maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
+<span class="fc bfc" id="L231" title="All 4 branches covered.">            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
+<span class="fc" id="L232">            ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
 
-<span class="nc" id="L234">    val nesteSuffix = lagIdSuffix(previousId)</span>
-<span class="nc" id="L235">    return previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix)</span>
+<span class="fc" id="L234">    val nesteSuffix = lagIdSuffix(previousId)</span>
+<span class="fc" id="L235">    return previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix)</span>
 }
 
-private fun lagIdSuffix(previousId: String): String {
-<span class="nc" id="L239">    val suffix = previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLong() + 1</span>
-<span class="nc" id="L240">    return suffix.toString().padStart(4, '0')</span>
+internal fun lagIdSuffix(previousId: String): String {
+<span class="fc bfc" id="L239" title="All 2 branches covered.">    val suffix = (previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L) + 1</span>
+<span class="fc" id="L240">    return suffix.toString().padStart(4, '0')</span>
 }
 
 
