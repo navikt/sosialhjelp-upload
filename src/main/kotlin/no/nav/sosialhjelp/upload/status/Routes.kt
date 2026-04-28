@@ -11,9 +11,10 @@ import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.database.notify.SubmissionUpdateNotification
-import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -50,25 +51,13 @@ fun Route.configureStatusRoutes() {
 
             send(submissionService.getSubmissionStatus(submissionId))
 
-            statusChannelFactory.getSubmissionFlow(submissionId).collect {
-                when (it) {
-                    SubmissionUpdateNotification.UpdateType.UPDATE -> {
+            statusChannelFactory.getSubmissionFlow(submissionId)
+                .onEach {
+                    if (it == SubmissionUpdateNotification.UpdateType.UPDATE) {
                         send(submissionService.getSubmissionStatus(submissionId))
                     }
-
-                    SubmissionUpdateNotification.UpdateType.DELETE -> {
-                        send(
-                            SubmissionState(
-                                status = SubmissionState.Status.DELETED,
-                                submissionId = submissionId.toString(),
-                                uploads = emptyList(),
-                                validations = emptyList(),
-                            )
-                        )
-                        return@collect
-                    }
                 }
-            }
+                .first { it == SubmissionUpdateNotification.UpdateType.DELETE }
         } finally {
             activeConnections.decrementAndGet()
         }

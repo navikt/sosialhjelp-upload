@@ -364,6 +364,68 @@ class UploadFlowIntegrationTest {
     }
 
     @Test
+    fun `after submit and reconnect, new SSE stream receives updates for new uploads`() = appTest {
+        val contextId = UUID.randomUUID().toString()
+        val token = JwtTestUtils.issueToken()
+        val fiksDigisosId = UUID.randomUUID().toString()
+
+        coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returnsMany
+            listOf(UUID.randomUUID(), UUID.randomUUID())
+
+        val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
+        coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak
+        coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } returns mockk<HttpResponse> {
+            every { status } returns HttpStatusCode.OK
+        }
+
+        // 1. Create initial submission and connect SSE
+        val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+        val (sseJob1, events1) = collectSseEvents(contextId, token)
+        awaitSseEventCount(events1, 1, description = "initial SSE event")
+
+        // 2. Upload a file and verify SSE receives the update
+        val uploadId1 = tusUpload(client, contextId, minimalPdf(), token)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId1)
+        awaitSseEvent(events1, description = "first upload COMPLETE") { event ->
+            event.uploads.any { it.status == UploadDto.Status.COMPLETE }
+        }
+
+        // 3. Submit — this deletes the submission, triggering a DELETE notification
+        val submitResp = client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+            header("Authorization", "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody("""{"fiksDigisosId":"$fiksDigisosId","metadata":{"type":"dok","tilleggsinfo":"info"}}""")
+        }
+        assertEquals(HttpStatusCode.Created, submitResp.status)
+
+        // 4. The first SSE stream should close on its own (server returns on DELETE)
+        kotlinx.coroutines.withTimeout(10_000) { sseJob1.join() }
+
+        // 5. Reconnect — simulates the frontend's automatic reconnection
+        val (sseJob2, events2) = collectSseEvents(contextId, token)
+        awaitSseEventCount(events2, 1, description = "reconnect initial SSE event")
+
+        // The reconnect should create a new submission with an empty state
+        val reconnectInitial = events2.first()
+        assertTrue(reconnectInitial.uploads.isEmpty(), "Reconnect initial state should have no uploads")
+
+        // 6. Upload a second file on the new submission
+        val uploadId2 = tusUpload(client, contextId, minimalPdf(), token, filename = "second.pdf")
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId2)
+
+        // 7. Verify the second SSE stream receives the update for the new upload
+        awaitSseEvent(events2, description = "second upload COMPLETE on reconnected stream") { event ->
+            event.uploads.any { it.status == UploadDto.Status.COMPLETE }
+        }
+
+        sseJob2.cancel()
+
+        val finalEvent = events2.last { it.uploads.any { u -> u.status == UploadDto.Status.COMPLETE } }
+        assertEquals(1, finalEvent.uploads.size, "Reconnected stream should show exactly one upload")
+        assertEquals(UploadDto.Status.COMPLETE, finalEvent.uploads.first().status)
+    }
+
+    @Test
     fun `submit returns error when Fiks rejects duplicate file names with 400`() = appTest {
         val contextId = UUID.randomUUID().toString()
         val token = JwtTestUtils.issueToken()

@@ -38,7 +38,7 @@ class RetentionServiceIntegrationTest {
     }
 
     private fun retentionService(timeout: Duration = Duration.ofSeconds(1)) =
-        RetentionService(dsl, submissionRepository, uploadRepository, mellomlagringClient, chunkStorage, SimpleMeterRegistry(), timeout)
+        RetentionService(dsl, submissionRepository, uploadRepository, mellomlagringClient, chunkStorage, mockk(relaxed = true), SimpleMeterRegistry(), timeout)
 
     @Test
     fun `stale submissions are deleted after retention period`() {

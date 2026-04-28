@@ -46,26 +46,21 @@ class SubmissionNotificationService(
                 try {
                     withContext(ioDispatcher) {
                         dataSource.connection.use { conn ->
-                            val pgConnUpdates = conn.unwrap(PGConnection::class.java)
+                            val pgConn = conn.unwrap(PGConnection::class.java)
                             conn.createStatement().execute("LISTEN submission_update")
-                            log.info("LISTEN connection established")
-                            val pgConnDeletes = conn.unwrap(PGConnection::class.java)
                             conn.createStatement().execute("LISTEN submission_delete")
                             log.info("LISTEN connection established")
                             while (true) {
-                                val updateNotifications = pgConnUpdates.getNotifications(500) ?: emptyArray()
-                                updateNotifications.forEach { notification ->
+                                val notifications = pgConn.getNotifications(500) ?: emptyArray()
+                                notifications.forEach { notification ->
+                                    val type = when (notification.name) {
+                                        "submission_delete" -> SubmissionUpdateNotification.UpdateType.DELETE
+                                        "submission_update" -> SubmissionUpdateNotification.UpdateType.UPDATE
+                                        else -> error("Unsupported notification name ${notification.name}")
+                                    }
                                     runCatching { UUID.fromString(notification.parameter) }
                                         .getOrNull()
-                                        ?.let { _updates.tryEmit(SubmissionUpdateNotification(it, type = SubmissionUpdateNotification.UpdateType.UPDATE)) }
-                                }
-                                val deleteNotifications = pgConnDeletes.getNotifications(500) ?: emptyArray()
-                                deleteNotifications.forEach { notification ->
-                                    runCatching { UUID.fromString(notification.parameter) }
-                                        .getOrNull()
-                                        ?.let {
-                                            _updates.tryEmit(SubmissionUpdateNotification(it, type = SubmissionUpdateNotification.UpdateType.DELETE))
-                                        }
+                                        ?.let { _updates.tryEmit(SubmissionUpdateNotification(it, type = type)) }
                                 }
                             }
                         }
