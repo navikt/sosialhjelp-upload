@@ -68,7 +68,7 @@ class SubmissionService(
                 uploads.toList(),
                 validations = listOfNotNull(
                     if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,
-                    if (totalTooLarge) ValidationCode.TOTAL_TOO_LARGE else null,
+                    if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,
                 ),
             )
         }

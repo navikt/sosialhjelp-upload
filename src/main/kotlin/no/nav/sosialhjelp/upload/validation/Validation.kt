@@ -10,7 +10,7 @@ enum class ValidationCode {
     FILETYPE_NOT_SUPPORTED,
     ENCRYPTED_PDF,
     INVALID_PDF,
-    TOTAL_TOO_LARGE,
+    TOTAL_SIZE_TOO_LARGE,
     TOO_MANY_FILES,
     ;
 
