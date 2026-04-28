@@ -88,7 +88,7 @@ import kotlin.time.toJavaDuration
 <span class="fc" id="L88">                    submissionRepository.cleanup(tx, submissionId)</span>
 <span class="fc" id="L89">                }</span>
             }
-<span class="fc" id="L91">            notificationService.notifyUpdate(submissionId)</span>
+<span class="fc" id="L91">            notificationService.notifyDeleted(submissionId)</span>
 <span class="fc" id="L92">            return true</span>
         }
 <span class="nc" id="L94">        return false</span>

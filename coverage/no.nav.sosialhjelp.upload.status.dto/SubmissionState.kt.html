@@ -9,5 +9,10 @@ import no.nav.sosialhjelp.upload.validation.ValidationCode
 <span class="fc" id="L9">    val uploads: List&lt;UploadDto&gt;,</span>
 <span class="pc" id="L10">    val error: String? = null,</span>
 <span class="pc" id="L11">    val validations: List&lt;ValidationCode&gt;,</span>
-<span class="fc" id="L12">)</span>
+<span class="fc" id="L12">    val status: Status,</span>
+<span class="fc" id="L13">) {</span>
+    enum class Status {
+<span class="fc" id="L15">        DELETED, ACTIVE</span>
+    }
+}
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
