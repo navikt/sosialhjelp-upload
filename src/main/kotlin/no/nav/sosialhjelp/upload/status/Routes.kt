@@ -1,10 +1,8 @@
 package no.nav.sosialhjelp.upload.status
 
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
@@ -14,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import no.nav.sosialhjelp.upload.database.notify.SubmissionUpdateNotification
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -51,7 +50,14 @@ fun Route.configureStatusRoutes() {
             send(submissionService.getSubmissionStatus(submissionId))
 
             statusChannelFactory.getSubmissionFlow(submissionId).collect {
-                send(submissionService.getSubmissionStatus(submissionId))
+                when (it) {
+                    SubmissionUpdateNotification.UpdateType.UPDATE -> {
+                        send(submissionService.getSubmissionStatus(submissionId))
+                    }
+                    SubmissionUpdateNotification.UpdateType.DELETE -> {
+
+                    }
+                }
             }
         } finally {
             activeConnections.decrementAndGet()

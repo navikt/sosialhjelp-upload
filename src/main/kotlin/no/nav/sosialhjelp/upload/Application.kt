@@ -160,7 +160,7 @@ fun Application.module() {
         }
     }
 
-    environment.monitor.subscribe(ApplicationStopped) {
+    monitor.subscribe(ApplicationStopped) {
         processingScope.cancel()
         notificationScope.cancel()
         recoveryScope.cancel()
