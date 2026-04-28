@@ -48,6 +48,7 @@ spec:
             envVarPrefix: POSTGRES
     buckets:
       - name: sosialhjelp-upload-mock
+        retentionPeriodDays: 1
         cascadingDelete: false
   resources:
     limits:

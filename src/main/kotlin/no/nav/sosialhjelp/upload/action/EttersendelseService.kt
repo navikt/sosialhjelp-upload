@@ -88,7 +88,7 @@ class EttersendelseService(
                     submissionRepository.cleanup(tx, submissionId)
                 }
             }
-            notificationService.notifyUpdate(submissionId)
+            notificationService.notifyDeleted(submissionId)
             return true
         }
         return false

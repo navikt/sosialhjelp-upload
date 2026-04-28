@@ -7,12 +7,12 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.storage.ChunkStorage
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.OffsetDateTime
-import java.time.temporal.ChronoUnit
 
 class RetentionService(
     private val dsl: DSLContext,
@@ -20,6 +20,7 @@ class RetentionService(
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
+    private val notificationService: SubmissionNotificationService,
     private val meterRegistry: MeterRegistry,
     private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -68,7 +69,9 @@ class RetentionService(
             // a dangling DB row that would cause repeated failed deletions on retry.
             withContext(ioDispatcher) {
                 dsl.transaction { tx -> submissionRepository.cleanup(tx, submission.id) }
+                notificationService.notifyDeleted(submission.id)
             }
+
             mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)
 
             gcsKeys.forEach { gcsKey ->
