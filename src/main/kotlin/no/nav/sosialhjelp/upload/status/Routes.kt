@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.database.notify.SubmissionUpdateNotification
+import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -54,8 +55,17 @@ fun Route.configureStatusRoutes() {
                     SubmissionUpdateNotification.UpdateType.UPDATE -> {
                         send(submissionService.getSubmissionStatus(submissionId))
                     }
-                    SubmissionUpdateNotification.UpdateType.DELETE -> {
 
+                    SubmissionUpdateNotification.UpdateType.DELETE -> {
+                        send(
+                            SubmissionState(
+                                status = SubmissionState.Status.DELETED,
+                                submissionId = submissionId.toString(),
+                                uploads = emptyList(),
+                                validations = emptyList(),
+                            )
+                        )
+                        return@collect
                     }
                 }
             }

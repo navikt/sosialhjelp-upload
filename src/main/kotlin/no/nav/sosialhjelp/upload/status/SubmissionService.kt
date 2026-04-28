@@ -70,6 +70,7 @@ class SubmissionService(
                     if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,
                     if (totalTooLarge) ValidationCode.TOTAL_TOO_LARGE else null,
                 ),
+                status = SubmissionState.Status.ACTIVE
             )
         }
 }

@@ -9,4 +9,9 @@ data class SubmissionState(
     val uploads: List<UploadDto>,
     val error: String? = null,
     val validations: List<ValidationCode>,
-)
+    val status: Status,
+) {
+    enum class Status {
+        DELETED, ACTIVE
+    }
+}

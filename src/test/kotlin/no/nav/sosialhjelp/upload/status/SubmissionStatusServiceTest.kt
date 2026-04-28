@@ -93,6 +93,7 @@ class SubmissionStatusServiceTest {
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
 
         // Then
+        assertEquals(result.status, SubmissionState.Status.ACTIVE)
         assertEquals(submissionId.toString(), result.submissionId)
         assertEquals(2, result.uploads.size)
         val firstUpload: UploadDto? = result.uploads.find { it.id == uploadId1 }
