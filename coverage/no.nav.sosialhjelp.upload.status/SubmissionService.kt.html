@@ -68,7 +68,7 @@ import java.util.*
 <span class="fc" id="L68">                uploads.toList(),</span>
 <span class="fc" id="L69">                validations = listOfNotNull(</span>
 <span class="pc bpc" id="L70" title="1 of 2 branches missed.">                    if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                    if (totalTooLarge) ValidationCode.TOTAL_TOO_LARGE else null,</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                    if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,</span>
                 ),
 <span class="fc" id="L73">            )</span>
 <span class="fc" id="L74">        }</span>
