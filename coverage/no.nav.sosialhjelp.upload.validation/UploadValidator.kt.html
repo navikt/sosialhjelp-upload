@@ -18,101 +18,300 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
 <span class="fc" id="L19">val SUPPORTED_MIME_TYPES =</span>
 <span class="fc" id="L20">    setOf(</span>
-<span class="fc" id="L21">        &quot;text/plain&quot;,</span>
-        // .docx er i realiteten .zip-filer
-<span class="fc" id="L23">        &quot;application/zip&quot;,</span>
-<span class="fc" id="L24">        &quot;application/pdf&quot;,</span>
-<span class="fc" id="L25">        &quot;image/png&quot;,</span>
-<span class="fc" id="L26">        &quot;image/jpeg&quot;,</span>
-<span class="fc" id="L27">        &quot;image/tiff&quot;,</span>
-<span class="fc" id="L28">        &quot;image/bmp&quot;,</span>
-<span class="fc" id="L29">        &quot;image/gif&quot;,</span>
-<span class="fc" id="L30">        &quot;application/msword&quot;,</span>
-<span class="fc" id="L31">        &quot;application/x-tika-ooxml&quot;,</span>
-<span class="fc" id="L32">        &quot;application/vnd.openxmlformats-officedocument.wordprocessingml.document&quot;,</span>
-<span class="fc" id="L33">        &quot;application/vnd.oasis.opendocument.text&quot;,</span>
+        // PDF
+<span class="fc" id="L22">        &quot;application/pdf&quot;,</span>
+        // Word Processing
+        // .doc
+<span class="fc" id="L25">        &quot;application/msword&quot;,</span>
+        // .docx, .docm, .dotx, .dotm
+<span class="fc" id="L27">        &quot;application/vnd.openxmlformats-officedocument.wordprocessingml.document&quot;,</span>
+<span class="fc" id="L28">        &quot;application/vnd.ms-word.document.macroEnabled.12&quot;,</span>
+<span class="fc" id="L29">        &quot;application/vnd.openxmlformats-officedocument.wordprocessingml.template&quot;,</span>
+<span class="fc" id="L30">        &quot;application/vnd.ms-word.template.macroEnabled.12&quot;,</span>
+        // .dot
+<span class="fc" id="L32">        &quot;application/msword-template&quot;,</span>
+        // .odt, .fodt, .ott
+<span class="fc" id="L34">        &quot;application/vnd.oasis.opendocument.text&quot;,</span>
+<span class="fc" id="L35">        &quot;application/vnd.oasis.opendocument.text-flat-xml&quot;,</span>
+<span class="fc" id="L36">        &quot;application/vnd.oasis.opendocument.text-template&quot;,</span>
+        // .rtf
+<span class="fc" id="L38">        &quot;application/rtf&quot;,</span>
+<span class="fc" id="L39">        &quot;text/rtf&quot;,</span>
+        // .txt
+<span class="fc" id="L41">        &quot;text/plain&quot;,</span>
+        // .wpd
+<span class="fc" id="L43">        &quot;application/wordperfect&quot;,</span>
+<span class="fc" id="L44">        &quot;application/vnd.wordperfect&quot;,</span>
+        // .pages (Apple Pages - zip-based)
+        // .abw (AbiWord)
+<span class="fc" id="L47">        &quot;application/x-abiword&quot;,</span>
+        // .hwp (Hangul Word Processor)
+<span class="fc" id="L49">        &quot;application/x-hwp&quot;,</span>
+        // .wps (Microsoft Works)
+<span class="fc" id="L51">        &quot;application/vnd.ms-works&quot;,</span>
+        // .lwp (Lotus Word Pro)
+<span class="fc" id="L53">        &quot;application/vnd.lotus-wordpro&quot;,</span>
+        // .sxw, .stw, .sgl (StarOffice Writer)
+<span class="fc" id="L55">        &quot;application/vnd.sun.xml.writer&quot;,</span>
+<span class="fc" id="L56">        &quot;application/vnd.sun.xml.writer.template&quot;,</span>
+<span class="fc" id="L57">        &quot;application/vnd.sun.xml.writer.global&quot;,</span>
+        // .vor (StarOffice template)
+<span class="fc" id="L59">        &quot;application/vnd.stardivision.writer&quot;,</span>
+        // .uof (Uniform Office Format)
+<span class="fc" id="L61">        &quot;application/vnd.uoml+xml&quot;,</span>
+        // .xml (generic XML)
+<span class="fc" id="L63">        &quot;application/xml&quot;,</span>
+<span class="fc" id="L64">        &quot;text/xml&quot;,</span>
+        // .psw (Pocket Word)
+<span class="fc" id="L66">        &quot;application/x-pocket-word&quot;,</span>
+        // Spreadsheets
+        // .xls
+<span class="fc" id="L69">        &quot;application/vnd.ms-excel&quot;,</span>
+        // .xlsx, .xltx
+<span class="fc" id="L71">        &quot;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&quot;,</span>
+<span class="fc" id="L72">        &quot;application/vnd.openxmlformats-officedocument.spreadsheetml.template&quot;,</span>
+        // .xlsm, .xltm
+<span class="fc" id="L74">        &quot;application/vnd.ms-excel.sheet.macroEnabled.12&quot;,</span>
+<span class="fc" id="L75">        &quot;application/vnd.ms-excel.template.macroEnabled.12&quot;,</span>
+        // .xlsb
+<span class="fc" id="L77">        &quot;application/vnd.ms-excel.sheet.binary.macroEnabled.12&quot;,</span>
+        // .xlw
+<span class="fc" id="L79">        &quot;application/vnd.ms-excel-workspace&quot;,</span>
+        // .ods, .fods, .ots
+<span class="fc" id="L81">        &quot;application/vnd.oasis.opendocument.spreadsheet&quot;,</span>
+<span class="fc" id="L82">        &quot;application/vnd.oasis.opendocument.spreadsheet-flat-xml&quot;,</span>
+<span class="fc" id="L83">        &quot;application/vnd.oasis.opendocument.spreadsheet-template&quot;,</span>
+        // .csv
+<span class="fc" id="L85">        &quot;text/csv&quot;,</span>
+        // .numbers (Apple Numbers - zip-based)
+        // .123, .wk1, .wks (Lotus 1-2-3)
+<span class="fc" id="L88">        &quot;application/vnd.lotus-1-2-3&quot;,</span>
+        // .wb2 (Quattro Pro)
+<span class="fc" id="L90">        &quot;application/x-quattro-pro&quot;,</span>
+        // .dbf (dBASE)
+<span class="fc" id="L92">        &quot;application/dbase&quot;,</span>
+<span class="fc" id="L93">        &quot;application/x-dbase&quot;,</span>
+        // .dif (Data Interchange Format)
+<span class="fc" id="L95">        &quot;application/x-dif&quot;,</span>
+<span class="fc" id="L96">        &quot;text/x-dif&quot;,</span>
+        // .slk (SYLK)
+<span class="fc" id="L98">        &quot;application/x-sylk&quot;,</span>
+<span class="fc" id="L99">        &quot;text/spreadsheet&quot;,</span>
+        // .sxc, .stc (StarOffice Calc)
+<span class="fc" id="L101">        &quot;application/vnd.sun.xml.calc&quot;,</span>
+<span class="fc" id="L102">        &quot;application/vnd.sun.xml.calc.template&quot;,</span>
+        // .uos (Uniform Office Spreadsheet)
+<span class="fc" id="L104">        &quot;application/vnd.uoml+xml&quot;,</span>
+        // .pxl (Pocket Excel)
+<span class="fc" id="L106">        &quot;application/x-pocket-excel&quot;,</span>
+        // .sdc (StarOffice Calc legacy)
+<span class="fc" id="L108">        &quot;application/vnd.stardivision.calc&quot;,</span>
+        // Presentations
+        // .ppt
+<span class="fc" id="L111">        &quot;application/vnd.ms-powerpoint&quot;,</span>
+        // .pptx, .potx
+<span class="fc" id="L113">        &quot;application/vnd.openxmlformats-officedocument.presentationml.presentation&quot;,</span>
+<span class="fc" id="L114">        &quot;application/vnd.openxmlformats-officedocument.presentationml.template&quot;,</span>
+        // .pptm, .potm
+<span class="fc" id="L116">        &quot;application/vnd.ms-powerpoint.presentation.macroEnabled.12&quot;,</span>
+<span class="fc" id="L117">        &quot;application/vnd.ms-powerpoint.template.macroEnabled.12&quot;,</span>
+        // .pot
+<span class="fc" id="L119">        &quot;application/vnd.ms-powerpoint-template&quot;,</span>
+        // .pps
+<span class="fc" id="L121">        &quot;application/vnd.ms-powerpoint-slideshow&quot;,</span>
+<span class="fc" id="L122">        &quot;application/vnd.openxmlformats-officedocument.presentationml.slideshow&quot;,</span>
+        // .odp, .fodp, .otp
+<span class="fc" id="L124">        &quot;application/vnd.oasis.opendocument.presentation&quot;,</span>
+<span class="fc" id="L125">        &quot;application/vnd.oasis.opendocument.presentation-flat-xml&quot;,</span>
+<span class="fc" id="L126">        &quot;application/vnd.oasis.opendocument.presentation-template&quot;,</span>
+        // .key (Apple Keynote - zip-based)
+        // .sxi, .sti (StarOffice Impress)
+<span class="fc" id="L129">        &quot;application/vnd.sun.xml.impress&quot;,</span>
+<span class="fc" id="L130">        &quot;application/vnd.sun.xml.impress.template&quot;,</span>
+        // .uop
+<span class="fc" id="L132">        &quot;application/vnd.uoml+xml&quot;,</span>
+        // .sdd, .sdp (StarOffice Impress legacy)
+<span class="fc" id="L134">        &quot;application/vnd.stardivision.impress&quot;,</span>
+        // Graphics &amp; Drawing
+        // .odg, .fodg, .otg
+<span class="fc" id="L137">        &quot;application/vnd.oasis.opendocument.graphics&quot;,</span>
+<span class="fc" id="L138">        &quot;application/vnd.oasis.opendocument.graphics-flat-xml&quot;,</span>
+<span class="fc" id="L139">        &quot;application/vnd.oasis.opendocument.graphics-template&quot;,</span>
+        // .vsd, .vsdx, .vsdm, .vdx (Visio)
+<span class="fc" id="L141">        &quot;application/vnd.visio&quot;,</span>
+<span class="fc" id="L142">        &quot;application/vnd.ms-visio.drawing&quot;,</span>
+<span class="fc" id="L143">        &quot;application/vnd.ms-visio.drawing.macroEnabled&quot;,</span>
+<span class="fc" id="L144">        &quot;application/vnd.ms-visio.xml&quot;,</span>
+        // .cdr (CorelDRAW)
+<span class="fc" id="L146">        &quot;application/coreldraw&quot;,</span>
+<span class="fc" id="L147">        &quot;image/x-cdr&quot;,</span>
+        // .svg
+<span class="fc" id="L149">        &quot;image/svg+xml&quot;,</span>
+        // .svm (StarView Metafile)
+<span class="fc" id="L151">        &quot;image/x-svm&quot;,</span>
+        // .wmf
+<span class="fc" id="L153">        &quot;image/wmf&quot;,</span>
+<span class="fc" id="L154">        &quot;image/x-wmf&quot;,</span>
+        // .emf
+<span class="fc" id="L156">        &quot;image/emf&quot;,</span>
+<span class="fc" id="L157">        &quot;image/x-emf&quot;,</span>
+        // .cgm (Computer Graphics Metafile)
+<span class="fc" id="L159">        &quot;image/cgm&quot;,</span>
+        // .dxf (AutoCAD)
+<span class="fc" id="L161">        &quot;image/vnd.dxf&quot;,</span>
+<span class="fc" id="L162">        &quot;application/dxf&quot;,</span>
+        // .std, .sxd (StarOffice Draw)
+<span class="fc" id="L164">        &quot;application/vnd.sun.xml.draw&quot;,</span>
+<span class="fc" id="L165">        &quot;application/vnd.sun.xml.draw.template&quot;,</span>
+        // .pub (Microsoft Publisher)
+<span class="fc" id="L167">        &quot;application/vnd.ms-publisher&quot;,</span>
+<span class="fc" id="L168">        &quot;application/x-mspublisher&quot;,</span>
+        // .wpg (WordPerfect Graphics)
+<span class="fc" id="L170">        &quot;image/x-wpg&quot;,</span>
+        // .sda (StarOffice Draw legacy)
+<span class="fc" id="L172">        &quot;application/vnd.stardivision.draw&quot;,</span>
+        // .met (OS/2 Metafile)
+<span class="fc" id="L174">        &quot;image/x-met&quot;,</span>
+        // .cmx (Corel Metafile Exchange)
+<span class="fc" id="L176">        &quot;image/x-cmx&quot;,</span>
+        // .eps
+<span class="fc" id="L178">        &quot;application/postscript&quot;,</span>
+<span class="fc" id="L179">        &quot;image/x-eps&quot;,</span>
+        // Images
+<span class="fc" id="L181">        &quot;image/jpeg&quot;,</span>
+<span class="fc" id="L182">        &quot;image/png&quot;,</span>
+<span class="fc" id="L183">        &quot;image/bmp&quot;,</span>
+<span class="fc" id="L184">        &quot;image/gif&quot;,</span>
+<span class="fc" id="L185">        &quot;image/tiff&quot;,</span>
+        // .pbm, .pgm, .ppm (Netpbm)
+<span class="fc" id="L187">        &quot;image/x-portable-bitmap&quot;,</span>
+<span class="fc" id="L188">        &quot;image/x-portable-graymap&quot;,</span>
+<span class="fc" id="L189">        &quot;image/x-portable-pixmap&quot;,</span>
+<span class="fc" id="L190">        &quot;image/x-portable-anymap&quot;,</span>
+        // .xbm
+<span class="fc" id="L192">        &quot;image/x-xbitmap&quot;,</span>
+        // .xpm
+<span class="fc" id="L194">        &quot;image/x-xpixmap&quot;,</span>
+        // .pcx
+<span class="fc" id="L196">        &quot;image/x-pcx&quot;,</span>
+        // .pcd (Kodak Photo CD)
+<span class="fc" id="L198">        &quot;image/x-photo-cd&quot;,</span>
+        // .pct / .pict (Mac PICT)
+<span class="fc" id="L200">        &quot;image/x-pict&quot;,</span>
+        // .psd (Photoshop)
+<span class="fc" id="L202">        &quot;image/vnd.adobe.photoshop&quot;,</span>
+        // .tga
+<span class="fc" id="L204">        &quot;image/x-tga&quot;,</span>
+        // .ras (Sun Raster)
+<span class="fc" id="L206">        &quot;image/x-sun-raster&quot;,</span>
+        // .pwp (PhotoWorks)
+<span class="fc" id="L208">        &quot;image/x-pwp&quot;,</span>
+        // Web &amp; Other
+<span class="fc" id="L210">        &quot;text/html&quot;,</span>
+<span class="fc" id="L211">        &quot;application/xhtml+xml&quot;,</span>
+        // .epub
+<span class="fc" id="L213">        &quot;application/epub+zip&quot;,</span>
+        // .pdb (Palm Database)
+<span class="fc" id="L215">        &quot;application/x-palm-database&quot;,</span>
+        // .ltx (LaTeX)
+<span class="fc" id="L217">        &quot;application/x-latex&quot;,</span>
+<span class="fc" id="L218">        &quot;text/x-tex&quot;,</span>
+        // .mml (MathML)
+<span class="fc" id="L220">        &quot;application/mathml+xml&quot;,</span>
+        // .smf, .sxm (StarOffice Math)
+<span class="fc" id="L222">        &quot;application/vnd.sun.xml.math&quot;,</span>
+<span class="fc" id="L223">        &quot;application/vnd.stardivision.math&quot;,</span>
+        // .sxg, .oth, .odm (StarOffice/ODF master documents)
+<span class="fc" id="L225">        &quot;application/vnd.sun.xml.writer.global&quot;,</span>
+<span class="fc" id="L226">        &quot;application/vnd.oasis.opendocument.text-web&quot;,</span>
+<span class="fc" id="L227">        &quot;application/vnd.oasis.opendocument.text-master&quot;,</span>
+        // .swf (Flash - legacy)
+<span class="fc" id="L229">        &quot;application/x-shockwave-flash&quot;,</span>
+        // Tika generic type for zip-based Office formats (e.g. .docx, .xlsx, .pptx)
+<span class="fc" id="L231">        &quot;application/zip&quot;,</span>
+<span class="fc" id="L232">        &quot;application/x-tika-ooxml&quot;,</span>
     )
 
-<span class="fc" id="L36">class UploadValidator(</span>
-<span class="pc" id="L37">    val virusScanner: VirusScanner,</span>
-<span class="fc" id="L38">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L39">) {</span>
-<span class="fc" id="L40">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
-<span class="fc" id="L41">    private val tika = Tika()</span>
+<span class="fc" id="L235">class UploadValidator(</span>
+<span class="pc" id="L236">    val virusScanner: VirusScanner,</span>
+<span class="fc" id="L237">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L238">) {</span>
+<span class="fc" id="L239">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L240">    private val tika = Tika()</span>
 
     suspend fun validate(
         filename: String,
         data: ByteArray,
         fileSize: Long,
     ): List&lt;Validation&gt; =
-<span class="pc bpc" id="L48" title="3 of 5 branches missed.">        coroutineScope {</span>
-<span class="fc" id="L49">            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }</span>
-<span class="fc bfc" id="L50" title="All 2 branches covered.">            val (mimeType, fileTypeValidation) = validateFileType(data)</span>
-<span class="fc" id="L51">            listOfNotNull(</span>
-<span class="fc" id="L52">                validateFileSize(fileSize),</span>
-<span class="fc" id="L53">                validateFilename(Filename(filename)),</span>
-<span class="fc" id="L54">                fileTypeValidation,</span>
-<span class="pc bpc" id="L55" title="1 of 4 branches missed.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                virusScanValidation.await(),</span>
-<span class="fc" id="L57">            )</span>
-<span class="fc" id="L58">        }</span>
+<span class="pc bpc" id="L247" title="3 of 5 branches missed.">        coroutineScope {</span>
+<span class="fc" id="L248">            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            val (mimeType, fileTypeValidation) = validateFileType(data)</span>
+<span class="fc" id="L250">            listOfNotNull(</span>
+<span class="fc" id="L251">                validateFileSize(fileSize),</span>
+<span class="fc" id="L252">                validateFilename(Filename(filename)),</span>
+<span class="fc" id="L253">                fileTypeValidation,</span>
+<span class="pc bpc" id="L254" title="1 of 4 branches missed.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">                virusScanValidation.await(),</span>
+<span class="fc" id="L256">            )</span>
+<span class="fc" id="L257">        }</span>
 
     private suspend fun validatePdf(data: ByteArray): Validation? =
-<span class="fc" id="L61">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L62">            try {</span>
-<span class="fc" id="L63">                val randomAccessRead = RandomAccessReadBuffer(data.inputStream())</span>
+<span class="fc" id="L260">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L261">            try {</span>
+<span class="fc" id="L262">                val randomAccessRead = RandomAccessReadBuffer(data.inputStream())</span>
                 Loader
-<span class="fc" id="L65">                    .loadPDF(randomAccessRead)</span>
-<span class="pc" id="L66">                    .use { document -&gt;</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                        if (document.isEncrypted) {</span>
-<span class="nc" id="L68">                            EncryptedPdfValidation()</span>
+<span class="fc" id="L264">                    .loadPDF(randomAccessRead)</span>
+<span class="pc" id="L265">                    .use { document -&gt;</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                        if (document.isEncrypted) {</span>
+<span class="nc" id="L267">                            EncryptedPdfValidation()</span>
                         } else {
-<span class="fc" id="L70">                            null</span>
-<span class="fc" id="L71">                        }</span>
+<span class="fc" id="L269">                            null</span>
+<span class="fc" id="L270">                        }</span>
                     }
-<span class="nc" id="L73">            } catch (e: InvalidPasswordException) {</span>
-<span class="nc" id="L74">                logger.warn(ValidationCode.ENCRYPTED_PDF.name + &quot; &quot; + e.message)</span>
-<span class="nc" id="L75">                EncryptedPdfValidation()</span>
-<span class="nc" id="L76">            } catch (e: IOException) {</span>
-<span class="nc" id="L77">                logger.warn(ValidationCode.INVALID_PDF.name, e)</span>
-<span class="nc" id="L78">                InvalidPdfValidation()</span>
-<span class="nc" id="L79">            } catch (e: Exception) {</span>
-<span class="nc" id="L80">                logger.warn(ValidationCode.INVALID_PDF.name + &quot; &quot; + e.message, e)</span>
-<span class="pc" id="L81">                InvalidPdfValidation()</span>
-<span class="fc" id="L82">            }</span>
-<span class="fc" id="L83">        }</span>
+<span class="nc" id="L272">            } catch (e: InvalidPasswordException) {</span>
+<span class="nc" id="L273">                logger.warn(ValidationCode.ENCRYPTED_PDF.name + &quot; &quot; + e.message)</span>
+<span class="nc" id="L274">                EncryptedPdfValidation()</span>
+<span class="nc" id="L275">            } catch (e: IOException) {</span>
+<span class="nc" id="L276">                logger.warn(ValidationCode.INVALID_PDF.name, e)</span>
+<span class="nc" id="L277">                InvalidPdfValidation()</span>
+<span class="nc" id="L278">            } catch (e: Exception) {</span>
+<span class="nc" id="L279">                logger.warn(ValidationCode.INVALID_PDF.name + &quot; &quot; + e.message, e)</span>
+<span class="pc" id="L280">                InvalidPdfValidation()</span>
+<span class="fc" id="L281">            }</span>
+<span class="fc" id="L282">        }</span>
 
     private suspend fun validateFileType(data: ByteArray): Pair&lt;String, Validation?&gt; =
-<span class="fc" id="L86">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L87">            val mimeType = tika.detect(data.inputStream())</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (mimeType !in SUPPORTED_MIME_TYPES) {</span>
-<span class="fc" id="L89">                return@withContext mimeType to FileTypeValidation(actual = mimeType)</span>
+<span class="fc" id="L285">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L286">            val mimeType = tika.detect(data.inputStream())</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            if (mimeType !in SUPPORTED_MIME_TYPES) {</span>
+<span class="fc" id="L288">                return@withContext mimeType to FileTypeValidation(actual = mimeType)</span>
             }
-<span class="fc" id="L91">            return@withContext mimeType to null</span>
-<span class="fc" id="L92">        }</span>
+<span class="fc" id="L290">            return@withContext mimeType to null</span>
+<span class="fc" id="L291">        }</span>
 
     private suspend fun runVirusScan(data: ByteArray): Validation? =
-<span class="pc bpc" id="L95" title="1 of 3 branches missed.">        when (virusScanner.scan(data)) {</span>
-<span class="fc" id="L96">            Result.FOUND -&gt; VirusValidation()</span>
+<span class="pc bpc" id="L294" title="1 of 3 branches missed.">        when (virusScanner.scan(data)) {</span>
+<span class="fc" id="L295">            Result.FOUND -&gt; VirusValidation()</span>
             Result.ERROR -&gt; {
-<span class="nc" id="L98">                logger.warn(&quot;Virus scanner returned ERROR, treating file as clean&quot;)</span>
-<span class="nc" id="L99">                null</span>
+<span class="nc" id="L297">                logger.warn(&quot;Virus scanner returned ERROR, treating file as clean&quot;)</span>
+<span class="nc" id="L298">                null</span>
             }
-<span class="fc" id="L101">            Result.OK -&gt; null</span>
-<span class="fc" id="L102">        }</span>
+<span class="fc" id="L300">            Result.OK -&gt; null</span>
+<span class="fc" id="L301">        }</span>
 
     private fun validateFileSize(filesize: Long): Validation? {
-<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (filesize &gt; MAX_FILE_SIZE) {</span>
-<span class="fc" id="L106">            return FileSizeValidation()</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (filesize &gt; MAX_FILE_SIZE) {</span>
+<span class="fc" id="L305">            return FileSizeValidation()</span>
         }
-<span class="fc" id="L108">        return null</span>
+<span class="fc" id="L307">        return null</span>
     }
 
     private fun validateFilename(filename: Filename): Validation? {
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (filename.containsIllegalCharacters()) {</span>
-<span class="nc" id="L113">            return FilenameValidation()</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (filename.containsIllegalCharacters()) {</span>
+<span class="nc" id="L312">            return FilenameValidation()</span>
         }
-<span class="fc" id="L115">        return null</span>
+<span class="fc" id="L314">        return null</span>
     }
 }
 
@@ -120,8 +319,8 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 private value class Filename(
     val value: String,
 ) {
-<span class="fc" id="L123">    fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()</span>
+<span class="fc" id="L322">    fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()</span>
 
-<span class="fc" id="L125">    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(&quot;[^a-zæøåA-ZÆØÅ0-9 (),._–-]&quot;.toRegex())</span>
+<span class="fc" id="L324">    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(&quot;[^a-zæøåA-ZÆØÅ0-9 (),._–-]&quot;.toRegex())</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
