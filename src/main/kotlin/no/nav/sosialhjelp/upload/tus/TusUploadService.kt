@@ -243,7 +243,7 @@ class TusUploadService(
         data: ByteArray,
     ): Pair<String, ByteArray> {
         val extension = File(filename).extension.lowercase()
-        if (extension in listOf("pdf", "jpeg", "jpg", "png", "zip", "exe", "bat", "cmd", "sh", "scr")) {
+        if (extension in listOf("pdf", "jpeg", "jpg", "png")) {
             return filename to data
         }
         val pdfName = File(filename).nameWithoutExtension + ".pdf"
