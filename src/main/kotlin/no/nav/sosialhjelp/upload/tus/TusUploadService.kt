@@ -171,7 +171,15 @@ class TusUploadService(
             return
         }
 
-        val (finalFilename, finalData) = convertIfNeeded(upload.filename, chunkData)
+        val (finalFilename, finalData) = try {
+            convertIfNeeded(upload.filename, chunkData)
+        } catch (e: Exception) {
+            logger.error("Upload $uploadId failed during PDF conversion", e)
+            markUploadFailed(uploadId)
+            meterRegistry.timer("upload.processing", "result", "conversion_failure")
+                .record(Duration.ofNanos(System.nanoTime() - startTime))
+            return
+        }
         val mellomlagringFilnavn = makeUniqueMellomlagringFilename(finalFilename, uploadId)
         val encrypted = encryptionService.encryptBytes(finalData)
 
@@ -191,13 +199,7 @@ class TusUploadService(
                 )
             } catch (e: Exception) {
                 logger.error("Upload $uploadId failed during mellomlagring upload", e)
-                withContext(ioDispatcher) {
-                    dsl.transaction { tx ->
-                        uploadRepository.markFailed(tx, uploadId)
-                        uploadRepository.notifyChange(tx, uploadId)
-                    }
-                    deleteGcsObjects(uploadId)
-                }
+                markUploadFailed(uploadId)
                 meterRegistry.timer("upload.processing", "result", "mellomlagring_failure")
                     .record(Duration.ofNanos(System.nanoTime() - startTime))
                 return
@@ -213,6 +215,16 @@ class TusUploadService(
         }
         meterRegistry.timer("upload.processing", "result", "success")
             .record(Duration.ofNanos(System.nanoTime() - startTime))
+    }
+
+    private suspend fun markUploadFailed(uploadId: UUID) {
+        withContext(ioDispatcher) {
+            dsl.transaction { tx ->
+                uploadRepository.markFailed(tx, uploadId)
+                uploadRepository.notifyChange(tx, uploadId)
+            }
+            deleteGcsObjects(uploadId)
+        }
     }
 
     private suspend fun deleteGcsObjects(uploadId: UUID) {
@@ -231,7 +243,7 @@ class TusUploadService(
         data: ByteArray,
     ): Pair<String, ByteArray> {
         val extension = File(filename).extension.lowercase()
-        if (extension in listOf("pdf", "jpeg", "jpg", "png")) {
+        if (extension in listOf("pdf", "jpeg", "jpg", "png", "zip", "exe", "bat", "cmd", "sh", "scr")) {
             return filename to data
         }
         val pdfName = File(filename).nameWithoutExtension + ".pdf"

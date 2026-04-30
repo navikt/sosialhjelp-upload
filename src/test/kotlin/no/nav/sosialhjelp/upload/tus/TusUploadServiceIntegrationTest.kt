@@ -272,6 +272,49 @@ class TusUploadServiceIntegrationTest {
             assertEquals(filId, row!![UPLOAD.FIL_ID])
         }
 
+    @Test
+    fun `appendChunk rejects zip files as unsupported filetype`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            // Minimal zip file header (0x504B03040 = "PK\x03\x04")
+            val zipContent = byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00)
+
+            createMockSubmission(dsl, externalId)
+            val uploadId = tusUploadService.create(externalId, "archive.zip", zipContent.size.toLong(), personident, "test-token", null, "id")
+            tusUploadService.appendChunk(uploadId, 0L, zipContent)
+
+            awaitUploadTerminal(dsl, uploadId)
+
+            val errors = dsl.selectFrom(ERROR).where(ERROR.UPLOAD.eq(uploadId)).fetch()
+            assertTrue(errors.isNotEmpty, "Zip file should be rejected with validation error")
+            assertTrue(errors.any { it[ERROR.CODE]?.contains("FILETYPE_NOT_SUPPORTED") == true },
+                "Error should be FILETYPE_NOT_SUPPORTED for zip files")
+
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            assertNull(row!![UPLOAD.FIL_ID], "Upload should not have filId if rejected")
+        }
+
+    @Test
+    fun `appendChunk marks upload as failed if PDF conversion fails`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            val content = "word-doc-content".toByteArray()
+
+            coEvery { gotenbergService.convertToPdf(any(), any()) } throws RuntimeException("Gotenberg service error: timeout")
+
+            createMockSubmission(dsl, externalId)
+            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, "test-token", null, "id")
+            tusUploadService.appendChunk(uploadId, 0L, content)
+
+            awaitUploadTerminal(dsl, uploadId)
+
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            assertEquals("FAILED", row!![UPLOAD.PROCESSING_STATUS], "Upload should be marked as FAILED when conversion fails")
+            assertNull(row[UPLOAD.FIL_ID], "Upload should not have filId when conversion fails")
+        }
+
     // endregion
 
     // region delete
