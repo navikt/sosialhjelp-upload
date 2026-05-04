@@ -23,7 +23,7 @@ spec:
     path: /metrics-micrometer
   replicas:
     min: 2
-    max: 2
+    max: 6
   observability:
     autoInstrumentation:
       enabled: true
@@ -56,7 +56,7 @@ spec:
     limits:
       memory: 2Gi
     requests:
-      cpu: 10m
+      cpu: 20m
       memory: 512Mi
   maskinporten:
     enabled: true
