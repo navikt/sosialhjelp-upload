@@ -228,7 +228,8 @@ val SUPPORTED_MIME_TYPES =
         // .swf (Flash - legacy)
         "application/x-shockwave-flash",
         // Tika generic type for zip-based Office formats (e.g. .docx, .xlsx, .pptx)
-        "application/zip",
+        // Note: "application/zip" is intentionally excluded — plain .zip files are not supported.
+        // All zip-based Office formats are already covered by their explicit MIME types above.
         "application/x-tika-ooxml",
     )
 
