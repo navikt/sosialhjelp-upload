@@ -39,6 +39,8 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.measureTimedValue
+import kotlin.time.toJavaDuration
 
 class MellomlagringClient(
     @Property("fiks.baseUrl") private val fiksBaseUrl: String,
@@ -121,47 +123,48 @@ class MellomlagringClient(
         data: ByteArray,
     ): UUID =
         withContext(ioDispatcher) {
-            val startTime = System.nanoTime()
-            val metadataPart = FormPart(
-                key = "metadata",
-                value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
-                headers = Headers.build { append(HttpHeaders.ContentType, ContentType.Application.Json.toString()) },
-            )
-            val filePart = FormPart(
-                key = "files",
-                value = ChannelProvider { ByteReadChannel(data) },
-                headers = Headers.build {
-                    append(HttpHeaders.ContentType, contentType)
-                    append(HttpHeaders.ContentDisposition, """filename="$filename"""")
-                },
-            )
-            val formData =
-                formData {
-                    append(metadataPart)
-                    append(filePart)
-                }
-            val response =
-                client.submitFormWithBinaryData(mellomlagringUrl(navEksternRefId), formData) {
-                    headers {
-                        integrasjonsid?.let { append("IntegrasjonId", it) }
-                        integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+            measureTimedValue {
+                val metadataPart = FormPart(
+                    key = "metadata",
+                    value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
+                    headers = Headers.build { append(HttpHeaders.ContentType, ContentType.Application.Json.toString()) },
+                )
+                val filePart = FormPart(
+                    key = "files",
+                    value = ChannelProvider { ByteReadChannel(data) },
+                    headers = Headers.build {
+                        append(HttpHeaders.ContentType, contentType)
+                        append(HttpHeaders.ContentDisposition, """filename="$filename"""")
+                    },
+                )
+                val formData =
+                    formData {
+                        append(metadataPart)
+                        append(filePart)
                     }
-                    contentType(ContentType.MultiPart.FormData)
-                    bearerAuth(texasClient.getMaskinportenToken())
+                val response =
+                    client.submitFormWithBinaryData(mellomlagringUrl(navEksternRefId), formData) {
+                        headers {
+                            integrasjonsid?.let { append("IntegrasjonId", it) }
+                            integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+                        }
+                        contentType(ContentType.MultiPart.FormData)
+                        bearerAuth(texasClient.getMaskinportenToken())
+                    }
+
+                check(response.status.isSuccess()) {
+                    "Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}"
                 }
 
-            check(response.status.isSuccess()) {
-                "Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}"
-            }
-
-            val mellomlagring = response.body<MellomlagringResponse>()
-            val filId = mellomlagring.mellomlagringMetadataList
-                .firstOrNull()
-                ?.filId
-                ?.let { UUID.fromString(it) }
-                ?: error("No filId returned from mellomlagring for upload to $navEksternRefId")
-            meterRegistry.timer("mellomlagring.upload").record(Duration.ofNanos(System.nanoTime() - startTime))
-            filId
+                val mellomlagring = response.body<MellomlagringResponse>()
+                mellomlagring.mellomlagringMetadataList
+                    .firstOrNull()
+                    ?.filId
+                    ?.let { UUID.fromString(it) }
+                    ?: error("No filId returned from mellomlagring for upload to $navEksternRefId")
+            }.also {
+                meterRegistry.timer("mellomlagring.upload").record(it.duration.toJavaDuration())
+            }.value
         }
 
     suspend fun deleteFile(
