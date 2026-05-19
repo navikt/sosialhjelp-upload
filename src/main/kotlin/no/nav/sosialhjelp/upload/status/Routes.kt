@@ -7,7 +7,6 @@ import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
 import io.ktor.util.reflect.*
-import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
@@ -24,8 +23,7 @@ fun Route.configureStatusRoutes() {
     val meterRegistry: MeterRegistry by application.dependencies
 
     val activeConnections = AtomicInteger(0)
-    Gauge.builder("sse.connections.active", activeConnections) { it.get().toDouble() }
-        .register(meterRegistry)
+    meterRegistry.gauge("sse.connections.active", activeConnections) { it.toDouble() }
 
 
     sse("/status/{id}", serialize = { typeInfo: TypeInfo, value: Any ->
