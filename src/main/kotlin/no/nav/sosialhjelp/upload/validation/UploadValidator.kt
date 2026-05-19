@@ -23,6 +23,7 @@ val SUPPORTED_MIME_TYPES =
         // Word Processing
         // .doc
         "application/msword",
+        "application/x-tika-msoffice",
         // .docx, .docm, .dotx, .dotm
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.ms-word.document.macroEnabled.12",
