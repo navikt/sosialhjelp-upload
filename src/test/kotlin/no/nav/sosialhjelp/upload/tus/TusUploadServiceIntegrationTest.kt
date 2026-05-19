@@ -63,7 +63,7 @@ class TusUploadServiceIntegrationTest {
         virusScanner = mockk()
         gotenbergService = mockk()
         fiksClient = mockk(relaxed = true)
-        val validator = UploadValidator(virusScanner)
+        val validator = UploadValidator(virusScanner, SimpleMeterRegistry())
 
         mellomlagringClient = mockk()
         encryptionService = mockk()

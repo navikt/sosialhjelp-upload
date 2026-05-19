@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.validation
 
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -236,6 +237,7 @@ val SUPPORTED_MIME_TYPES =
 
 class UploadValidator(
     val virusScanner: VirusScanner,
+    private val meterRegistry: MeterRegistry,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -249,6 +251,7 @@ class UploadValidator(
         coroutineScope {
             val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }
             val (mimeType, fileTypeValidation) = validateFileType(data)
+            meterRegistry.counter("upload.tika_mime_type", "mime_type", mimeType).increment()
             listOfNotNull(
                 validateFileSize(fileSize),
                 validateFilename(Filename(filename)),

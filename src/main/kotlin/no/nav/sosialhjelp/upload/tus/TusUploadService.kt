@@ -85,7 +85,11 @@ class TusUploadService(
                 submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)
                 uploadRepository
                     .create(tx, submissionId, filename, size)
-                    .also { meterRegistry.counter("upload.created").increment() }
+                    .also {
+                        meterRegistry.counter("upload.created").increment()
+                        val extension = File(filename).extension.lowercase().ifEmpty { "none" }
+                        meterRegistry.counter("upload.file_extension", "extension", extension).increment()
+                    }
                     ?: error("Failed to create upload record")
             }
         } catch (_: SubmissionOwnedByAnotherUserException) {
@@ -143,6 +147,7 @@ class TusUploadService(
                     uploadRepository.getUploadForProcessing(tx, uploadId)
                 }
             }
+        val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { "none" }
 
         val chunkData = withContext(ioDispatcher) {
             val chunkPrefix = "uploads/$uploadId-chunk-"
@@ -166,7 +171,7 @@ class TusUploadService(
                 }
                 deleteGcsObjects(uploadId)
             }
-            meterRegistry.timer("upload.processing", "result", "validation_failure")
+            meterRegistry.timer("upload.processing", "result", "validation_failure", "extension", fileExtension)
                 .record(Duration.ofNanos(System.nanoTime() - startTime))
             return
         }
@@ -176,10 +181,12 @@ class TusUploadService(
         } catch (e: Exception) {
             logger.error("Upload $uploadId failed during PDF conversion", e)
             markUploadFailed(uploadId)
-            meterRegistry.timer("upload.processing", "result", "conversion_failure")
+            meterRegistry.timer("upload.processing", "result", "conversion_failure", "extension", fileExtension)
                 .record(Duration.ofNanos(System.nanoTime() - startTime))
             return
         }
+        val finalExtension = File(finalFilename).extension.lowercase().ifEmpty { "none" }
+        meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
         val mellomlagringFilnavn = makeUniqueMellomlagringFilename(finalFilename, uploadId)
         val encrypted = encryptionService.encryptBytes(finalData)
 
@@ -200,7 +207,7 @@ class TusUploadService(
             } catch (e: Exception) {
                 logger.error("Upload $uploadId failed during mellomlagring upload", e)
                 markUploadFailed(uploadId)
-                meterRegistry.timer("upload.processing", "result", "mellomlagring_failure")
+                meterRegistry.timer("upload.processing", "result", "mellomlagring_failure", "extension", fileExtension)
                     .record(Duration.ofNanos(System.nanoTime() - startTime))
                 return
             }
@@ -213,7 +220,7 @@ class TusUploadService(
             }
             deleteGcsObjects(uploadId)
         }
-        meterRegistry.timer("upload.processing", "result", "success")
+        meterRegistry.timer("upload.processing", "result", "success", "extension", fileExtension)
             .record(Duration.ofNanos(System.nanoTime() - startTime))
     }
 
