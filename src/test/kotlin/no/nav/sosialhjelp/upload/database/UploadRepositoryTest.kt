@@ -158,4 +158,34 @@ class UploadRepositoryTest {
             assertEquals("FAILED", record[UPLOAD.PROCESSING_STATUS])
         }
     }
+
+    @Test
+    fun `markHaltedPendingAsFailed marks uploads with zero offset as failed`() {
+        val submissionId = TestUtils.createMockSubmission(dsl)
+        every { notificationServiceMock.notifyUpdate(any()) } returns Unit
+        val uploadId = dsl.transactionResult { tx ->
+            uploadRepository.create(tx, submissionId, "never-started.txt", 100L)
+        } ?: error("No uploadId")
+
+        // upload_offset stays 0 (no chunks received), just set old updated_at
+        dsl.execute(
+            "UPDATE upload SET updated_at = NOW() - INTERVAL '5 minutes' WHERE id = ?",
+            uploadId,
+        )
+
+        val cutoff = java.time.OffsetDateTime.now()
+        val staleUploads = dsl.transactionResult { tx ->
+            uploadRepository.markHaltedPendingAsFailed(tx, cutoff)
+        }
+
+        assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
+        dsl.transaction { tx ->
+            val record = tx.dsl()
+                .select(UPLOAD.PROCESSING_STATUS)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .fetchSingle()
+            assertEquals("FAILED", record[UPLOAD.PROCESSING_STATUS])
+        }
+    }
 }

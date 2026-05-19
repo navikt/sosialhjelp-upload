@@ -84,6 +84,17 @@ I CI settes de som `ORG_GRADLE_PROJECT_githubUser` og `ORG_GRADLE_PROJECT_github
 - JOOQ-genererte klasser er committed under `database/generated/` og regenereres med `./gradlew generateJooq` ved skjemaendringer
 - `SubmissionNotificationService` bruker Postgres LISTEN/NOTIFY og en Kotlin `SharedFlow` for å sende sanntidsoppdateringer til SSE-abonnenter
 
+## Opprydding og retention
+
+Tjenesten kjører periodiske oppryddingsjobber:
+
+| Jobb | Timeout | Handling |
+|------|---------|----------|
+| **Stuck uploads** | 3 minutter | Opplastinger som står i `PENDING` eller `PROCESSING` i mer enn 3 minutter markeres som `FAILED`. Brukeren kan deretter forkaste dem selv via UI. |
+| **Stale submissions** | 1 time | Submissions som ikke har blitt sendt inn og ikke har hatt aktivitet på 1 time slettes automatisk, inkludert tilhørende filer i GCS og mellomlagring. |
+
+Jobbene kjøres av `UploadRecoveryService` (stuck uploads) og `RetentionService` (stale submissions).
+
 ## Miljøvariabler
 
 | Variabel | Formål |

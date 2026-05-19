@@ -1,4 +1,4 @@
-# Copilot Instructions for sosialhjelp-upload
+3# Copilot Instructions for sosialhjelp-upload
 
 ## Overview
 
@@ -82,6 +82,17 @@ The fix uses two mechanisms together:
 | `pdf/` | Gotenberg integration for PDF conversion |
 | `validation/` | File type, size, virus scanning |
 | `texas/` | Maskinporten token acquisition via NAIS Texas |
+
+### Cleanup and retention
+
+Two background jobs handle stale data:
+
+| Job | Class | Timeout | Action |
+|-----|-------|---------|--------|
+| Stuck uploads | `UploadRecoveryService` | 3 min | Marks `PENDING`/`PROCESSING` uploads as `FAILED`; cleans up GCS chunks |
+| Stale submissions | `RetentionService` | 1 hour | Deletes entire submission + uploads + GCS objects + mellomlagring |
+
+The 3-minute timeout is reasonable given the 10MB file size limit. Users can discard failed uploads via the UI.
 
 ## Dependency Injection
 

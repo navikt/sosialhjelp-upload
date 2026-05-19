@@ -26,8 +26,8 @@ class UploadRecoveryService(
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
 
     companion object {
-        const val PROCESSING_TIMEOUT_MINUTES = 5L
-        const val PENDING_CHUNK_TIMEOUT_HOURS = 1L
+        const val PROCESSING_TIMEOUT_MINUTES = 3L
+        const val PENDING_TIMEOUT_MINUTES = 3L
     }
 
     suspend fun recoverAll() {
@@ -80,7 +80,7 @@ class UploadRecoveryService(
         val span = tracer.spanBuilder("upload.recovery.halted_pending").startSpan()
         val scope = span.makeCurrent()
         try {
-            val cutoff = OffsetDateTime.now().minus(PENDING_CHUNK_TIMEOUT_HOURS, ChronoUnit.HOURS)
+            val cutoff = OffsetDateTime.now().minus(PENDING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
             val staleUploads = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     uploadRepository.markHaltedPendingAsFailed(tx, cutoff)
@@ -88,7 +88,7 @@ class UploadRecoveryService(
             }
             span.setAttribute("upload.recovery.count", staleUploads.size.toLong())
             if (staleUploads.isNotEmpty()) {
-                log.info("Cleaned up ${staleUploads.size} halted PENDING upload(s) (stalled for >${PENDING_CHUNK_TIMEOUT_HOURS}h)")
+                log.info("Cleaned up ${staleUploads.size} halted PENDING upload(s) (stalled for >${PENDING_TIMEOUT_MINUTES}m)")
                 meterRegistry.counter("upload.recovery", "reason", "halted_pending")
                     .increment(staleUploads.size.toDouble())
                 staleUploads.forEach { info ->

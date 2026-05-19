@@ -129,7 +129,7 @@ class UploadRepository {
         val newOffset = expectedOffset + chunkSize
         val affected = tx.dsl().update(UPLOAD)
             .set(UPLOAD.UPLOAD_OFFSET, newOffset)
-            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
             .and(UPLOAD.UPLOAD_OFFSET.eq(expectedOffset))
             .execute()
@@ -159,7 +159,7 @@ class UploadRepository {
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)
-            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
             .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
             .execute() > 0
@@ -222,7 +222,7 @@ class UploadRepository {
             .dsl()
             .update(UPLOAD)
             .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)
-            .set(UPLOAD.UPDATED_AT, java.time.OffsetDateTime.now())
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
     }
@@ -233,7 +233,7 @@ class UploadRepository {
      */
     fun markStaleProcessingAsFailed(
         tx: Configuration,
-        cutoff: java.time.OffsetDateTime,
+        cutoff: OffsetDateTime,
     ): List<StaleUploadInfo> =
         tx
             .dsl()
@@ -249,7 +249,7 @@ class UploadRepository {
             }
 
     /**
-     * Finds PENDING uploads that have received at least one chunk but stalled since before [cutoff].
+     * Finds PENDING uploads that have stalled since before [cutoff].
      * Marks them FAILED. Returns info needed for SSE notification and GCS cleanup.
      */
     fun markHaltedPendingAsFailed(
@@ -262,7 +262,6 @@ class UploadRepository {
             .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
-            .and(UPLOAD.UPLOAD_OFFSET.gt(0L))
             .and(UPLOAD.UPDATED_AT.lt(cutoff))
             .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)
             .fetch()
