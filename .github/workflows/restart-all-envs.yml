@@ -1,0 +1,24 @@
+name: "Restart all environments"
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy_dev:
+    uses: navikt/sosialhjelp-upload/.github/workflows/deploy-dev.yml@main
+    with:
+      config-file-name: dev
+    secrets: inherit
+  deploy_mock:
+    uses: navikt/sosialhjelp-upload/.github/workflows/deploy-dev.yml@main
+    with:
+      config-file-name: mock
+    secrets: inherit
+  deploy_prod:
+    uses: navikt/sosialhjelp-upload/.github/workflows/deploy-prod.yml@main
+    secrets: inherit
