@@ -4,6 +4,7 @@ env:
   ORG_GRADLE_PROJECT_githubUser: x-access-token
   ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches:
