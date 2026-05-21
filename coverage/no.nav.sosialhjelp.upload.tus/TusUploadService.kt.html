@@ -164,7 +164,7 @@ import java.util.UUID
 
 <span class="fc" id="L165">        val errors = validator.validate(upload.filename, chunkData, chunkData.size.toLong())</span>
 <span class="fc bfc" id="L166" title="All 4 branches covered.">        if (errors.isNotEmpty()) {</span>
-<span class="fc" id="L167">            logger.info(&quot;Upload $uploadId failed validation: ${errors.map { it.code }}&quot;)</span>
+<span class="fc" id="L167">            logger.info(&quot;Upload $uploadId failed validation: ${errors.map { &quot;${it.code}: ${it.message}&quot; }}&quot;)</span>
 <span class="fc" id="L168">            withContext(ioDispatcher) {</span>
 <span class="fc" id="L169">                dsl.transaction { tx -&gt;</span>
 <span class="fc" id="L170">                    uploadRepository.addErrors(tx, uploadId, errors)</span>
@@ -195,7 +195,7 @@ import java.util.UUID
 <span class="fc" id="L195">                .defaultForFile(File(finalFilename))</span>
 <span class="fc" id="L196">                .toString()</span>
 
-<span class="fc" id="L198">        logger.info(&quot;Uploading $mellomlagringFilnavn (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}&quot;)</span>
+<span class="fc" id="L198">        logger.info(&quot;Uploading file (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}&quot;)</span>
 <span class="fc" id="L199">        val filId =</span>
 <span class="fc" id="L200">            try {</span>
 <span class="fc" id="L201">                mellomlagringClient.uploadFile(</span>
