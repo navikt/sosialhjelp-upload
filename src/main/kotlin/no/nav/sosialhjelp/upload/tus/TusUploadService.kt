@@ -17,6 +17,7 @@ import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.validation.UploadValidator
+import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.slf4j.LoggerFactory
@@ -83,7 +84,7 @@ class TusUploadService(
                         ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
 
                 submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)
-                uploadRepository
+                val uploadId = uploadRepository
                     .create(tx, submissionId, filename, size)
                     .also {
                         meterRegistry.counter("upload.created").increment()
@@ -91,6 +92,11 @@ class TusUploadService(
                         meterRegistry.counter("upload.file_extension", "extension", extension).increment()
                     }
                     ?: error("Failed to create upload record")
+                val validations = validator.validate(filename, fileSize = size)
+                if (validations.isNotEmpty()) {
+                    uploadRepository.addErrors(tx, uploadId, validations)
+                }
+                uploadId
             }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")

@@ -245,6 +245,16 @@ class UploadValidator(
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val tika = Tika()
 
+    fun validate(
+        filename: String,
+        fileSize: Long,
+    ): List<Validation> {
+        return listOfNotNull(
+            validateFileSize(fileSize),
+            validateFilename(Filename(filename)),
+        )
+    }
+
     suspend fun validate(
         filename: String,
         data: ByteArray,
@@ -256,7 +266,6 @@ class UploadValidator(
             meterRegistry.counter("upload.tika_mime_type", "mime_type", mimeType).increment()
             listOfNotNull(
                 validateFileSize(fileSize),
-                validateFilename(Filename(filename)),
                 fileTypeValidation,
                 if (mimeType == "application/pdf") validatePdf(data) else null,
                 virusScanValidation.await(),
@@ -307,6 +316,7 @@ class UploadValidator(
                 logger.warn("Virus scanner returned ERROR, treating file as clean")
                 null
             }
+
             Result.OK -> null
         }
 
