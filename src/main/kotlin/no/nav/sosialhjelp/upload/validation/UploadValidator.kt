@@ -10,6 +10,9 @@ import org.apache.pdfbox.Loader
 import org.apache.pdfbox.io.RandomAccessReadBuffer
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
 import org.apache.tika.Tika
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.TikaCoreProperties
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
@@ -45,6 +48,7 @@ val SUPPORTED_MIME_TYPES =
         "application/wordperfect",
         "application/vnd.wordperfect",
         // .pages (Apple Pages - zip-based)
+        "application/vnd.apple.pages",
         // .abw (AbiWord)
         "application/x-abiword",
         // .hwp (Hangul Word Processor)
@@ -230,8 +234,6 @@ val SUPPORTED_MIME_TYPES =
         // .swf (Flash - legacy)
         "application/x-shockwave-flash",
         // Tika generic type for zip-based Office formats (e.g. .docx, .xlsx, .pptx)
-        // Note: "application/zip" is intentionally excluded — plain .zip files are not supported.
-        // All zip-based Office formats are already covered by their explicit MIME types above.
         "application/x-tika-ooxml",
     )
 
@@ -250,7 +252,7 @@ class UploadValidator(
     ): List<Validation> =
         coroutineScope {
             val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }
-            val (mimeType, fileTypeValidation) = validateFileType(data)
+            val (mimeType, fileTypeValidation) = validateFileType(data, filename)
             meterRegistry.counter("upload.tika_mime_type", "mime_type", mimeType).increment()
             listOfNotNull(
                 validateFileSize(fileSize),
@@ -286,9 +288,12 @@ class UploadValidator(
             }
         }
 
-    private suspend fun validateFileType(data: ByteArray): Pair<String, Validation?> =
+    private suspend fun validateFileType(data: ByteArray, filename: String): Pair<String, Validation?> =
         withContext(ioDispatcher) {
-            val mimeType = tika.detect(data.inputStream())
+            val tikaIS = TikaInputStream.get(data.inputStream())
+            val tikaMetadata = Metadata()
+            tikaMetadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)
+            val mimeType = tikaIS.use { tika.detect(tikaIS, tikaMetadata) }
             if (mimeType !in SUPPORTED_MIME_TYPES) {
                 return@withContext mimeType to FileTypeValidation(actual = mimeType)
             }

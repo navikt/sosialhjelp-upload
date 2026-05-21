@@ -23,6 +23,7 @@ tika = "3.3.0"
 
 [libraries]
 apache-tika = { module = "org.apache.tika:tika-core", version.ref = "tika" }
+apache-tika-parsers = { module = "org.apache.tika:tika-parsers", version.ref = "tika" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 fiks-kryptering = { module = "no.ks.fiks:kryptering", version.ref = "fiks_kryptering" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
@@ -79,6 +80,10 @@ kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", vers
 ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 
 [bundles]
+tika = [
+    "apache-tika",
+    "apache-tika-parsers",
+]
 jooq = [
     "jooq",
     "jooq-kotlin",

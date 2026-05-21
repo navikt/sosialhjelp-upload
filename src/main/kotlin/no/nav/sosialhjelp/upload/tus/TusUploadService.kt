@@ -164,7 +164,7 @@ class TusUploadService(
 
         val errors = validator.validate(upload.filename, chunkData, chunkData.size.toLong())
         if (errors.isNotEmpty()) {
-            logger.info("Upload $uploadId failed validation: ${errors.map { it.code }}")
+            logger.info("Upload $uploadId failed validation: ${errors.map { "${it.code}: ${it.message}" }}")
             withContext(ioDispatcher) {
                 dsl.transaction { tx ->
                     uploadRepository.addErrors(tx, uploadId, errors)
@@ -195,7 +195,7 @@ class TusUploadService(
                 .defaultForFile(File(finalFilename))
                 .toString()
 
-        logger.info("Uploading $mellomlagringFilnavn (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}")
+        logger.info("Uploading file (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}")
         val filId =
             try {
                 mellomlagringClient.uploadFile(

@@ -39,7 +39,7 @@ dependencies {
 
     // Common utilities
     implementation(libs.bouncycastle)
-    implementation(libs.apache.tika)
+    implementation(libs.bundles.tika)
 
     implementation(libs.sosialhjelp.common.api)
 
