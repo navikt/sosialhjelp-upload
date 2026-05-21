@@ -25,7 +25,7 @@ interface Validation {
 }
 
 <span class="fc" id="L27">class FileSizeValidation : Validation {</span>
-<span class="fc" id="L28">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
+<span class="pc" id="L28">    override val message: String = &quot;File size exceeds the maximum allowed limit of $MAX_FILE_SIZE bytes.&quot;</span>
 <span class="fc" id="L29">    override val code: ValidationCode = ValidationCode.FILE_TOO_LARGE</span>
 }
 
@@ -49,8 +49,8 @@ interface Validation {
 <span class="nc" id="L49">    override val code: ValidationCode = ValidationCode.ENCRYPTED_PDF</span>
 }
 
-<span class="fc" id="L52">class InvalidPdfValidation : Validation {</span>
-<span class="fc" id="L53">    override val message: String = &quot;Could not load PDF document.&quot;</span>
-<span class="fc" id="L54">    override val code: ValidationCode = ValidationCode.INVALID_PDF</span>
+<span class="nc" id="L52">class InvalidPdfValidation : Validation {</span>
+<span class="nc" id="L53">    override val message: String = &quot;Could not load PDF document.&quot;</span>
+<span class="nc" id="L54">    override val code: ValidationCode = ValidationCode.INVALID_PDF</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
