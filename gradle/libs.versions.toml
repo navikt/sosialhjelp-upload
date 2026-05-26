@@ -1,23 +1,23 @@
 [versions]
 bouncycastle = "1.84"
-coroutines = "1.10.2"
-fiks_kryptering = "2.2.2"
-flyway = "12.4.0"
-google-cloud-storage = "2.67.0"
-hikari = "6.3.0"
+coroutines = "1.11.0"
+fiks_kryptering = "2.3.0"
+flyway = "12.6.2"
+google-cloud-storage = "2.68.0"
+hikari = "7.0.2"
 jdbc = "42.7.8"
-jooq = "3.21.2"
-junit = "6.0.3"
+jooq = "3.21.4"
+junit = "6.1.0"
 kotlin = "2.3.21"
-ktor = "3.3.1"
+ktor = "3.5.0"
 logback = "1.5.32"
 mockk = "1.14.9"
 mockwebserver = "5.3.2"
-opentelemetry = "1.61.0"
+opentelemetry = "1.62.0"
 pdfbox = "3.0.7"
-postgres = "42.7.10"
+postgres = "42.7.11"
 prometheus = "1.16.5"
-sosialhjelp_common = "1.20260204.1322-0cda8ef"
+sosialhjelp_common = "1.20260512.1419-f4bad13"
 testcontainers = "2.0.5"
 tika = "3.3.0"
 
@@ -28,8 +28,8 @@ bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "boun
 fiks-kryptering = { module = "no.ks.fiks:kryptering", version.ref = "fiks_kryptering" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
-hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "google-cloud-storage" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
 jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
@@ -45,8 +45,8 @@ ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
-ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-serialization-jackson = { module = "io.ktor:ktor-serialization-jackson", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
 ktor-server-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
 ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
@@ -80,10 +80,6 @@ kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", vers
 ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 
 [bundles]
-tika = [
-    "apache-tika",
-    "apache-tika-parsers",
-]
 jooq = [
     "jooq",
     "jooq-kotlin",
@@ -118,4 +114,8 @@ ktor = [
 testcontainers = [
     "testcontainers-junit-jupiter",
     "testcontainers-postgresql",
+]
+tika = [
+    "apache-tika",
+    "apache-tika-parsers",
 ]
