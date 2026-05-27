@@ -1,9 +1,12 @@
 package no.nav.sosialhjelp.upload.common
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import org.jooq.DSLContext
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 object TestUtils {
     fun createMockSubmission(
@@ -48,18 +51,17 @@ object TestUtils {
      * Blocks until [events] contains at least [minCount] entries, or throws if [timeoutMs] elapses.
      * Use this instead of fixed `delay()` calls when waiting for SSE events to arrive.
      */
-    fun <T> awaitSseEventCount(
+    suspend fun <T> awaitSseEventCount(
         events: List<T>,
         minCount: Int,
         timeoutMs: Long = 10_000L,
         description: String = "events",
     ) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            if (events.size >= minCount) return
-            Thread.sleep(50)
+        withTimeout(timeoutMs.milliseconds) {
+            while (events.size < minCount) {
+                delay(50.milliseconds)
+            }
         }
-        error("Expected at least $minCount $description within ${timeoutMs}ms, but only got ${events.size}")
     }
 
     /**
