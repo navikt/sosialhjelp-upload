@@ -93,7 +93,7 @@ fun Route.configureTusRoutes(basePath: String) {
 <span class="nc" id="L93">        }</span>
 
         // Append a chunk
-<span class="pc bpc" id="L96" title="8 of 11 branches missed.">        patch {</span>
+<span class="pc bpc" id="L96" title="7 of 11 branches missed.">        patch {</span>
 <span class="fc" id="L97">            val uploadId = call.attributes[VerifiedUploadId]</span>
 
 <span class="fc" id="L99">            val contentType = call.request.header(&quot;Content-Type&quot;)</span>
@@ -103,14 +103,14 @@ fun Route.configureTusRoutes(basePath: String) {
 <span class="pc bpc" id="L103" title="2 of 4 branches missed.">            val uploadOffset = call.request.header(&quot;Upload-Offset&quot;)?.toLongOrNull()</span>
 <span class="nc" id="L104">                ?: return@patch call.respond(HttpStatusCode.BadRequest)</span>
 
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()</span>
 <span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (data.size &gt; MAX_CHUNK_SIZE) {</span>
 <span class="nc" id="L108">                return@patch call.respond(HttpStatusCode.PayloadTooLarge)</span>
             }
 
 <span class="fc" id="L111">            val newOffset =</span>
 <span class="pc" id="L112">                runCatching {</span>
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    tusUploadService.appendChunk(uploadId, uploadOffset, data)</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                    tusUploadService.appendChunk(uploadId, uploadOffset, data)</span>
 <span class="pc bpc" id="L114" title="1 of 2 branches missed.">                }.getOrElse { e -&gt;</span>
 <span class="nc" id="L115">                    when (e) {</span>
 <span class="nc bnc" id="L116" title="All 2 branches missed.">                        is OffsetMismatchException -&gt; return@patch call.respond(HttpStatusCode.Conflict)</span>

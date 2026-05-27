@@ -88,7 +88,7 @@ private fun migrateDatabase(dataSource: DataSource, clean: Boolean) {
         .migrate()
 }
 
-fun Application.module() {
+fun Application.module(disableJobs: Boolean = false) {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource, clean = environment.config.property(&quot;database.cleanOnStart&quot;).getString() == &quot;true&quot;)
     val runtimeEnv = this@module.property&lt;String&gt;(&quot;runtimeEnv&quot;)
@@ -140,31 +140,33 @@ fun Application.module() {
     configureStatusPages()
     configureRouting()
 
-    val recoveryService: UploadRecoveryService by dependencies
-    val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="pc bpc" id="L145" title="3 of 4 branches missed.">    recoveryScope.launch {</span>
-<span class="fc" id="L146">        while (true) {</span>
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc bnc" id="L148" title="All 2 branches missed.">            runCatching { recoveryService.recoverAll() }</span>
-<span class="nc bnc" id="L149" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+    val scopes = if (!disableJobs) {
+        val recoveryService: UploadRecoveryService by dependencies
+        val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+<span class="pc bpc" id="L146" title="3 of 4 branches missed.">        recoveryScope.launch {</span>
+<span class="fc" id="L147">            while (true) {</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+            }
         }
-    }
 
-    val retentionService: RetentionService by dependencies
-    val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="pc bpc" id="L155" title="3 of 4 branches missed.">    retentionScope.launch {</span>
-<span class="fc" id="L156">        while (true) {</span>
-<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc bnc" id="L158" title="All 2 branches missed.">            runCatching { retentionService.runRetention() }</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+        val retentionService: RetentionService by dependencies
+        val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+<span class="pc bpc" id="L156" title="3 of 4 branches missed.">        retentionScope.launch {</span>
+<span class="fc" id="L157">            while (true) {</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                runCatching { retentionService.runRetention() }</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+            }
         }
-    }
+        listOf(retentionScope, recoveryScope)
+    } else emptyList()
 
     monitor.subscribe(ApplicationStopped) {
         processingScope.cancel()
         notificationScope.cancel()
-        recoveryScope.cancel()
-        retentionScope.cancel()
+        scopes.forEach { it.cancel() }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
