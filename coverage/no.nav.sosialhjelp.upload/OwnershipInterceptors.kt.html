@@ -32,7 +32,7 @@ import java.util.UUID
 <span class="fc" id="L32">        val dsl: DSLContext by application.dependencies</span>
 <span class="fc" id="L33">        val uploadRepository: UploadRepository by application.dependencies</span>
 
-<span class="pc bpc" id="L35" title="5 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="pc bpc" id="L35" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
 <span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
 
 <span class="pc bpc" id="L38" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
@@ -47,7 +47,7 @@ import java.util.UUID
 <span class="nc" id="L47">                return@on</span>
             }
 
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            val owned = withContext(ioDispatcher) {</span>
 <span class="fc" id="L51">                dsl.transactionResult { tx -&gt; uploadRepository.isOwnedByUser(tx, uploadId, personident) }</span>
             }
 <span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (!owned) {</span>
@@ -65,7 +65,7 @@ import java.util.UUID
 <span class="fc" id="L65">    createRouteScopedPlugin(&quot;VerifySubmissionOwnership&quot;) {</span>
 <span class="fc" id="L66">        val submissionRepository: SubmissionRepository by application.dependencies</span>
 
-<span class="pc bpc" id="L68" title="5 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="pc bpc" id="L68" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
 <span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
 
 <span class="pc bpc" id="L71" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
@@ -80,7 +80,7 @@ import java.util.UUID
 <span class="nc" id="L80">                return@on</span>
             }
 
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            val owned = withContext(ioDispatcher) {</span>
 <span class="fc" id="L84">                submissionRepository.isOwnedByUser(submissionId, personident)</span>
             }
 <span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (!owned) {</span>

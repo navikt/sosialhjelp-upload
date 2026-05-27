@@ -8,6 +8,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -18,10 +19,10 @@ import java.util.*
 import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 
-<span class="fc" id="L21">data class SubmissionUpdateNotification(val submissionId: UUID, val type: UpdateType) {</span>
+<span class="fc" id="L22">data class SubmissionUpdateNotification(val submissionId: UUID, val type: UpdateType) {</span>
     enum class UpdateType {
-<span class="fc" id="L23">        UPDATE,</span>
-<span class="fc" id="L24">        DELETE</span>
+<span class="fc" id="L24">        UPDATE,</span>
+<span class="fc" id="L25">        DELETE</span>
     }
 }
 
@@ -31,49 +32,52 @@ import kotlin.time.Duration.Companion.seconds
  * A single shared LISTEN connection is maintained in the background and distributes
  * notifications via a SharedFlow, so SSE subscribers do not each hold a DB connection.
  */
-<span class="fc" id="L34">class SubmissionNotificationService(</span>
-<span class="fc" id="L35">    private val dataSource: DataSource,</span>
-<span class="fc" id="L36">    listenerScope: CoroutineScope = CoroutineScope(SupervisorJob()),</span>
-<span class="fc" id="L37">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L38">) {</span>
-<span class="fc" id="L39">    private val log = LoggerFactory.getLogger(SubmissionNotificationService::class.java)</span>
+<span class="fc" id="L35">class SubmissionNotificationService(</span>
+<span class="fc" id="L36">    private val dataSource: DataSource,</span>
+<span class="fc" id="L37">    listenerScope: CoroutineScope = CoroutineScope(SupervisorJob()),</span>
+<span class="fc" id="L38">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L39">) {</span>
+<span class="fc" id="L40">    private val log = LoggerFactory.getLogger(SubmissionNotificationService::class.java)</span>
 
-<span class="fc" id="L41">    private val _updates = MutableSharedFlow&lt;SubmissionUpdateNotification&gt;(extraBufferCapacity = 64)</span>
+<span class="fc" id="L42">    private val _updates = MutableSharedFlow&lt;SubmissionUpdateNotification&gt;(extraBufferCapacity = 64)</span>
 
-<span class="fc" id="L43">    init {</span>
-<span class="fc" id="L44">        listenerScope.launch {</span>
-<span class="fc" id="L45">            while (true) {</span>
-<span class="fc" id="L46">                try {</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L48">                        dataSource.connection.use { conn -&gt;</span>
-<span class="fc" id="L49">                            val pgConn = conn.unwrap(PGConnection::class.java)</span>
-<span class="fc" id="L50">                            conn.createStatement().execute(&quot;LISTEN submission_update&quot;)</span>
-<span class="fc" id="L51">                            conn.createStatement().execute(&quot;LISTEN submission_delete&quot;)</span>
-<span class="fc" id="L52">                            log.info(&quot;LISTEN connection established&quot;)</span>
-<span class="fc" id="L53">                            while (true) {</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                                val notifications = pgConn.getNotifications(500) ?: emptyArray()</span>
-<span class="fc" id="L55">                                notifications.forEach { notification -&gt;</span>
-<span class="fc" id="L56">                                    val type = when (notification.name) {</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">                                        &quot;submission_delete&quot; -&gt; SubmissionUpdateNotification.UpdateType.DELETE</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                                        &quot;submission_update&quot; -&gt; SubmissionUpdateNotification.UpdateType.UPDATE</span>
-<span class="nc" id="L59">                                        else -&gt; error(&quot;Unsupported notification name ${notification.name}&quot;)</span>
+    /** All submission update/delete notifications, unfiltered. */
+<span class="fc" id="L45">    val allUpdates: Flow&lt;SubmissionUpdateNotification&gt; = _updates.asSharedFlow()</span>
+
+<span class="fc" id="L47">    init {</span>
+<span class="fc" id="L48">        listenerScope.launch {</span>
+<span class="fc" id="L49">            while (true) {</span>
+<span class="fc" id="L50">                try {</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                    withContext(ioDispatcher) {</span>
+<span class="fc" id="L52">                        dataSource.connection.use { conn -&gt;</span>
+<span class="fc" id="L53">                            val pgConn = conn.unwrap(PGConnection::class.java)</span>
+<span class="fc" id="L54">                            conn.createStatement().execute(&quot;LISTEN submission_update&quot;)</span>
+<span class="fc" id="L55">                            conn.createStatement().execute(&quot;LISTEN submission_delete&quot;)</span>
+<span class="fc" id="L56">                            log.info(&quot;LISTEN connection established&quot;)</span>
+<span class="fc" id="L57">                            while (true) {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                                val notifications = pgConn.getNotifications(500) ?: emptyArray()</span>
+<span class="fc" id="L59">                                notifications.forEach { notification -&gt;</span>
+<span class="fc" id="L60">                                    val type = when (notification.name) {</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                                        &quot;submission_delete&quot; -&gt; SubmissionUpdateNotification.UpdateType.DELETE</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                                        &quot;submission_update&quot; -&gt; SubmissionUpdateNotification.UpdateType.UPDATE</span>
+<span class="nc" id="L63">                                        else -&gt; error(&quot;Unsupported notification name ${notification.name}&quot;)</span>
                                     }
-<span class="pc" id="L61">                                    runCatching { UUID.fromString(notification.parameter) }</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                                        .getOrNull()</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                                        ?.let { _updates.tryEmit(SubmissionUpdateNotification(it, type = type)) }</span>
-<span class="fc" id="L64">                                }</span>
+<span class="pc" id="L65">                                    runCatching { UUID.fromString(notification.parameter) }</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                                        .getOrNull()</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                                        ?.let { _updates.tryEmit(SubmissionUpdateNotification(it, type = type)) }</span>
+<span class="fc" id="L68">                                }</span>
                             }
                         }
                     }
-<span class="nc" id="L68">                } catch (e: CancellationException) {</span>
-<span class="nc" id="L69">                    throw e</span>
-<span class="nc" id="L70">                } catch (e: Exception) {</span>
-<span class="nc" id="L71">                    log.warn(&quot;LISTEN connection lost, reconnecting in 1s&quot;, e)</span>
-<span class="nc" id="L72">                    delay(1.seconds)</span>
+<span class="nc" id="L72">                } catch (e: CancellationException) {</span>
+<span class="nc" id="L73">                    throw e</span>
+<span class="nc" id="L74">                } catch (e: Exception) {</span>
+<span class="nc" id="L75">                    log.warn(&quot;LISTEN connection lost, reconnecting in 1s&quot;, e)</span>
+<span class="nc" id="L76">                    delay(1.seconds)</span>
                 }
             }
         }
-<span class="fc" id="L76">    }</span>
+<span class="fc" id="L80">    }</span>
 
     /**
      * Fires a pg_notify immediately on a new autocommit connection.
@@ -86,13 +90,13 @@ import kotlin.time.Duration.Companion.seconds
      * notifications that must be atomic with a write transaction.
      */
     fun notifyUpdate(submissionId: UUID) {
-<span class="nc" id="L89">        dataSource.connection.use { conn -&gt;</span>
-<span class="nc" id="L90">            conn.prepareStatement(&quot;SELECT pg_notify('submission_update', ?)&quot;).use { ps -&gt;</span>
-<span class="nc" id="L91">                ps.setString(1, submissionId.toString())</span>
-<span class="nc" id="L92">                ps.execute()</span>
-<span class="nc" id="L93">            }</span>
+<span class="nc" id="L93">        dataSource.connection.use { conn -&gt;</span>
+<span class="nc" id="L94">            conn.prepareStatement(&quot;SELECT pg_notify('submission_update', ?)&quot;).use { ps -&gt;</span>
+<span class="nc" id="L95">                ps.setString(1, submissionId.toString())</span>
+<span class="nc" id="L96">                ps.execute()</span>
+<span class="nc" id="L97">            }</span>
         }
-<span class="nc" id="L95">    }</span>
+<span class="nc" id="L99">    }</span>
 
     /**
      * Fires a pg_notify immediately on a new autocommit connection.
@@ -105,17 +109,17 @@ import kotlin.time.Duration.Companion.seconds
      * notifications that must be atomic with a write transaction.
      */
     fun notifyDeleted(submissionId: UUID) {
-<span class="pc" id="L108">        dataSource.connection.use { conn -&gt;</span>
-<span class="pc" id="L109">            conn.prepareStatement(&quot;SELECT pg_notify('submission_delete', ?)&quot;).use { ps -&gt;</span>
-<span class="fc" id="L110">                ps.setString(1, submissionId.toString())</span>
-<span class="fc" id="L111">                ps.execute()</span>
-<span class="fc" id="L112">            }</span>
+<span class="pc" id="L112">        dataSource.connection.use { conn -&gt;</span>
+<span class="pc" id="L113">            conn.prepareStatement(&quot;SELECT pg_notify('submission_delete', ?)&quot;).use { ps -&gt;</span>
+<span class="fc" id="L114">                ps.setString(1, submissionId.toString())</span>
+<span class="fc" id="L115">                ps.execute()</span>
+<span class="fc" id="L116">            }</span>
         }
-<span class="fc" id="L114">    }</span>
+<span class="fc" id="L118">    }</span>
 
     fun getSubmissionFlow(submissionId: UUID): Flow&lt;SubmissionUpdateNotification.UpdateType&gt; =
-<span class="fc" id="L117">        _updates</span>
-<span class="fc" id="L118">            .filter { it.submissionId == submissionId }</span>
-<span class="fc" id="L119">            .map { it.type }</span>
+<span class="fc" id="L121">        _updates</span>
+<span class="fc" id="L122">            .filter { it.submissionId == submissionId }</span>
+<span class="fc" id="L123">            .map { it.type }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

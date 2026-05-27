@@ -32,14 +32,14 @@ fun Route.configureActionRoutes() {
 <span class="fc" id="L32">    route(&quot;/submission/{submissionId}&quot;) {</span>
 <span class="fc" id="L33">        verifySubmissionOwnership()</span>
 
-<span class="pc bpc" id="L35" title="7 of 8 branches missed.">        post(&quot;/submit&quot;) {</span>
+<span class="pc bpc" id="L35" title="6 of 8 branches missed.">        post(&quot;/submit&quot;) {</span>
 <span class="fc" id="L36">            val submissionId = call.attributes[VerifiedSubmissionId]</span>
 <span class="fc" id="L37">            val input = call.receive&lt;SubmitInput&gt;()</span>
 <span class="pc bpc" id="L38" title="1 of 2 branches missed.">            val fiksDigisosId = input.fiksDigisosId</span>
 <span class="nc bnc" id="L39" title="All 2 branches missed.">                ?: return@post call.respondText(&quot;fiksDigisosId is required&quot;, status = HttpStatusCode.BadRequest)</span>
 
 <span class="fc" id="L41">            val result =</span>
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                ettersendelseService.upload(</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                ettersendelseService.upload(</span>
 <span class="fc" id="L43">                    input.metadata,</span>
 <span class="fc" id="L44">                    fiksDigisosId = fiksDigisosId,</span>
 <span class="pc bpc" id="L45" title="2 of 4 branches missed.">                    call.request.header(&quot;Authorization&quot;)?.removePrefix(&quot;Bearer &quot;)</span>

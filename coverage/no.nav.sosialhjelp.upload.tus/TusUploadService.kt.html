@@ -132,7 +132,7 @@ import java.util.UUID
 <span class="fc bfc" id="L132" title="All 2 branches covered.">            if (claimed) {</span>
 <span class="fc" id="L133">                logger.info(&quot;Upload $uploadId complete — launching background processing&quot;)</span>
 <span class="pc bpc" id="L134" title="1 of 3 branches missed.">                processingScope.launch {</span>
-<span class="pc bfc" id="L135" title="All 2 branches covered.">                    runCatching { processCompletedUpload(uploadId) }</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                    runCatching { processCompletedUpload(uploadId) }</span>
 <span class="pc bpc" id="L136" title="1 of 2 branches missed.">                        .onFailure { logger.error(&quot;Unhandled error processing upload $uploadId&quot;, it) }</span>
 <span class="fc" id="L137">                }</span>
             } else {
