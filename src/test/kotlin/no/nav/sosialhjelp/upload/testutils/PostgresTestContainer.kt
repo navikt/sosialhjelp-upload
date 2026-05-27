@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.testutils
 
+import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
@@ -28,6 +29,11 @@ object PostgresTestContainer {
 
     val dsl: DSLContext by lazy {
         DSL.using(dataSource, SQLDialect.POSTGRES)
+    }
+
+    /** Shared notification service backed by a single LISTEN connection. */
+    val notificationService: SubmissionNotificationService by lazy {
+        SubmissionNotificationService(dataSource)
     }
 
     val jdbcUrl: String get() = instance.jdbcUrl

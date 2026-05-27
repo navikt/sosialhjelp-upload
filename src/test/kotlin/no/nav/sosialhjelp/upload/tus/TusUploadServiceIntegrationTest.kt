@@ -14,7 +14,6 @@ import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
-import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
@@ -45,7 +44,6 @@ class TusUploadServiceIntegrationTest {
     private lateinit var tusUploadService: TusUploadService
     private lateinit var mellomlagringClient: MellomlagringClient
     private lateinit var encryptionService: EncryptionService
-    private lateinit var notificationService: SubmissionNotificationService
     private lateinit var virusScanner: VirusScanner
     private lateinit var gotenbergService: GotenbergService
     private lateinit var fiksClient: FiksClient
@@ -56,7 +54,6 @@ class TusUploadServiceIntegrationTest {
         PostgresTestContainer.migrate()
         dsl = PostgresTestContainer.dsl
 
-        notificationService = SubmissionNotificationService(PostgresTestContainer.dataSource)
         uploadRepository = UploadRepository()
         submissionRepository = SubmissionRepository(dsl)
 

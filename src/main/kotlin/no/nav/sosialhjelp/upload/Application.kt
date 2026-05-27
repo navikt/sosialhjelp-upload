@@ -88,7 +88,7 @@ private fun migrateDatabase(dataSource: DataSource, clean: Boolean) {
         .migrate()
 }
 
-fun Application.module() {
+fun Application.module(disableJobs: Boolean = false) {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource, clean = environment.config.property("database.cleanOnStart").getString() == "true")
     val runtimeEnv = this@module.property<String>("runtimeEnv")
@@ -140,30 +140,32 @@ fun Application.module() {
     configureStatusPages()
     configureRouting()
 
-    val recoveryService: UploadRecoveryService by dependencies
-    val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    recoveryScope.launch {
-        while (true) {
-            delay(1.minutes)
-            runCatching { recoveryService.recoverAll() }
-                .onFailure { log.warn("Upload recovery sweep failed", it) }
+    val scopes = if (!disableJobs) {
+        val recoveryService: UploadRecoveryService by dependencies
+        val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        recoveryScope.launch {
+            while (true) {
+                delay(1.minutes)
+                runCatching { recoveryService.recoverAll() }
+                    .onFailure { log.warn("Upload recovery sweep failed", it) }
+            }
         }
-    }
 
-    val retentionService: RetentionService by dependencies
-    val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    retentionScope.launch {
-        while (true) {
-            delay(1.minutes)
-            runCatching { retentionService.runRetention() }
-                .onFailure { log.warn("Retention sweep failed", it) }
+        val retentionService: RetentionService by dependencies
+        val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        retentionScope.launch {
+            while (true) {
+                delay(1.minutes)
+                runCatching { retentionService.runRetention() }
+                    .onFailure { log.warn("Retention sweep failed", it) }
+            }
         }
-    }
+        listOf(retentionScope, recoveryScope)
+    } else emptyList()
 
     monitor.subscribe(ApplicationStopped) {
         processingScope.cancel()
         notificationScope.cancel()
-        recoveryScope.cancel()
-        retentionScope.cancel()
+        scopes.forEach { it.cancel() }
     }
 }

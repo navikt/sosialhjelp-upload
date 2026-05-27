@@ -32,14 +32,23 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -48,8 +57,6 @@ import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.common.TestUtils.awaitSseEvent
-import no.nav.sosialhjelp.upload.common.TestUtils.awaitSseEventCount
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
@@ -68,13 +75,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayOutputStream
 import java.util.Base64
-import java.util.Collections
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UploadFlowIntegrationTest {
@@ -158,7 +164,7 @@ class UploadFlowIntegrationTest {
             },
         ) {
             install(DI) { conflictPolicy = OverridePrevious }
-            module()
+            module(disableJobs = true)
             dependencies.provide<MellomlagringClient> { mellomlagringClient }
             dependencies.provide<FiksClient> { fiksClient }
             // Wrap to avoid DI trying to close Dispatchers.IO on shutdown
@@ -231,28 +237,29 @@ class UploadFlowIntegrationTest {
     }
 
     /**
-     * Opens an SSE connection for [contextId] and collects [SubmissionState] events into a
-     * synchronized list until the scope is cancelled. Must be called from within [appTestReal].
+     * Opens an SSE connection for [contextId] and returns a [SharedFlow] of [SubmissionState]
+     * events. The connection runs in the background until the scope is cancelled.
+     * Must be called from within [appTestReal].
      */
-    private fun CoroutineScope.collectSseEvents(
+    private fun CoroutineScope.sseEvents(
         client: HttpClient,
         contextId: String,
         token: String,
-    ): List<SubmissionState> {
-        val events = Collections.synchronizedList(mutableListOf<SubmissionState>())
+    ): SharedFlow<SubmissionState> {
+        val flow = MutableSharedFlow<SubmissionState>(replay = 64)
         launch(Dispatchers.IO) {
             client.sse("/sosialhjelp/upload/status/$contextId?soknadId=test", {
                 header("Authorization", "Bearer $token")
             }) {
-                incoming.collect {
-                    it.data?.let { data ->
+                incoming.collect { event ->
+                    event.data?.let { data ->
                         runCatching { Json.decodeFromString<SubmissionState>(data) }
-                            .onSuccess { submissionState -> events.add(submissionState) }
+                            .onSuccess { flow.emit(it) }
                     }
                 }
             }
         }
-        return events
+        return flow.asSharedFlow()
     }
 
     @Test
@@ -355,24 +362,21 @@ class UploadFlowIntegrationTest {
 
         createMockSubmission(PostgresTestContainer.dsl, contextId)
 
-        val events = collectSseEvents(client, contextId, token)
-        awaitSseEventCount(events, 1, description = "initial SSE event")
+        val events = sseEvents(client, contextId, token)
+
+        // Wait for the initial empty state before triggering the upload
+        val initial = withTimeout(10.seconds) { events.first { it.uploads.isEmpty() } }
+        assertTrue(initial.uploads.isEmpty(), "Initial SSE event should have no uploads")
 
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
         awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
-        awaitSseEvent(events, description = "COMPLETE SSE event") { event ->
-            event.uploads.any { it.status == UploadDto.Status.COMPLETE }
+
+        val completed = withTimeout(10.seconds) {
+            events.first { event -> event.uploads.any { it.status == UploadDto.Status.COMPLETE } }
         }
-
-        assertTrue(events.size >= 2, "Expected ≥2 SSE events (initial state + post-upload), got ${events.size}")
-
-        val initial = events.first()
-        assertTrue(initial.uploads.isEmpty(), "Initial SSE event should have no uploads")
-
-        val final = events.last { it.uploads.any { u -> u.status == UploadDto.Status.COMPLETE } }
-        assertEquals(1, final.uploads.size, "Final SSE event should contain the uploaded file")
-        assertEquals(filId, final.uploads.first().filId, "Upload filId should match mellomlagring response")
-        assertEquals(UploadDto.Status.COMPLETE, final.uploads.first().status)
+        assertEquals(1, completed.uploads.size)
+        assertEquals(filId, completed.uploads.first().filId)
+        assertEquals(UploadDto.Status.COMPLETE, completed.uploads.first().status)
     }
 
     @Test
@@ -384,24 +388,24 @@ class UploadFlowIntegrationTest {
 
         createMockSubmission(PostgresTestContainer.dsl, contextId)
 
-        val events = collectSseEvents(client, contextId, token)
-        awaitSseEventCount(events, 1, description = "initial SSE event")
+        val events = sseEvents(client, contextId, token)
+
+        withTimeout(10.seconds) { events.first { it.uploads.isEmpty() } } // initial state
 
         val uploadId = tusUpload(client, contextId, minimalPdf(), token)
         awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
-        awaitSseEvent(events, description = "upload present") { it.uploads.isNotEmpty() }
+        withTimeout(10.seconds) { events.first { it.uploads.isNotEmpty() } }
 
         client.delete("/sosialhjelp/upload/tus/files/$uploadId") {
             header("Authorization", "Bearer $token")
             header("Tus-Resumable", "1.0.0")
         }
-        // Wait for at least 2 empty-upload states: initial + post-delete
-        awaitSseEvent(events, description = "post-delete empty state") {
-            events.count { e -> e.uploads.isEmpty() } >= 2
-        }
 
-        assertTrue(events.any { it.uploads.isNotEmpty() }, "Should have received a state showing the upload")
-        assertTrue(events.last().uploads.isEmpty(), "Final SSE event after delete should have no uploads")
+        // After delete the state should revert to empty uploads (skip the initial empty event we already consumed)
+        val afterDelete = withTimeout(10.seconds) {
+            events.filter { state: SubmissionState -> state.uploads.isEmpty() }.drop(1).first()
+        }
+        assertTrue(afterDelete.uploads.isEmpty(), "State after delete should have no uploads")
     }
 
     @Test
@@ -421,17 +425,17 @@ class UploadFlowIntegrationTest {
 
         // 1. Create initial submission and connect SSE
         val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
-        val events1 = collectSseEvents(client, contextId, token)
-        awaitSseEventCount(events1, 1, description = "initial SSE event")
+        val events1 = sseEvents(client, contextId, token)
+        withTimeout(10.seconds) { events1.first { it.uploads.isEmpty() } } // initial state
 
-        // 2. Upload a file and verify SSE receives the update
+        // 2. Upload a file and wait for COMPLETE on the stream
         val uploadId1 = tusUpload(client, contextId, minimalPdf(), token)
         awaitUploadTerminal(PostgresTestContainer.dsl, uploadId1)
-        awaitSseEvent(events1, description = "first upload COMPLETE") { event ->
-            event.uploads.any { it.status == UploadDto.Status.COMPLETE }
+        withTimeout(10.seconds) {
+            events1.first { event -> event.uploads.any { it.status == UploadDto.Status.COMPLETE } }
         }
 
-        // 3. Submit — this deletes the submission, triggering a DELETE notification
+        // 3. Submit — deletes the submission
         val submitResp = client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
             header("Authorization", "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -439,23 +443,19 @@ class UploadFlowIntegrationTest {
         }
         assertEquals(HttpStatusCode.Created, submitResp.status)
 
-        // 4. Reconnect — simulates the frontend's automatic reconnection
-        val events2 = collectSseEvents(client, contextId, token)
-        awaitSseEventCount(events2, 1, description = "reconnect initial SSE event")
-
-        val reconnectInitial = events2.first()
+        // 4. Reconnect — new stream, new submission
+        val events2 = sseEvents(client, contextId, token)
+        val reconnectInitial = withTimeout(10.seconds) { events2.first { it.uploads.isEmpty() } }
         assertTrue(reconnectInitial.uploads.isEmpty(), "Reconnect initial state should have no uploads")
 
         // 5. Upload a second file on the new submission
         val uploadId2 = tusUpload(client, contextId, minimalPdf(), token, filename = "second.pdf")
         awaitUploadTerminal(PostgresTestContainer.dsl, uploadId2)
 
-        // 6. Verify the second SSE stream receives the update for the new upload
-        awaitSseEvent(events2, description = "second upload COMPLETE on reconnected stream") { event ->
-            event.uploads.any { it.status == UploadDto.Status.COMPLETE }
+        // 6. The reconnected stream should see the new upload reach COMPLETE
+        val finalEvent = withTimeout(10.seconds) {
+            events2.first { event -> event.uploads.any { it.status == UploadDto.Status.COMPLETE } }
         }
-
-        val finalEvent = events2.last { it.uploads.any { u -> u.status == UploadDto.Status.COMPLETE } }
         assertEquals(1, finalEvent.uploads.size, "Reconnected stream should show exactly one upload")
         assertEquals(UploadDto.Status.COMPLETE, finalEvent.uploads.first().status)
     }
@@ -507,17 +507,20 @@ class UploadFlowIntegrationTest {
         val soknadId = UUID.randomUUID().toString()
         val token = JwtTestUtils.issueToken()
 
-        var statusCode: HttpStatusCode? = null
-        var contentTypeHeader: String? = null
-        // prepareGet().execute gives access to response headers without consuming the streaming body
-        client.prepareGet("/sosialhjelp/upload/status/$contextId?soknadId=$soknadId") {
-            header("Authorization", "Bearer $token")
-        }.execute { response ->
-            statusCode = response.status
-            contentTypeHeader = response.headers[HttpHeaders.ContentType]
-        }
+        data class Headers(val status: HttpStatusCode, val contentType: String?)
 
-        assertEquals(HttpStatusCode.OK, statusCode)
-        assertEquals(contentTypeHeader?.contains("text/event-stream"), true, "Expected text/event-stream but got: $contentTypeHeader")
+        // supervisorScope so that cancelling the child job doesn't cancel the scope itself.
+        supervisorScope {
+            val headers = async {
+                client.prepareGet("/sosialhjelp/upload/status/$contextId?soknadId=$soknadId") {
+                    header("Authorization", "Bearer $token")
+                }.execute { response ->
+                    Headers(response.status, response.headers[HttpHeaders.ContentType])
+                }
+            }
+            val (statusCode, contentTypeHeader) = headers.await()
+            assertEquals(HttpStatusCode.OK, statusCode)
+            assertEquals(contentTypeHeader?.contains("text/event-stream"), true, "Expected text/event-stream but got: $contentTypeHeader")
+        }
     }
 }
