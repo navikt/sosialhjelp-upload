@@ -196,7 +196,7 @@ import kotlin.time.toJavaDuration
 <span class="nc" id="L196">                    }</span>
 <span class="nc" id="L197">                    bearerAuth(texasClient.getMaskinportenToken())</span>
 <span class="nc" id="L198">                }</span>
-<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (response.status != HttpStatusCode.NoContent) {</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {</span>
 <span class="nc" id="L200">                logger.warn(&quot;Failed to delete mellomlagring for $navEksternRefId: ${response.status}&quot;)</span>
             }
 <span class="nc" id="L202">        }</span>
