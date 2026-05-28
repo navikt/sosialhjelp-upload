@@ -56,7 +56,7 @@ spec:
     limits:
       memory: 2Gi
     requests:
-      cpu: 20m
+      cpu: 50m
       memory: 512Mi
   maskinporten:
     enabled: true
