@@ -32,14 +32,12 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -47,7 +45,6 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import mockwebserver3.Dispatcher
@@ -502,25 +499,24 @@ class UploadFlowIntegrationTest {
     }
 
     @Test
-    fun `SSE endpoint responds with event-stream content type`() = appTest {
+    fun `SSE endpoint responds with event-stream content type`() = appTestReal { client ->
         val contextId = UUID.randomUUID().toString()
         val soknadId = UUID.randomUUID().toString()
         val token = JwtTestUtils.issueToken()
 
         data class Headers(val status: HttpStatusCode, val contentType: String?)
 
-        // supervisorScope so that cancelling the child job doesn't cancel the scope itself.
-        supervisorScope {
-            val headers = async {
-                client.prepareGet("/sosialhjelp/upload/status/$contextId?soknadId=$soknadId") {
-                    header("Authorization", "Bearer $token")
-                }.execute { response ->
-                    Headers(response.status, response.headers[HttpHeaders.ContentType])
-                }
+        val deferredHeaders = async {
+            client.prepareGet("/sosialhjelp/upload/status/$contextId?soknadId=$soknadId") {
+                header("Authorization", "Bearer $token")
+            }.execute { response ->
+                Headers(response.status, response.headers[HttpHeaders.ContentType])
             }
-            val (statusCode, contentTypeHeader) = headers.await()
-            assertEquals(HttpStatusCode.OK, statusCode)
-            assertEquals(contentTypeHeader?.contains("text/event-stream"), true, "Expected text/event-stream but got: $contentTypeHeader")
         }
+        val (statusCode, contentTypeHeader) = deferredHeaders.await()
+        // Cancel the SSE connection — the server-side handler will run indefinitely otherwise.
+        deferredHeaders.cancel()
+        assertEquals(HttpStatusCode.OK, statusCode)
+        assertEquals(contentTypeHeader?.contains("text/event-stream"), true, "Expected text/event-stream but got: $contentTypeHeader")
     }
 }
