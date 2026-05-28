@@ -29,7 +29,6 @@ import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,6 +42,7 @@ import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import kotlinx.coroutines.CoroutineDispatcher
 import javax.sql.DataSource
 
 fun main(args: Array<String>) {
@@ -88,16 +88,17 @@ private fun migrateDatabase(dataSource: DataSource, clean: Boolean) {
         .migrate()
 }
 
-fun Application.module(disableJobs: Boolean = false) {
+fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource, clean = environment.config.property("database.cleanOnStart").getString() == "true")
     val runtimeEnv = this@module.property<String>("runtimeEnv")
-    val isLocal = runtimeEnv == "local"
-    val isMock = runtimeEnv == "mock" || isLocal
+    val isTest = runtimeEnv == "test"
+    val isLocalOrTest = runtimeEnv == "local" || isTest
+    val isMock = runtimeEnv == "mock" || isLocalOrTest
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-    val chunkStorage: ChunkStorage = if (isLocal) {
+    val chunkStorage: ChunkStorage = if (isLocalOrTest) {
         FileSystemStorage()
     } else {
         val bucketName = environment.config.property("gcs.bucketName").getString()
@@ -140,7 +141,7 @@ fun Application.module(disableJobs: Boolean = false) {
     configureStatusPages()
     configureRouting()
 
-    val scopes = if (!disableJobs) {
+    val scopes = if (!isTest) {
         val recoveryService: UploadRecoveryService by dependencies
         val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         recoveryScope.launch {
@@ -166,6 +167,8 @@ fun Application.module(disableJobs: Boolean = false) {
     monitor.subscribe(ApplicationStopped) {
         processingScope.cancel()
         notificationScope.cancel()
-        scopes.forEach { it.cancel() }
+        scopes.forEach {
+            it.cancel()
+        }
     }
 }

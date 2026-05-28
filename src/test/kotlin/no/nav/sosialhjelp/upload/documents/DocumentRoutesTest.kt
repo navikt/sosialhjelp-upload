@@ -68,7 +68,7 @@ class DocumentRoutesTest {
     }
 
     private fun appConfig() = MapApplicationConfig(
-        "runtimeEnv" to "local",
+        "runtimeEnv" to "test",
         "database.user" to PostgresTestContainer.username,
         "database.password" to PostgresTestContainer.password,
         "database.jdbcUrl" to PostgresTestContainer.jdbcUrl,

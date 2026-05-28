@@ -114,7 +114,7 @@ class UploadFlowIntegrationTest {
     }
 
     private fun appConfig() = MapApplicationConfig(
-        "runtimeEnv" to "local",
+        "runtimeEnv" to "test",
         "database.user" to PostgresTestContainer.username,
         "database.password" to PostgresTestContainer.password,
         "database.jdbcUrl" to PostgresTestContainer.jdbcUrl,
@@ -164,7 +164,7 @@ class UploadFlowIntegrationTest {
             },
         ) {
             install(DI) { conflictPolicy = OverridePrevious }
-            module(disableJobs = true)
+            module()
             dependencies.provide<MellomlagringClient> { mellomlagringClient }
             dependencies.provide<FiksClient> { fiksClient }
             // Wrap to avoid DI trying to close Dispatchers.IO on shutdown

@@ -17,7 +17,6 @@ import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.validation.UploadValidator
-import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.slf4j.LoggerFactory
