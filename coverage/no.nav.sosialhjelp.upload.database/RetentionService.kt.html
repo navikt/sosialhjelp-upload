@@ -22,7 +22,7 @@ import java.time.OffsetDateTime
 <span class="fc" id="L22">    private val chunkStorage: ChunkStorage,</span>
 <span class="fc" id="L23">    private val notificationService: SubmissionNotificationService,</span>
 <span class="fc" id="L24">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L25">    private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),</span>
+<span class="pc" id="L25">    private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),</span>
 <span class="fc" id="L26">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
 <span class="fc" id="L27">) {</span>
 <span class="fc" id="L28">    private val log = LoggerFactory.getLogger(RetentionService::class.java)</span>

@@ -14,16 +14,16 @@ import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
 
-<span class="pc" id="L17">class UploadRecoveryService(</span>
-<span class="fc" id="L18">    private val dsl: DSLContext,</span>
-<span class="fc" id="L19">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L20">    private val notificationService: SubmissionNotificationService,</span>
-<span class="fc" id="L21">    private val chunkStorage: ChunkStorage,</span>
-<span class="fc" id="L22">    private val meterRegistry: MeterRegistry,</span>
-<span class="pc" id="L23">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="nc" id="L17">class UploadRecoveryService(</span>
+<span class="nc" id="L18">    private val dsl: DSLContext,</span>
+<span class="nc" id="L19">    private val uploadRepository: UploadRepository,</span>
+<span class="nc" id="L20">    private val notificationService: SubmissionNotificationService,</span>
+<span class="nc" id="L21">    private val chunkStorage: ChunkStorage,</span>
+<span class="nc" id="L22">    private val meterRegistry: MeterRegistry,</span>
+<span class="nc" id="L23">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
 <span class="nc" id="L24">) {</span>
-<span class="fc" id="L25">    private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)</span>
-<span class="fc" id="L26">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
+<span class="nc" id="L25">    private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)</span>
+<span class="nc" id="L26">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
 
     companion object {
         const val PROCESSING_TIMEOUT_MINUTES = 3L

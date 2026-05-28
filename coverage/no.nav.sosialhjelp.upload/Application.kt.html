@@ -29,7 +29,6 @@ import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,6 +42,7 @@ import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import kotlinx.coroutines.CoroutineDispatcher
 import javax.sql.DataSource
 
 fun main(args: Array&lt;String&gt;) {
@@ -88,37 +88,38 @@ private fun migrateDatabase(dataSource: DataSource, clean: Boolean) {
         .migrate()
 }
 
-fun Application.module(disableJobs: Boolean = false) {
+fun Application.module() {
     val dataSource = getDataSource(environment.config)
     migrateDatabase(dataSource, clean = environment.config.property(&quot;database.cleanOnStart&quot;).getString() == &quot;true&quot;)
     val runtimeEnv = this@module.property&lt;String&gt;(&quot;runtimeEnv&quot;)
-    val isLocal = runtimeEnv == &quot;local&quot;
-    val isMock = runtimeEnv == &quot;mock&quot; || isLocal
+    val isTest = runtimeEnv == &quot;test&quot;
+    val isLocalOrTest = runtimeEnv == &quot;local&quot; || isTest
+    val isMock = runtimeEnv == &quot;mock&quot; || isLocalOrTest
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-    val chunkStorage: ChunkStorage = if (isLocal) {
+    val chunkStorage: ChunkStorage = if (isLocalOrTest) {
         FileSystemStorage()
     } else {
         val bucketName = environment.config.property(&quot;gcs.bucketName&quot;).getString()
         GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
     }
     dependencies {
-<span class="nc" id="L107">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="fc" id="L108">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="nc" id="L109">        provide&lt;DataSource&gt; { dataSource }</span>
-<span class="fc" id="L110">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
-<span class="pc bpc" id="L111" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (isMock) {</span>
-<span class="fc" id="L113">                create(EncryptionServiceMock::class)</span>
+<span class="nc" id="L108">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="fc" id="L109">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="nc" id="L110">        provide&lt;DataSource&gt; { dataSource }</span>
+<span class="fc" id="L111">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
+<span class="pc bpc" id="L112" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (isMock) {</span>
+<span class="fc" id="L114">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L115">                create(EncryptionServiceImpl::class)</span>
-<span class="fc" id="L116">            }</span>
+<span class="nc" id="L116">                create(EncryptionServiceImpl::class)</span>
+<span class="fc" id="L117">            }</span>
         }
-<span class="fc" id="L118">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
-<span class="fc" id="L119">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO }</span>
-<span class="fc" id="L120">        provide&lt;CoroutineScope&gt; { processingScope }</span>
-<span class="fc" id="L121">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
+<span class="fc" id="L119">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
+<span class="fc" id="L120">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO }</span>
+<span class="fc" id="L121">        provide&lt;CoroutineScope&gt; { processingScope }</span>
+<span class="fc" id="L122">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
         provide(VirusScanner::class)
@@ -140,24 +141,24 @@ fun Application.module(disableJobs: Boolean = false) {
     configureStatusPages()
     configureRouting()
 
-    val scopes = if (!disableJobs) {
+    val scopes = if (!isTest) {
         val recoveryService: UploadRecoveryService by dependencies
         val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="pc bpc" id="L146" title="3 of 4 branches missed.">        recoveryScope.launch {</span>
-<span class="fc" id="L147">            while (true) {</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                delay(1.minutes)</span>
-<span class="nc bnc" id="L149" title="All 2 branches missed.">                runCatching { recoveryService.recoverAll() }</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L147" title="All 4 branches missed.">        recoveryScope.launch {</span>
+<span class="nc" id="L148">            while (true) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
             }
         }
 
         val retentionService: RetentionService by dependencies
         val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="pc bpc" id="L156" title="3 of 4 branches missed.">        retentionScope.launch {</span>
-<span class="fc" id="L157">            while (true) {</span>
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                delay(1.minutes)</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">                runCatching { retentionService.runRetention() }</span>
-<span class="nc bnc" id="L160" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        retentionScope.launch {</span>
+<span class="nc" id="L158">            while (true) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                runCatching { retentionService.runRetention() }</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
             }
         }
         listOf(retentionScope, recoveryScope)
@@ -166,7 +167,9 @@ fun Application.module(disableJobs: Boolean = false) {
     monitor.subscribe(ApplicationStopped) {
         processingScope.cancel()
         notificationScope.cancel()
-        scopes.forEach { it.cancel() }
+        scopes.forEach {
+            it.cancel()
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
