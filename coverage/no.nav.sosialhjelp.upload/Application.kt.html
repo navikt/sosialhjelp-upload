@@ -117,7 +117,7 @@ fun Application.module() {
 <span class="fc" id="L117">            }</span>
         }
 <span class="fc" id="L119">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
-<span class="fc" id="L120">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO }</span>
+<span class="fc" id="L120">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO.limitedParallelism(Int.MAX_VALUE) }</span>
 <span class="fc" id="L121">        provide&lt;CoroutineScope&gt; { processingScope }</span>
 <span class="fc" id="L122">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
         provide(TexasClient::class)
