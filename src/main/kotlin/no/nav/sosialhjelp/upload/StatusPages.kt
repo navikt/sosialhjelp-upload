@@ -7,6 +7,7 @@ import io.ktor.server.request.uri
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
+import io.ktor.utils.io.ClosedWriteChannelException
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 
@@ -14,6 +15,10 @@ fun Application.configureStatusPages() {
     install(StatusPages) {
         exception<ChannelWriteException> { call, _ ->
             // Client disconnected (tab closed, navigated away, network drop) — normal for SSE
+            this@configureStatusPages.environment.log.debug("Client disconnected from ${call.request.uri}")
+        }
+        exception<ClosedWriteChannelException> { call, _ ->
+            // Client disconnected — thrown by heartbeat coroutine in SSE
             this@configureStatusPages.environment.log.debug("Client disconnected from ${call.request.uri}")
         }
         exception<SubmissionValidationException> { call, cause ->
