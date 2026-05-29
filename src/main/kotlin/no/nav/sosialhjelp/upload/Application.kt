@@ -117,7 +117,7 @@ fun Application.module() {
             }
         }
         provide<ChunkStorage> { chunkStorage }
-        provide<CoroutineDispatcher> { Dispatchers.IO }
+        provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(Int.MAX_VALUE) }
         provide<CoroutineScope> { processingScope }
         provide<SubmissionNotificationService> { SubmissionNotificationService(dataSource, notificationScope) }
         provide(TexasClient::class)
