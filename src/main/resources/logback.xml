@@ -5,7 +5,11 @@
         </encoder>
     </appender>
     <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <inlineHash>true</inlineHash>
+            </throwableConverter>
+        </encoder>
     </appender>
 
     <if condition='"local".equals(System.getenv("RUNTIME_ENV")) || System.getenv("RUNTIME_ENV") == null'>
