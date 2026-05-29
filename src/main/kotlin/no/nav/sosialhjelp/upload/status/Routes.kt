@@ -6,7 +6,9 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
+import io.ktor.util.cio.ChannelWriteException
 import io.ktor.util.reflect.*
+import java.io.IOException
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
@@ -56,6 +58,10 @@ fun Route.configureStatusRoutes() {
                     }
                 }
                 .first { it == SubmissionUpdateNotification.UpdateType.DELETE }
+        } catch (_: ChannelWriteException) {
+            // Client disconnected (tab closed, navigated away, network drop) — expected for SSE
+        } catch (_: IOException) {
+            // Client disconnected — expected for SSE
         } finally {
             activeConnections.decrementAndGet()
         }

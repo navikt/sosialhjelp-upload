@@ -64,6 +64,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.reactive)
     implementation(libs.ktor.server.netty)
     implementation(libs.logback.classic)
+    implementation(libs.logback.janino)
+    implementation(libs.logstash.logback.encoder)
     implementation(libs.ktor.server.config.yaml)
 
     implementation(libs.flyway.core)
