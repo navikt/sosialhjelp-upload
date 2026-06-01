@@ -27,10 +27,12 @@ fun Application.configureRouting() {
                 configureStatusRoutes()
                 configureDocumentRoutes()
                 configureActionRoutes()
-                configureVedleggRoutes()
                 route(TUS_BASE_PATH) {
                     configureTusRoutes(TUS_BASE_PATH)
                 }
+            }
+            authenticate("tokenx") {
+                configureVedleggRoutes()
             }
         }
     }

@@ -198,6 +198,18 @@ class SubmissionRepository(
             ).fetchSingle()
             .value1() > 0
 
+    fun navEksternRefIdExists(
+        tx: Configuration,
+        navEksternRefId: String,
+    ): Boolean =
+        tx
+            .dsl()
+            .selectCount()
+            .from(SUBMISSION)
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .fetchSingle()
+            .value1() > 0
+
     fun cleanup(
         tx: Configuration,
         submissionId: UUID,

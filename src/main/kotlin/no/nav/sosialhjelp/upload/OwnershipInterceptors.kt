@@ -220,3 +220,77 @@ fun Route.verifyVedleggUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispa
 fun Route.verifyNavEksternRefIdOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     install(verifyNavEksternRefIdOwnershipPlugin(ioDispatcher))
 }
+
+// ── M2M (TokenX / machine-to-machine) interceptors ─────────────────────────────────────────────
+// These are used by endpoints called from sosialhjelp-soknad-api (server-to-server).
+// There is no user identity in the token; we only verify that the resource exists.
+
+private fun verifyVedleggUploadExistsPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyVedleggUploadExists") {
+        val dsl: DSLContext by application.dependencies
+        val uploadRepository: UploadRepository by application.dependencies
+
+        on(AuthenticationChecked) { call ->
+            if (call.isHandled) return@on
+
+            val uploadId = call.parameters["uploadId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            if (uploadId == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            val exists = withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> uploadRepository.getSubmissionIdFromUploadId(tx, uploadId) } != null
+            }
+            if (!exists) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            call.attributes.put(VerifiedVedleggUploadId, uploadId)
+        }
+    }
+
+private fun verifyNavEksternRefIdExistsPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyNavEksternRefIdExists") {
+        val dsl: DSLContext by application.dependencies
+        val submissionRepository: SubmissionRepository by application.dependencies
+
+        on(AuthenticationChecked) { call ->
+            if (call.isHandled) return@on
+
+            val navEksternRefId = call.parameters["navEksternRefId"]
+            if (navEksternRefId == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            val exists = withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> submissionRepository.navEksternRefIdExists(tx, navEksternRefId) }
+            }
+            if (!exists) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+        }
+    }
+
+/**
+ * Route-scoped interceptor for M2M vedlegg upload endpoints (TokenX auth).
+ *
+ * Verifies that the upload identified by `{uploadId}` exists, without any user ownership check.
+ * On success, [VerifiedVedleggUploadId] is available in `call.attributes`.
+ */
+fun Route.verifyVedleggUploadExists(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    install(verifyVedleggUploadExistsPlugin(ioDispatcher))
+}
+
+/**
+ * Route-scoped interceptor for M2M navEksternRefId endpoints (TokenX auth).
+ *
+ * Verifies that a submission with the given `{navEksternRefId}` exists, without any user
+ * ownership check.
+ */
+fun Route.verifyNavEksternRefIdExists(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    install(verifyNavEksternRefIdExistsPlugin(ioDispatcher))
+}

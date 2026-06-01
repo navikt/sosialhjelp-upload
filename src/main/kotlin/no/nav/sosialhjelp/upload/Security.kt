@@ -18,6 +18,16 @@ fun Application.configureSecurity() {
             .rateLimited(10, 1, TimeUnit.MINUTES)
             .build()
 
+    val tokenxJwksUri = environment.config.property("tokenx.jwksUri").getString()
+    val tokenxIssuer = environment.config.property("tokenx.issuer").getString()
+    val tokenxClientId = environment.config.property("tokenx.clientId").getString()
+
+    val tokenxJwkProvider =
+        JwkProviderBuilder(URI(tokenxJwksUri).toURL())
+            .cached(10, 24, TimeUnit.HOURS)
+            .rateLimited(10, 1, TimeUnit.MINUTES)
+            .build()
+
     authentication {
         jwt {
             verifier(jwkProvider, jwtIssuer)
@@ -42,6 +52,20 @@ fun Application.configureSecurity() {
                 val subject = credential.payload.subject
                 if (subject == null || !subject.matches(Regex("\\d{11}"))) {
                     this@configureSecurity.log.warn("JWT subject is missing or not a valid 11-digit personnummer")
+                    return@validate null
+                }
+                JWTPrincipal(credential.payload)
+            }
+        }
+
+        // TokenX provider for machine-to-machine calls from sosialhjelp-soknad-api.
+        // Nais injects TOKEN_X_CLIENT_ID as the expected audience (e.g. "prod-gcp:teamdigisos:sosialhjelp-upload").
+        jwt("tokenx") {
+            verifier(tokenxJwkProvider, tokenxIssuer)
+            validate { credential ->
+                val audience = credential.payload.audience
+                if (audience == null || tokenxClientId !in audience) {
+                    this@configureSecurity.log.warn("TokenX JWT has wrong or missing audience")
                     return@validate null
                 }
                 JWTPrincipal(credential.payload)

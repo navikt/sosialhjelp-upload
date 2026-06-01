@@ -64,6 +64,8 @@ spec:
     requests:
       cpu: 10m
       memory: 512Mi
+  tokenx:
+    enabled: true
   maskinporten:
     enabled: true
     scopes:
