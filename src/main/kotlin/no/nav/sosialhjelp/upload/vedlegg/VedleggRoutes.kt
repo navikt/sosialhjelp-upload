@@ -10,8 +10,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import no.nav.sosialhjelp.upload.VerifiedVedleggUploadId
-import no.nav.sosialhjelp.upload.verifyNavEksternRefIdExists
-import no.nav.sosialhjelp.upload.verifyVedleggUploadExists
+import no.nav.sosialhjelp.upload.verifyNavEksternRefIdOwnershipByPid
+import no.nav.sosialhjelp.upload.verifyVedleggUploadOwnershipByPid
 
 fun Route.configureVedleggRoutes() {
     val vedleggService: VedleggService by application.dependencies
@@ -20,7 +20,7 @@ fun Route.configureVedleggRoutes() {
         // POST /vedlegg/{uploadId}/type — set document type on a completed upload.
         // Called machine-to-machine by sosialhjelp-soknad-api; uses TokenX auth.
         route("/{uploadId}/type") {
-            verifyVedleggUploadExists()
+            verifyVedleggUploadOwnershipByPid()
 
             post {
                 val uploadId = call.attributes[VerifiedVedleggUploadId]
@@ -33,7 +33,7 @@ fun Route.configureVedleggRoutes() {
         // GET /vedlegg/{navEksternRefId} — return JsonVedleggSpesifikasjon for the given soknadId.
         // Called machine-to-machine by sosialhjelp-soknad-api; uses TokenX auth.
         route("/{navEksternRefId}") {
-            verifyNavEksternRefIdExists()
+            verifyNavEksternRefIdOwnershipByPid()
 
             get {
                 val navEksternRefId = call.parameters["navEksternRefId"]!!

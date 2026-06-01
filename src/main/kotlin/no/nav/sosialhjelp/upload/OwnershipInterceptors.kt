@@ -221,17 +221,23 @@ fun Route.verifyNavEksternRefIdOwnership(ioDispatcher: CoroutineDispatcher = Dis
     install(verifyNavEksternRefIdOwnershipPlugin(ioDispatcher))
 }
 
-// ── M2M (TokenX / machine-to-machine) interceptors ─────────────────────────────────────────────
-// These are used by endpoints called from sosialhjelp-soknad-api (server-to-server).
-// There is no user identity in the token; we only verify that the resource exists.
+// ── TokenX interceptors ─────────────────────────────────────────────────────────────────────────
+// Used by endpoints called from sosialhjelp-soknad-api via TokenX token exchange.
+// The exchanged token carries the original user's personnummer in the `pid` claim.
 
-private fun verifyVedleggUploadExistsPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
-    createRouteScopedPlugin("VerifyVedleggUploadExists") {
+private fun verifyVedleggUploadOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyVedleggUploadOwnershipByPid") {
         val dsl: DSLContext by application.dependencies
         val uploadRepository: UploadRepository by application.dependencies
 
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
+
+            val personident = call.principal<JWTPrincipal>()?.payload?.getClaim("pid")?.asString()
+            if (personident == null) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@on
+            }
 
             val uploadId = call.parameters["uploadId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
             if (uploadId == null) {
@@ -239,25 +245,32 @@ private fun verifyVedleggUploadExistsPlugin(ioDispatcher: CoroutineDispatcher = 
                 return@on
             }
 
-            val exists = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.getSubmissionIdFromUploadId(tx, uploadId) } != null
+            val owned = withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> uploadRepository.isOwnedByUser(tx, uploadId, personident) }
             }
-            if (!exists) {
+            if (!owned) {
                 call.respond(HttpStatusCode.NotFound)
                 return@on
             }
 
             call.attributes.put(VerifiedVedleggUploadId, uploadId)
+            call.attributes.put(VerifiedPersonident, personident)
         }
     }
 
-private fun verifyNavEksternRefIdExistsPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
-    createRouteScopedPlugin("VerifyNavEksternRefIdExists") {
+private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyNavEksternRefIdOwnershipByPid") {
         val dsl: DSLContext by application.dependencies
         val submissionRepository: SubmissionRepository by application.dependencies
 
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
+
+            val personident = call.principal<JWTPrincipal>()?.payload?.getClaim("pid")?.asString()
+            if (personident == null) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@on
+            }
 
             val navEksternRefId = call.parameters["navEksternRefId"]
             if (navEksternRefId == null) {
@@ -265,32 +278,38 @@ private fun verifyNavEksternRefIdExistsPlugin(ioDispatcher: CoroutineDispatcher 
                 return@on
             }
 
-            val exists = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> submissionRepository.navEksternRefIdExists(tx, navEksternRefId) }
+            val owned = withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+                }
             }
-            if (!exists) {
+            if (!owned) {
                 call.respond(HttpStatusCode.NotFound)
                 return@on
             }
+
+            call.attributes.put(VerifiedPersonident, personident)
         }
     }
 
 /**
- * Route-scoped interceptor for M2M vedlegg upload endpoints (TokenX auth).
+ * Route-scoped ownership interceptor for vedlegg upload endpoints called via TokenX.
  *
- * Verifies that the upload identified by `{uploadId}` exists, without any user ownership check.
- * On success, [VerifiedVedleggUploadId] is available in `call.attributes`.
+ * Reads the user's personnummer from the `pid` claim in the TokenX JWT and verifies
+ * they own the upload identified by `{uploadId}`.
+ * On success, [VerifiedVedleggUploadId] and [VerifiedPersonident] are available in `call.attributes`.
  */
-fun Route.verifyVedleggUploadExists(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
-    install(verifyVedleggUploadExistsPlugin(ioDispatcher))
+fun Route.verifyVedleggUploadOwnershipByPid(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    install(verifyVedleggUploadOwnershipByPidPlugin(ioDispatcher))
 }
 
 /**
- * Route-scoped interceptor for M2M navEksternRefId endpoints (TokenX auth).
+ * Route-scoped ownership interceptor for navEksternRefId endpoints called via TokenX.
  *
- * Verifies that a submission with the given `{navEksternRefId}` exists, without any user
- * ownership check.
+ * Reads the user's personnummer from the `pid` claim in the TokenX JWT and verifies
+ * they own a submission with the given `{navEksternRefId}`.
+ * On success, [VerifiedPersonident] is available in `call.attributes`.
  */
-fun Route.verifyNavEksternRefIdExists(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
-    install(verifyNavEksternRefIdExistsPlugin(ioDispatcher))
+fun Route.verifyNavEksternRefIdOwnershipByPid(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    install(verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher))
 }
