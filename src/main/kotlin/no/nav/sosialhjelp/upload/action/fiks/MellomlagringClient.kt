@@ -180,7 +180,7 @@ class MellomlagringClient(
                     }
                     bearerAuth(texasClient.getMaskinportenToken())
                 }
-            if (response.status != HttpStatusCode.NoContent) {
+            if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
                 logger.warn("Failed to delete file $filId from mellomlagring: ${response.status}")
             }
         }
