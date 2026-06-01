@@ -180,7 +180,7 @@ import kotlin.time.toJavaDuration
 <span class="nc" id="L180">                    }</span>
 <span class="nc" id="L181">                    bearerAuth(texasClient.getMaskinportenToken())</span>
 <span class="nc" id="L182">                }</span>
-<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (response.status != HttpStatusCode.NoContent) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {</span>
 <span class="nc" id="L184">                logger.warn(&quot;Failed to delete file $filId from mellomlagring: ${response.status}&quot;)</span>
             }
 <span class="nc" id="L186">        }</span>
