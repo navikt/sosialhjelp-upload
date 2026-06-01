@@ -41,6 +41,7 @@ spec:
     inbound:
       rules:
         - application: sosialhjelp-innsyn
+        - application: sosialhjelp-soknad-api
         - application: sosialhjelp-soknad
   gcp:
     sqlInstances:

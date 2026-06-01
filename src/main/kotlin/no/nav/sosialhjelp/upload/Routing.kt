@@ -10,6 +10,7 @@ import no.nav.sosialhjelp.upload.action.configureActionRoutes
 import no.nav.sosialhjelp.upload.documents.configureDocumentRoutes
 import no.nav.sosialhjelp.upload.status.configureStatusRoutes
 import no.nav.sosialhjelp.upload.tus.configureTusRoutes
+import no.nav.sosialhjelp.upload.vedlegg.configureVedleggRoutes
 
 private const val TUS_BASE_PATH = "/tus/files"
 
@@ -26,6 +27,7 @@ fun Application.configureRouting() {
                 configureStatusRoutes()
                 configureDocumentRoutes()
                 configureActionRoutes()
+                configureVedleggRoutes()
                 route(TUS_BASE_PATH) {
                     configureTusRoutes(TUS_BASE_PATH)
                 }

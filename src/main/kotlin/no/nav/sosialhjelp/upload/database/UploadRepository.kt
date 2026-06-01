@@ -35,6 +35,13 @@ data class UploadForProcessing(
     val navEksternRefId: String,
 )
 
+data class UploadForVedlegg(
+    val documentType: String,
+    val tilleggsinfo: String?,
+    val mellomlagringFilnavn: String,
+    val sha512: String?,
+)
+
 class UploadRepository {
     class OffsetMismatchException(message: String) : RuntimeException(message)
 
@@ -379,6 +386,47 @@ class UploadRepository {
         markFailed(tx, uploadId)
         notifyChange(tx, uploadId)
     }
+
+    fun setDocumentType(
+        tx: Configuration,
+        uploadId: UUID,
+        documentType: String,
+        tilleggsinfo: String?,
+    ) {
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.DOCUMENT_TYPE, documentType)
+            .set(UPLOAD.TILLEGGSINFO, tilleggsinfo)
+            .where(UPLOAD.ID.eq(uploadId))
+            .execute()
+    }
+
+    fun getCompletedUploadsByNavEksternRefId(
+        tx: Configuration,
+        navEksternRefId: String,
+    ): List<UploadForVedlegg> =
+        tx
+            .dsl()
+            .select(
+                UPLOAD.DOCUMENT_TYPE,
+                UPLOAD.TILLEGGSINFO,
+                UPLOAD.MELLOMLAGRING_FILNAVN,
+                UPLOAD.SHA512,
+            )
+            .from(UPLOAD)
+            .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .and(UPLOAD.PROCESSING_STATUS.eq(Status.COMPLETE.name))
+            .fetch()
+            .map {
+                UploadForVedlegg(
+                    documentType = it.get(UPLOAD.DOCUMENT_TYPE) ?: "annet",
+                    tilleggsinfo = it.get(UPLOAD.TILLEGGSINFO),
+                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN)!!,
+                    sha512 = it.get(UPLOAD.SHA512),
+                )
+            }
 }
 
 

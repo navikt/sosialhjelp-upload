@@ -1,0 +1,2 @@
+ALTER TABLE upload ADD COLUMN document_type VARCHAR(100);
+ALTER TABLE upload ADD COLUMN tilleggsinfo VARCHAR(100);

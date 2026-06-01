@@ -66,10 +66,18 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(11, value)
         get(): String? = get(11) as String?
 
+    open var documentType: String?
+        set(value): Unit = set(12, value)
+        get(): String? = get(12) as String?
+
+    open var tilleggsinfo: String?
+        set(value): Unit = set(13, value)
+        get(): String? = get(13) as String?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null): this() {
+    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null, documentType: String? = null, tilleggsinfo: String? = null): this() {
         this.id = id
         this.submissionId = submissionId
         this.originalFilename = originalFilename
@@ -82,6 +90,8 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         this.sha512 = sha512
         this.updatedAt = updatedAt
         this.gcsKey = gcsKey
+        this.documentType = documentType
+        this.tilleggsinfo = tilleggsinfo
         resetChangedOnNotNull()
     }
 }

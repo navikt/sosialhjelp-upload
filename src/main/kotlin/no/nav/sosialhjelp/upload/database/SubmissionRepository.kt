@@ -182,6 +182,22 @@ class SubmissionRepository(
         return (count ?: 0) != 0
     }
 
+    fun isNavEksternRefIdOwnedByUser(
+        tx: Configuration,
+        navEksternRefId: String,
+        personIdent: String,
+    ): Boolean =
+        tx
+            .dsl()
+            .selectCount()
+            .from(SUBMISSION)
+            .where(
+                SUBMISSION.NAV_EKSTERN_REF_ID
+                    .eq(navEksternRefId)
+                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
+            ).fetchSingle()
+            .value1() > 0
+
     fun cleanup(
         tx: Configuration,
         submissionId: UUID,

@@ -128,6 +128,16 @@ open class Upload(
      */
     val GCS_KEY: TableField<UploadRecord, String?> = createField(DSL.name("gcs_key"), SQLDataType.VARCHAR(500), this, "")
 
+    /**
+     * The column <code>public.upload.document_type</code>.
+     */
+    val DOCUMENT_TYPE: TableField<UploadRecord, String?> = createField(DSL.name("document_type"), SQLDataType.VARCHAR(100), this, "")
+
+    /**
+     * The column <code>public.upload.tilleggsinfo</code>.
+     */
+    val TILLEGGSINFO: TableField<UploadRecord, String?> = createField(DSL.name("tilleggsinfo"), SQLDataType.VARCHAR(100), this, "")
+
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, where: Condition?): this(alias, null, null, null, aliased, null, where)

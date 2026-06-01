@@ -29,6 +29,7 @@ import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
+import no.nav.sosialhjelp.upload.vedlegg.VedleggService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -134,6 +135,7 @@ fun Application.module() {
         provide(EttersendelseService::class)
         provide(UploadRecoveryService::class)
         provide(RetentionService::class)
+        provide(VedleggService::class)
     }
     configureSecurity()
     configureHTTP()

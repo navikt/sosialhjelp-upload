@@ -24,6 +24,9 @@ val VerifiedUploadId = AttributeKey<UUID>("VerifiedUploadId")
 /** Set by [verifySubmissionOwnership] — the validated submission ID parsed from the path parameter. */
 val VerifiedSubmissionId = AttributeKey<UUID>("VerifiedSubmissionId")
 
+/** Set by [verifyVedleggUploadOwnership] — the validated uploadId from the {uploadId} path parameter. */
+val VerifiedVedleggUploadId = AttributeKey<UUID>("VerifiedVedleggUploadId")
+
 /** Set by [verifyUploadOwnership] or [verifySubmissionOwnership] — the authenticated user's personident. */
 val VerifiedPersonident = AttributeKey<String>("VerifiedPersonident")
 
@@ -129,4 +132,91 @@ fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.
  */
 fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     install(verifySubmissionOwnershipPlugin(ioDispatcher))
+}
+
+private fun verifyVedleggUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyVedleggUploadOwnership") {
+        val dsl: DSLContext by application.dependencies
+        val uploadRepository: UploadRepository by application.dependencies
+
+        on(AuthenticationChecked) { call ->
+            if (call.isHandled) return@on
+
+            val personident = call.principal<JWTPrincipal>()?.subject
+            if (personident == null) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@on
+            }
+
+            val uploadId = call.parameters["uploadId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            if (uploadId == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            val owned = withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> uploadRepository.isOwnedByUser(tx, uploadId, personident) }
+            }
+            if (!owned) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            call.attributes.put(VerifiedVedleggUploadId, uploadId)
+            call.attributes.put(VerifiedPersonident, personident)
+        }
+    }
+
+private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyNavEksternRefIdOwnership") {
+        val dsl: DSLContext by application.dependencies
+        val submissionRepository: SubmissionRepository by application.dependencies
+
+        on(AuthenticationChecked) { call ->
+            if (call.isHandled) return@on
+
+            val personident = call.principal<JWTPrincipal>()?.subject
+            if (personident == null) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@on
+            }
+
+            val navEksternRefId = call.parameters["navEksternRefId"]
+            if (navEksternRefId == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            val owned = withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+                }
+            }
+            if (!owned) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            call.attributes.put(VerifiedPersonident, personident)
+        }
+    }
+
+/**
+ * Route-scoped ownership interceptor for vedlegg upload endpoints.
+ *
+ * Reads `{uploadId}` from the path and verifies the authenticated user owns it.
+ * On success, [VerifiedVedleggUploadId] and [VerifiedPersonident] are available in `call.attributes`.
+ */
+fun Route.verifyVedleggUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    install(verifyVedleggUploadOwnershipPlugin(ioDispatcher))
+}
+
+/**
+ * Route-scoped ownership interceptor for navEksternRefId-scoped vedlegg endpoints.
+ *
+ * Reads `{navEksternRefId}` from the path and verifies the authenticated user owns a submission
+ * with that reference ID. On success, [VerifiedPersonident] is available in `call.attributes`.
+ */
+fun Route.verifyNavEksternRefIdOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    install(verifyNavEksternRefIdOwnershipPlugin(ioDispatcher))
 }
