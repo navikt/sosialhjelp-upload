@@ -211,16 +211,6 @@ fun Route.verifyVedleggUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispa
     install(verifyVedleggUploadOwnershipPlugin(ioDispatcher))
 }
 
-/**
- * Route-scoped ownership interceptor for navEksternRefId-scoped vedlegg endpoints.
- *
- * Reads `{navEksternRefId}` from the path and verifies the authenticated user owns a submission
- * with that reference ID. On success, [VerifiedPersonident] is available in `call.attributes`.
- */
-fun Route.verifyNavEksternRefIdOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
-    install(verifyNavEksternRefIdOwnershipPlugin(ioDispatcher))
-}
-
 // ── TokenX interceptors ─────────────────────────────────────────────────────────────────────────
 // Used by endpoints called from sosialhjelp-soknad-api via TokenX token exchange.
 // The exchanged token carries the original user's personnummer in the `pid` claim.

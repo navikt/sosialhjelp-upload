@@ -56,7 +56,8 @@ class SubmissionService(
                                     if (ext.isNotEmpty()) "$originalBase.$ext" else originalBase
                                 },
                                 status = UploadDto.Status.valueOf(upload.status.name),
-                                upload.fileSize
+                                upload.fileSize,
+                                upload.kategori
                             )
                         }
                 }

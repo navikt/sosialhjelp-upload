@@ -23,7 +23,7 @@ fun Application.configureRouting() {
                     call.respondText("I'm alive!", ContentType.Text.Plain)
                 }
             }
-            authenticate {
+            authenticate("idporten") {
                 configureStatusRoutes()
                 configureDocumentRoutes()
                 configureActionRoutes()
@@ -31,9 +31,7 @@ fun Application.configureRouting() {
                     configureTusRoutes(TUS_BASE_PATH)
                 }
             }
-            authenticate("tokenx") {
-                configureVedleggRoutes()
-            }
+            configureVedleggRoutes()
         }
     }
 }

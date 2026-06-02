@@ -4,27 +4,22 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SetTypeRequest(
-    val type: String,
-    val tilleggsinfo: String? = null,
+    val kategori: String? = null,
 )
 
 @Serializable
-data class JsonVedleggSpesifikasjon(
-    val vedlegg: List<JsonVedlegg>,
+data class VedleggSpesifikasjon(
+    val vedlegg: List<Vedlegg>,
 )
 
 @Serializable
-data class JsonVedlegg(
-    val type: String,
-    val tilleggsinfo: String? = null,
-    val status: String,
-    val filer: List<JsonFiler>,
-    val hendelseType: String? = null,
-    val hendelseReferanse: String? = null,
+data class Vedlegg(
+    val kategori: String? = null,
+    val filer: List<Fil>,
 )
 
 @Serializable
-data class JsonFiler(
+data class Fil(
     val filnavn: String,
     val sha512: String? = null,
 )

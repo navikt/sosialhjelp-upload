@@ -29,7 +29,7 @@ fun Application.configureSecurity() {
             .build()
 
     authentication {
-        jwt {
+        jwt("idporten") {
             verifier(jwkProvider, jwtIssuer)
             validate { credential ->
                 if (credential.payload.getClaim("client_id") == null) {

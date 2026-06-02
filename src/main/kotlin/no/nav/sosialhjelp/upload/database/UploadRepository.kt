@@ -22,6 +22,7 @@ data class Upload(
     val mellomlagringStorrelse: Long?,
     val status: Status,
     val sha512: String? = null,
+    val kategori: String? = null,
 )
 
 enum class Status {
@@ -36,8 +37,7 @@ data class UploadForProcessing(
 )
 
 data class UploadForVedlegg(
-    val documentType: String,
-    val tilleggsinfo: String?,
+    val category: String?,
     val mellomlagringFilnavn: String,
     val sha512: String?,
 )
@@ -316,7 +316,8 @@ class UploadRepository {
                 UPLOAD.SIZE,
                 UPLOAD.MELLOMLAGRING_STORRELSE,
                 UPLOAD.PROCESSING_STATUS,
-                UPLOAD.SHA512
+                UPLOAD.SHA512,
+                UPLOAD.KATEGORI
             )
             .from(UPLOAD)
             .leftJoin(ERROR)
@@ -337,7 +338,8 @@ class UploadRepository {
                     fileSize = records.first().get(UPLOAD.SIZE),
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
                     status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error("No processing status. Was it not selected?"),
-                    sha512 = records.first().get(UPLOAD.SHA512)
+                    sha512 = records.first().get(UPLOAD.SHA512),
+                    records.first().get(UPLOAD.KATEGORI)
                 )
             }
 
@@ -387,19 +389,18 @@ class UploadRepository {
         notifyChange(tx, uploadId)
     }
 
-    fun setDocumentType(
+    fun setCategory(
         tx: Configuration,
         uploadId: UUID,
-        documentType: String,
-        tilleggsinfo: String?,
+        kategori: String?,
     ) {
         tx
             .dsl()
             .update(UPLOAD)
-            .set(UPLOAD.DOCUMENT_TYPE, documentType)
-            .set(UPLOAD.TILLEGGSINFO, tilleggsinfo)
+            .set(UPLOAD.KATEGORI, kategori)
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
+        notifyChange(tx, uploadId)
     }
 
     fun getCompletedUploadsByNavEksternRefId(
@@ -409,8 +410,7 @@ class UploadRepository {
         tx
             .dsl()
             .select(
-                UPLOAD.DOCUMENT_TYPE,
-                UPLOAD.TILLEGGSINFO,
+                UPLOAD.KATEGORI,
                 UPLOAD.MELLOMLAGRING_FILNAVN,
                 UPLOAD.SHA512,
             )
@@ -421,8 +421,7 @@ class UploadRepository {
             .fetch()
             .map {
                 UploadForVedlegg(
-                    documentType = it.get(UPLOAD.DOCUMENT_TYPE) ?: "annet",
-                    tilleggsinfo = it.get(UPLOAD.TILLEGGSINFO),
+                    category = it.get(UPLOAD.KATEGORI),
                     mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN)!!,
                     sha512 = it.get(UPLOAD.SHA512),
                 )
