@@ -77,7 +77,7 @@ open class Submission(
     /**
      * The column <code>public.submission.context_id</code>.
      */
-    val CONTEXT_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("context_id"), SQLDataType.VARCHAR(255).nullable(false), this, "")
+    val CONTEXT_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("context_id"), SQLDataType.CLOB.nullable(false), this, "")
 
     /**
      * The column <code>public.submission.owner_ident</code>.
@@ -92,7 +92,7 @@ open class Submission(
     /**
      * The column <code>public.submission.fiks_digisos_id</code>.
      */
-    val FIKS_DIGISOS_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("fiks_digisos_id"), SQLDataType.VARCHAR(255).nullable(true), this, "")
+    val FIKS_DIGISOS_ID: TableField<SubmissionRecord, String?> = createField(DSL.name("fiks_digisos_id"), SQLDataType.CLOB.nullable(true), this, "")
 
     /**
      * The column <code>public.submission.created_at</code>.
