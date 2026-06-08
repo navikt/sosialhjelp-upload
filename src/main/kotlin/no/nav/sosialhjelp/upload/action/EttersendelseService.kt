@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.EttersendelseAlreadyExistsException
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
@@ -18,6 +19,7 @@ import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
 import org.jooq.DSLContext
+import org.slf4j.LoggerFactory
 import java.util.*
 import kotlin.time.measureTimedValue
 import kotlin.time.toJavaDuration
@@ -33,6 +35,8 @@ class EttersendelseService(
     private val encryptionService: EncryptionService,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    private val logger = LoggerFactory.getLogger(this::class.java)
+
     suspend fun upload(
         metadata: Metadata,
         fiksDigisosId: String,
@@ -68,16 +72,29 @@ class EttersendelseService(
             }
             Fil(it.mellomlagringFilnavn, it.sha512)
         }
-        val (response, duration) = measureTimedValue {
-            fiksClient.uploadEttersendelse(
-                fiksDigisosId,
-                kommunenummer,
-                navEksternRefId,
-                metadata,
-                token,
-                filer,
-            )
-        }
+        val (response, duration) =
+            try {
+                measureTimedValue {
+                    fiksClient.uploadEttersendelse(
+                        fiksDigisosId,
+                        kommunenummer,
+                        navEksternRefId,
+                        metadata,
+                        token,
+                        filer,
+                    )
+                }
+            } catch (e: EttersendelseAlreadyExistsException) {
+                logger.warn(
+                    "Ettersendelse ${e.navEksternRefId} already exists in Fiks for $fiksDigisosId — treating as success",
+                )
+                meterRegistry.counter("fiks.submission.already_exists").increment()
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx -> submissionRepository.cleanup(tx, submissionId) }
+                }
+                notificationService.notifyDeleted(submissionId)
+                return true
+            }
 
         val result = if (response.status.isSuccess()) "success" else "failure"
         meterRegistry.timer("fiks.submission", "result", result).record(duration.toJavaDuration())

@@ -177,7 +177,11 @@ class FiksClient(
                         contentType(ContentType.MultiPart.FormData)
                     }.also {
                         if (!it.status.isSuccess()) {
-                            logger.error("Feil ved opplasting til fiks: ${it.status}: ${it.bodyAsText()}")
+                            val body = it.bodyAsText()
+                            if (it.status == HttpStatusCode.BadRequest && body.contains("finnes all")) {
+                                throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
+                            }
+                            logger.error("Feil ved opplasting til fiks: ${it.status}: $body")
                         } else {
                             logger.info("Opplasting til fiks vellykket: ${it.status}")
                         }
@@ -240,6 +244,11 @@ internal fun lagIdSuffix(previousId: String): String {
     return suffix.toString().padStart(4, '0')
 }
 
+
+class EttersendelseAlreadyExistsException(
+    val navEksternRefId: String,
+    val fiksDigisosId: String,
+) : RuntimeException("Ettersendelse $navEksternRefId already exists for fiksDigisosId $fiksDigisosId")
 
 @Serializable
 data class Fil(val filnavn: String, val sha512: String)

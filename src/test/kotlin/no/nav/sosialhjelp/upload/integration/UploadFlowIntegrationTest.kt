@@ -52,6 +52,7 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.api.fiks.DigisosSak
+import no.nav.sosialhjelp.upload.action.fiks.EttersendelseAlreadyExistsException
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
@@ -336,6 +337,36 @@ class UploadFlowIntegrationTest {
     }
 
     @Test
+    fun `submit returns 201 and cleans up when Fiks reports ettersendelse already exists`() = appTest {
+        val contextId = UUID.randomUUID().toString()
+        val token = JwtTestUtils.issueToken()
+        val filId = UUID.randomUUID()
+        val fiksDigisosId = UUID.randomUUID().toString()
+
+        coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+
+        val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
+        coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak
+        coEvery {
+            fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any())
+        } throws EttersendelseAlreadyExistsException("navEksternRefId-0001", fiksDigisosId)
+
+        val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+        val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+        awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+
+        val submitResp = client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+            header("Authorization", "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody("""{"fiksDigisosId":"$fiksDigisosId","metadata":{"type":"dok","tilleggsinfo":"info"}}""")
+        }
+        assertEquals(HttpStatusCode.Created, submitResp.status)
+
+        val sub = PostgresTestContainer.dsl.selectFrom(SUBMISSION).where(SUBMISSION.ID.eq(submissionId)).fetchOne()
+        assertNull(sub, "Submission should be cleaned up even when Fiks reports already exists")
+    }
+
+    @Test
     fun `POST to contextId owned by another user returns Forbidden`() = appTest {
         val contextId = UUID.randomUUID().toString()
         createMockSubmission(PostgresTestContainer.dsl, contextId, ownerIdent = "11111111111")
@@ -458,7 +489,7 @@ class UploadFlowIntegrationTest {
     }
 
     @Test
-    fun `submit returns error when Fiks rejects duplicate file names with 400`() = appTest {
+    fun `submit returns 201 when Fiks rejects duplicate file names with 400`() = appTest {
         val contextId = UUID.randomUUID().toString()
         val token = JwtTestUtils.issueToken()
         val fiksDigisosId = UUID.randomUUID().toString()
