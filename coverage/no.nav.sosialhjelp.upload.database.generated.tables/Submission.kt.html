@@ -77,7 +77,7 @@ import org.jooq.impl.TableImpl
     /**
      * The column &lt;code&gt;public.submission.context_id&lt;/code&gt;.
      */
-<span class="fc" id="L80">    val CONTEXT_ID: TableField&lt;SubmissionRecord, String?&gt; = createField(DSL.name(&quot;context_id&quot;), SQLDataType.VARCHAR(255).nullable(false), this, &quot;&quot;)</span>
+<span class="fc" id="L80">    val CONTEXT_ID: TableField&lt;SubmissionRecord, String?&gt; = createField(DSL.name(&quot;context_id&quot;), SQLDataType.CLOB.nullable(false), this, &quot;&quot;)</span>
 
     /**
      * The column &lt;code&gt;public.submission.owner_ident&lt;/code&gt;.
@@ -92,7 +92,7 @@ import org.jooq.impl.TableImpl
     /**
      * The column &lt;code&gt;public.submission.fiks_digisos_id&lt;/code&gt;.
      */
-<span class="fc" id="L95">    val FIKS_DIGISOS_ID: TableField&lt;SubmissionRecord, String?&gt; = createField(DSL.name(&quot;fiks_digisos_id&quot;), SQLDataType.VARCHAR(255).nullable(true), this, &quot;&quot;)</span>
+<span class="fc" id="L95">    val FIKS_DIGISOS_ID: TableField&lt;SubmissionRecord, String?&gt; = createField(DSL.name(&quot;fiks_digisos_id&quot;), SQLDataType.CLOB.nullable(true), this, &quot;&quot;)</span>
 
     /**
      * The column &lt;code&gt;public.submission.created_at&lt;/code&gt;.
