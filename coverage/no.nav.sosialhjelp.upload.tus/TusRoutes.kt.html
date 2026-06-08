@@ -95,7 +95,7 @@ fun Route.configureTusRoutes(basePath: String) {
 <span class="nc" id="L95">        }</span>
 
         // Append a chunk
-<span class="pc bpc" id="L98" title="7 of 11 branches missed.">        patch {</span>
+<span class="pc bpc" id="L98" title="8 of 11 branches missed.">        patch {</span>
 <span class="fc" id="L99">            val uploadId = call.attributes[VerifiedUploadId]</span>
 
 <span class="fc" id="L101">            val contentType = call.request.header(&quot;Content-Type&quot;)</span>
@@ -105,7 +105,7 @@ fun Route.configureTusRoutes(basePath: String) {
 <span class="pc bpc" id="L105" title="2 of 4 branches missed.">            val uploadOffset = call.request.header(&quot;Upload-Offset&quot;)?.toLongOrNull()</span>
 <span class="nc" id="L106">                ?: return@patch call.respond(HttpStatusCode.BadRequest)</span>
 
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()</span>
 <span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (data.size &gt; MAX_CHUNK_SIZE) {</span>
 <span class="nc" id="L110">                return@patch call.respond(HttpStatusCode.PayloadTooLarge)</span>
             }
