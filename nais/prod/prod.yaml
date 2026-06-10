@@ -41,6 +41,7 @@ spec:
     inbound:
       rules:
         - application: sosialhjelp-innsyn
+        - application: sosialhjelp-soknad
   gcp:
     sqlInstances:
       - type: POSTGRES_17

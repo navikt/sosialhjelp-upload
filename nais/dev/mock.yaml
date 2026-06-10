@@ -39,6 +39,7 @@ spec:
     inbound:
       rules:
         - application: sosialhjelp-innsyn-mock
+        - application: sosialhjelp-soknad-mock
   gcp:
     sqlInstances:
       - type: POSTGRES_17
