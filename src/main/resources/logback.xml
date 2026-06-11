@@ -29,4 +29,5 @@
     <logger name="io.netty" level="INFO"/>
     <logger name="io.ktor.server.netty" level="WARN"/>
     <logger name="io.ktor.auth.jwt" level="DEBUG"/>
+    <logger name="org.jooq.Constants" level="OFF"/>
 </configuration>
