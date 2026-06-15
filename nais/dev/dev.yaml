@@ -53,7 +53,8 @@ spec:
             envVarPrefix: POSTGRES
     buckets:
       - name: sosialhjelp-upload-dev
-        retentionPeriodDays: 1
+        lifecycleCondition:
+          age: 1
         cascadingDelete: false
   resources:
     limits:

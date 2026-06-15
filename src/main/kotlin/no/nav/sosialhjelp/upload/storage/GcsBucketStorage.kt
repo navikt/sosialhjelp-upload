@@ -40,8 +40,12 @@ class GcsBucketStorage(
         withContext(ioDispatcher) {
             try {
                 storage.delete(BlobId.of(bucketName, key))
-            } catch (_: StorageException) {
-                // Ignore — object may already be gone
+            } catch (e: StorageException) {
+                if (e.code == 404) {
+                    // Object already gone — expected, ignore
+                } else {
+                    throw e
+                }
             }
         }
     }

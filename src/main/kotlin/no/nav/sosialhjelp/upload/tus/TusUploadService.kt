@@ -154,7 +154,7 @@ class TusUploadService(
             }
         val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { "none" }
 
-        val chunkData = withContext(ioDispatcher) {
+        val (chunkData, composedKey) = withContext(ioDispatcher) {
             val chunkPrefix = "uploads/$uploadId-chunk-"
             val chunkKeys = chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
                 key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
@@ -162,9 +162,11 @@ class TusUploadService(
             if (chunkKeys.isEmpty()) {
                 error("No chunk objects found for upload $uploadId at prefix $chunkPrefix")
             }
-            val composedKey = upload.gcsKey
+            // Use a unique key per attempt so we never try to overwrite an existing GCS object,
+            // which would be rejected with 403 if a previous composed object is still present.
+            val composedKey = "${upload.gcsKey}-${UUID.randomUUID()}"
             chunkStorage.composeChunks(chunkKeys, composedKey)
-            chunkStorage.readObject(composedKey)
+            chunkStorage.readObject(composedKey) to composedKey
         }
 
         val errors = validator.validate(upload.filename, chunkData, chunkData.size.toLong())
@@ -174,7 +176,7 @@ class TusUploadService(
                 dsl.transaction { tx ->
                     uploadRepository.addErrors(tx, uploadId, errors)
                 }
-                deleteGcsObjects(uploadId)
+                deleteGcsObjects(uploadId, composedKey)
             }
             meterRegistry.timer("upload.processing", "result", "validation_failure", "extension", fileExtension)
                 .record(Duration.ofNanos(System.nanoTime() - startTime))
@@ -185,7 +187,7 @@ class TusUploadService(
             convertIfNeeded(upload.filename, chunkData)
         } catch (e: Exception) {
             logger.error("Upload $uploadId failed during PDF conversion", e)
-            markUploadFailed(uploadId)
+            markUploadFailed(uploadId, composedKey)
             meterRegistry.timer("upload.processing", "result", "conversion_failure", "extension", fileExtension)
                 .record(Duration.ofNanos(System.nanoTime() - startTime))
             return
@@ -211,7 +213,7 @@ class TusUploadService(
                 )
             } catch (e: Exception) {
                 logger.error("Upload $uploadId failed during mellomlagring upload", e)
-                markUploadFailed(uploadId)
+                markUploadFailed(uploadId, composedKey)
                 meterRegistry.timer("upload.processing", "result", "mellomlagring_failure", "extension", fileExtension)
                     .record(Duration.ofNanos(System.nanoTime() - startTime))
                 return
@@ -223,27 +225,30 @@ class TusUploadService(
                 uploadRepository.setFilId(tx, uploadId, filId, mellomlagringFilnavn, finalData.size.toLong(), getSha512(finalData))
                 uploadRepository.notifyChange(tx, uploadId)
             }
-            deleteGcsObjects(uploadId)
+            deleteGcsObjects(uploadId, composedKey)
         }
         meterRegistry.timer("upload.processing", "result", "success", "extension", fileExtension)
             .record(Duration.ofNanos(System.nanoTime() - startTime))
     }
 
-    private suspend fun markUploadFailed(uploadId: UUID) {
+    private suspend fun markUploadFailed(uploadId: UUID, composedKey: String? = null) {
         withContext(ioDispatcher) {
             dsl.transaction { tx ->
                 uploadRepository.markFailed(tx, uploadId)
                 uploadRepository.notifyChange(tx, uploadId)
             }
-            deleteGcsObjects(uploadId)
+            deleteGcsObjects(uploadId, composedKey)
         }
     }
 
-    private suspend fun deleteGcsObjects(uploadId: UUID) {
+    private suspend fun deleteGcsObjects(uploadId: UUID, composedKey: String? = null) {
         val chunkPrefix = "uploads/$uploadId-chunk-"
+        val keysToDelete = buildList {
+            add(composedKey ?: "uploads/$uploadId")
+        }
         runCatching {
             val chunkKeys = chunkStorage.listKeys(chunkPrefix)
-            (chunkKeys + listOf("uploads/$uploadId")).forEach { key ->
+            (chunkKeys + keysToDelete).distinct().forEach { key ->
                 runCatching { chunkStorage.deleteObject(key) }
                     .onFailure { logger.warn("Failed to delete GCS object $key", it) }
             }
