@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.tus
 
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.log
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.plugins.di.dependencies
@@ -70,6 +71,7 @@ fun Route.configureTusRoutes(basePath: String) {
             }
 
         val forwardedPrefix = call.request.header("x-forwarded-prefix")
+        application.log.info("Forwarded prefix: $forwardedPrefix")
         val proxyPath = forwardedPrefix ?: when {
             fiksDigisosId != null -> ProxyPathInnsyn
             else  -> ProxyPathSoknad
