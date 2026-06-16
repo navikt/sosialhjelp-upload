@@ -3,11 +3,6 @@ package no.nav.sosialhjelp.upload.vedlegg
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class SetTypeRequest(
-    val kategori: String? = null,
-)
-
-@Serializable
 data class VedleggSpesifikasjon(
     val vedlegg: List<Vedlegg>,
 )

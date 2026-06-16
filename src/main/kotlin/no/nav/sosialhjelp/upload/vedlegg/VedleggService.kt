@@ -2,18 +2,11 @@ package no.nav.sosialhjelp.upload.vedlegg
 
 import no.nav.sosialhjelp.upload.database.UploadRepository
 import org.jooq.DSLContext
-import java.util.UUID
 
 class VedleggService(
     private val dsl: DSLContext,
     private val uploadRepository: UploadRepository,
 ) {
-    fun setDocumentCategory(uploadId: UUID, kategori: String?) {
-        dsl.transaction { tx ->
-            uploadRepository.setCategory(tx, uploadId, kategori)
-        }
-    }
-
     fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
         val uploads = dsl.transactionResult { tx ->
             uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)

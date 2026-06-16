@@ -24,9 +24,6 @@ val VerifiedUploadId = AttributeKey<UUID>("VerifiedUploadId")
 /** Set by [verifySubmissionOwnership] — the validated submission ID parsed from the path parameter. */
 val VerifiedSubmissionId = AttributeKey<UUID>("VerifiedSubmissionId")
 
-/** Set by [verifyVedleggUploadOwnership] — the validated uploadId from the {uploadId} path parameter. */
-val VerifiedVedleggUploadId = AttributeKey<UUID>("VerifiedVedleggUploadId")
-
 /** Set by [verifyUploadOwnership] or [verifySubmissionOwnership] — the authenticated user's personident. */
 val VerifiedPersonident = AttributeKey<String>("VerifiedPersonident")
 
@@ -134,39 +131,6 @@ fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatch
     install(verifySubmissionOwnershipPlugin(ioDispatcher))
 }
 
-private fun verifyVedleggUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
-    createRouteScopedPlugin("VerifyVedleggUploadOwnership") {
-        val dsl: DSLContext by application.dependencies
-        val uploadRepository: UploadRepository by application.dependencies
-
-        on(AuthenticationChecked) { call ->
-            if (call.isHandled) return@on
-
-            val personident = call.principal<JWTPrincipal>()?.subject
-            if (personident == null) {
-                call.respond(HttpStatusCode.Unauthorized)
-                return@on
-            }
-
-            val uploadId = call.parameters["uploadId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            if (uploadId == null) {
-                call.respond(HttpStatusCode.NotFound)
-                return@on
-            }
-
-            val owned = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.isOwnedByUser(tx, uploadId, personident) }
-            }
-            if (!owned) {
-                call.respond(HttpStatusCode.NotFound)
-                return@on
-            }
-
-            call.attributes.put(VerifiedVedleggUploadId, uploadId)
-            call.attributes.put(VerifiedPersonident, personident)
-        }
-    }
-
 private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     createRouteScopedPlugin("VerifyNavEksternRefIdOwnership") {
         val dsl: DSLContext by application.dependencies
@@ -201,52 +165,9 @@ private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatch
         }
     }
 
-/**
- * Route-scoped ownership interceptor for vedlegg upload endpoints.
- *
- * Reads `{uploadId}` from the path and verifies the authenticated user owns it.
- * On success, [VerifiedVedleggUploadId] and [VerifiedPersonident] are available in `call.attributes`.
- */
-fun Route.verifyVedleggUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
-    install(verifyVedleggUploadOwnershipPlugin(ioDispatcher))
-}
-
 // ── TokenX interceptors ─────────────────────────────────────────────────────────────────────────
 // Used by endpoints called from sosialhjelp-soknad-api via TokenX token exchange.
 // The exchanged token carries the original user's personnummer in the `pid` claim.
-
-private fun verifyVedleggUploadOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
-    createRouteScopedPlugin("VerifyVedleggUploadOwnershipByPid") {
-        val dsl: DSLContext by application.dependencies
-        val uploadRepository: UploadRepository by application.dependencies
-
-        on(AuthenticationChecked) { call ->
-            if (call.isHandled) return@on
-
-            val personident = call.principal<JWTPrincipal>()?.payload?.getClaim("pid")?.asString()
-            if (personident == null) {
-                call.respond(HttpStatusCode.Unauthorized)
-                return@on
-            }
-
-            val uploadId = call.parameters["uploadId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            if (uploadId == null) {
-                call.respond(HttpStatusCode.NotFound)
-                return@on
-            }
-
-            val owned = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.isOwnedByUser(tx, uploadId, personident) }
-            }
-            if (!owned) {
-                call.respond(HttpStatusCode.NotFound)
-                return@on
-            }
-
-            call.attributes.put(VerifiedVedleggUploadId, uploadId)
-            call.attributes.put(VerifiedPersonident, personident)
-        }
-    }
 
 private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     createRouteScopedPlugin("VerifyNavEksternRefIdOwnershipByPid") {
@@ -281,17 +202,6 @@ private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDis
             call.attributes.put(VerifiedPersonident, personident)
         }
     }
-
-/**
- * Route-scoped ownership interceptor for vedlegg upload endpoints called via TokenX.
- *
- * Reads the user's personnummer from the `pid` claim in the TokenX JWT and verifies
- * they own the upload identified by `{uploadId}`.
- * On success, [VerifiedVedleggUploadId] and [VerifiedPersonident] are available in `call.attributes`.
- */
-fun Route.verifyVedleggUploadOwnershipByPid(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
-    install(verifyVedleggUploadOwnershipByPidPlugin(ioDispatcher))
-}
 
 /**
  * Route-scoped ownership interceptor for navEksternRefId endpoints called via TokenX.

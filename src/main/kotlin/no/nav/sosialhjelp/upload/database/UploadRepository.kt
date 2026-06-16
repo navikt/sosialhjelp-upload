@@ -317,7 +317,7 @@ class UploadRepository {
                 UPLOAD.MELLOMLAGRING_STORRELSE,
                 UPLOAD.PROCESSING_STATUS,
                 UPLOAD.SHA512,
-                UPLOAD.KATEGORI
+                SUBMISSION.KATEGORI
             )
             .from(UPLOAD)
             .leftJoin(ERROR)
@@ -339,7 +339,7 @@ class UploadRepository {
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
                     status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error("No processing status. Was it not selected?"),
                     sha512 = records.first().get(UPLOAD.SHA512),
-                    records.first().get(UPLOAD.KATEGORI)
+                    records.first().get(SUBMISSION.KATEGORI)
                 )
             }
 
@@ -389,20 +389,6 @@ class UploadRepository {
         notifyChange(tx, uploadId)
     }
 
-    fun setCategory(
-        tx: Configuration,
-        uploadId: UUID,
-        kategori: String?,
-    ) {
-        tx
-            .dsl()
-            .update(UPLOAD)
-            .set(UPLOAD.KATEGORI, kategori)
-            .where(UPLOAD.ID.eq(uploadId))
-            .execute()
-        notifyChange(tx, uploadId)
-    }
-
     fun getCompletedUploadsByNavEksternRefId(
         tx: Configuration,
         navEksternRefId: String,
@@ -410,7 +396,7 @@ class UploadRepository {
         tx
             .dsl()
             .select(
-                UPLOAD.KATEGORI,
+                SUBMISSION.KATEGORI,
                 UPLOAD.MELLOMLAGRING_FILNAVN,
                 UPLOAD.SHA512,
             )
@@ -421,7 +407,7 @@ class UploadRepository {
             .fetch()
             .map {
                 UploadForVedlegg(
-                    category = it.get(UPLOAD.KATEGORI),
+                    category = it.get(SUBMISSION.KATEGORI),
                     mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN)!!,
                     sha512 = it.get(UPLOAD.SHA512),
                 )

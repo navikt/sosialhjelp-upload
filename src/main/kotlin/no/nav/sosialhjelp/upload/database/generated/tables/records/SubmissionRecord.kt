@@ -42,16 +42,21 @@ open class SubmissionRecord() : TableRecordImpl<SubmissionRecord>(Submission.SUB
         set(value): Unit = set(5, value)
         get(): String? = get(5) as String?
 
+    open var kategori: String?
+        set(value): Unit = set(6, value)
+        get(): String? = get(6) as String?
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null): this() {
+    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null): this() {
         this.id = id
         this.contextId = contextId
         this.ownerIdent = ownerIdent
         this.navEksternRefId = navEksternRefId
         this.createdAt = createdAt
         this.fiksDigisosId = fiksDigisosId
+        this.kategori = kategori
         resetChangedOnNotNull()
     }
 }

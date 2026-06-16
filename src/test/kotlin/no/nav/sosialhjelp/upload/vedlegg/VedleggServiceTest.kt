@@ -41,7 +41,6 @@ class VedleggServiceTest {
         filename: String,
         mellomlagringFilnavn: String,
         sha512: String = "abc123",
-        kategori: String? = null,
     ): UUID {
         val uploadId = UUID.randomUUID()
         dsl.transaction { config ->
@@ -53,10 +52,27 @@ class VedleggServiceTest {
                 .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)
                 .set(UPLOAD.SHA512, sha512)
                 .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
-                .set(UPLOAD.KATEGORI, kategori)
                 .execute()
         }
         return uploadId
+    }
+
+    private fun createMockSubmissionWithKategori(
+        navEksternRefId: String,
+        kategori: String? = null,
+    ): UUID {
+        val uuid = UUID.randomUUID()
+        dsl.transaction { config ->
+            config.dsl()
+                .insertInto(SUBMISSION)
+                .set(SUBMISSION.ID, uuid)
+                .set(SUBMISSION.OWNER_IDENT, "12345678910")
+                .set(SUBMISSION.CONTEXT_ID, UUID.randomUUID().toString())
+                .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
+                .set(SUBMISSION.KATEGORI, kategori)
+                .execute()
+        }
+        return uuid
     }
 
     @Test
@@ -70,44 +86,41 @@ class VedleggServiceTest {
     }
 
     @Test
-    fun `getVedleggByNavEksternRefId defaults null document type to annet`() {
+    fun `getVedleggByNavEksternRefId groups uploads with same kategori`() {
         val navEksternRefId = UUID.randomUUID().toString()
-        val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
-        insertCompleteUpload(submissionId, "test.pdf", "mellom.pdf", kategori = null)
+        val submissionId = createMockSubmissionWithKategori(navEksternRefId, kategori = "lonnslipp")
+        insertCompleteUpload(submissionId, "a.pdf", "mella.pdf")
+        insertCompleteUpload(submissionId, "b.pdf", "mellb.pdf")
 
         val result = service.getVedleggByNavEksternRefId(navEksternRefId)
 
         assertEquals(1, result.vedlegg.size)
-        assertEquals("annet", result.vedlegg[0].kategori)
+        val vedlegg = result.vedlegg.single()
+        assertEquals("lonnslipp", vedlegg.kategori)
+        assertEquals(2, vedlegg.filer.size)
     }
 
     @Test
-    fun `getVedleggByNavEksternRefId groups uploads with same kategori`() {
+    fun `getVedleggByNavEksternRefId splits uploads with different kategori into separate vedlegg`() {
         val navEksternRefId = UUID.randomUUID().toString()
-        val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
-        insertCompleteUpload(submissionId, "a.pdf", "mella.pdf", kategori = "lonnslipp")
-        insertCompleteUpload(submissionId, "b.pdf", "mellb.pdf", kategori = "lonnslipp")
-        insertCompleteUpload(submissionId, "c.pdf", "mellc.pdf", kategori = "annet")
+        val submissionA = createMockSubmissionWithKategori(navEksternRefId + "-a", kategori = "lonnslipp")
+        val submissionB = createMockSubmissionWithKategori(navEksternRefId + "-b", kategori = "annet")
+
+        dsl.transaction { config ->
+            config.dsl().update(SUBMISSION)
+                .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
+                .where(SUBMISSION.ID.`in`(submissionA, submissionB))
+                .execute()
+        }
+
+        insertCompleteUpload(submissionA, "a.pdf", "mella.pdf")
+        insertCompleteUpload(submissionB, "c.pdf", "mellc.pdf")
 
         val result = service.getVedleggByNavEksternRefId(navEksternRefId)
 
         assertEquals(2, result.vedlegg.size)
-        val lonnslipp = result.vedlegg.find { it.kategori == "lonnslipp" }
-        assertNotNull(lonnslipp)
-        assertEquals(2, lonnslipp.filer.size)
-    }
-
-    @Test
-    fun `setDocumentType updates kategori on upload`() {
-        val navEksternRefId = UUID.randomUUID().toString()
-        val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
-        val uploadId = insertCompleteUpload(submissionId, "a.pdf", "mella.pdf")
-
-        service.setDocumentCategory(uploadId, "lonnslipp")
-
-        val result = service.getVedleggByNavEksternRefId(navEksternRefId)
-        val vedlegg = result.vedlegg.single()
-        assertEquals("lonnslipp", vedlegg.kategori)
+        assertNotNull(result.vedlegg.find { it.kategori == "lonnslipp" })
+        assertNotNull(result.vedlegg.find { it.kategori == "annet" })
     }
 
     @Test
@@ -115,7 +128,6 @@ class VedleggServiceTest {
         val navEksternRefId = UUID.randomUUID().toString()
         val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
 
-        // Insert a PENDING upload — should be excluded
         val uploadId = UUID.randomUUID()
         dsl.transaction { config ->
             config.dsl()
