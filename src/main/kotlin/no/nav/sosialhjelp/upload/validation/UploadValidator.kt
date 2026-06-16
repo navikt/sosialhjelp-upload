@@ -334,7 +334,7 @@ class UploadValidator(
     }
 
     private fun validateFilename(filename: Filename): Validation? {
-        if (filename.containsIllegalCharacters()) {
+        if (filename.containsDangerousSequences()) {
             return FilenameValidation()
         }
         return null
@@ -347,5 +347,12 @@ private value class Filename(
 ) {
     fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()
 
-    fun containsIllegalCharacters(): Boolean = this.sanitize().contains("[^a-zæøåA-ZÆØÅ0-9 (),._–-]".toRegex())
+    fun containsDangerousSequences(): Boolean {
+        val normalized = sanitize()
+        return normalized.any { it.code < 32 || it.code == 127 } || // control characters and DEL
+            normalized.contains('\u0000') || // null byte
+            normalized.contains("..") || // path traversal
+            normalized.startsWith("/") || // absolute path (Unix)
+            normalized.startsWith("\\") // absolute path (Windows)
+    }
 }
