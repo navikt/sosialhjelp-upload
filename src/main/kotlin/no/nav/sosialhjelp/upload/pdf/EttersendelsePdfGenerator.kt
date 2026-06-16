@@ -36,7 +36,7 @@ object EttersendelsePdfGenerator {
                 pdf.addText("Følgende vedlegg er sendt " + formatLocalDateTime(LocalDateTime.now()))
 
                 pdf.addBlankLine()
-                pdf.addText("Type: " + metadata.type.replaceUnsupportedCharacters())
+                pdf.addText("Type: " + metadata.type)
                 metadata.filer.forEach { fil ->
                     pdf.addText("Filnavn: " + fil.filnavn)
                 }
@@ -47,17 +47,6 @@ object EttersendelsePdfGenerator {
             throw PdfGenerationException("Error while creating pdf", e)
         }
 }
-
-/** Replaces characters that have no glyph in SourceSansPro-Regular:
- * - U+0009: Tab (\t)
- * - U+000A: Line feed (\n)
- * - U+000D: Carriage return (\r)
- * - U+001F: Unit separator (ASCII control character)
- * - U+F0B7: Private use area bullet (used by some Windows fonts)
- **/
-private fun String.replaceUnsupportedCharacters() =
-    replace(Regex("[\\x09\\x0D\\x0A]"), " ")
-        .replace(Regex("[\\uF0B7\\x1F]"), "")
 
 fun formatLocalDateTime(dato: LocalDateTime): String {
     val datoFormatter = DateTimeFormatter.ofPattern("d. MMMM yyyy 'kl.' HH.mm", Locale.forLanguageTag("nb"))
