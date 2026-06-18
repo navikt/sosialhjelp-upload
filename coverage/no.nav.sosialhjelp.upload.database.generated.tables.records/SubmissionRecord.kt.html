@@ -42,17 +42,22 @@ import org.jooq.impl.TableRecordImpl
 <span class="nc" id="L42">        set(value): Unit = set(5, value)</span>
 <span class="nc" id="L43">        get(): String? = get(5) as String?</span>
 
+    open var kategori: String?
+<span class="nc" id="L46">        set(value): Unit = set(6, value)</span>
+<span class="nc" id="L47">        get(): String? = get(6) as String?</span>
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-<span class="nc" id="L48">    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null): this() {</span>
-<span class="nc" id="L49">        this.id = id</span>
-<span class="nc" id="L50">        this.contextId = contextId</span>
-<span class="nc" id="L51">        this.ownerIdent = ownerIdent</span>
-<span class="nc" id="L52">        this.navEksternRefId = navEksternRefId</span>
-<span class="nc" id="L53">        this.createdAt = createdAt</span>
-<span class="nc" id="L54">        this.fiksDigisosId = fiksDigisosId</span>
-<span class="nc" id="L55">        resetChangedOnNotNull()</span>
-<span class="nc" id="L56">    }</span>
+<span class="nc" id="L52">    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null): this() {</span>
+<span class="nc" id="L53">        this.id = id</span>
+<span class="nc" id="L54">        this.contextId = contextId</span>
+<span class="nc" id="L55">        this.ownerIdent = ownerIdent</span>
+<span class="nc" id="L56">        this.navEksternRefId = navEksternRefId</span>
+<span class="nc" id="L57">        this.createdAt = createdAt</span>
+<span class="nc" id="L58">        this.fiksDigisosId = fiksDigisosId</span>
+<span class="nc" id="L59">        this.kategori = kategori</span>
+<span class="nc" id="L60">        resetChangedOnNotNull()</span>
+<span class="nc" id="L61">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

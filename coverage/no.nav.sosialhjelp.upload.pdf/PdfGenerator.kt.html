@@ -35,233 +35,180 @@ import java.io.InputStream
 <span class="fc" id="L35">    private var cat: PDDocumentCatalog = document.documentCatalog</span>
 <span class="fc" id="L36">    private var metadata: PDMetadata = PDMetadata(document)</span>
 
-<span class="fc" id="L38">    private var fontStream1: InputStream? = this::class.java.getResourceAsStream(&quot;/pdf/NotoSans-Bold.ttf&quot;)</span>
+<span class="fc" id="L38">    private var fontStream1: InputStream? = this::class.java.getResourceAsStream(&quot;/pdf/SourceSansPro-Bold.ttf&quot;)</span>
 <span class="fc" id="L39">    private val fontBold: PDFont = PDType0Font.load(document, fontStream1)</span>
-<span class="fc" id="L40">    private var fontStream2: InputStream? = this::class.java.getResourceAsStream(&quot;/pdf/NotoSans-Regular.ttf&quot;)</span>
+<span class="fc" id="L40">    private var fontStream2: InputStream? = this::class.java.getResourceAsStream(&quot;/pdf/SourceSansPro-Regular.ttf&quot;)</span>
 <span class="fc" id="L41">    private val fontPlain: PDFont = PDType0Font.load(document, fontStream2)</span>
-<span class="fc" id="L42">    private var fontStream3: InputStream? = this::class.java.getResourceAsStream(&quot;/pdf/NotoNaskhArabic-Bold.ttf&quot;)</span>
-<span class="fc" id="L43">    private val fontArabicBold: PDFont = PDType0Font.load(document, fontStream3)</span>
-<span class="fc" id="L44">    private var fontStream4: InputStream? = this::class.java.getResourceAsStream(&quot;/pdf/NotoNaskhArabic-Regular.ttf&quot;)</span>
-<span class="fc" id="L45">    private val fontArabicPlain: PDFont = PDType0Font.load(document, fontStream4)</span>
 
-<span class="fc" id="L47">    private fun calculateStartY(): Float = MEDIA_BOX.upperRightY - MARGIN</span>
+<span class="fc" id="L43">    private fun calculateStartY(): Float = MEDIA_BOX.upperRightY - MARGIN</span>
 
     fun finish(): ByteArray {
-<span class="fc" id="L50">        cat.metadata = metadata</span>
+<span class="fc" id="L46">        cat.metadata = metadata</span>
 
-<span class="fc" id="L52">        pdfaid.conformance = &quot;B&quot;</span>
-<span class="fc" id="L53">        pdfaid.part = 1</span>
-<span class="fc" id="L54">        pdfaid.setAboutAsSimple(&quot;&quot;)</span>
-<span class="fc" id="L55">        xmp.addSchema(pdfaid)</span>
-<span class="fc" id="L56">        val xmpOS = ByteArrayOutputStream()</span>
-<span class="pc" id="L57">        xmpOS.use {</span>
-<span class="fc" id="L58">            XmpSerializer().serialize(xmp, it, true)</span>
-<span class="fc" id="L59">            metadata.importXMPMetadata(it.toByteArray())</span>
-<span class="fc" id="L60">        }</span>
+<span class="fc" id="L48">        pdfaid.conformance = &quot;B&quot;</span>
+<span class="fc" id="L49">        pdfaid.part = 1</span>
+<span class="fc" id="L50">        pdfaid.setAboutAsSimple(&quot;&quot;)</span>
+<span class="fc" id="L51">        xmp.addSchema(pdfaid)</span>
+<span class="fc" id="L52">        val xmpOS = ByteArrayOutputStream()</span>
+<span class="pc" id="L53">        xmpOS.use {</span>
+<span class="fc" id="L54">            XmpSerializer().serialize(xmp, it, true)</span>
+<span class="fc" id="L55">            metadata.importXMPMetadata(it.toByteArray())</span>
+<span class="fc" id="L56">        }</span>
 
-<span class="fc" id="L62">        oi.info = S_RGB_IEC61966_2_1</span>
-<span class="fc" id="L63">        oi.outputCondition = S_RGB_IEC61966_2_1</span>
-<span class="fc" id="L64">        oi.outputConditionIdentifier = S_RGB_IEC61966_2_1</span>
-<span class="fc" id="L65">        oi.registryName = &quot;http://www.color.org&quot;</span>
-<span class="fc" id="L66">        cat.addOutputIntent(oi)</span>
+<span class="fc" id="L58">        oi.info = S_RGB_IEC61966_2_1</span>
+<span class="fc" id="L59">        oi.outputCondition = S_RGB_IEC61966_2_1</span>
+<span class="fc" id="L60">        oi.outputConditionIdentifier = S_RGB_IEC61966_2_1</span>
+<span class="fc" id="L61">        oi.registryName = &quot;http://www.color.org&quot;</span>
+<span class="fc" id="L62">        cat.addOutputIntent(oi)</span>
 
-<span class="fc" id="L68">        document.addPage(currentPage)</span>
-<span class="fc" id="L69">        val baos = ByteArrayOutputStream()</span>
-<span class="fc" id="L70">        currentStream.close()</span>
-<span class="fc" id="L71">        document.save(baos)</span>
-<span class="fc" id="L72">        return baos.toByteArray()</span>
+<span class="fc" id="L64">        document.addPage(currentPage)</span>
+<span class="fc" id="L65">        val baos = ByteArrayOutputStream()</span>
+<span class="fc" id="L66">        currentStream.close()</span>
+<span class="fc" id="L67">        document.save(baos)</span>
+<span class="fc" id="L68">        return baos.toByteArray()</span>
     }
 
     fun addBlankLine() {
-<span class="fc" id="L76">        y -= 20</span>
-<span class="fc" id="L77">    }</span>
+<span class="fc" id="L72">        y -= 20</span>
+<span class="fc" id="L73">    }</span>
 
     fun addDividerLine() {
-<span class="nc" id="L80">        currentStream.setLineWidth(1f)</span>
-<span class="nc" id="L81">        currentStream.moveTo(MARGIN, y)</span>
-<span class="nc" id="L82">        currentStream.lineTo(MEDIA_BOX.width - MARGIN, y)</span>
-<span class="nc" id="L83">        currentStream.closeAndStroke()</span>
-<span class="nc" id="L84">    }</span>
+<span class="nc" id="L76">        currentStream.setLineWidth(1f)</span>
+<span class="nc" id="L77">        currentStream.moveTo(MARGIN, y)</span>
+<span class="nc" id="L78">        currentStream.lineTo(MEDIA_BOX.width - MARGIN, y)</span>
+<span class="nc" id="L79">        currentStream.closeAndStroke()</span>
+<span class="nc" id="L80">    }</span>
 
     fun addSmallDividerLine() {
-<span class="fc" id="L87">        currentStream.setLineWidth(1F)</span>
-<span class="fc" id="L88">        currentStream.moveTo((MARGIN * 7), y)</span>
-<span class="fc" id="L89">        currentStream.lineTo(MEDIA_BOX.width - (MARGIN * 7), y)</span>
-<span class="fc" id="L90">        currentStream.closeAndStroke()</span>
-<span class="fc" id="L91">    }</span>
+<span class="fc" id="L83">        currentStream.setLineWidth(1F)</span>
+<span class="fc" id="L84">        currentStream.moveTo((MARGIN * 7), y)</span>
+<span class="fc" id="L85">        currentStream.lineTo(MEDIA_BOX.width - (MARGIN * 7), y)</span>
+<span class="fc" id="L86">        currentStream.closeAndStroke()</span>
+<span class="fc" id="L87">    }</span>
 
     fun addCenteredH1Bold(text: String) {
-<span class="fc" id="L94">        addCenteredParagraph(text, fontBold, fontArabicBold, FONT_H1_SIZE, LEADING_PERCENTAGE)</span>
-<span class="fc" id="L95">    }</span>
+<span class="fc" id="L90">        addCenteredParagraph(text, fontBold, FONT_H1_SIZE, LEADING_PERCENTAGE)</span>
+<span class="fc" id="L91">    }</span>
 
     fun addCenteredH4Bold(text: String) {
-<span class="fc" id="L98">        addCenteredParagraph(text, fontBold, fontArabicBold, FONT_H4_SIZE, LEADING_PERCENTAGE)</span>
-<span class="fc" id="L99">    }</span>
+<span class="fc" id="L94">        addCenteredParagraph(text, fontBold, FONT_H4_SIZE, LEADING_PERCENTAGE)</span>
+<span class="fc" id="L95">    }</span>
 
     fun addText(text: String) {
-<span class="fc" id="L102">        addParagraph(text, fontPlain, fontArabicPlain, FONT_PLAIN_SIZE, MARGIN)</span>
-<span class="fc" id="L103">    }</span>
+<span class="fc" id="L98">        addParagraph(text, fontPlain, FONT_PLAIN_SIZE, MARGIN)</span>
+<span class="fc" id="L99">    }</span>
 
     private fun addParagraph(
         text: String,
         font: PDFont,
-        arabicFont: PDFont,
         fontSize: Float,
         margin: Float,
     ) {
-<span class="fc" id="L112">        val lines: List&lt;String&gt; = parseLines(text, font, arabicFont, fontSize)</span>
-<span class="fc" id="L113">        currentStream.beginText()</span>
-<span class="fc" id="L114">        currentStream.newLineAtOffset(margin, y)</span>
+<span class="fc" id="L107">        val lines: List&lt;String&gt; = parseLines(text, font, fontSize)</span>
+<span class="fc" id="L108">        currentStream.setFont(font, fontSize)</span>
+<span class="fc" id="L109">        currentStream.beginText()</span>
+<span class="fc" id="L110">        currentStream.newLineAtOffset(margin, y)</span>
 
-<span class="fc" id="L116">        lines.forEach { line -&gt;</span>
-<span class="fc" id="L117">            var xOffset = 0f</span>
-<span class="fc" id="L118">            splitIntoFontRuns(line).forEach { (run, isArabic) -&gt;</span>
-<span class="fc bfc" id="L119" title="All 2 branches covered.">                val activeFont = if (isArabic) arabicFont else font</span>
-<span class="fc" id="L120">                currentStream.setFont(activeFont, fontSize)</span>
-<span class="fc" id="L121">                currentStream.setCharacterSpacing(0F)</span>
-<span class="fc" id="L122">                currentStream.showText(run)</span>
-<span class="fc" id="L123">                xOffset += activeFont.getStringWidth(run) / 1000 * fontSize</span>
-<span class="fc" id="L124">            }</span>
-<span class="fc" id="L125">            currentStream.newLineAtOffset(-xOffset, -LEADING_PERCENTAGE * fontSize)</span>
+<span class="fc" id="L112">        lines.forEach {</span>
+<span class="fc" id="L113">            currentStream.setCharacterSpacing(0F)</span>
+<span class="fc" id="L114">            currentStream.showText(it)</span>
+<span class="fc" id="L115">            currentStream.newLineAtOffset(0F, -LEADING_PERCENTAGE * fontSize)</span>
 
-<span class="fc" id="L127">            y -= fontSize * LEADING_PERCENTAGE</span>
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (y &lt; 100) {</span>
-<span class="nc" id="L129">                currentStream.endText()</span>
-<span class="nc" id="L130">                continueOnNewPage()</span>
-<span class="nc" id="L131">                y = calculateStartY()</span>
-<span class="nc" id="L132">                currentStream.beginText()</span>
-<span class="nc" id="L133">                currentStream.setFont(font, fontSize)</span>
-<span class="nc" id="L134">                currentStream.newLineAtOffset(margin, y)</span>
+<span class="fc" id="L117">            y -= fontSize * LEADING_PERCENTAGE</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (y &lt; 100) {</span>
+<span class="nc" id="L119">                currentStream.endText()</span>
+<span class="nc" id="L120">                continueOnNewPage()</span>
+<span class="nc" id="L121">                y = calculateStartY()</span>
+<span class="nc" id="L122">                currentStream.beginText()</span>
+<span class="nc" id="L123">                currentStream.setFont(font, fontSize)</span>
+<span class="nc" id="L124">                currentStream.newLineAtOffset(margin, y)</span>
             }
-<span class="fc" id="L136">        }</span>
-<span class="fc" id="L137">        currentStream.endText()</span>
-<span class="fc" id="L138">    }</span>
+<span class="fc" id="L126">        }</span>
+<span class="fc" id="L127">        currentStream.endText()</span>
+<span class="fc" id="L128">    }</span>
 
     private fun addCenteredParagraph(
         text: String,
         font: PDFont,
-        arabicFont: PDFont,
         fontSize: Float,
         leadingPercentage: Float,
     ) {
-<span class="fc" id="L147">        val lines: List&lt;String&gt; = parseLines(text, font, arabicFont, fontSize)</span>
-<span class="fc" id="L148">        currentStream.beginText()</span>
-<span class="fc" id="L149">        var prevX = 0f</span>
-<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (i in lines.indices) {</span>
-<span class="fc" id="L151">            val lineWidth = measureLineWidth(lines[i], font, arabicFont, fontSize)</span>
-<span class="fc" id="L152">            val startX = (MEDIA_BOX.width - lineWidth) / 2</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (i == 0) {</span>
-<span class="fc" id="L154">                currentStream.newLineAtOffset(startX, y)</span>
-            } else {
-<span class="nc" id="L156">                currentStream.newLineAtOffset(startX - prevX, -leadingPercentage * fontSize)</span>
-            }
-<span class="fc" id="L158">            prevX = startX</span>
-<span class="fc" id="L159">            splitIntoFontRuns(lines[i]).forEach { (run, isArabic) -&gt;</span>
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                currentStream.setFont(if (isArabic) arabicFont else font, fontSize)</span>
-<span class="fc" id="L161">                currentStream.showText(run)</span>
-<span class="fc" id="L162">            }</span>
+<span class="fc" id="L136">        val lines: List&lt;String&gt; = parseLines(text, font, fontSize)</span>
+<span class="fc" id="L137">        currentStream.beginText()</span>
+<span class="fc" id="L138">        currentStream.setFont(font, fontSize)</span>
+<span class="fc" id="L139">        var prevX = 0f</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (i in lines.indices) {</span>
+<span class="fc" id="L141">            prevX =</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                if (i == 0) {</span>
+<span class="fc" id="L143">                    val lineWidth = font.getStringWidth(lines[i]) / 1000 * fontSize</span>
+<span class="fc" id="L144">                    val startX = (MEDIA_BOX.width - lineWidth) / 2</span>
+<span class="fc" id="L145">                    currentStream.newLineAtOffset(startX, y)</span>
+<span class="fc" id="L146">                    startX</span>
+                } else {
+<span class="nc" id="L148">                    val lineWidth = font.getStringWidth(lines[i]) / 1000 * fontSize</span>
+<span class="nc" id="L149">                    val startX = (MEDIA_BOX.width - lineWidth) / 2</span>
+<span class="nc" id="L150">                    currentStream.newLineAtOffset(startX - prevX, -leadingPercentage * fontSize)</span>
+<span class="nc" id="L151">                    startX</span>
+                }
+<span class="fc" id="L153">            currentStream.showText(lines[i])</span>
         }
-<span class="fc" id="L164">        currentStream.endText()</span>
-<span class="fc" id="L165">        y -= lines.size * fontSize</span>
-<span class="fc" id="L166">    }</span>
-
-    /** Measures the total rendered width of a line, accounting for font switching. */
-    private fun measureLineWidth(
-        line: String,
-        font: PDFont,
-        arabicFont: PDFont,
-        fontSize: Float,
-    ): Float =
-<span class="fc bfc" id="L175" title="All 2 branches covered.">        splitIntoFontRuns(line).sumOf { (run, isArabic) -&gt;</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">            ((if (isArabic) arabicFont else font).getStringWidth(run) / 1000 * fontSize).toDouble()</span>
-<span class="fc" id="L177">        }.toFloat()</span>
-
-    /**
-     * Splits a string into runs of consecutive characters that share the same script family:
-     * Arabic (U+0600–U+06FF, U+0750–U+077F, U+FB50–U+FDFF, U+FE70–U+FEFF, U+1EE00–U+1EEFF)
-     * versus everything else (Latin, Norwegian, digits, punctuation…).
-     *
-     * Returns a list of (text, isArabic) pairs in logical order.
-     */
-    private fun splitIntoFontRuns(text: String): List&lt;Pair&lt;String, Boolean&gt;&gt; {
-<span class="pc bpc" id="L187" title="2 of 4 branches missed.">        if (text.isEmpty()) return emptyList()</span>
-<span class="fc" id="L188">        val runs = mutableListOf&lt;Pair&lt;String, Boolean&gt;&gt;()</span>
-<span class="fc" id="L189">        val sb = StringBuilder()</span>
-<span class="fc" id="L190">        var currentIsArabic = text[0].isArabicScript()</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (ch in text) {</span>
-<span class="fc" id="L192">            val arabic = ch.isArabicScript()</span>
-<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (arabic != currentIsArabic) {</span>
-<span class="fc" id="L194">                runs.add(sb.toString() to currentIsArabic)</span>
-<span class="fc" id="L195">                sb.clear()</span>
-<span class="fc" id="L196">                currentIsArabic = arabic</span>
-            }
-<span class="fc" id="L198">            sb.append(ch)</span>
-        }
-<span class="pc bpc" id="L200" title="2 of 4 branches missed.">        if (sb.isNotEmpty()) runs.add(sb.toString() to currentIsArabic)</span>
-<span class="fc" id="L201">        return runs</span>
-    }
-
-    private fun Char.isArabicScript(): Boolean {
-<span class="fc" id="L205">        val cp = this.code</span>
-<span class="pc bpc" id="L206" title="1 of 6 branches missed.">        return cp in 0x0600..0x06FF || // Arabic</span>
-<span class="pc bpc" id="L207" title="4 of 6 branches missed.">            cp in 0x0750..0x077F || // Arabic Supplement</span>
-<span class="pc bpc" id="L208" title="4 of 6 branches missed.">            cp in 0xFB50..0xFDFF || // Arabic Presentation Forms-A</span>
-<span class="pc bpc" id="L209" title="4 of 6 branches missed.">            cp in 0xFE70..0xFEFF // Arabic Presentation Forms-B</span>
-    }
+<span class="fc" id="L155">        currentStream.endText()</span>
+<span class="fc" id="L156">        y -= lines.size * fontSize</span>
+<span class="fc" id="L157">    }</span>
 
     private fun continueOnNewPage() {
-<span class="nc" id="L213">        document.addPage(currentPage)</span>
-<span class="nc" id="L214">        currentStream.close()</span>
-<span class="nc" id="L215">        currentPage = PDPage(PDRectangle.A4)</span>
-<span class="nc" id="L216">        currentStream = PDPageContentStream(document, currentPage)</span>
-<span class="nc" id="L217">    }</span>
+<span class="nc" id="L160">        document.addPage(currentPage)</span>
+<span class="nc" id="L161">        currentStream.close()</span>
+<span class="nc" id="L162">        currentPage = PDPage(PDRectangle.A4)</span>
+<span class="nc" id="L163">        currentStream = PDPageContentStream(document, currentPage)</span>
+<span class="nc" id="L164">    }</span>
 
     private fun parseLines(
         inputText: String,
         font: PDFont,
-        arabicFont: PDFont,
         fontSize: Float,
     ): List&lt;String&gt; {
-<span class="fc" id="L225">        var text: String? = inputText</span>
-<span class="fc" id="L226">        val lines: MutableList&lt;String&gt; = ArrayList()</span>
-<span class="fc" id="L227">        var lastSpace = -1</span>
-<span class="pc bpc" id="L228" title="1 of 6 branches missed.">        while (!text.isNullOrEmpty()) {</span>
-<span class="fc" id="L229">            var spaceIndex = text.indexOf(' ', lastSpace + 1)</span>
-<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (spaceIndex &lt; 0) spaceIndex = text.length</span>
-<span class="fc" id="L231">            val subString = text.substring(0, spaceIndex)</span>
-<span class="fc" id="L232">            val size = measureLineWidth(subString, font, arabicFont, fontSize)</span>
-<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            if (size &gt; WIDTH_OF_CONTENT_COLUMN) {</span>
-<span class="nc bnc" id="L234" title="All 2 branches missed.">                if (lastSpace &lt; 0) {</span>
-<span class="nc" id="L235">                    lastSpace = spaceIndex</span>
+<span class="fc" id="L171">        var text: String? = inputText</span>
+<span class="fc" id="L172">        val lines: MutableList&lt;String&gt; = ArrayList()</span>
+<span class="fc" id="L173">        var lastSpace = -1</span>
+<span class="pc bpc" id="L174" title="1 of 6 branches missed.">        while (!text.isNullOrEmpty()) {</span>
+<span class="fc" id="L175">            var spaceIndex = text.indexOf(' ', lastSpace + 1)</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (spaceIndex &lt; 0) spaceIndex = text.length</span>
+<span class="fc" id="L177">            var subString = text.substring(0, spaceIndex)</span>
+<span class="fc" id="L178">            val size = fontSize * font.getStringWidth(subString) / 1000</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (size &gt; WIDTH_OF_CONTENT_COLUMN) {</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                if (lastSpace &lt; 0) {</span>
+<span class="nc" id="L181">                    lastSpace = spaceIndex</span>
                 }
-<span class="nc" id="L237">                lines.add(text.substring(0, lastSpace))</span>
-<span class="nc bnc" id="L238" title="All 2 branches missed.">                text = text.substring(lastSpace).trim { it &lt;= ' ' }</span>
-<span class="nc" id="L239">                lastSpace = -1</span>
-<span class="fc bfc" id="L240" title="All 2 branches covered.">            } else if (spaceIndex == text.length) {</span>
-<span class="fc" id="L241">                lines.add(text)</span>
-<span class="fc" id="L242">                text = &quot;&quot;</span>
+<span class="nc" id="L183">                subString = text.substring(0, lastSpace)</span>
+<span class="nc" id="L184">                lines.add(subString)</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                text = text.substring(lastSpace).trim { it &lt;= ' ' }</span>
+<span class="nc" id="L186">                lastSpace = -1</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            } else if (spaceIndex == text.length) {</span>
+<span class="fc" id="L188">                lines.add(text)</span>
+<span class="fc" id="L189">                text = &quot;&quot;</span>
             } else {
-<span class="fc" id="L244">                lastSpace = spaceIndex</span>
+<span class="fc" id="L191">                lastSpace = spaceIndex</span>
             }
         }
-<span class="fc" id="L247">        return lines</span>
+<span class="fc" id="L194">        return lines</span>
     }
 
     private fun addLogo() {
-<span class="fc" id="L251">        val ximage = PDImageXObject.createFromByteArray(document, logo(), &quot;logo&quot;)</span>
-<span class="fc" id="L252">        currentStream.drawImage(ximage, 27f, 765f, 99f, 62f)</span>
-<span class="fc" id="L253">    }</span>
+<span class="fc" id="L198">        val ximage = PDImageXObject.createFromByteArray(document, logo(), &quot;logo&quot;)</span>
+<span class="fc" id="L199">        currentStream.drawImage(ximage, 27f, 765f, 99f, 62f)</span>
+<span class="fc" id="L200">    }</span>
 
     private fun logo(): ByteArray {
-<span class="fc" id="L256">        try {</span>
-<span class="fc" id="L257">            val inputStream = this::class.java.getResourceAsStream(&quot;/pdf/nav-logo_alphaless.jpg&quot;)</span>
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (inputStream != null) {</span>
-<span class="pc" id="L259">                return inputStream.use { it.readAllBytes() }</span>
+<span class="fc" id="L203">        try {</span>
+<span class="fc" id="L204">            val inputStream = this::class.java.getResourceAsStream(&quot;/pdf/nav-logo_alphaless.jpg&quot;)</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (inputStream != null) {</span>
+<span class="pc" id="L206">                return inputStream.use { it.readAllBytes() }</span>
             }
-<span class="nc" id="L261">    } catch (e: IOException) {</span>
-<span class="nc" id="L262">            logger.error(&quot;Failed to load NAV logo from resources&quot;, e)</span>
+<span class="nc" id="L208">    } catch (e: IOException) {</span>
+<span class="nc" id="L209">            logger.error(&quot;Failed to load NAV logo from resources&quot;, e)</span>
         }
-<span class="nc" id="L264">        return ByteArray(0)</span>
+<span class="nc" id="L211">        return ByteArray(0)</span>
     }
 
     companion object {
@@ -275,14 +222,14 @@ import java.io.InputStream
 
         private const val S_RGB_IEC61966_2_1 = &quot;sRGB IEC61966-2.1&quot;
 
-<span class="fc" id="L278">        private val WIDTH_OF_CONTENT_COLUMN = PDPage(PDRectangle.A4).mediaBox.width - (MARGIN * 2)</span>
-<span class="fc" id="L279">        private val MEDIA_BOX = PDPage(PDRectangle.A4).mediaBox</span>
+<span class="fc" id="L225">        private val WIDTH_OF_CONTENT_COLUMN = PDPage(PDRectangle.A4).mediaBox.width - (MARGIN * 2)</span>
+<span class="fc" id="L226">        private val MEDIA_BOX = PDPage(PDRectangle.A4).mediaBox</span>
     }
 
-<span class="fc" id="L282">    init {</span>
-<span class="fc" id="L283">        currentStream = PDPageContentStream(document, currentPage)</span>
-<span class="fc" id="L284">        y = calculateStartY()</span>
-<span class="fc" id="L285">        addLogo()</span>
-<span class="fc" id="L286">    }</span>
+<span class="fc" id="L229">    init {</span>
+<span class="fc" id="L230">        currentStream = PDPageContentStream(document, currentPage)</span>
+<span class="fc" id="L231">        y = calculateStartY()</span>
+<span class="fc" id="L232">        addLogo()</span>
+<span class="fc" id="L233">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

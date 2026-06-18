@@ -130,4 +130,87 @@ import java.util.UUID
 <span class="fc" id="L130">fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
 <span class="fc" id="L131">    install(verifySubmissionOwnershipPlugin(ioDispatcher))</span>
 <span class="fc" id="L132">}</span>
+
+<span class="nc" id="L134">private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
+<span class="nc" id="L135">    createRouteScopedPlugin(&quot;VerifyNavEksternRefIdOwnership&quot;) {</span>
+<span class="nc" id="L136">        val dsl: DSLContext by application.dependencies</span>
+<span class="nc" id="L137">        val submissionRepository: SubmissionRepository by application.dependencies</span>
+
+<span class="nc bnc" id="L139" title="All 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (call.isHandled) return@on</span>
+
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (personident == null) {</span>
+<span class="nc" id="L144">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L145">                return@on</span>
+            }
+
+<span class="nc" id="L148">            val navEksternRefId = call.parameters[&quot;navEksternRefId&quot;]</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (navEksternRefId == null) {</span>
+<span class="nc" id="L150">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L151">                return@on</span>
+            }
+
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
+<span class="nc" id="L155">                dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L156">                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
+<span class="nc" id="L157">                }</span>
+            }
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (!owned) {</span>
+<span class="nc" id="L160">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L161">                return@on</span>
+            }
+
+<span class="nc" id="L164">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="nc" id="L165">        }</span>
+<span class="nc" id="L166">    }</span>
+
+// ── TokenX interceptors ─────────────────────────────────────────────────────────────────────────
+// Used by endpoints called from sosialhjelp-soknad-api via TokenX token exchange.
+// The exchanged token carries the original user's personnummer in the `pid` claim.
+
+<span class="nc" id="L172">private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
+<span class="fc" id="L173">    createRouteScopedPlugin(&quot;VerifyNavEksternRefIdOwnershipByPid&quot;) {</span>
+<span class="pc" id="L174">        val dsl: DSLContext by application.dependencies</span>
+<span class="pc" id="L175">        val submissionRepository: SubmissionRepository by application.dependencies</span>
+
+<span class="pc bnc" id="L177" title="All 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (call.isHandled) return@on</span>
+
+<span class="nc bnc" id="L180" title="All 6 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.payload?.getClaim(&quot;pid&quot;)?.asString()</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if (personident == null) {</span>
+<span class="nc" id="L182">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L183">                return@on</span>
+            }
+
+<span class="nc" id="L186">            val navEksternRefId = call.parameters[&quot;navEksternRefId&quot;]</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (navEksternRefId == null) {</span>
+<span class="nc" id="L188">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L189">                return@on</span>
+            }
+
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
+<span class="nc" id="L193">                dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L194">                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
+<span class="nc" id="L195">                }</span>
+            }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (!owned) {</span>
+<span class="nc" id="L198">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L199">                return@on</span>
+            }
+
+<span class="nc" id="L202">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="nc" id="L203">        }</span>
+<span class="fc" id="L204">    }</span>
+
+/**
+ * Route-scoped ownership interceptor for navEksternRefId endpoints called via TokenX.
+ *
+ * Reads the user's personnummer from the `pid` claim in the TokenX JWT and verifies
+ * they own a submission with the given `{navEksternRefId}`.
+ * On success, [VerifiedPersonident] is available in `call.attributes`.
+ */
+<span class="fc" id="L213">fun Route.verifyNavEksternRefIdOwnershipByPid(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
+<span class="fc" id="L214">    install(verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher))</span>
+<span class="fc" id="L215">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

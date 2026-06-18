@@ -10,27 +10,29 @@ import no.nav.sosialhjelp.upload.action.configureActionRoutes
 import no.nav.sosialhjelp.upload.documents.configureDocumentRoutes
 import no.nav.sosialhjelp.upload.status.configureStatusRoutes
 import no.nav.sosialhjelp.upload.tus.configureTusRoutes
+import no.nav.sosialhjelp.upload.vedlegg.configureVedleggRoutes
 
 private const val TUS_BASE_PATH = &quot;/tus/files&quot;
 
 fun Application.configureRouting() {
-<span class="fc" id="L17">    install(SSE)</span>
-<span class="fc" id="L18">    routing {</span>
-<span class="fc" id="L19">        route(&quot;/sosialhjelp/upload&quot;) {</span>
-<span class="fc" id="L20">            route(&quot;/internal/isAlive&quot;) {</span>
-<span class="pc bnc" id="L21" title="All 3 branches missed.">                get {</span>
-<span class="nc bnc" id="L22" title="All 2 branches missed.">                    call.respondText(&quot;I'm alive!&quot;, ContentType.Text.Plain)</span>
-<span class="nc" id="L23">                }</span>
-<span class="fc" id="L24">            }</span>
-<span class="fc" id="L25">            authenticate {</span>
-<span class="fc" id="L26">                configureStatusRoutes()</span>
-<span class="fc" id="L27">                configureDocumentRoutes()</span>
-<span class="fc" id="L28">                configureActionRoutes()</span>
-<span class="fc" id="L29">                route(TUS_BASE_PATH) {</span>
-<span class="fc" id="L30">                    configureTusRoutes(TUS_BASE_PATH)</span>
-<span class="fc" id="L31">                }</span>
-<span class="fc" id="L32">            }</span>
-<span class="fc" id="L33">        }</span>
-<span class="fc" id="L34">    }</span>
-<span class="fc" id="L35">}</span>
+<span class="fc" id="L18">    install(SSE)</span>
+<span class="fc" id="L19">    routing {</span>
+<span class="fc" id="L20">        route(&quot;/sosialhjelp/upload&quot;) {</span>
+<span class="fc" id="L21">            route(&quot;/internal/isAlive&quot;) {</span>
+<span class="pc bnc" id="L22" title="All 3 branches missed.">                get {</span>
+<span class="nc bnc" id="L23" title="All 2 branches missed.">                    call.respondText(&quot;I'm alive!&quot;, ContentType.Text.Plain)</span>
+<span class="nc" id="L24">                }</span>
+<span class="fc" id="L25">            }</span>
+<span class="fc" id="L26">            authenticate(&quot;idporten&quot;) {</span>
+<span class="fc" id="L27">                configureStatusRoutes()</span>
+<span class="fc" id="L28">                configureDocumentRoutes()</span>
+<span class="fc" id="L29">                configureActionRoutes()</span>
+<span class="fc" id="L30">                route(TUS_BASE_PATH) {</span>
+<span class="fc" id="L31">                    configureTusRoutes(TUS_BASE_PATH)</span>
+<span class="fc" id="L32">                }</span>
+<span class="fc" id="L33">            }</span>
+<span class="fc" id="L34">            configureVedleggRoutes()</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">    }</span>
+<span class="fc" id="L37">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

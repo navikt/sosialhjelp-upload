@@ -29,6 +29,7 @@ import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
+import no.nav.sosialhjelp.upload.vedlegg.VedleggService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -105,21 +106,21 @@ fun Application.module() {
         GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
     }
     dependencies {
-<span class="nc" id="L108">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="fc" id="L109">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="nc" id="L110">        provide&lt;DataSource&gt; { dataSource }</span>
-<span class="fc" id="L111">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
-<span class="pc bpc" id="L112" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (isMock) {</span>
-<span class="fc" id="L114">                create(EncryptionServiceMock::class)</span>
+<span class="nc" id="L109">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="fc" id="L110">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="nc" id="L111">        provide&lt;DataSource&gt; { dataSource }</span>
+<span class="fc" id="L112">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
+<span class="pc bpc" id="L113" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (isMock) {</span>
+<span class="fc" id="L115">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L116">                create(EncryptionServiceImpl::class)</span>
-<span class="fc" id="L117">            }</span>
+<span class="nc" id="L117">                create(EncryptionServiceImpl::class)</span>
+<span class="fc" id="L118">            }</span>
         }
-<span class="fc" id="L119">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
-<span class="fc" id="L120">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO.limitedParallelism(Int.MAX_VALUE) }</span>
-<span class="fc" id="L121">        provide&lt;CoroutineScope&gt; { processingScope }</span>
-<span class="fc" id="L122">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
+<span class="fc" id="L120">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
+<span class="fc" id="L121">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO.limitedParallelism(Int.MAX_VALUE) }</span>
+<span class="fc" id="L122">        provide&lt;CoroutineScope&gt; { processingScope }</span>
+<span class="fc" id="L123">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
         provide(VirusScanner::class)
@@ -134,6 +135,7 @@ fun Application.module() {
         provide(EttersendelseService::class)
         provide(UploadRecoveryService::class)
         provide(RetentionService::class)
+        provide(VedleggService::class)
     }
     configureSecurity()
     configureHTTP()
@@ -144,21 +146,21 @@ fun Application.module() {
     val scopes = if (!isTest) {
         val recoveryService: UploadRecoveryService by dependencies
         val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="nc bnc" id="L147" title="All 4 branches missed.">        recoveryScope.launch {</span>
-<span class="nc" id="L148">            while (true) {</span>
-<span class="nc bnc" id="L149" title="All 2 branches missed.">                delay(1.minutes)</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">                runCatching { recoveryService.recoverAll() }</span>
-<span class="nc bnc" id="L151" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L149" title="All 4 branches missed.">        recoveryScope.launch {</span>
+<span class="nc" id="L150">            while (true) {</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
             }
         }
 
         val retentionService: RetentionService by dependencies
         val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="nc bnc" id="L157" title="All 4 branches missed.">        retentionScope.launch {</span>
-<span class="nc" id="L158">            while (true) {</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">                delay(1.minutes)</span>
-<span class="nc bnc" id="L160" title="All 2 branches missed.">                runCatching { retentionService.runRetention() }</span>
-<span class="nc bnc" id="L161" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">        retentionScope.launch {</span>
+<span class="nc" id="L160">            while (true) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                runCatching { retentionService.runRetention() }</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
             }
         }
         listOf(retentionScope, recoveryScope)

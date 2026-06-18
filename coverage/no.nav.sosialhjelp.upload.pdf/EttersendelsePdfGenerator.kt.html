@@ -34,7 +34,7 @@ object EttersendelsePdfGenerator {
 <span class="fc" id="L34">                pdf.addText(&quot;Følgende vedlegg er sendt &quot; + formatLocalDateTime(LocalDateTime.now()))</span>
 
 <span class="fc" id="L36">                pdf.addBlankLine()</span>
-<span class="fc" id="L37">                pdf.addText(&quot;Type: &quot; + metadata.type)</span>
+<span class="fc" id="L37">                pdf.addText(&quot;Type: &quot; + metadata.type.replaceUnsupportedCharacters())</span>
 <span class="fc" id="L38">                metadata.filer.forEach { fil -&gt;</span>
 <span class="fc" id="L39">                    pdf.addText(&quot;Filnavn: &quot; + fil.filnavn)</span>
 <span class="fc" id="L40">                }</span>
@@ -46,8 +46,19 @@ object EttersendelsePdfGenerator {
 <span class="fc" id="L46">        }</span>
 }
 
+/** Replace illegal characters bacause there is no glyph for that in the font we use (SourceSansPro-Regular):
+ * - U+0009: Tab character (\t)
+ * - U+000D: Carriage return (CR)
+ * - U+F0B7: Bullet point?
+ * - U+001F: No idea
+ * - U+000A: EOF/LF/NL
+ **/
+private fun String.replaceUnsupportedCharacters() =
+<span class="fc" id="L57">    replace(Regex(&quot;[\\x09\\x0D\\x0A]&quot;), &quot; &quot;)</span>
+<span class="fc" id="L58">        .replace(Regex(&quot;[\\uF0B7\\x1F]&quot;), &quot;&quot;)</span>
+
 fun formatLocalDateTime(dato: LocalDateTime): String {
-<span class="fc" id="L50">    val datoFormatter = DateTimeFormatter.ofPattern(&quot;d. MMMM yyyy 'kl.' HH.mm&quot;, Locale.forLanguageTag(&quot;nb&quot;))</span>
-<span class="fc" id="L51">    return dato.format(datoFormatter)</span>
+<span class="fc" id="L61">    val datoFormatter = DateTimeFormatter.ofPattern(&quot;d. MMMM yyyy 'kl.' HH.mm&quot;, Locale.forLanguageTag(&quot;nb&quot;))</span>
+<span class="fc" id="L62">    return dato.format(datoFormatter)</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
