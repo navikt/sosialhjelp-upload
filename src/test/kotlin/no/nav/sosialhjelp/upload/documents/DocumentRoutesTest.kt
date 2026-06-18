@@ -82,6 +82,9 @@ class DocumentRoutesTest {
         "virus.scanner.url" to "",
         "texas.url" to "http://unused",
         "database.cleanOnStart" to "true",
+        "tokenx.jwksUri" to "http://unused",
+        "tokenx.issuer" to "whatever",
+        "tokenx.clientId" to "whatever",
     )
 
     private fun appTest(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
