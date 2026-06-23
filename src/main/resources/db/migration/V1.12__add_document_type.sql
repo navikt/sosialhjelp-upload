@@ -1,0 +1,1 @@
+ALTER TABLE upload ADD COLUMN kategori VARCHAR(100);

@@ -10,6 +10,7 @@ import no.nav.sosialhjelp.upload.action.configureActionRoutes
 import no.nav.sosialhjelp.upload.documents.configureDocumentRoutes
 import no.nav.sosialhjelp.upload.status.configureStatusRoutes
 import no.nav.sosialhjelp.upload.tus.configureTusRoutes
+import no.nav.sosialhjelp.upload.vedlegg.configureVedleggRoutes
 
 private const val TUS_BASE_PATH = "/tus/files"
 
@@ -22,7 +23,7 @@ fun Application.configureRouting() {
                     call.respondText("I'm alive!", ContentType.Text.Plain)
                 }
             }
-            authenticate {
+            authenticate("idporten") {
                 configureStatusRoutes()
                 configureDocumentRoutes()
                 configureActionRoutes()
@@ -30,6 +31,7 @@ fun Application.configureRouting() {
                     configureTusRoutes(TUS_BASE_PATH)
                 }
             }
+            configureVedleggRoutes()
         }
     }
 }

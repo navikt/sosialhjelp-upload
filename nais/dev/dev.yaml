@@ -43,6 +43,8 @@ spec:
         - application: sosialhjelp-innsyn-dev
         - application: sosialhjelp-soknad-dev
         - application: sosialhjelp-innsyn
+        - application: sosialhjelp-soknad-api-dev
+        - application: sosialhjelp-soknad-api
         - application: sosialhjelp-soknad
   gcp:
     sqlInstances:
@@ -62,6 +64,8 @@ spec:
     requests:
       cpu: 10m
       memory: 512Mi
+  tokenx:
+    enabled: true
   maskinporten:
     enabled: true
     scopes:

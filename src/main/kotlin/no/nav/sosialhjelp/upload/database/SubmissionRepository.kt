@@ -100,6 +100,7 @@ class SubmissionRepository(
         contextId: String,
         personIdent: String,
         fiksDigisosId: String? = null,
+        kategori: String? = null,
     ): UUID {
         if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
             throw SubmissionOwnedByAnotherUserException()
@@ -113,6 +114,7 @@ class SubmissionRepository(
                 .set(SUBMISSION.OWNER_IDENT, personIdent)
                 .set(SUBMISSION.CONTEXT_ID, contextId)
                 .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
+                .set(SUBMISSION.KATEGORI, kategori)
                 .onDuplicateKeyIgnore()
                 .returning(SUBMISSION.ID)
                 .fetchOne()
@@ -131,6 +133,20 @@ class SubmissionRepository(
                         .eq(contextId)
                         .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
                         .and(SUBMISSION.FIKS_DIGISOS_ID.isNull),
+                ).execute()
+        }
+
+        // update kategori if not set
+        if (kategori != null) {
+            tx
+                .dsl()
+                .update(SUBMISSION)
+                .set(SUBMISSION.KATEGORI, kategori)
+                .where(
+                    SUBMISSION.CONTEXT_ID
+                        .eq(contextId)
+                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
+                        .and(SUBMISSION.KATEGORI.isNull),
                 ).execute()
         }
 
@@ -181,6 +197,34 @@ class SubmissionRepository(
                 ?.value1()
         return (count ?: 0) != 0
     }
+
+    fun isNavEksternRefIdOwnedByUser(
+        tx: Configuration,
+        navEksternRefId: String,
+        personIdent: String,
+    ): Boolean =
+        tx
+            .dsl()
+            .selectCount()
+            .from(SUBMISSION)
+            .where(
+                SUBMISSION.NAV_EKSTERN_REF_ID
+                    .eq(navEksternRefId)
+                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
+            ).fetchSingle()
+            .value1() > 0
+
+    fun navEksternRefIdExists(
+        tx: Configuration,
+        navEksternRefId: String,
+    ): Boolean =
+        tx
+            .dsl()
+            .selectCount()
+            .from(SUBMISSION)
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .fetchSingle()
+            .value1() > 0
 
     fun cleanup(
         tx: Configuration,

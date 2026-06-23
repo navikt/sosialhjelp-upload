@@ -22,6 +22,7 @@ data class Upload(
     val mellomlagringStorrelse: Long?,
     val status: Status,
     val sha512: String? = null,
+    val kategori: String? = null,
 )
 
 enum class Status {
@@ -33,6 +34,12 @@ data class UploadForProcessing(
     val gcsKey: String,
     val submissionId: UUID,
     val navEksternRefId: String,
+)
+
+data class UploadForVedlegg(
+    val category: String?,
+    val mellomlagringFilnavn: String,
+    val sha512: String?,
 )
 
 class UploadRepository {
@@ -309,7 +316,8 @@ class UploadRepository {
                 UPLOAD.SIZE,
                 UPLOAD.MELLOMLAGRING_STORRELSE,
                 UPLOAD.PROCESSING_STATUS,
-                UPLOAD.SHA512
+                UPLOAD.SHA512,
+                SUBMISSION.KATEGORI
             )
             .from(UPLOAD)
             .leftJoin(ERROR)
@@ -330,7 +338,8 @@ class UploadRepository {
                     fileSize = records.first().get(UPLOAD.SIZE),
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
                     status = records.first().get(UPLOAD.PROCESSING_STATUS)?.let { Status.valueOf(it) } ?: error("No processing status. Was it not selected?"),
-                    sha512 = records.first().get(UPLOAD.SHA512)
+                    sha512 = records.first().get(UPLOAD.SHA512),
+                    records.first().get(SUBMISSION.KATEGORI)
                 )
             }
 
@@ -379,6 +388,30 @@ class UploadRepository {
         markFailed(tx, uploadId)
         notifyChange(tx, uploadId)
     }
+
+    fun getCompletedUploadsByNavEksternRefId(
+        tx: Configuration,
+        navEksternRefId: String,
+    ): List<UploadForVedlegg> =
+        tx
+            .dsl()
+            .select(
+                SUBMISSION.KATEGORI,
+                UPLOAD.MELLOMLAGRING_FILNAVN,
+                UPLOAD.SHA512,
+            )
+            .from(UPLOAD)
+            .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .and(UPLOAD.PROCESSING_STATUS.eq(Status.COMPLETE.name))
+            .fetch()
+            .map {
+                UploadForVedlegg(
+                    category = it.get(SUBMISSION.KATEGORI),
+                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN)!!,
+                    sha512 = it.get(UPLOAD.SHA512),
+                )
+            }
 }
 
 

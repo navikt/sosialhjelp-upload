@@ -41,6 +41,7 @@ spec:
     inbound:
       rules:
         - application: sosialhjelp-innsyn
+        - application: sosialhjelp-soknad-api
         - application: sosialhjelp-soknad
   gcp:
     sqlInstances:
@@ -60,6 +61,8 @@ spec:
     requests:
       cpu: 50m
       memory: 512Mi
+  tokenx:
+    enabled: true
   maskinporten:
     enabled: true
     scopes:

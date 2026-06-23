@@ -130,3 +130,86 @@ fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.
 fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     install(verifySubmissionOwnershipPlugin(ioDispatcher))
 }
+
+private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyNavEksternRefIdOwnership") {
+        val dsl: DSLContext by application.dependencies
+        val submissionRepository: SubmissionRepository by application.dependencies
+
+        on(AuthenticationChecked) { call ->
+            if (call.isHandled) return@on
+
+            val personident = call.principal<JWTPrincipal>()?.subject
+            if (personident == null) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@on
+            }
+
+            val navEksternRefId = call.parameters["navEksternRefId"]
+            if (navEksternRefId == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            val owned = withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+                }
+            }
+            if (!owned) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            call.attributes.put(VerifiedPersonident, personident)
+        }
+    }
+
+// ── TokenX interceptors ─────────────────────────────────────────────────────────────────────────
+// Used by endpoints called from sosialhjelp-soknad-api via TokenX token exchange.
+// The exchanged token carries the original user's personnummer in the `pid` claim.
+
+private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    createRouteScopedPlugin("VerifyNavEksternRefIdOwnershipByPid") {
+        val dsl: DSLContext by application.dependencies
+        val submissionRepository: SubmissionRepository by application.dependencies
+
+        on(AuthenticationChecked) { call ->
+            if (call.isHandled) return@on
+
+            val personident = call.principal<JWTPrincipal>()?.payload?.getClaim("pid")?.asString()
+            if (personident == null) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@on
+            }
+
+            val navEksternRefId = call.parameters["navEksternRefId"]
+            if (navEksternRefId == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            val owned = withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+                }
+            }
+            if (!owned) {
+                call.respond(HttpStatusCode.NotFound)
+                return@on
+            }
+
+            call.attributes.put(VerifiedPersonident, personident)
+        }
+    }
+
+/**
+ * Route-scoped ownership interceptor for navEksternRefId endpoints called via TokenX.
+ *
+ * Reads the user's personnummer from the `pid` claim in the TokenX JWT and verifies
+ * they own a submission with the given `{navEksternRefId}`.
+ * On success, [VerifiedPersonident] is available in `call.attributes`.
+ */
+fun Route.verifyNavEksternRefIdOwnershipByPid(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    install(verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher))
+}

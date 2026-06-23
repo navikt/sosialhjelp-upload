@@ -49,6 +49,7 @@ class TusUploadService(
         token: String,
         fiksDigisosId: String?,
         navEksternRefId: String?,
+        kategori: String? = null,
     ): UUID {
         return try {
             dsl.transactionCoroutine { tx ->
@@ -60,7 +61,7 @@ class TusUploadService(
                     submissionRepository.acquireAdvisoryLock(tx, fiksDigisosId)
                 }
 
-                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId)
+                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)
 
                 val eksternRef =
                     // If navEksternRefId is already set on this submission (e.g. a second

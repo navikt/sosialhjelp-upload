@@ -25,5 +25,9 @@ virus:
     url: "$CLAMAV_URL:"
 texas:
   url: "$NAIS_TOKEN_ENDPOINT:http://localhost:8081/api/v1/token"
+tokenx:
+  jwksUri: "$TOKEN_X_JWKS_URI:http://localhost:8888/tokenx/jwks"
+  issuer: "$TOKEN_X_ISSUER:http://localhost:8888/tokenx"
+  clientId: "$TOKEN_X_CLIENT_ID:local:teamdigisos:sosialhjelp-upload"
 gcs:
   bucketName: "$GCS_BUCKET_NAME:sosialhjelp-upload-dev"
