@@ -1,2 +1,11 @@
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
 [*.{kt,kts}]
+indent_size = 4
+indent_style = space
+max_line_length = 120
 ij_kotlin_packages_to_use_import_on_demand = java.util.*,io.ktor.**,kotlinx.coroutines.**
+ktlint_standard_no-wildcard-imports = disabled

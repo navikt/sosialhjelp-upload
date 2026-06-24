@@ -1,9 +1,14 @@
+@file:Suppress("TooGenericExceptionCaught")
+
 package no.nav.sosialhjelp.upload.action.fiks
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -25,9 +30,6 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
 import io.micrometer.core.instrument.MeterRegistry
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -36,7 +38,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
-import java.time.Duration
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTimedValue
@@ -57,31 +58,37 @@ class MellomlagringClient(
             expectSuccess = false
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             install(Logging) {
-                logger = object : Logger {
-                    override fun log(message: String) = this@MellomlagringClient.logger.info(message)
-                }
+                logger =
+                    object : Logger {
+                        override fun log(message: String) = this@MellomlagringClient.logger.info(message)
+                    }
                 level = LogLevel.INFO
             }
         }
     }
 
-    private fun mellomlagringUrl(navEksternRefId: String) =
-        "$fiksBaseUrl/digisos/api/v1/mellomlagring/$navEksternRefId"
+    private fun mellomlagringUrl(navEksternRefId: String) = "$fiksBaseUrl/digisos/api/v1/mellomlagring/$navEksternRefId"
 
-    suspend fun getFile(navEksternRefId: String, id: UUID): ByteArray {
-        val response = client.get(mellomlagringUrl(navEksternRefId) + "/$id") {
-            headers {
-                integrasjonsid?.let { append("IntegrasjonId", it) } ?: run {
-                    logger.warn("Mangler fiks integrasjonsid")
+    suspend fun getFile(
+        navEksternRefId: String,
+        id: UUID,
+    ): ByteArray {
+        val response =
+            client.get(mellomlagringUrl(navEksternRefId) + "/$id") {
+                headers {
+                    integrasjonsid?.let { append("IntegrasjonId", it) } ?: run {
+                        logger.warn("Mangler fiks integrasjonsid")
+                    }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", it) } ?: run {
+                        logger.warn("Mangler fiks integrasjonspassord")
+                    }
                 }
-                integrasjonspassord?.let { append("IntegrasjonPassord", it) } ?: run {
-                    logger.warn("Mangler fiks integrasjonspassord")
-                }
+                accept(ContentType.Any)
+                bearerAuth(texasClient.getMaskinportenToken())
             }
-            accept(ContentType.Any)
-            bearerAuth(texasClient.getMaskinportenToken())
+        check(response.status.isSuccess()) {
+            "Fikk feil fra Fiks på GET /mellomlagring/$navEksternRefId/$id: ${response.bodyAsText()}"
         }
-        check(response.status.isSuccess()) { "Fikk feil fra Fiks på GET /mellomlagring/$navEksternRefId/$id: ${response.bodyAsText()}" }
         return response.bodyAsBytes()
     }
 
@@ -105,7 +112,8 @@ class MellomlagringClient(
                 if (attempt < MAX_ATTEMPTS) {
                     val delayMs = RETRY_DELAYS_MS[attempt - 1]
                     logger.warn(
-                        "Mellomlagring upload attempt $attempt/$MAX_ATTEMPTS failed for $navEksternRefId, retrying in ${delayMs}ms",
+                        "Mellomlagring upload attempt $attempt/$MAX_ATTEMPTS failed for " +
+                            "$navEksternRefId, retrying in ${delayMs}ms",
                         e,
                     )
                     meterRegistry.counter("mellomlagring.upload.retry").increment()
@@ -124,19 +132,28 @@ class MellomlagringClient(
     ): UUID =
         withContext(ioDispatcher) {
             measureTimedValue {
-                val metadataPart = FormPart(
-                    key = "metadata",
-                    value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
-                    headers = Headers.build { append(HttpHeaders.ContentType, ContentType.Application.Json.toString()) },
-                )
-                val filePart = FormPart(
-                    key = "files",
-                    value = ChannelProvider { ByteReadChannel(data) },
-                    headers = Headers.build {
-                        append(HttpHeaders.ContentType, contentType)
-                        append(HttpHeaders.ContentDisposition, """filename="$filename"""")
-                    },
-                )
+                val metadataPart =
+                    FormPart(
+                        key = "metadata",
+                        value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
+                        headers =
+                            Headers.build {
+                                append(
+                                    HttpHeaders.ContentType,
+                                    ContentType.Application.Json.toString(),
+                                )
+                            },
+                    )
+                val filePart =
+                    FormPart(
+                        key = "files",
+                        value = ChannelProvider { ByteReadChannel(data) },
+                        headers =
+                            Headers.build {
+                                append(HttpHeaders.ContentType, contentType)
+                                append(HttpHeaders.ContentDisposition, """filename="$filename"""")
+                            },
+                    )
                 val formData =
                     formData {
                         append(metadataPart)

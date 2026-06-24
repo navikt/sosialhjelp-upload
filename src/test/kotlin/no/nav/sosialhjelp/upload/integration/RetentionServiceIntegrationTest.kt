@@ -25,7 +25,6 @@ import kotlin.test.assertNull
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RetentionServiceIntegrationTest {
-
     private val dsl: DSLContext = PostgresTestContainer.dsl
     private val submissionRetentionQueries = SubmissionRetentionQueries()
     private val submissionQueries = SubmissionQueries(dsl)

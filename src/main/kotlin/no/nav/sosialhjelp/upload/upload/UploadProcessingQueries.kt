@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList")
+
 package no.nav.sosialhjelp.upload.upload
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
@@ -13,24 +15,25 @@ import java.util.UUID
  * and marking uploads as failed.
  */
 class UploadProcessingQueries {
-
     fun getUploadForProcessing(
         tx: Configuration,
         uploadId: UUID,
     ): UploadForProcessing {
-        val record = tx
-            .dsl()
-            .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.GCS_KEY, UPLOAD.SUBMISSION_ID)
-            .from(UPLOAD)
-            .where(UPLOAD.ID.eq(uploadId))
-            .fetchSingle()
+        val record =
+            tx
+                .dsl()
+                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.GCS_KEY, UPLOAD.SUBMISSION_ID)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .fetchSingle()
         val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!
-        val submissionRecord = tx
-            .dsl()
-            .select(SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.FIKS_DIGISOS_ID)
-            .from(SUBMISSION)
-            .where(SUBMISSION.ID.eq(submissionId))
-            .fetchSingle()
+        val submissionRecord =
+            tx
+                .dsl()
+                .select(SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.FIKS_DIGISOS_ID)
+                .from(SUBMISSION)
+                .where(SUBMISSION.ID.eq(submissionId))
+                .fetchSingle()
         return UploadForProcessing(
             filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,
             gcsKey = record.get(UPLOAD.GCS_KEY)!!,

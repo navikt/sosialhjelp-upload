@@ -1,3 +1,5 @@
+@file:Suppress("TooGenericExceptionCaught")
+
 package no.nav.sosialhjelp.upload.pdf
 
 import org.apache.pdfbox.pdmodel.PDDocument
@@ -42,7 +44,7 @@ object EttersendelsePdfGenerator {
                 pdf.finish()
             }
         } catch (e: Exception) {
-            throw RuntimeException("Error while creating pdf", e)
+            throw PdfGenerationException("Error while creating pdf", e)
         }
 }
 
@@ -61,3 +63,5 @@ fun formatLocalDateTime(dato: LocalDateTime): String {
     val datoFormatter = DateTimeFormatter.ofPattern("d. MMMM yyyy 'kl.' HH.mm", Locale.forLanguageTag("nb"))
     return dato.format(datoFormatter)
 }
+
+class PdfGenerationException(message: String, cause: Throwable) : RuntimeException(message, cause)

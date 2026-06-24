@@ -40,9 +40,10 @@ private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Disp
                 return@on
             }
 
-            val owned = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }
-            }
+            val owned =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx -> tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }
+                }
             if (!owned) {
                 // Return 404 rather than 403 to avoid leaking whether the resource exists.
                 call.respond(HttpStatusCode.NotFound)

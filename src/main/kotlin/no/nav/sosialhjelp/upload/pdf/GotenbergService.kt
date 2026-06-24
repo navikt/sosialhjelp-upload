@@ -7,13 +7,10 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.Property
-import org.slf4j.LoggerFactory
 
 class GotenbergService(
     @Property("gotenberg.url") gotenbergUrl: String,
 ) {
-    private val logger = LoggerFactory.getLogger(this::class.java)
-
     private val gotenbergClient =
         HttpClient(CIO) {
             expectSuccess = false
@@ -23,7 +20,10 @@ class GotenbergService(
     private fun buildHeaders(filetype: String): Headers =
         Headers.build { append(HttpHeaders.ContentDisposition, """filename="file.$filetype"""") }
 
-    suspend fun convertToPdf(data: ByteArray, extension: String): ByteArray {
+    suspend fun convertToPdf(
+        data: ByteArray,
+        extension: String,
+    ): ByteArray {
         val res =
             gotenbergClient
                 .submitFormWithBinaryData(

@@ -14,7 +14,6 @@ import java.util.UUID
  * ownership checks, and deletion.
  */
 class TusUploadQueries {
-
     class OffsetMismatchException(message: String) : RuntimeException(message)
 
     fun create(
@@ -95,12 +94,13 @@ class TusUploadQueries {
         tx.dsl().select(UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(uploadId)).forUpdate().fetchOne()
             ?: throw OffsetMismatchException("Upload $uploadId not found")
         val newOffset = expectedOffset + chunkSize
-        val affected = tx.dsl().update(UPLOAD)
-            .set(UPLOAD.UPLOAD_OFFSET, newOffset)
-            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
-            .where(UPLOAD.ID.eq(uploadId))
-            .and(UPLOAD.UPLOAD_OFFSET.eq(expectedOffset))
-            .execute()
+        val affected =
+            tx.dsl().update(UPLOAD)
+                .set(UPLOAD.UPLOAD_OFFSET, newOffset)
+                .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
+                .where(UPLOAD.ID.eq(uploadId))
+                .and(UPLOAD.UPLOAD_OFFSET.eq(expectedOffset))
+                .execute()
         if (affected == 0) {
             throw OffsetMismatchException("Upload $uploadId offset mismatch: expected $expectedOffset")
         }
@@ -139,9 +139,14 @@ class TusUploadQueries {
         tx
             .dsl()
             .select(
-                UPLOAD.ID, UPLOAD.ORIGINAL_FILENAME, UPLOAD.FIL_ID,
-                SUBMISSION.NAV_EKSTERN_REF_ID, UPLOAD.MELLOMLAGRING_FILNAVN,
-                UPLOAD.SIZE, UPLOAD.MELLOMLAGRING_STORRELSE, UPLOAD.PROCESSING_STATUS,
+                UPLOAD.ID,
+                UPLOAD.ORIGINAL_FILENAME,
+                UPLOAD.FIL_ID,
+                SUBMISSION.NAV_EKSTERN_REF_ID,
+                UPLOAD.MELLOMLAGRING_FILNAVN,
+                UPLOAD.SIZE,
+                UPLOAD.MELLOMLAGRING_STORRELSE,
+                UPLOAD.PROCESSING_STATUS,
             )
             .from(UPLOAD)
             .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
@@ -157,9 +162,10 @@ class TusUploadQueries {
                     mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),
                     fileSize = it.get(UPLOAD.SIZE),
                     mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),
-                    status = it.get(UPLOAD.PROCESSING_STATUS)
-                        ?.let { s -> Status.valueOf(s) }
-                        ?: error("No processing status. Was it not selected?"),
+                    status =
+                        it.get(UPLOAD.PROCESSING_STATUS)
+                            ?.let { s -> Status.valueOf(s) }
+                            ?: error("No processing status. Was it not selected?"),
                 )
             }
 
@@ -167,13 +173,15 @@ class TusUploadQueries {
         tx: Configuration,
         uploadId: UUID,
     ): Int {
-        val submissionId = getSubmissionIdFromUploadId(tx, uploadId)
-            ?: error("No submissionId for upload")
-        val deleted = tx
-            .dsl()
-            .delete(UPLOAD)
-            .where(UPLOAD.ID.eq(uploadId))
-            .execute()
+        val submissionId =
+            getSubmissionIdFromUploadId(tx, uploadId)
+                ?: error("No submissionId for upload")
+        val deleted =
+            tx
+                .dsl()
+                .delete(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .execute()
         tx.dsl().execute("SELECT pg_notify('submission_update', ?)", submissionId.toString())
         return deleted
     }

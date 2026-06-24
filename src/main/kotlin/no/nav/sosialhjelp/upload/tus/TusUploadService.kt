@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList")
+
 package no.nav.sosialhjelp.upload.tus
 
 import io.micrometer.core.instrument.MeterRegistry
@@ -57,7 +59,14 @@ class TusUploadService(
                     tusSubmissionQueries.acquireAdvisoryLock(tx, fiksDigisosId)
                 }
 
-                val submissionId = tusSubmissionQueries.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)
+                val submissionId =
+                    tusSubmissionQueries.getOrCreateSubmission(
+                        tx,
+                        contextId,
+                        personident,
+                        fiksDigisosId,
+                        kategori,
+                    )
 
                 val eksternRef =
                     // If navEksternRefId is already set on this submission (e.g. a second
@@ -80,14 +89,15 @@ class TusUploadService(
                         ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
 
                 tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)
-                val uploadId = tusUploadQueries
-                    .create(tx, submissionId, filename, size)
-                    .also {
-                        meterRegistry.counter("upload.created").increment()
-                        val extension = File(filename).extension.lowercase().ifEmpty { "none" }
-                        meterRegistry.counter("upload.file_extension", "extension", extension).increment()
-                    }
-                    ?: error("Failed to create upload record")
+                val uploadId =
+                    tusUploadQueries
+                        .create(tx, submissionId, filename, size)
+                        .also {
+                            meterRegistry.counter("upload.created").increment()
+                            val extension = File(filename).extension.lowercase().ifEmpty { "none" }
+                            meterRegistry.counter("upload.file_extension", "extension", extension).increment()
+                        }
+                        ?: error("Failed to create upload record")
                 val validations = validator.validate(filename, fileSize = size)
                 if (validations.isNotEmpty()) {
                     uploadProcessingQueries.addErrors(tx, uploadId, validations)
@@ -122,9 +132,10 @@ class TusUploadService(
         meterRegistry.summary("upload.chunk.bytes").record(data.size.toDouble())
 
         if (newOffset == totalSize) {
-            val claimed = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.claimForProcessing(tx, uploadId) }
-            }
+            val claimed =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx -> tusUploadQueries.claimForProcessing(tx, uploadId) }
+                }
             if (claimed) {
                 logger.info("Upload $uploadId complete — launching background processing")
                 processingScope.launch {
@@ -140,19 +151,23 @@ class TusUploadService(
     }
 
     suspend fun delete(uploadId: UUID) {
-        val (filId, navEksternRefId) = withContext(ioDispatcher) {
-            dsl.transactionResult { tx ->
-                val upload = tusUploadQueries.getUpload(tx, uploadId)
-                tusUploadQueries.deleteUpload(tx, uploadId)
-                upload.filId to upload.navEksternRefId
+        val (filId, navEksternRefId) =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    val upload = tusUploadQueries.getUpload(tx, uploadId)
+                    tusUploadQueries.deleteUpload(tx, uploadId)
+                    upload.filId to upload.navEksternRefId
+                }
             }
-        }
 
         if (filId != null && navEksternRefId != null) {
             runCatching {
                 mellomlagringClient.deleteFile(navEksternRefId, filId)
             }.onFailure {
-                logger.warn("Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned", it)
+                logger.warn(
+                    "Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned",
+                    it,
+                )
             }
         }
 

@@ -3,10 +3,10 @@ package no.nav.sosialhjelp.upload.status
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
-import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.DSLContext
 import java.io.File
@@ -23,9 +23,10 @@ class SubmissionService(
         personIdent: String,
     ): UUID {
         return withContext(ioDispatcher) {
-            val existing = dsl.transactionResult { tx ->
-                tusSubmissionQueries.findSubmission(tx, contextId, personIdent)
-            }
+            val existing =
+                dsl.transactionResult { tx ->
+                    tusSubmissionQueries.findSubmission(tx, contextId, personIdent)
+                }
             if (existing != null) return@withContext existing
 
             dsl.transactionResult { tx ->
@@ -47,14 +48,15 @@ class SubmissionService(
                                 upload.errors,
                                 upload.filId,
                                 url = upload.filId?.let { "/upload/${upload.id}" },
-                                finalFilename = upload.mellomlagringFilnavn?.let { mellomlagringFilnavn ->
-                                    // Derive the user-facing name from the original filename, using the
-                                    // mellomlagring extension (which may differ if the file was converted to PDF).
-                                    // This hides the UUID suffix added for mellomlagring uniqueness.
-                                    val ext = File(mellomlagringFilnavn).extension
-                                    val originalBase = File(upload.originalFilename ?: "").nameWithoutExtension
-                                    if (ext.isNotEmpty()) "$originalBase.$ext" else originalBase
-                                },
+                                finalFilename =
+                                    upload.mellomlagringFilnavn?.let { mellomlagringFilnavn ->
+                                        // Derive the user-facing name from the original filename, using the
+                                        // mellomlagring extension (which may differ if the file was converted to PDF).
+                                        // This hides the UUID suffix added for mellomlagring uniqueness.
+                                        val ext = File(mellomlagringFilnavn).extension
+                                        val originalBase = File(upload.originalFilename ?: "").nameWithoutExtension
+                                        if (ext.isNotEmpty()) "$originalBase.$ext" else originalBase
+                                    },
                                 status = UploadDto.Status.valueOf(upload.status.name),
                                 upload.fileSize,
                                 upload.kategori,
@@ -67,11 +69,12 @@ class SubmissionService(
             SubmissionState(
                 submissionId.toString(),
                 uploads.toList(),
-                validations = listOfNotNull(
-                    if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,
-                    if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,
-                ),
-                status = SubmissionState.Status.ACTIVE
+                validations =
+                    listOfNotNull(
+                        if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,
+                        if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,
+                    ),
+                status = SubmissionState.Status.ACTIVE,
             )
         }
 }

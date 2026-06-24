@@ -22,7 +22,10 @@ data class Upload(
 )
 
 enum class Status {
-    PROCESSING, FAILED, PENDING, COMPLETE
+    PROCESSING,
+    FAILED,
+    PENDING,
+    COMPLETE,
 }
 
 data class UploadForProcessing(
@@ -43,7 +46,6 @@ data class UploadForVedlegg(
  * Cross-cutting upload read queries used by status, vedlegg and retention features.
  */
 class UploadRepository {
-
     fun getUploads(
         tx: Configuration,
         submissionId: UUID,
@@ -79,9 +81,10 @@ class UploadRepository {
                     mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),
                     fileSize = records.first().get(UPLOAD.SIZE),
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
-                    status = records.first().get(UPLOAD.PROCESSING_STATUS)
-                        ?.let { Status.valueOf(it) }
-                        ?: error("No processing status. Was it not selected?"),
+                    status =
+                        records.first().get(UPLOAD.PROCESSING_STATUS)
+                            ?.let { Status.valueOf(it) }
+                            ?: error("No processing status. Was it not selected?"),
                     sha512 = records.first().get(UPLOAD.SHA512),
                     kategori = records.first().get(SUBMISSION.KATEGORI),
                 )

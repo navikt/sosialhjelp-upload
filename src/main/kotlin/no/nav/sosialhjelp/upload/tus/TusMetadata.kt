@@ -15,7 +15,9 @@ internal fun parseMetadata(header: String?): Map<String, String> {
             when (parts.size) {
                 2 -> {
                     val key = parts[0].trim()
-                    val value = runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull() ?: return@mapNotNull null
+                    val value =
+                        runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull()
+                            ?: return@mapNotNull null
                     key to value
                 }
 

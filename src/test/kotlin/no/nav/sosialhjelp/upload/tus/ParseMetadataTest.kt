@@ -4,12 +4,9 @@ import org.junit.jupiter.api.Test
 import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertFailsWith
 
 class ParseMetadataTest {
-
-    private fun b64(value: String): String =
-        Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
+    private fun b64(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 
     @Test
     fun `parses single key-value pair`() {

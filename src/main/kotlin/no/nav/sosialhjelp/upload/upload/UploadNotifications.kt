@@ -10,14 +10,19 @@ import java.util.UUID
  * logic lives in one place.
  */
 object UploadNotifications {
-
-    fun notifyChange(tx: Configuration, uploadId: UUID) {
+    fun notifyChange(
+        tx: Configuration,
+        uploadId: UUID,
+    ) {
         val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: return
         // Send NOTIFY within the transaction so it fires atomically on commit
         tx.dsl().execute("SELECT pg_notify('submission_update', ?)", submissionId.toString())
     }
 
-    private fun getSubmissionIdFromUploadId(tx: Configuration, uploadId: UUID): UUID? =
+    private fun getSubmissionIdFromUploadId(
+        tx: Configuration,
+        uploadId: UUID,
+    ): UUID? =
         tx
             .dsl()
             .select(UPLOAD.SUBMISSION_ID)

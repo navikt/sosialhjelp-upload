@@ -1,43 +1,47 @@
 package no.nav.sosialhjelp.upload.action.fiks
 
 import no.nav.sosialhjelp.api.fiks.DigisosSak
+import no.nav.sosialhjelp.api.fiks.DokumentInfo
 import no.nav.sosialhjelp.api.fiks.Ettersendelse
 import no.nav.sosialhjelp.api.fiks.EttersendtInfoNAV
 import no.nav.sosialhjelp.api.fiks.OriginalSoknadNAV
-import no.nav.sosialhjelp.api.fiks.DokumentInfo
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class FiksClientTest {
-
     private fun digisosSak(
         fiksDigisosId: String = "fiks-id",
         originalSoknadRefId: String? = null,
         ettersendelser: List<String> = emptyList(),
     ): DigisosSak {
-        val originalSoknad = originalSoknadRefId?.let {
-            OriginalSoknadNAV(
-                navEksternRefId = it,
-                metadata = "",
-                vedleggMetadata = "",
-                soknadDokument = DokumentInfo("soknad.pdf", "doc-id", 100L),
-                vedlegg = emptyList(),
-                timestampSendt = 0L,
-            )
-        }
-        val ettersendtInfo = if (ettersendelser.isNotEmpty()) {
-            EttersendtInfoNAV(
-                ettersendelser = ettersendelser.map {
-                    Ettersendelse(
-                        navEksternRefId = it,
-                        vedleggMetadata = "",
-                        vedlegg = emptyList(),
-                        timestampSendt = 0L,
-                    )
-                },
-            )
-        } else null
+        val originalSoknad =
+            originalSoknadRefId?.let {
+                OriginalSoknadNAV(
+                    navEksternRefId = it,
+                    metadata = "",
+                    vedleggMetadata = "",
+                    soknadDokument = DokumentInfo("soknad.pdf", "doc-id", 100L),
+                    vedlegg = emptyList(),
+                    timestampSendt = 0L,
+                )
+            }
+        val ettersendtInfo =
+            if (ettersendelser.isNotEmpty()) {
+                EttersendtInfoNAV(
+                    ettersendelser =
+                        ettersendelser.map {
+                            Ettersendelse(
+                                navEksternRefId = it,
+                                vedleggMetadata = "",
+                                vedlegg = emptyList(),
+                                timestampSendt = 0L,
+                            )
+                        },
+                )
+            } else {
+                null
+            }
 
         return DigisosSak(
             fiksDigisosId = fiksDigisosId,
@@ -69,10 +73,11 @@ class FiksClientTest {
 
     @Test
     fun `increments counter from highest existing ettersendelse`() {
-        val sak = digisosSak(
-            originalSoknadRefId = "ref0000",
-            ettersendelser = listOf("ref0000", "ref0003", "ref0001"),
-        )
+        val sak =
+            digisosSak(
+                originalSoknadRefId = "ref0000",
+                ettersendelser = listOf("ref0000", "ref0003", "ref0001"),
+            )
         val result = lagNavEksternRefId(sak)
         assertEquals("ref0004", result)
     }

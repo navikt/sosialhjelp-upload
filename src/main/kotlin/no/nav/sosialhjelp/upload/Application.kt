@@ -1,5 +1,10 @@
+@file:Suppress("LongMethod")
+
 package no.nav.sosialhjelp.upload
 
+import com.google.cloud.storage.StorageOptions
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import io.ktor.server.application.*
 import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.config.property
@@ -7,6 +12,13 @@ import io.ktor.server.plugins.di.*
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.EttersendelseService
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
@@ -18,37 +30,27 @@ import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.SubmissionService
+import no.nav.sosialhjelp.upload.texas.TexasClient
+import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.tus.storage.GcsBucketStorage
-import com.google.cloud.storage.StorageOptions
-import no.nav.sosialhjelp.upload.texas.TexasClient
-import no.nav.sosialhjelp.upload.tus.TusUploadService
-import no.nav.sosialhjelp.upload.upload.RetentionService
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
+import no.nav.sosialhjelp.upload.upload.RetentionService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.upload.UploadRecoveryService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
 import no.nav.sosialhjelp.upload.vedlegg.VedleggService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.minutes
 import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
-import kotlinx.coroutines.CoroutineDispatcher
 import javax.sql.DataSource
+import kotlin.time.Duration.Companion.minutes
 
 fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain
@@ -73,7 +75,10 @@ private fun getDataSource(config: ApplicationConfig): DataSource {
     )
 }
 
-private fun migrateDatabase(dataSource: DataSource, clean: Boolean) {
+private fun migrateDatabase(
+    dataSource: DataSource,
+    clean: Boolean,
+) {
     Flyway
         .configure()
         .dataSource(dataSource)
@@ -103,12 +108,13 @@ fun Application.module() {
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-    val chunkStorage: ChunkStorage = if (isLocalOrTest) {
-        FileSystemStorage()
-    } else {
-        val bucketName = environment.config.property("gcs.bucketName").getString()
-        GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
-    }
+    val chunkStorage: ChunkStorage =
+        if (isLocalOrTest) {
+            FileSystemStorage()
+        } else {
+            val bucketName = environment.config.property("gcs.bucketName").getString()
+            GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
+        }
     dependencies {
         provide<PrometheusMeterRegistry> { appMicrometerRegistry }
         provide<MeterRegistry> { appMicrometerRegistry }
@@ -157,28 +163,31 @@ fun Application.module() {
     configureStatusPages()
     configureRouting()
 
-    val scopes = if (!isTest) {
-        val recoveryService: UploadRecoveryService by dependencies
-        val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        recoveryScope.launch {
-            while (true) {
-                delay(1.minutes)
-                runCatching { recoveryService.recoverAll() }
-                    .onFailure { log.warn("Upload recovery sweep failed", it) }
+    val scopes =
+        if (!isTest) {
+            val recoveryService: UploadRecoveryService by dependencies
+            val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            recoveryScope.launch {
+                while (true) {
+                    delay(1.minutes)
+                    runCatching { recoveryService.recoverAll() }
+                        .onFailure { log.warn("Upload recovery sweep failed", it) }
+                }
             }
-        }
 
-        val retentionService: RetentionService by dependencies
-        val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        retentionScope.launch {
-            while (true) {
-                delay(1.minutes)
-                runCatching { retentionService.runRetention() }
-                    .onFailure { log.warn("Retention sweep failed", it) }
+            val retentionService: RetentionService by dependencies
+            val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            retentionScope.launch {
+                while (true) {
+                    delay(1.minutes)
+                    runCatching { retentionService.runRetention() }
+                        .onFailure { log.warn("Retention sweep failed", it) }
+                }
             }
+            listOf(retentionScope, recoveryScope)
+        } else {
+            emptyList()
         }
-        listOf(retentionScope, recoveryScope)
-    } else emptyList()
 
     monitor.subscribe(ApplicationStopped) {
         processingScope.cancel()

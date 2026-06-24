@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod", "CyclomaticComplexMethod")
+
 package no.nav.sosialhjelp.upload.tus
 
 import io.ktor.http.HttpStatusCode
@@ -11,20 +13,19 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
-import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
+import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
 
 private const val TUS_RESUMABLE = "1.0.0"
 private const val TUS_VERSION = "1.0.0"
 private const val TUS_EXTENSION = "creation,termination"
 private const val MAX_CHUNK_SIZE = 10 * 1024 * 1024 + 1024 // 10MB + some headroom
 
-private const val ProxyPathInnsyn = "/sosialhjelp/innsyn/api/upload-api"
-private const val ProxyPathSoknad = "/sosialhjelp/soknad/api/upload-api"
+private const val PROXY_PATH_INNSYN = "/sosialhjelp/innsyn/api/upload-api"
+private const val PROXY_PATH_SOKNAD = "/sosialhjelp/soknad/api/upload-api"
 
 fun Route.configureTusRoutes(basePath: String) {
     val tusUploadService: TusUploadService by application.dependencies
-
 
     options {
         call.response.header("Tus-Resumable", TUS_RESUMABLE)
@@ -36,10 +37,12 @@ fun Route.configureTusRoutes(basePath: String) {
 
     // Create a new upload
     post {
-        val personident = call.principal<JWTPrincipal>()?.subject
-            ?: return@post call.respond(HttpStatusCode.Unauthorized)
-        val token = call.request.headers["Authorization"]?.removePrefix("Bearer ")
-            ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val personident =
+            call.principal<JWTPrincipal>()?.subject
+                ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val token =
+            call.request.headers["Authorization"]?.removePrefix("Bearer ")
+                ?: return@post call.respond(HttpStatusCode.Unauthorized)
 
         val tusResumable = call.request.header("Tus-Resumable")
         if (tusResumable != TUS_RESUMABLE) {
@@ -47,31 +50,54 @@ fun Route.configureTusRoutes(basePath: String) {
             return@post call.respond(HttpStatusCode.PreconditionFailed)
         }
 
-        val uploadLength = call.request.header("Upload-Length")?.toLongOrNull()
-            ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val uploadLength =
+            call.request.header("Upload-Length")?.toLongOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
 
         val metadata = parseMetadata(call.request.header("Upload-Metadata"))
-        val filename = metadata["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler filename")
-        val contextId = metadata["contextId"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
+        val filename =
+            metadata["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler filename")
+        val contextId =
+            metadata["contextId"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
         val fiksDigisosId = metadata["fiksDigisosId"]
         val navEksternRefId = metadata["navEksternRefId"]
         val kategori = metadata["kategori"]
-        if (fiksDigisosId == null && navEksternRefId == null) return@post call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller navEksternRefId")
+        if (fiksDigisosId == null && navEksternRefId == null) {
+            return@post call.respond(
+                HttpStatusCode.BadRequest,
+                "Mangler fiksDigisosId eller navEksternRefId",
+            )
+        }
         if (contextId.length > 2048) return@post call.respond(HttpStatusCode.BadRequest, "contextId for lang")
-        if (fiksDigisosId != null && fiksDigisosId.length > 255) return@post call.respond(HttpStatusCode.BadRequest, "fiksDigisosId for lang")
+        if (fiksDigisosId != null && fiksDigisosId.length > 255) {
+            return@post call.respond(
+                HttpStatusCode.BadRequest,
+                "fiksDigisosId for lang",
+            )
+        }
 
         val uploadId =
             try {
-                tusUploadService.create(contextId, filename, uploadLength, personident, token, fiksDigisosId, navEksternRefId, kategori)
+                tusUploadService.create(
+                    contextId,
+                    filename,
+                    uploadLength,
+                    personident,
+                    token,
+                    fiksDigisosId,
+                    navEksternRefId,
+                    kategori,
+                )
             } catch (_: UploadForbiddenException) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }
 
         val forwardedPrefix = call.request.header("x-forwarded-prefix")
-        val proxyPath = forwardedPrefix ?: when {
-            fiksDigisosId != null -> ProxyPathInnsyn
-            else  -> ProxyPathSoknad
-        }
+        val proxyPath =
+            forwardedPrefix ?: when {
+                fiksDigisosId != null -> PROXY_PATH_INNSYN
+                else -> PROXY_PATH_SOKNAD
+            }
 
         call.response.header("Location", "$proxyPath$basePath/$uploadId")
         call.response.header("Tus-Resumable", TUS_RESUMABLE)
@@ -107,8 +133,9 @@ fun Route.configureTusRoutes(basePath: String) {
             if (contentType != "application/offset+octet-stream") {
                 return@patch call.respond(HttpStatusCode.UnsupportedMediaType)
             }
-            val uploadOffset = call.request.header("Upload-Offset")?.toLongOrNull()
-                ?: return@patch call.respond(HttpStatusCode.BadRequest)
+            val uploadOffset =
+                call.request.header("Upload-Offset")?.toLongOrNull()
+                    ?: return@patch call.respond(HttpStatusCode.BadRequest)
 
             val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()
             if (data.size > MAX_CHUNK_SIZE) {
@@ -146,5 +173,3 @@ fun Route.configureTusRoutes(basePath: String) {
         }
     }
 }
-
-

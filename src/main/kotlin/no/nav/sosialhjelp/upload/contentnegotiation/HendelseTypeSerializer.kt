@@ -7,10 +7,13 @@ import kotlinx.serialization.encoding.Encoder
 import no.nav.sosialhjelp.upload.action.fiks.Vedlegg
 
 class HendelseTypeSerializer : KSerializer<Vedlegg.HendelseType> {
-    override val descriptor = PrimitiveSerialDescriptor("HendelseType", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+    override val descriptor =
+        PrimitiveSerialDescriptor("HendelseType", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
 
-
-    override fun serialize(encoder: Encoder, value: Vedlegg.HendelseType) {
+    override fun serialize(
+        encoder: Encoder,
+        value: Vedlegg.HendelseType,
+    ) {
         encoder.encodeString(value.value)
     }
 

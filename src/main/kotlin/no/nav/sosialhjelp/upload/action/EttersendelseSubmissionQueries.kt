@@ -8,8 +8,11 @@ import java.util.UUID
  * DB queries for the ettersendelse submission flow.
  */
 class EttersendelseSubmissionQueries {
-
-    fun getNavEksternRefId(tx: Configuration, submissionId: UUID, personIdent: String): String =
+    fun getNavEksternRefId(
+        tx: Configuration,
+        submissionId: UUID,
+        personIdent: String,
+    ): String =
         tx
             .dsl()
             .select(SUBMISSION.NAV_EKSTERN_REF_ID)

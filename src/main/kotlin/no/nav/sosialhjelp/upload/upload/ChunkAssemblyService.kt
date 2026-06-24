@@ -22,12 +22,16 @@ class ChunkAssemblyService(
      * a single GCS object, reads the assembled bytes, and returns the data together with
      * the composed object key (needed for later cleanup).
      */
-    suspend fun assembleChunks(uploadId: UUID, gcsKey: String): Pair<ByteArray, String> =
+    suspend fun assembleChunks(
+        uploadId: UUID,
+        gcsKey: String,
+    ): Pair<ByteArray, String> =
         withContext(ioDispatcher) {
             val chunkPrefix = "uploads/$uploadId-chunk-"
-            val chunkKeys = chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
-                key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
-            }
+            val chunkKeys =
+                chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
+                    key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
+                }
             if (chunkKeys.isEmpty()) {
                 error("No chunk objects found for upload $uploadId at prefix $chunkPrefix")
             }
@@ -42,11 +46,15 @@ class ChunkAssemblyService(
      * Deletes all chunk objects for [uploadId] and the composed object (if any).
      * Errors are logged but not rethrown so cleanup never blocks the caller.
      */
-    suspend fun deleteGcsObjects(uploadId: UUID, composedKey: String? = null) {
+    suspend fun deleteGcsObjects(
+        uploadId: UUID,
+        composedKey: String? = null,
+    ) {
         val chunkPrefix = "uploads/$uploadId-chunk-"
-        val keysToDelete = buildList {
-            add(composedKey ?: "uploads/$uploadId")
-        }
+        val keysToDelete =
+            buildList {
+                add(composedKey ?: "uploads/$uploadId")
+            }
         runCatching {
             val chunkKeys = chunkStorage.listKeys(chunkPrefix)
             (chunkKeys + keysToDelete).distinct().forEach { key ->

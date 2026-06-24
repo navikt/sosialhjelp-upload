@@ -18,10 +18,12 @@ class EncryptionServiceImpl(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : EncryptionService {
     private val logger = LoggerFactory.getLogger(this::class.java)
+
     override suspend fun encryptBytes(data: ByteArray): ByteArray {
-        val cert = withContext(ioDispatcher) {
-            fiksClient.fetchPublicKey()
-        }
+        val cert =
+            withContext(ioDispatcher) {
+                fiksClient.fetchPublicKey()
+            }
         logger.debug("Krypterer ${data.size} bytes")
         return kryptering.krypterData(data, cert, Security.getProvider("BC"))
     }
@@ -29,6 +31,7 @@ class EncryptionServiceImpl(
 
 class EncryptionServiceMock : EncryptionService {
     private val logger = LoggerFactory.getLogger(this::class.java)
+
     override suspend fun encryptBytes(data: ByteArray): ByteArray {
         logger.debug("Lar vær å kryptere ${data.size} bytes i mock")
         return data

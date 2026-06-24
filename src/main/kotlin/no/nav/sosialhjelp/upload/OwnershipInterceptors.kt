@@ -20,7 +20,10 @@ import java.util.UUID
 /** Set by [verifySubmissionOwnership] — the validated submission ID parsed from the path parameter. */
 val VerifiedSubmissionId = AttributeKey<UUID>("VerifiedSubmissionId")
 
-/** Set by [no.nav.sosialhjelp.upload.tus.verifyUploadOwnership] or [verifySubmissionOwnership] — the authenticated user's personident. */
+/**
+ * Set by [no.nav.sosialhjelp.upload.tus.verifyUploadOwnership] or [verifySubmissionOwnership]
+ * — the authenticated user's personident.
+ */
 val VerifiedPersonident = AttributeKey<String>("VerifiedPersonident")
 
 private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
@@ -42,9 +45,10 @@ private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = 
                 return@on
             }
 
-            val owned = withContext(ioDispatcher) {
-                submissionQueries.isOwnedByUser(submissionId, personident)
-            }
+            val owned =
+                withContext(ioDispatcher) {
+                    submissionQueries.isOwnedByUser(submissionId, personident)
+                }
             if (!owned) {
                 call.respond(HttpStatusCode.NotFound)
                 return@on
@@ -73,40 +77,6 @@ fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatch
     install(verifySubmissionOwnershipPlugin(ioDispatcher))
 }
 
-private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
-    createRouteScopedPlugin("VerifyNavEksternRefIdOwnership") {
-        val dsl: DSLContext by application.dependencies
-        val submissionQueries: SubmissionQueries by application.dependencies
-
-        on(AuthenticationChecked) { call ->
-            if (call.isHandled) return@on
-
-            val personident = call.principal<JWTPrincipal>()?.subject
-            if (personident == null) {
-                call.respond(HttpStatusCode.Unauthorized)
-                return@on
-            }
-
-            val navEksternRefId = call.parameters["navEksternRefId"]
-            if (navEksternRefId == null) {
-                call.respond(HttpStatusCode.NotFound)
-                return@on
-            }
-
-            val owned = withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
-                }
-            }
-            if (!owned) {
-                call.respond(HttpStatusCode.NotFound)
-                return@on
-            }
-
-            call.attributes.put(VerifiedPersonident, personident)
-        }
-    }
-
 // ── TokenX interceptors ─────────────────────────────────────────────────────────────────────────
 // Used by endpoints called from sosialhjelp-soknad-api via TokenX token exchange.
 // The exchanged token carries the original user's personnummer in the `pid` claim.
@@ -131,11 +101,12 @@ private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDis
                 return@on
             }
 
-            val owned = withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+            val owned =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx ->
+                        submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+                    }
                 }
-            }
             if (!owned) {
                 call.respond(HttpStatusCode.NotFound)
                 return@on

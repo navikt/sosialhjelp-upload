@@ -1,3 +1,5 @@
+@file:Suppress("TooGenericExceptionCaught", "LongParameterList")
+
 package no.nav.sosialhjelp.upload.upload
 
 import io.micrometer.core.instrument.MeterRegistry
@@ -39,14 +41,18 @@ class RetentionService(
         val scope = span.makeCurrent()
         try {
             val cutoff = OffsetDateTime.now().minus(retentionTimeout)
-            val staleSubmissions = withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    submissionRetentionQueries.getStaleSubmissions(tx, cutoff)
+            val staleSubmissions =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx ->
+                        submissionRetentionQueries.getStaleSubmissions(tx, cutoff)
+                    }
                 }
-            }
             span.setAttribute("submission.retention.count", staleSubmissions.size.toLong())
             if (staleSubmissions.isNotEmpty()) {
-                log.info("Found ${staleSubmissions.size} stale submission(s) to clean up (idle for >${RETENTION_TIMEOUT_HOURS}h without being submitted)")
+                log.info(
+                    "Found ${staleSubmissions.size} stale submission(s) to clean up " +
+                        "(idle for >${RETENTION_TIMEOUT_HOURS}h without being submitted)",
+                )
             }
             for (submission in staleSubmissions) {
                 deleteStaleSubmission(submission)
@@ -63,9 +69,10 @@ class RetentionService(
 
     private suspend fun deleteStaleSubmission(submission: SubmissionRetentionQueries.StaleSubmission) {
         try {
-            val gcsKeys = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.getGcsKeysForSubmission(tx, submission.id) }
-            }
+            val gcsKeys =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx -> uploadRepository.getGcsKeysForSubmission(tx, submission.id) }
+                }
 
             // Delete from DB first so that a crash leaves orphaned remote data rather than
             // a dangling DB row that would cause repeated failed deletions on retry.

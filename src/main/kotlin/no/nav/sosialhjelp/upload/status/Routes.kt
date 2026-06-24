@@ -8,14 +8,14 @@ import io.ktor.server.sse.*
 import io.ktor.sse.*
 import io.ktor.util.cio.ChannelWriteException
 import io.ktor.util.reflect.*
-import java.io.IOException
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.serialization.json.Json.Default
-import kotlinx.serialization.serializer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
+import kotlinx.serialization.json.Json.Default
+import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.database.notify.SubmissionUpdateNotification
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,7 +26,6 @@ fun Route.configureStatusRoutes() {
 
     val activeConnections = AtomicInteger(0)
     meterRegistry.gauge("sse.connections.active", activeConnections) { it.toDouble() }
-
 
     sse("/status/{id}", serialize = { typeInfo: TypeInfo, value: Any ->
         val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)

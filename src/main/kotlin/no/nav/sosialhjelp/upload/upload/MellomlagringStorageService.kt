@@ -40,12 +40,13 @@ class MellomlagringStorageService(
         val contentType = ContentType.defaultForFile(File(filename)).toString()
 
         logger.info("Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId")
-        val filId = mellomlagringClient.uploadFile(
-            navEksternRefId = navEksternRefId,
-            filename = mellomlagringFilnavn,
-            contentType = contentType,
-            data = encrypted,
-        )
+        val filId =
+            mellomlagringClient.uploadFile(
+                navEksternRefId = navEksternRefId,
+                filename = mellomlagringFilnavn,
+                contentType = contentType,
+                data = encrypted,
+            )
         return StorageResult(
             filId = filId,
             mellomlagringFilnavn = mellomlagringFilnavn,

@@ -1,4 +1,6 @@
 [versions]
+detekt = "1.23.8"
+ktlint-gradle = "12.3.0"
 bouncycastle = "1.84"
 coroutines = "1.11.0"
 fiks_kryptering = "2.3.0"
@@ -79,8 +81,10 @@ testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgr
 xmpbox = { module = "org.apache.pdfbox:xmpbox", version.ref = "pdfbox" }
 
 [plugins]
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-gradle" }
 ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
 
 [bundles]

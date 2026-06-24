@@ -1,6 +1,5 @@
 package no.nav.sosialhjelp.upload.pdf
 
-import org.apache.xmpbox.schema.PDFAIdentificationSchema
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.PDDocumentCatalog
 import org.apache.pdfbox.pdmodel.PDPage
@@ -12,6 +11,7 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font
 import org.apache.pdfbox.pdmodel.graphics.color.PDOutputIntent
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
 import org.apache.xmpbox.XMPMetadata
+import org.apache.xmpbox.schema.PDFAIdentificationSchema
 import org.apache.xmpbox.xml.XmpSerializer
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
@@ -205,7 +205,7 @@ class PdfGenerator internal constructor(
             if (inputStream != null) {
                 return inputStream.use { it.readAllBytes() }
             }
-    } catch (e: IOException) {
+        } catch (e: IOException) {
             logger.error("Failed to load NAV logo from resources", e)
         }
         return ByteArray(0)

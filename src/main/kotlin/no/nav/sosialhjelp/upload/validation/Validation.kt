@@ -12,11 +12,6 @@ enum class ValidationCode {
     INVALID_PDF,
     TOTAL_SIZE_TOO_LARGE,
     TOO_MANY_FILES,
-    ;
-
-    companion object {
-
-    }
 }
 
 interface Validation {

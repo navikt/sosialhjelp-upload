@@ -17,13 +17,19 @@ class FileSystemStorage(
 
     private fun file(key: String) = File(root, key).also { it.parentFile.mkdirs() }
 
-    override suspend fun writeChunk(key: String, data: ByteArray) {
+    override suspend fun writeChunk(
+        key: String,
+        data: ByteArray,
+    ) {
         withContext(ioDispatcher) {
             file(key).writeBytes(data)
         }
     }
 
-    override suspend fun composeChunks(sourceKeys: List<String>, destKey: String) {
+    override suspend fun composeChunks(
+        sourceKeys: List<String>,
+        destKey: String,
+    ) {
         withContext(ioDispatcher) {
             val dest = file(destKey)
             dest.outputStream().use { out ->

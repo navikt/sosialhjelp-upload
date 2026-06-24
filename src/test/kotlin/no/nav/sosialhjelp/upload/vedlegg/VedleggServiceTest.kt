@@ -1,10 +1,10 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
-import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach

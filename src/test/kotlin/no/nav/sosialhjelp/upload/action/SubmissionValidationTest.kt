@@ -12,19 +12,19 @@ import kotlin.test.assertContains
 import kotlin.test.assertTrue
 
 class SubmissionValidationTest {
-
-    private fun makeCompleteUpload(mellomlagringStorrelse: Long = 1024L): Upload = Upload(
-        id = UUID.randomUUID(),
-        originalFilename = "file.pdf",
-        errors = emptyList(),
-        filId = UUID.randomUUID(),
-        navEksternRefId = "ref",
-        mellomlagringFilnavn = "file.pdf",
-        fileSize = mellomlagringStorrelse,
-        mellomlagringStorrelse = mellomlagringStorrelse,
-        status = Status.COMPLETE,
-        sha512 = "abc",
-    )
+    private fun makeCompleteUpload(mellomlagringStorrelse: Long = 1024L): Upload =
+        Upload(
+            id = UUID.randomUUID(),
+            originalFilename = "file.pdf",
+            errors = emptyList(),
+            filId = UUID.randomUUID(),
+            navEksternRefId = "ref",
+            mellomlagringFilnavn = "file.pdf",
+            fileSize = mellomlagringStorrelse,
+            mellomlagringStorrelse = mellomlagringStorrelse,
+            status = Status.COMPLETE,
+            sha512 = "abc",
+        )
 
     @Test
     fun `returns TOO_MANY_FILES when more than 30 complete uploads exist`() {
@@ -68,9 +68,10 @@ class SubmissionValidationTest {
     @Test
     fun `failed uploads are not counted toward limits`() {
         val completeUploads = (1..MAX_FILES_PER_SUBMISSION).map { makeCompleteUpload() }
-        val failedUploads = (1..10).map {
-            makeCompleteUpload().copy(status = Status.FAILED, mellomlagringStorrelse = null)
-        }
+        val failedUploads =
+            (1..10).map {
+                makeCompleteUpload().copy(status = Status.FAILED, mellomlagringStorrelse = null)
+            }
         val violations = validateSubmissionUploads(completeUploads + failedUploads)
         assertTrue(violations.isEmpty())
     }

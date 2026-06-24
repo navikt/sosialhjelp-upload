@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.tus
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -10,31 +11,30 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
+import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
+import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
-import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.SUBMISSION
-import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
+import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
 import no.nav.sosialhjelp.upload.validation.Result
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
-import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.util.UUID
-import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -74,15 +74,16 @@ class TusUploadServiceIntegrationTest {
         val chunkAssemblyService = ChunkAssemblyService(chunkStorage)
         val fileConversionService = FileConversionService(gotenbergService)
         val mellomlagringStorageService = MellomlagringStorageService(encryptionService, mellomlagringClient)
-        val uploadProcessingService = UploadProcessingService(
-            dsl = dsl,
-            uploadProcessingQueries = uploadProcessingQueries,
-            chunkAssemblyService = chunkAssemblyService,
-            validator = validator,
-            fileConversionService = fileConversionService,
-            mellomlagringStorageService = mellomlagringStorageService,
-            meterRegistry = meterRegistry,
-        )
+        val uploadProcessingService =
+            UploadProcessingService(
+                dsl = dsl,
+                uploadProcessingQueries = uploadProcessingQueries,
+                chunkAssemblyService = chunkAssemblyService,
+                validator = validator,
+                fileConversionService = fileConversionService,
+                mellomlagringStorageService = mellomlagringStorageService,
+                meterRegistry = meterRegistry,
+            )
 
         tusUploadService =
             TusUploadService(
@@ -166,7 +167,16 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             val content = "hello world".toByteArray()
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "partial.pdf", (content.size * 2).toLong(), personident, "test-token", null, "id")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "partial.pdf",
+                    (content.size * 2).toLong(),
+                    personident,
+                    "test-token",
+                    null,
+                    "id",
+                )
 
             val newOffset = tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -187,7 +197,16 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "complete.pdf", content.size.toLong(), personident, "test-token", null, "id")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "complete.pdf",
+                    content.size.toLong(),
+                    personident,
+                    "test-token",
+                    null,
+                    "id",
+                )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
             awaitUploadTerminal(dsl, uploadId)
@@ -213,7 +232,8 @@ class TusUploadServiceIntegrationTest {
                     (MAX_FILE_SIZE + 1).toLong(),
                     personident,
                     "test-token",
-                    null, "id"
+                    null,
+                    "id",
                 )
             tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
 
@@ -244,7 +264,9 @@ class TusUploadServiceIntegrationTest {
                     "virus.pdf",
                     content.size.toLong(),
                     personident,
-                    "test-token", null, "id"
+                    "test-token",
+                    null,
+                    "id",
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -279,7 +301,16 @@ class TusUploadServiceIntegrationTest {
             } returns filId
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, "test-token", null, "id")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "document.docx",
+                    content.size.toLong(),
+                    personident,
+                    "test-token",
+                    null,
+                    "id",
+                )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
             awaitUploadTerminal(dsl, uploadId)
@@ -297,15 +328,26 @@ class TusUploadServiceIntegrationTest {
             val zipContent = byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00)
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "archive.zip", zipContent.size.toLong(), personident, "test-token", null, "id")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "archive.zip",
+                    zipContent.size.toLong(),
+                    personident,
+                    "test-token",
+                    null,
+                    "id",
+                )
             tusUploadService.appendChunk(uploadId, 0L, zipContent)
 
             awaitUploadTerminal(dsl, uploadId)
 
             val errors = dsl.selectFrom(ERROR).where(ERROR.UPLOAD.eq(uploadId)).fetch()
             assertTrue(errors.isNotEmpty, "Zip file should be rejected with validation error")
-            assertTrue(errors.any { it[ERROR.CODE]?.contains("FILETYPE_NOT_SUPPORTED") == true },
-                "Error should be FILETYPE_NOT_SUPPORTED for zip files")
+            assertTrue(
+                errors.any { it[ERROR.CODE]?.contains("FILETYPE_NOT_SUPPORTED") == true },
+                "Error should be FILETYPE_NOT_SUPPORTED for zip files",
+            )
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertNull(row!![UPLOAD.FIL_ID], "Upload should not have filId if rejected")
@@ -318,16 +360,30 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             val content = "word-doc-content".toByteArray()
 
-            coEvery { gotenbergService.convertToPdf(any(), any()) } throws RuntimeException("Gotenberg service error: timeout")
+            coEvery { gotenbergService.convertToPdf(any(), any()) } throws
+                RuntimeException("Gotenberg service error: timeout")
 
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "document.docx", content.size.toLong(), personident, "test-token", null, "id")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "document.docx",
+                    content.size.toLong(),
+                    personident,
+                    "test-token",
+                    null,
+                    "id",
+                )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
             awaitUploadTerminal(dsl, uploadId)
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
-            assertEquals("FAILED", row!![UPLOAD.PROCESSING_STATUS], "Upload should be marked as FAILED when conversion fails")
+            assertEquals(
+                "FAILED",
+                row!![UPLOAD.PROCESSING_STATUS],
+                "Upload should be marked as FAILED when conversion fails",
+            )
             assertNull(row[UPLOAD.FIL_ID], "Upload should not have filId when conversion fails")
         }
 
@@ -341,7 +397,16 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "delete-me.pdf", 10L, personident, "test-token", null, "")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "delete-me.pdf",
+                    10L,
+                    personident,
+                    "test-token",
+                    null,
+                    "",
+                )
 
             tusUploadService.delete(uploadId)
 
@@ -371,7 +436,10 @@ class TusUploadServiceIntegrationTest {
 
             assertNotNull(ref1)
             assertNotNull(ref2)
-            assertTrue(ref1 != ref2, "Expected different navEksternRefIds for different submissions, but both got: $ref1")
+            assertTrue(
+                ref1 != ref2,
+                "Expected different navEksternRefIds for different submissions, but both got: $ref1",
+            )
         }
 
     // endregion

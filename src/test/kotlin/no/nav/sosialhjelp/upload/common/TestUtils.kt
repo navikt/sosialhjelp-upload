@@ -24,7 +24,7 @@ object TestUtils {
         navEksternRefId: String? = null,
     ): UUID {
         val uuid = UUID.randomUUID()
-        tx.transactionResult { it ->
+        tx.transactionResult {
             it
                 .dsl()
                 .insertInto(Submission.SUBMISSION)
@@ -55,12 +55,13 @@ object TestUtils {
                 fun isTerminal(s: String?) = s == "COMPLETE" || s == "FAILED"
 
                 val channel = Channel<Unit>(capacity = Channel.UNLIMITED)
-                val collector = notifications.allUpdates
-                    .onEach { channel.trySend(Unit) }
-                    .launchIn(this)
+                val collector =
+                    notifications.allUpdates
+                        .onEach { channel.trySend(Unit) }
+                        .launchIn(this)
                 try {
                     if (isTerminal(currentStatus())) return@withTimeout
-                    for (notification in channel) {
+                    for (ignored in channel) {
                         if (isTerminal(currentStatus())) return@withTimeout
                     }
                 } finally {

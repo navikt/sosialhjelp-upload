@@ -20,6 +20,9 @@ data class UploadDto(
     val kategori: String?,
 ) {
     enum class Status {
-        COMPLETE, PROCESSING, FAILED, PENDING
+        COMPLETE,
+        PROCESSING,
+        FAILED,
+        PENDING,
     }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("TooGenericExceptionCaught")
+
 package no.nav.sosialhjelp.upload.database.notify
 
 import kotlinx.coroutines.CancellationException
@@ -22,7 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 data class SubmissionUpdateNotification(val submissionId: UUID, val type: UpdateType) {
     enum class UpdateType {
         UPDATE,
-        DELETE
+        DELETE,
     }
 }
 
@@ -39,6 +41,7 @@ class SubmissionNotificationService(
 ) {
     private val log = LoggerFactory.getLogger(SubmissionNotificationService::class.java)
 
+    @Suppress("PropertyName")
     private val _updates = MutableSharedFlow<SubmissionUpdateNotification>(extraBufferCapacity = 64)
 
     /** All submission update/delete notifications, unfiltered. */
@@ -57,11 +60,12 @@ class SubmissionNotificationService(
                             while (true) {
                                 val notifications = pgConn.getNotifications(500) ?: emptyArray()
                                 notifications.forEach { notification ->
-                                    val type = when (notification.name) {
-                                        "submission_delete" -> SubmissionUpdateNotification.UpdateType.DELETE
-                                        "submission_update" -> SubmissionUpdateNotification.UpdateType.UPDATE
-                                        else -> error("Unsupported notification name ${notification.name}")
-                                    }
+                                    val type =
+                                        when (notification.name) {
+                                            "submission_delete" -> SubmissionUpdateNotification.UpdateType.DELETE
+                                            "submission_update" -> SubmissionUpdateNotification.UpdateType.UPDATE
+                                            else -> error("Unsupported notification name ${notification.name}")
+                                        }
                                     runCatching { UUID.fromString(notification.parameter) }
                                         .getOrNull()
                                         ?.let { _updates.tryEmit(SubmissionUpdateNotification(it, type = type)) }
@@ -86,8 +90,8 @@ class SubmissionNotificationService(
      * If called before commit (or if the transaction rolls back), subscribers will
      * receive a spurious notification for a change that was never persisted.
      *
-      * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
-      * notifications that must be atomic with a write transaction.
+     * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
+     * notifications that must be atomic with a write transaction.
      */
     fun notifyUpdate(submissionId: UUID) {
         dataSource.connection.use { conn ->
@@ -105,8 +109,8 @@ class SubmissionNotificationService(
      * If called before commit (or if the transaction rolls back), subscribers will
      * receive a spurious notification for a change that was never persisted.
      *
-      * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
-      * notifications that must be atomic with a write transaction.
+     * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
+     * notifications that must be atomic with a write transaction.
      */
     fun notifyDeleted(submissionId: UUID) {
         dataSource.connection.use { conn ->

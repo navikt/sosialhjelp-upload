@@ -11,12 +11,12 @@ import javax.sql.DataSource
 
 object PostgresTestContainer {
     private val instance: PostgreSQLContainer<*> by lazy {
-            PostgreSQLContainer("postgres:17").apply {
-                withDatabaseName("testdb")
-                withUsername("test")
-                withPassword("test")
-                start()
-            }
+        PostgreSQLContainer("postgres:17").apply {
+            withDatabaseName("testdb")
+            withUsername("test")
+            withPassword("test")
+            start()
+        }
     }
 
     val dataSource: DataSource by lazy {

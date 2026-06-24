@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList", "LongMethod")
+
 package no.nav.sosialhjelp.upload.action
 
 import io.ktor.http.*
@@ -47,32 +49,49 @@ class EttersendelseService(
     ): Boolean {
         val sak = fiksClient.getSak(fiksDigisosId, token)
         val kommunenummer = sak.kommunenummer
-        val navEksternRefId = withContext(ioDispatcher) {
-            dsl.transactionResult { tx ->
-                ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
+        val navEksternRefId =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
+                }
             }
-        }
 
-        val uploads = withContext(ioDispatcher) {
-            dsl.transactionResult { tx ->
-                uploadRepository.getUploads(tx, submissionId)
+        val uploads =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    uploadRepository.getUploads(tx, submissionId)
+                }
             }
-        }
 
         val violations = validateSubmissionUploads(uploads)
         if (violations.isNotEmpty()) {
             throw SubmissionValidationException(violations)
         }
 
-        val ettersendelsePdf = EttersendelsePdfGenerator.generate(PdfMetadata(metadata.type, uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } }), personIdent)
-        mellomlagringClient.uploadFile(navEksternRefId, "ettersendelse.pdf", "application/pdf", encryptionService.encryptBytes(ettersendelsePdf))
+        val ettersendelsePdf =
+            EttersendelsePdfGenerator.generate(
+                PdfMetadata(
+                    metadata.type,
+                    uploads.mapNotNull {
+                        it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) }
+                    },
+                ),
+                personIdent,
+            )
+        mellomlagringClient.uploadFile(
+            navEksternRefId,
+            "ettersendelse.pdf",
+            "application/pdf",
+            encryptionService.encryptBytes(ettersendelsePdf),
+        )
 
-        val filer = uploads.mapNotNull {
-            if (it.mellomlagringFilnavn == null || it.sha512 == null) {
-                return@mapNotNull null
+        val filer =
+            uploads.mapNotNull {
+                if (it.mellomlagringFilnavn == null || it.sha512 == null) {
+                    return@mapNotNull null
+                }
+                Fil(it.mellomlagringFilnavn, it.sha512)
             }
-            Fil(it.mellomlagringFilnavn, it.sha512)
-        }
         val (response, duration) =
             try {
                 measureTimedValue {
@@ -87,7 +106,8 @@ class EttersendelseService(
                 }
             } catch (e: EttersendelseAlreadyExistsException) {
                 logger.warn(
-                    "Ettersendelse ${e.navEksternRefId} already exists in Fiks for $fiksDigisosId — treating as success",
+                    "Ettersendelse ${e.navEksternRefId} already exists in Fiks for $fiksDigisosId " +
+                        "— treating as success",
                 )
                 meterRegistry.counter("fiks.submission.already_exists").increment()
                 withContext(ioDispatcher) {

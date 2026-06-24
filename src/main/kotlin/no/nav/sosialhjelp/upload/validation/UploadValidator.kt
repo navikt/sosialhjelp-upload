@@ -1,3 +1,5 @@
+@file:Suppress("TooGenericExceptionCaught")
+
 package no.nav.sosialhjelp.upload.validation
 
 import io.micrometer.core.instrument.MeterRegistry
@@ -299,7 +301,10 @@ class UploadValidator(
             }
         }
 
-    private suspend fun validateFileType(data: ByteArray, filename: String): Pair<String, Validation?> =
+    private suspend fun validateFileType(
+        data: ByteArray,
+        filename: String,
+    ): Pair<String, Validation?> =
         withContext(ioDispatcher) {
             val tikaIS = TikaInputStream.get(data.inputStream())
             val tikaMetadata = Metadata()

@@ -16,7 +16,10 @@ class SubmissionQueries(
      * Ownership check for the submission interceptor — uses DSLContext directly
      * since it is called outside a transaction in the route plugin.
      */
-    fun isOwnedByUser(id: UUID, personIdent: String): Boolean =
+    fun isOwnedByUser(
+        id: UUID,
+        personIdent: String,
+    ): Boolean =
         dsl
             .selectCount()
             .from(SUBMISSION)
@@ -44,7 +47,10 @@ class SubmissionQueries(
             .fetchSingle()
             .value1() > 0
 
-    fun cleanup(tx: Configuration, submissionId: UUID): Int =
+    fun cleanup(
+        tx: Configuration,
+        submissionId: UUID,
+    ): Int =
         tx
             .dsl()
             .deleteFrom(SUBMISSION)

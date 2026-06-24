@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor.plugin)
     alias(libs.plugins.kotlinx.serialization)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
     id("nl.littlerobots.version-catalog-update") version "1.0.0"
     id("org.jooq.jooq-codegen-gradle") version libs.versions.jooq
     id("jacoco")
@@ -170,5 +172,28 @@ tasks {
         mergeServiceFiles()
         isZip64 = true
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+}
+
+detekt {
+    config.setFrom(files("detekt.yml"))
+    buildUponDefaultConfig = true
+    source.setFrom(
+        files(
+            "src/main/kotlin",
+            "src/test/kotlin",
+        ),
+    )
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    exclude("**/database/generated/**")
+}
+
+ktlint {
+    filter {
+        exclude { entry ->
+            entry.file.path.contains("database/generated")
+        }
     }
 }
