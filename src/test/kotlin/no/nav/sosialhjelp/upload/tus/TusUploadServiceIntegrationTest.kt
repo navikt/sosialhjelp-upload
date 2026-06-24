@@ -20,6 +20,9 @@ import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.SUBMISSION
 import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
+import no.nav.sosialhjelp.upload.upload.FileConversionService
+import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.validation.Result
 import no.nav.sosialhjelp.upload.validation.UploadValidator
@@ -69,14 +72,16 @@ class TusUploadServiceIntegrationTest {
 
         val chunkStorage = FileSystemStorage()
         val meterRegistry = SimpleMeterRegistry()
+        val chunkAssemblyService = ChunkAssemblyService(chunkStorage)
+        val fileConversionService = FileConversionService(gotenbergService)
+        val mellomlagringStorageService = MellomlagringStorageService(encryptionService, mellomlagringClient)
         val uploadProcessingService = UploadProcessingService(
             dsl = dsl,
             uploadRepository = uploadRepository,
+            chunkAssemblyService = chunkAssemblyService,
             validator = validator,
-            gotenbergService = gotenbergService,
-            mellomlagringClient = mellomlagringClient,
-            encryptionService = encryptionService,
-            chunkStorage = chunkStorage,
+            fileConversionService = fileConversionService,
+            mellomlagringStorageService = mellomlagringStorageService,
             meterRegistry = meterRegistry,
         )
 
@@ -89,6 +94,7 @@ class TusUploadServiceIntegrationTest {
                 fiksClient = fiksClient,
                 mellomlagringClient = mellomlagringClient,
                 chunkStorage = chunkStorage,
+                chunkAssemblyService = chunkAssemblyService,
                 uploadProcessingService = uploadProcessingService,
                 processingScope = processingScope,
                 meterRegistry = meterRegistry,

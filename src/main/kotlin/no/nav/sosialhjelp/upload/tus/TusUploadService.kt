@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.tus
 
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -10,10 +11,10 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.SubmissionRepository.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
+import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.UploadValidator
-import io.micrometer.core.instrument.MeterRegistry
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.slf4j.LoggerFactory
@@ -28,6 +29,7 @@ class TusUploadService(
     private val fiksClient: FiksClient,
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
+    private val chunkAssemblyService: ChunkAssemblyService,
     private val uploadProcessingService: UploadProcessingService,
     private val processingScope: CoroutineScope,
     private val meterRegistry: MeterRegistry,
@@ -154,7 +156,7 @@ class TusUploadService(
             }
         }
 
-        uploadProcessingService.deleteGcsObjects(uploadId)
+        chunkAssemblyService.deleteGcsObjects(uploadId)
     }
 
     class UploadForbiddenException(
