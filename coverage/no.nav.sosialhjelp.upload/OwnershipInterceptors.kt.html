@@ -20,40 +20,44 @@ import java.util.UUID
 /** Set by [verifySubmissionOwnership] — the validated submission ID parsed from the path parameter. */
 <span class="fc" id="L21">val VerifiedSubmissionId = AttributeKey&lt;UUID&gt;(&quot;VerifiedSubmissionId&quot;)</span>
 
-/** Set by [no.nav.sosialhjelp.upload.tus.verifyUploadOwnership] or [verifySubmissionOwnership] — the authenticated user's personident. */
-<span class="fc" id="L24">val VerifiedPersonident = AttributeKey&lt;String&gt;(&quot;VerifiedPersonident&quot;)</span>
+/**
+ * Set by [no.nav.sosialhjelp.upload.tus.verifyUploadOwnership] or [verifySubmissionOwnership]
+ * — the authenticated user's personident.
+ */
+<span class="fc" id="L27">val VerifiedPersonident = AttributeKey&lt;String&gt;(&quot;VerifiedPersonident&quot;)</span>
 
-<span class="nc" id="L26">private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
-<span class="fc" id="L27">    createRouteScopedPlugin(&quot;VerifySubmissionOwnership&quot;) {</span>
-<span class="fc" id="L28">        val submissionQueries: SubmissionQueries by application.dependencies</span>
+<span class="nc" id="L29">private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
+<span class="fc" id="L30">    createRouteScopedPlugin(&quot;VerifySubmissionOwnership&quot;) {</span>
+<span class="fc" id="L31">        val submissionQueries: SubmissionQueries by application.dependencies</span>
 
-<span class="pc bpc" id="L30" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
+<span class="pc bpc" id="L33" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
 
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (personident == null) {</span>
-<span class="nc" id="L35">                call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L36">                return@on</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (personident == null) {</span>
+<span class="nc" id="L38">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L39">                return@on</span>
             }
 
-<span class="pc bpc" id="L39" title="2 of 4 branches missed.">            val submissionId = call.parameters[&quot;submissionId&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            if (submissionId == null) {</span>
-<span class="nc" id="L41">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L42">                return@on</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">            val submissionId = call.parameters[&quot;submissionId&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            if (submissionId == null) {</span>
+<span class="nc" id="L44">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L45">                return@on</span>
             }
 
-<span class="fc bfc" id="L45" title="All 2 branches covered.">            val owned = withContext(ioDispatcher) {</span>
-<span class="fc" id="L46">                submissionQueries.isOwnedByUser(submissionId, personident)</span>
-            }
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (!owned) {</span>
-<span class="nc" id="L49">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L50">                return@on</span>
+<span class="fc" id="L48">            val owned =</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                withContext(ioDispatcher) {</span>
+<span class="fc" id="L50">                    submissionQueries.isOwnedByUser(submissionId, personident)</span>
+                }
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (!owned) {</span>
+<span class="nc" id="L53">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L54">                return@on</span>
             }
 
-<span class="fc" id="L53">            call.attributes.put(VerifiedSubmissionId, submissionId)</span>
-<span class="fc" id="L54">            call.attributes.put(VerifiedPersonident, personident)</span>
-<span class="fc" id="L55">        }</span>
-<span class="fc" id="L56">    }</span>
+<span class="fc" id="L57">            call.attributes.put(VerifiedSubmissionId, submissionId)</span>
+<span class="fc" id="L58">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">    }</span>
 
 /**
  * Route-scoped ownership interceptor for submission resources.
@@ -69,81 +73,48 @@ import java.util.UUID
  * On success, [VerifiedSubmissionId] and [VerifiedPersonident] are available in `call.attributes`.
  * On failure the pipeline is short-circuited via `call.respond` (404/401); the handler never runs.
  */
-<span class="fc" id="L72">fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
-<span class="fc" id="L73">    install(verifySubmissionOwnershipPlugin(ioDispatcher))</span>
-<span class="fc" id="L74">}</span>
-
-<span class="nc" id="L76">private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
-<span class="nc" id="L77">    createRouteScopedPlugin(&quot;VerifyNavEksternRefIdOwnership&quot;) {</span>
-<span class="nc" id="L78">        val dsl: DSLContext by application.dependencies</span>
-<span class="nc" id="L79">        val submissionQueries: SubmissionQueries by application.dependencies</span>
-
-<span class="nc bnc" id="L81" title="All 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
-<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (call.isHandled) return@on</span>
-
-<span class="nc bnc" id="L84" title="All 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
-<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (personident == null) {</span>
-<span class="nc" id="L86">                call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L87">                return@on</span>
-            }
-
-<span class="nc" id="L90">            val navEksternRefId = call.parameters[&quot;navEksternRefId&quot;]</span>
-<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (navEksternRefId == null) {</span>
-<span class="nc" id="L92">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L93">                return@on</span>
-            }
-
-<span class="nc bnc" id="L96" title="All 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
-<span class="nc" id="L97">                dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L98">                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
-<span class="nc" id="L99">                }</span>
-            }
-<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (!owned) {</span>
-<span class="nc" id="L102">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L103">                return@on</span>
-            }
-
-<span class="nc" id="L106">            call.attributes.put(VerifiedPersonident, personident)</span>
-<span class="nc" id="L107">        }</span>
-<span class="nc" id="L108">    }</span>
+<span class="fc" id="L76">fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
+<span class="fc" id="L77">    install(verifySubmissionOwnershipPlugin(ioDispatcher))</span>
+<span class="fc" id="L78">}</span>
 
 // ── TokenX interceptors ─────────────────────────────────────────────────────────────────────────
 // Used by endpoints called from sosialhjelp-soknad-api via TokenX token exchange.
 // The exchanged token carries the original user's personnummer in the `pid` claim.
 
-<span class="nc" id="L114">private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
-<span class="fc" id="L115">    createRouteScopedPlugin(&quot;VerifyNavEksternRefIdOwnershipByPid&quot;) {</span>
-<span class="pc" id="L116">        val dsl: DSLContext by application.dependencies</span>
-<span class="pc" id="L117">        val submissionQueries: SubmissionQueries by application.dependencies</span>
+<span class="nc" id="L84">private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
+<span class="fc" id="L85">    createRouteScopedPlugin(&quot;VerifyNavEksternRefIdOwnershipByPid&quot;) {</span>
+<span class="pc" id="L86">        val dsl: DSLContext by application.dependencies</span>
+<span class="pc" id="L87">        val submissionQueries: SubmissionQueries by application.dependencies</span>
 
-<span class="pc bnc" id="L119" title="All 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
-<span class="nc bnc" id="L120" title="All 2 branches missed.">            if (call.isHandled) return@on</span>
+<span class="pc bnc" id="L89" title="All 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (call.isHandled) return@on</span>
 
-<span class="nc bnc" id="L122" title="All 6 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.payload?.getClaim(&quot;pid&quot;)?.asString()</span>
-<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (personident == null) {</span>
-<span class="nc" id="L124">                call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L125">                return@on</span>
+<span class="nc bnc" id="L92" title="All 6 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.payload?.getClaim(&quot;pid&quot;)?.asString()</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (personident == null) {</span>
+<span class="nc" id="L94">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L95">                return@on</span>
             }
 
-<span class="nc" id="L128">            val navEksternRefId = call.parameters[&quot;navEksternRefId&quot;]</span>
-<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (navEksternRefId == null) {</span>
-<span class="nc" id="L130">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L131">                return@on</span>
+<span class="nc" id="L98">            val navEksternRefId = call.parameters[&quot;navEksternRefId&quot;]</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (navEksternRefId == null) {</span>
+<span class="nc" id="L100">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L101">                return@on</span>
             }
 
-<span class="nc bnc" id="L134" title="All 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
-<span class="nc" id="L135">                dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L136">                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
-<span class="nc" id="L137">                }</span>
-            }
-<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (!owned) {</span>
-<span class="nc" id="L140">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L141">                return@on</span>
+<span class="nc" id="L104">            val owned =</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                withContext(ioDispatcher) {</span>
+<span class="nc" id="L106">                    dsl.transactionResult { tx -&gt;</span>
+<span class="nc" id="L107">                        submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
+<span class="nc" id="L108">                    }</span>
+                }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            if (!owned) {</span>
+<span class="nc" id="L111">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L112">                return@on</span>
             }
 
-<span class="nc" id="L144">            call.attributes.put(VerifiedPersonident, personident)</span>
-<span class="nc" id="L145">        }</span>
-<span class="fc" id="L146">    }</span>
+<span class="nc" id="L115">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="nc" id="L116">        }</span>
+<span class="fc" id="L117">    }</span>
 
 /**
  * Route-scoped ownership interceptor for navEksternRefId endpoints called via TokenX.
@@ -152,7 +123,7 @@ import java.util.UUID
  * they own a submission with the given `{navEksternRefId}`.
  * On success, [VerifiedPersonident] is available in `call.attributes`.
  */
-<span class="fc" id="L155">fun Route.verifyNavEksternRefIdOwnershipByPid(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
-<span class="fc" id="L156">    install(verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher))</span>
-<span class="fc" id="L157">}</span>
+<span class="fc" id="L126">fun Route.verifyNavEksternRefIdOwnershipByPid(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
+<span class="fc" id="L127">    install(verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher))</span>
+<span class="fc" id="L128">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

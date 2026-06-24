@@ -18,20 +18,23 @@ interface EncryptionService {
 <span class="nc" id="L18">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
 <span class="nc" id="L19">) : EncryptionService {</span>
 <span class="nc" id="L20">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
-<span class="nc" id="L21">    override suspend fun encryptBytes(data: ByteArray): ByteArray {</span>
-<span class="nc" id="L22">        val cert = withContext(ioDispatcher) {</span>
-<span class="nc" id="L23">            fiksClient.fetchPublicKey()</span>
-        }
-<span class="nc" id="L25">        logger.debug(&quot;Krypterer ${data.size} bytes&quot;)</span>
-<span class="nc" id="L26">        return kryptering.krypterData(data, cert, Security.getProvider(&quot;BC&quot;))</span>
+
+<span class="nc" id="L22">    override suspend fun encryptBytes(data: ByteArray): ByteArray {</span>
+<span class="nc" id="L23">        val cert =</span>
+<span class="nc" id="L24">            withContext(ioDispatcher) {</span>
+<span class="nc" id="L25">                fiksClient.fetchPublicKey()</span>
+            }
+<span class="nc" id="L27">        logger.debug(&quot;Krypterer ${data.size} bytes&quot;)</span>
+<span class="nc" id="L28">        return kryptering.krypterData(data, cert, Security.getProvider(&quot;BC&quot;))</span>
     }
 }
 
-<span class="fc" id="L30">class EncryptionServiceMock : EncryptionService {</span>
-<span class="fc" id="L31">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L32">class EncryptionServiceMock : EncryptionService {</span>
+<span class="fc" id="L33">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
     override suspend fun encryptBytes(data: ByteArray): ByteArray {
-<span class="fc" id="L33">        logger.debug(&quot;Lar vær å kryptere ${data.size} bytes i mock&quot;)</span>
-<span class="fc" id="L34">        return data</span>
+<span class="fc" id="L36">        logger.debug(&quot;Lar vær å kryptere ${data.size} bytes i mock&quot;)</span>
+<span class="fc" id="L37">        return data</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

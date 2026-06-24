@@ -10,20 +10,25 @@ import java.util.UUID
  * logic lives in one place.
  */
 object UploadNotifications {
-
-    fun notifyChange(tx: Configuration, uploadId: UUID) {
-<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: return</span>
+    fun notifyChange(
+        tx: Configuration,
+        uploadId: UUID,
+    ) {
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        val submissionId = getSubmissionIdFromUploadId(tx, uploadId) ?: return</span>
         // Send NOTIFY within the transaction so it fires atomically on commit
-<span class="fc" id="L17">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
-<span class="fc" id="L18">    }</span>
+<span class="fc" id="L19">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
+<span class="fc" id="L20">    }</span>
 
-    private fun getSubmissionIdFromUploadId(tx: Configuration, uploadId: UUID): UUID? =
-<span class="fc" id="L21">        tx</span>
-<span class="fc" id="L22">            .dsl()</span>
-<span class="fc" id="L23">            .select(UPLOAD.SUBMISSION_ID)</span>
-<span class="fc" id="L24">            .from(UPLOAD)</span>
-<span class="fc" id="L25">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L26">            .fetchOne()</span>
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            ?.get(UPLOAD.SUBMISSION_ID)</span>
+    private fun getSubmissionIdFromUploadId(
+        tx: Configuration,
+        uploadId: UUID,
+    ): UUID? =
+<span class="fc" id="L26">        tx</span>
+<span class="fc" id="L27">            .dsl()</span>
+<span class="fc" id="L28">            .select(UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L29">            .from(UPLOAD)</span>
+<span class="fc" id="L30">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L31">            .fetchOne()</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            ?.get(UPLOAD.SUBMISSION_ID)</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

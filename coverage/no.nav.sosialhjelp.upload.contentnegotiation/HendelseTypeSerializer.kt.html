@@ -7,15 +7,18 @@ import kotlinx.serialization.encoding.Encoder
 import no.nav.sosialhjelp.upload.action.fiks.Vedlegg
 
 <span class="nc" id="L9">class HendelseTypeSerializer : KSerializer&lt;Vedlegg.HendelseType&gt; {</span>
-<span class="nc" id="L10">    override val descriptor = PrimitiveSerialDescriptor(&quot;HendelseType&quot;, kotlinx.serialization.descriptors.PrimitiveKind.STRING)</span>
+<span class="nc" id="L10">    override val descriptor =</span>
+<span class="nc" id="L11">        PrimitiveSerialDescriptor(&quot;HendelseType&quot;, kotlinx.serialization.descriptors.PrimitiveKind.STRING)</span>
 
-
-    override fun serialize(encoder: Encoder, value: Vedlegg.HendelseType) {
-<span class="nc" id="L14">        encoder.encodeString(value.value)</span>
-<span class="nc" id="L15">    }</span>
+    override fun serialize(
+        encoder: Encoder,
+        value: Vedlegg.HendelseType,
+    ) {
+<span class="nc" id="L17">        encoder.encodeString(value.value)</span>
+<span class="nc" id="L18">    }</span>
 
     override fun deserialize(decoder: Decoder): Vedlegg.HendelseType {
-<span class="nc" id="L18">        return Vedlegg.HendelseType.fromValue(decoder.decodeString())</span>
+<span class="nc" id="L21">        return Vedlegg.HendelseType.fromValue(decoder.decodeString())</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -40,16 +40,17 @@ import java.util.UUID
 <span class="fc" id="L40">        val contentType = ContentType.defaultForFile(File(filename)).toString()</span>
 
 <span class="fc" id="L42">        logger.info(&quot;Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId&quot;)</span>
-<span class="fc" id="L43">        val filId = mellomlagringClient.uploadFile(</span>
-<span class="fc" id="L44">            navEksternRefId = navEksternRefId,</span>
-<span class="fc" id="L45">            filename = mellomlagringFilnavn,</span>
-<span class="fc" id="L46">            contentType = contentType,</span>
-<span class="fc" id="L47">            data = encrypted,</span>
-        )
-<span class="fc" id="L49">        return StorageResult(</span>
-<span class="fc" id="L50">            filId = filId,</span>
-<span class="fc" id="L51">            mellomlagringFilnavn = mellomlagringFilnavn,</span>
-<span class="fc" id="L52">            storedSize = data.size.toLong(),</span>
+<span class="fc" id="L43">        val filId =</span>
+<span class="fc" id="L44">            mellomlagringClient.uploadFile(</span>
+<span class="fc" id="L45">                navEksternRefId = navEksternRefId,</span>
+<span class="fc" id="L46">                filename = mellomlagringFilnavn,</span>
+<span class="fc" id="L47">                contentType = contentType,</span>
+<span class="fc" id="L48">                data = encrypted,</span>
+            )
+<span class="fc" id="L50">        return StorageResult(</span>
+<span class="fc" id="L51">            filId = filId,</span>
+<span class="fc" id="L52">            mellomlagringFilnavn = mellomlagringFilnavn,</span>
+<span class="fc" id="L53">            storedSize = data.size.toLong(),</span>
         )
     }
 }

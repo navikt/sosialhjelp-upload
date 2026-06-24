@@ -7,23 +7,23 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.Property
-import org.slf4j.LoggerFactory
 
-<span class="fc" id="L12">class GotenbergService(</span>
+<span class="fc" id="L11">class GotenbergService(</span>
     @Property(&quot;gotenberg.url&quot;) gotenbergUrl: String,
 ) {
-<span class="fc" id="L15">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
-
     private val gotenbergClient =
-<span class="fc" id="L18">        HttpClient(CIO) {</span>
-<span class="fc" id="L19">            expectSuccess = false</span>
-<span class="pc" id="L20">            defaultRequest { url(gotenbergUrl) }</span>
-<span class="fc" id="L21">        }</span>
+<span class="fc" id="L15">        HttpClient(CIO) {</span>
+<span class="fc" id="L16">            expectSuccess = false</span>
+<span class="pc" id="L17">            defaultRequest { url(gotenbergUrl) }</span>
+<span class="fc" id="L18">        }</span>
 
     private fun buildHeaders(filetype: String): Headers =
-<span class="nc" id="L24">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$filetype&quot;&quot;&quot;&quot;) }</span>
+<span class="nc" id="L21">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$filetype&quot;&quot;&quot;&quot;) }</span>
 
-    suspend fun convertToPdf(data: ByteArray, extension: String): ByteArray {
+    suspend fun convertToPdf(
+        data: ByteArray,
+        extension: String,
+    ): ByteArray {
 <span class="nc" id="L27">        val res =</span>
 <span class="nc" id="L28">            gotenbergClient</span>
 <span class="nc" id="L29">                .submitFormWithBinaryData(</span>

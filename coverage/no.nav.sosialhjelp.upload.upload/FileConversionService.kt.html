@@ -15,14 +15,17 @@ import java.io.File
      * Returns the file unchanged if it is already a supported direct-store format.
      * Otherwise converts to PDF via Gotenberg and returns the new filename + converted bytes.
      */
-<span class="fc" id="L18">    suspend fun convertIfNeeded(filename: String, data: ByteArray): Pair&lt;String, ByteArray&gt; {</span>
-<span class="fc" id="L19">        val extension = File(filename).extension.lowercase()</span>
-<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (extension in listOf(&quot;pdf&quot;, &quot;jpeg&quot;, &quot;jpg&quot;, &quot;png&quot;)) {</span>
-<span class="fc" id="L21">            return filename to data</span>
+<span class="fc" id="L18">    suspend fun convertIfNeeded(</span>
+        filename: String,
+        data: ByteArray,
+    ): Pair&lt;String, ByteArray&gt; {
+<span class="fc" id="L22">        val extension = File(filename).extension.lowercase()</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (extension in listOf(&quot;pdf&quot;, &quot;jpeg&quot;, &quot;jpg&quot;, &quot;png&quot;)) {</span>
+<span class="fc" id="L24">            return filename to data</span>
         }
-<span class="fc" id="L23">        val pdfName = File(filename).nameWithoutExtension + &quot;.pdf&quot;</span>
-<span class="fc" id="L24">        val converted = gotenbergService.convertToPdf(data, extension)</span>
-<span class="fc" id="L25">        return pdfName to converted</span>
+<span class="fc" id="L26">        val pdfName = File(filename).nameWithoutExtension + &quot;.pdf&quot;</span>
+<span class="fc" id="L27">        val converted = gotenbergService.convertToPdf(data, extension)</span>
+<span class="fc" id="L28">        return pdfName to converted</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

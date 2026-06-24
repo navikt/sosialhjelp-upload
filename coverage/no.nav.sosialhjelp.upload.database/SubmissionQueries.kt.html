@@ -16,39 +16,45 @@ import java.util.UUID
      * Ownership check for the submission interceptor — uses DSLContext directly
      * since it is called outside a transaction in the route plugin.
      */
-    fun isOwnedByUser(id: UUID, personIdent: String): Boolean =
-<span class="fc" id="L20">        dsl</span>
-<span class="fc" id="L21">            .selectCount()</span>
-<span class="fc" id="L22">            .from(SUBMISSION)</span>
-<span class="fc" id="L23">            .where(</span>
-<span class="fc" id="L24">                SUBMISSION.ID.eq(id)</span>
-<span class="fc" id="L25">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+    fun isOwnedByUser(
+        id: UUID,
+        personIdent: String,
+    ): Boolean =
+<span class="fc" id="L23">        dsl</span>
+<span class="fc" id="L24">            .selectCount()</span>
+<span class="fc" id="L25">            .from(SUBMISSION)</span>
+<span class="fc" id="L26">            .where(</span>
+<span class="fc" id="L27">                SUBMISSION.ID.eq(id)</span>
+<span class="fc" id="L28">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
             )
-<span class="fc" id="L27">            .fetchOne()</span>
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">            ?.value1()</span>
-<span class="pc bpc" id="L29" title="2 of 4 branches missed.">            .let { (it ?: 0) != 0 }</span>
+<span class="fc" id="L30">            .fetchOne()</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            ?.value1()</span>
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">            .let { (it ?: 0) != 0 }</span>
 
     fun isNavEksternRefIdOwnedByUser(
         tx: Configuration,
         navEksternRefId: String,
         personIdent: String,
     ): Boolean =
-<span class="nc bnc" id="L36" title="All 2 branches missed.">        tx</span>
-<span class="nc" id="L37">            .dsl()</span>
-<span class="nc" id="L38">            .selectCount()</span>
-<span class="nc" id="L39">            .from(SUBMISSION)</span>
-<span class="nc" id="L40">            .where(</span>
-<span class="nc" id="L41">                SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId)</span>
-<span class="nc" id="L42">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        tx</span>
+<span class="nc" id="L40">            .dsl()</span>
+<span class="nc" id="L41">            .selectCount()</span>
+<span class="nc" id="L42">            .from(SUBMISSION)</span>
+<span class="nc" id="L43">            .where(</span>
+<span class="nc" id="L44">                SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId)</span>
+<span class="nc" id="L45">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
             )
-<span class="nc" id="L44">            .fetchSingle()</span>
-<span class="nc" id="L45">            .value1() &gt; 0</span>
+<span class="nc" id="L47">            .fetchSingle()</span>
+<span class="nc" id="L48">            .value1() &gt; 0</span>
 
-    fun cleanup(tx: Configuration, submissionId: UUID): Int =
-<span class="fc" id="L48">        tx</span>
-<span class="fc" id="L49">            .dsl()</span>
-<span class="fc" id="L50">            .deleteFrom(SUBMISSION)</span>
-<span class="fc" id="L51">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L52">            .execute()</span>
+    fun cleanup(
+        tx: Configuration,
+        submissionId: UUID,
+    ): Int =
+<span class="fc" id="L54">        tx</span>
+<span class="fc" id="L55">            .dsl()</span>
+<span class="fc" id="L56">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L57">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L58">            .execute()</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

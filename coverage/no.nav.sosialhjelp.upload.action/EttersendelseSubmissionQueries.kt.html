@@ -4,12 +4,12 @@ import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import org.jooq.Configuration
 import java.util.UUID
 
-/**
- * DB queries for the ettersendelse submission flow.
- */
-<span class="fc" id="L10">class EttersendelseSubmissionQueries {</span>
-
-    fun getNavEksternRefId(tx: Configuration, submissionId: UUID, personIdent: String): String =
+<span class="fc" id="L7">class EttersendelseSubmissionQueries {</span>
+    fun getNavEksternRefId(
+        tx: Configuration,
+        submissionId: UUID,
+        personIdent: String,
+    ): String =
 <span class="pc bpc" id="L13" title="1 of 2 branches missed.">        tx</span>
 <span class="fc" id="L14">            .dsl()</span>
 <span class="fc" id="L15">            .select(SUBMISSION.NAV_EKSTERN_REF_ID)</span>

@@ -22,38 +22,46 @@ import java.util.UUID
      * a single GCS object, reads the assembled bytes, and returns the data together with
      * the composed object key (needed for later cleanup).
      */
-    suspend fun assembleChunks(uploadId: UUID, gcsKey: String): Pair&lt;ByteArray, String&gt; =
-<span class="fc" id="L26">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L27">            val chunkPrefix = &quot;uploads/$uploadId-chunk-&quot;</span>
-<span class="fc" id="L28">            val chunkKeys = chunkStorage.listKeys(chunkPrefix).sortedBy { key -&gt;</span>
-<span class="nc" id="L29">                key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L</span>
-            }
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (chunkKeys.isEmpty()) {</span>
-<span class="nc" id="L32">                error(&quot;No chunk objects found for upload $uploadId at prefix $chunkPrefix&quot;)</span>
+    suspend fun assembleChunks(
+        uploadId: UUID,
+        gcsKey: String,
+    ): Pair&lt;ByteArray, String&gt; =
+<span class="fc" id="L29">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L30">            val chunkPrefix = &quot;uploads/$uploadId-chunk-&quot;</span>
+<span class="fc" id="L31">            val chunkKeys =</span>
+<span class="fc" id="L32">                chunkStorage.listKeys(chunkPrefix).sortedBy { key -&gt;</span>
+<span class="nc" id="L33">                    key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L</span>
+                }
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (chunkKeys.isEmpty()) {</span>
+<span class="nc" id="L36">                error(&quot;No chunk objects found for upload $uploadId at prefix $chunkPrefix&quot;)</span>
             }
             // Use a unique key per attempt so we never try to overwrite an existing GCS object,
             // which would be rejected with 403 if a previous composed object is still present.
-<span class="fc" id="L36">            val composedKey = &quot;$gcsKey-${UUID.randomUUID()}&quot;</span>
-<span class="fc" id="L37">            chunkStorage.composeChunks(chunkKeys, composedKey)</span>
-<span class="fc" id="L38">            chunkStorage.readObject(composedKey) to composedKey</span>
-<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">            val composedKey = &quot;$gcsKey-${UUID.randomUUID()}&quot;</span>
+<span class="fc" id="L41">            chunkStorage.composeChunks(chunkKeys, composedKey)</span>
+<span class="fc" id="L42">            chunkStorage.readObject(composedKey) to composedKey</span>
+<span class="fc" id="L43">        }</span>
 
     /**
      * Deletes all chunk objects for [uploadId] and the composed object (if any).
      * Errors are logged but not rethrown so cleanup never blocks the caller.
      */
-<span class="fc" id="L45">    suspend fun deleteGcsObjects(uploadId: UUID, composedKey: String? = null) {</span>
-<span class="fc" id="L46">        val chunkPrefix = &quot;uploads/$uploadId-chunk-&quot;</span>
-<span class="fc" id="L47">        val keysToDelete = buildList {</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">            add(composedKey ?: &quot;uploads/$uploadId&quot;)</span>
-<span class="fc" id="L49">        }</span>
-<span class="pc" id="L50">        runCatching {</span>
-<span class="fc" id="L51">            val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
-<span class="fc" id="L52">            (chunkKeys + keysToDelete).distinct().forEach { key -&gt;</span>
-<span class="pc" id="L53">                runCatching { chunkStorage.deleteObject(key) }</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                    .onFailure { logger.warn(&quot;Failed to delete GCS object $key&quot;, it) }</span>
-<span class="fc" id="L55">            }</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        }.onFailure { logger.warn(&quot;Failed to list GCS chunks for cleanup of upload $uploadId&quot;, it) }</span>
-<span class="fc" id="L57">    }</span>
+<span class="fc" id="L49">    suspend fun deleteGcsObjects(</span>
+        uploadId: UUID,
+<span class="fc" id="L51">        composedKey: String? = null,</span>
+    ) {
+<span class="fc" id="L53">        val chunkPrefix = &quot;uploads/$uploadId-chunk-&quot;</span>
+<span class="fc" id="L54">        val keysToDelete =</span>
+<span class="fc" id="L55">            buildList {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                add(composedKey ?: &quot;uploads/$uploadId&quot;)</span>
+<span class="fc" id="L57">            }</span>
+<span class="pc" id="L58">        runCatching {</span>
+<span class="fc" id="L59">            val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
+<span class="fc" id="L60">            (chunkKeys + keysToDelete).distinct().forEach { key -&gt;</span>
+<span class="pc" id="L61">                runCatching { chunkStorage.deleteObject(key) }</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                    .onFailure { logger.warn(&quot;Failed to delete GCS object $key&quot;, it) }</span>
+<span class="fc" id="L63">            }</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        }.onFailure { logger.warn(&quot;Failed to list GCS chunks for cleanup of upload $uploadId&quot;, it) }</span>
+<span class="fc" id="L65">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -40,19 +40,20 @@ import java.util.UUID
 <span class="nc" id="L40">                return@on</span>
             }
 
-<span class="fc bfc" id="L43" title="All 2 branches covered.">            val owned = withContext(ioDispatcher) {</span>
-<span class="fc" id="L44">                dsl.transactionResult { tx -&gt; tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }</span>
-            }
-<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (!owned) {</span>
+<span class="fc" id="L43">            val owned =</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">                withContext(ioDispatcher) {</span>
+<span class="fc" id="L45">                    dsl.transactionResult { tx -&gt; tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }</span>
+                }
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (!owned) {</span>
                 // Return 404 rather than 403 to avoid leaking whether the resource exists.
-<span class="nc" id="L48">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L49">                return@on</span>
+<span class="nc" id="L49">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L50">                return@on</span>
             }
 
-<span class="fc" id="L52">            call.attributes.put(VerifiedUploadId, uploadId)</span>
-<span class="fc" id="L53">            call.attributes.put(VerifiedPersonident, personident)</span>
-<span class="fc" id="L54">        }</span>
-<span class="fc" id="L55">    }</span>
+<span class="fc" id="L53">            call.attributes.put(VerifiedUploadId, uploadId)</span>
+<span class="fc" id="L54">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">    }</span>
 
 /**
  * Route-scoped ownership interceptor for upload resources.
@@ -70,7 +71,7 @@ import java.util.UUID
  * On success, [VerifiedUploadId] and [VerifiedPersonident] are available in `call.attributes`.
  * On failure the pipeline is short-circuited via `call.respond` (404/401); the handler never runs.
  */
-<span class="fc" id="L73">fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
-<span class="fc" id="L74">    install(verifyUploadOwnershipPlugin(ioDispatcher))</span>
-<span class="fc" id="L75">}</span>
+<span class="fc" id="L74">fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
+<span class="fc" id="L75">    install(verifyUploadOwnershipPlugin(ioDispatcher))</span>
+<span class="fc" id="L76">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

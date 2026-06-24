@@ -8,25 +8,28 @@ import org.jooq.DSLContext
 <span class="fc" id="L8">    private val uploadRepository: UploadRepository,</span>
 ) {
     fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
-<span class="fc" id="L11">        val uploads = dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L12">            uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
-        }
+<span class="fc" id="L11">        val uploads =</span>
+<span class="fc" id="L12">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L13">                uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
+            }
 
-<span class="fc" id="L15">        val grouped = uploads.groupBy { it.category }</span>
+<span class="fc" id="L16">        val grouped = uploads.groupBy { it.category }</span>
 
-<span class="fc" id="L17">        val vedleggList = grouped.map { (key, files) -&gt;</span>
-<span class="fc" id="L18">            Vedlegg(</span>
-<span class="fc" id="L19">                kategori = key,</span>
-<span class="fc" id="L20">                filer = files.map { file -&gt;</span>
-<span class="fc" id="L21">                    Fil(</span>
-<span class="fc" id="L22">                        filnavn = file.mellomlagringFilnavn,</span>
-<span class="fc" id="L23">                        sha512 = file.sha512,</span>
-<span class="fc" id="L24">                    )</span>
-                },
-<span class="fc" id="L26">            )</span>
-        }
+<span class="fc" id="L18">        val vedleggList =</span>
+<span class="fc" id="L19">            grouped.map { (key, files) -&gt;</span>
+<span class="fc" id="L20">                Vedlegg(</span>
+<span class="fc" id="L21">                    kategori = key,</span>
+                    filer =
+<span class="fc" id="L23">                        files.map { file -&gt;</span>
+<span class="fc" id="L24">                            Fil(</span>
+<span class="fc" id="L25">                                filnavn = file.mellomlagringFilnavn,</span>
+<span class="fc" id="L26">                                sha512 = file.sha512,</span>
+<span class="fc" id="L27">                            )</span>
+                        },
+<span class="fc" id="L29">                )</span>
+            }
 
-<span class="fc" id="L29">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
+<span class="fc" id="L32">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

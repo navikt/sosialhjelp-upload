@@ -26,25 +26,30 @@ fun Route.configureDocumentRoutes() {
 
 <span class="pc bpc" id="L27" title="5 of 6 branches missed.">    get(&quot;/upload/{uploadId}&quot;) {</span>
 <span class="pc bpc" id="L28" title="1 of 2 branches missed.">        val id = call.parameters[&quot;uploadId&quot;] ?: error(&quot;uploadId is required&quot;)</span>
-<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        val subject = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
-<span class="nc" id="L30">            ?: return@get call.respond(HttpStatusCode.Unauthorized, &quot;Missing subject in token&quot;)</span>
+<span class="fc" id="L29">        val subject =</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">            call.principal&lt;JWTPrincipal&gt;()?.subject</span>
+<span class="nc" id="L31">                ?: return@get call.respond(HttpStatusCode.Unauthorized, &quot;Missing subject in token&quot;)</span>
 
-<span class="fc" id="L32">        val uploadId = UUID.fromString(id)</span>
-<span class="fc" id="L33">        val owned = dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L34">            tusUploadQueries.isOwnedByUser(tx, uploadId, subject)</span>
-        }
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (!owned) return@get call.respond(HttpStatusCode.Forbidden, &quot;Access denied&quot;)</span>
+<span class="fc" id="L33">        val uploadId = UUID.fromString(id)</span>
+<span class="fc" id="L34">        val owned =</span>
+<span class="fc" id="L35">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L36">                tusUploadQueries.isOwnedByUser(tx, uploadId, subject)</span>
+            }
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (!owned) return@get call.respond(HttpStatusCode.Forbidden, &quot;Access denied&quot;)</span>
 
-<span class="fc" id="L38">        val upload = dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L39">            tusUploadQueries.getUpload(tx, uploadId)</span>
-        }
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        checkNotNull(upload.navEksternRefId) { &quot;Mangler navEksternRefId. Er ikke fil ferdig opplastet?&quot; }</span>
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        checkNotNull(upload.filId) { &quot;Mangler filId. Er ikke fil ferdig opplastet?&quot; }</span>
-<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        checkNotNull(upload.mellomlagringFilnavn) { &quot;Mangler originalFilename. Er ikke fil ferdig opplastet?&quot; }</span>
+<span class="fc" id="L40">        val upload =</span>
+<span class="fc" id="L41">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L42">                tusUploadQueries.getUpload(tx, uploadId)</span>
+            }
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        checkNotNull(upload.navEksternRefId) { &quot;Mangler navEksternRefId. Er ikke fil ferdig opplastet?&quot; }</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        checkNotNull(upload.filId) { &quot;Mangler filId. Er ikke fil ferdig opplastet?&quot; }</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        checkNotNull(upload.mellomlagringFilnavn) { &quot;Mangler originalFilename. Er ikke fil ferdig opplastet?&quot; }</span>
 
-
-<span class="fc" id="L46">        call.response.header(HttpHeaders.ContentDisposition, &quot;inline; filename=\&quot;${upload.mellomlagringFilnavn}\&quot;&quot;)</span>
-<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        call.respondBytes(mellomlagringClient.getFile(upload.navEksternRefId, upload.filId), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))</span>
-<span class="fc" id="L48">    }</span>
-<span class="fc" id="L49">}</span>
+<span class="fc" id="L48">        call.response.header(HttpHeaders.ContentDisposition, &quot;inline; filename=\&quot;${upload.mellomlagringFilnavn}\&quot;&quot;)</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        call.respondBytes(</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            mellomlagringClient.getFile(upload.navEksternRefId, upload.filId),</span>
+<span class="fc" id="L51">            ContentType.defaultForFile(File(upload.mellomlagringFilnavn)),</span>
+        )
+<span class="fc" id="L53">    }</span>
+<span class="fc" id="L54">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

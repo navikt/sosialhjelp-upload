@@ -31,66 +31,74 @@ import java.time.Instant
     }
 
     @Volatile private var cachedToken: String? = null
-<span class="fc" id="L34">    @Volatile private var tokenExpiresAt: Instant = Instant.MIN</span>
+
+<span class="fc" id="L35">    @Volatile private var tokenExpiresAt: Instant = Instant.MIN</span>
 
     suspend fun getMaskinportenToken(): String {
-<span class="fc" id="L37">        val now = Instant.now()</span>
-<span class="fc bfc" id="L38" title="All 2 branches covered.">        cachedToken?.let { token -&gt;</span>
-<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (now.isBefore(tokenExpiresAt)) return token</span>
-<span class="fc" id="L40">        }</span>
-<span class="fc" id="L41">        return fetchAndCacheToken()</span>
+<span class="fc" id="L38">        val now = Instant.now()</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        cachedToken?.let { token -&gt;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (now.isBefore(tokenExpiresAt)) return token</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        return fetchAndCacheToken()</span>
     }
 
     private suspend fun fetchAndCacheToken(): String {
-<span class="fc" id="L45">        val response =</span>
-<span class="fc" id="L46">            client</span>
-<span class="fc" id="L47">                .post(texasUrl) {</span>
-<span class="fc" id="L48">                    accept(ContentType.Application.Json)</span>
-<span class="fc" id="L49">                    contentType(ContentType.Application.Json)</span>
-<span class="fc" id="L50">                    setBody(maskinportenParams)</span>
-<span class="fc" id="L51">                }</span>
-<span class="fc" id="L52">        val body =</span>
-<span class="fc" id="L53">            try {</span>
-<span class="fc" id="L54">                response.body&lt;TokenResponse.Success&gt;()</span>
-<span class="fc" id="L55">            } catch (e: Exception) {</span>
-<span class="fc" id="L56">                response.body&lt;TokenResponse.Error&gt;()</span>
+<span class="fc" id="L46">        val response =</span>
+<span class="fc" id="L47">            client</span>
+<span class="fc" id="L48">                .post(texasUrl) {</span>
+<span class="fc" id="L49">                    accept(ContentType.Application.Json)</span>
+<span class="fc" id="L50">                    contentType(ContentType.Application.Json)</span>
+<span class="fc" id="L51">                    setBody(maskinportenParams)</span>
+<span class="fc" id="L52">                }</span>
+
+        @Suppress(&quot;TooGenericExceptionCaught&quot;, &quot;SwallowedException&quot;)
+<span class="fc" id="L55">        val body =</span>
+<span class="fc" id="L56">            try {</span>
+<span class="fc" id="L57">                response.body&lt;TokenResponse.Success&gt;()</span>
+<span class="fc" id="L58">            } catch (e: Exception) {</span>
+<span class="fc" id="L59">                response.body&lt;TokenResponse.Error&gt;()</span>
             }
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (body is TokenResponse.Success) {</span>
-<span class="fc" id="L59">            cachedToken = body.accessToken</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (body is TokenResponse.Success) {</span>
+<span class="fc" id="L62">            cachedToken = body.accessToken</span>
             // Subtract 30s buffer to avoid using a token that expires in transit
-<span class="fc" id="L61">            tokenExpiresAt = Instant.now().plusSeconds(body.expiresInSeconds.toLong() - 30)</span>
-<span class="fc" id="L62">            return body.accessToken</span>
+<span class="fc" id="L64">            tokenExpiresAt = Instant.now().plusSeconds(body.expiresInSeconds.toLong() - 30)</span>
+<span class="fc" id="L65">            return body.accessToken</span>
         } else {
-<span class="nc" id="L64">            logger.error(&quot;Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}&quot;)</span>
-<span class="nc" id="L65">            throw RuntimeException(&quot;Failed to get token from Texas&quot;)</span>
+<span class="nc" id="L67">            logger.error(</span>
+<span class="nc" id="L68">                &quot;Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}&quot;,</span>
+            )
+<span class="nc" id="L70">            throw TexasTokenException(&quot;Failed to get token from Texas&quot;)</span>
         }
     }
 }
 
-<span class="fc" id="L70">private val maskinportenParams: Map&lt;String, String&gt; = mapOf(&quot;identity_provider&quot; to &quot;maskinporten&quot;, &quot;target&quot; to &quot;ks:fiks&quot;)</span>
+<span class="nc" id="L75">class TexasTokenException(message: String) : RuntimeException(message)</span>
 
-<span class="pc" id="L72">@Serializable</span>
+private val maskinportenParams: Map&lt;String, String&gt; =
+<span class="fc" id="L78">    mapOf(&quot;identity_provider&quot; to &quot;maskinporten&quot;, &quot;target&quot; to &quot;ks:fiks&quot;)</span>
+
+<span class="pc" id="L80">@Serializable</span>
 sealed class TokenResponse {
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">    @Serializable</span>
-<span class="nc" id="L75">    data class Success(</span>
-<span class="nc" id="L76">        @SerialName(&quot;access_token&quot;)</span>
-<span class="fc" id="L77">        val accessToken: String,</span>
-<span class="nc" id="L78">        @SerialName(&quot;expires_in&quot;)</span>
-<span class="fc" id="L79">        val expiresInSeconds: Int,</span>
-<span class="nc" id="L80">        @SerialName(&quot;token_type&quot;)</span>
-<span class="nc" id="L81">        val tokenType: String,</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">    @Serializable</span>
+<span class="nc" id="L83">    data class Success(</span>
+<span class="nc" id="L84">        @SerialName(&quot;access_token&quot;)</span>
+<span class="fc" id="L85">        val accessToken: String,</span>
+<span class="nc" id="L86">        @SerialName(&quot;expires_in&quot;)</span>
+<span class="fc" id="L87">        val expiresInSeconds: Int,</span>
+<span class="nc" id="L88">        @SerialName(&quot;token_type&quot;)</span>
+<span class="nc" id="L89">        val tokenType: String,</span>
     ) : TokenResponse()
 
-<span class="nc" id="L84">    data class Error(</span>
-<span class="nc" id="L85">        val error: TokenErrorResponse,</span>
-<span class="nc" id="L86">        val status: HttpStatusCode,</span>
+<span class="nc" id="L92">    data class Error(</span>
+<span class="nc" id="L93">        val error: TokenErrorResponse,</span>
+<span class="nc" id="L94">        val status: HttpStatusCode,</span>
     ) : TokenResponse()
-<span class="fc" id="L88">}</span>
+<span class="fc" id="L96">}</span>
 
-<span class="nc bnc" id="L90" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L91">data class TokenErrorResponse(</span>
-<span class="nc" id="L92">    val error: String,</span>
-<span class="nc" id="L93">    @SerialName(&quot;error_description&quot;)</span>
-<span class="nc" id="L94">    val errorDescription: String,</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L99">data class TokenErrorResponse(</span>
+<span class="nc" id="L100">    val error: String,</span>
+<span class="nc" id="L101">    @SerialName(&quot;error_description&quot;)</span>
+<span class="nc" id="L102">    val errorDescription: String,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

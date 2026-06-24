@@ -15,18 +15,20 @@ internal fun parseMetadata(header: String?): Map&lt;String, String&gt; {
 <span class="pc bpc" id="L15" title="1 of 3 branches missed.">            when (parts.size) {</span>
                 2 -&gt; {
 <span class="fc" id="L17">                    val key = parts[0].trim()</span>
-<span class="pc bpc" id="L18" title="2 of 4 branches missed.">                    val value = runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull() ?: return@mapNotNull null</span>
-<span class="fc" id="L19">                    key to value</span>
+<span class="fc" id="L18">                    val value =</span>
+<span class="pc bpc" id="L19" title="2 of 4 branches missed.">                        runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull()</span>
+<span class="nc" id="L20">                            ?: return@mapNotNull null</span>
+<span class="fc" id="L21">                    key to value</span>
                 }
 
                 1 -&gt; {
-<span class="fc" id="L23">                    parts[0].trim() to &quot;&quot;</span>
+<span class="fc" id="L25">                    parts[0].trim() to &quot;&quot;</span>
                 }
 
                 else -&gt; {
-<span class="nc" id="L27">                    null</span>
+<span class="nc" id="L29">                    null</span>
                 }
-<span class="fc" id="L29">            }</span>
-<span class="fc" id="L30">        }.toMap()</span>
+<span class="fc" id="L31">            }</span>
+<span class="fc" id="L32">        }.toMap()</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
