@@ -17,30 +17,30 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.OffsetDateTime
 
-class RetentionService(
+class StaleSubmissionCleanupService(
     private val dsl: DSLContext,
-    private val submissionRetentionQueries: SubmissionRetentionQueries,
+    private val submissionRetentionQueries: StaleSubmissionQueries,
     private val submissionQueries: SubmissionQueries,
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
     private val notificationService: SubmissionNotificationService,
     private val meterRegistry: MeterRegistry,
-    private val retentionTimeout: Duration = Duration.ofHours(RETENTION_TIMEOUT_HOURS),
+    private val idleTimeout: Duration = Duration.ofHours(IDLE_TIMEOUT_HOURS),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val log = LoggerFactory.getLogger(RetentionService::class.java)
+    private val log = LoggerFactory.getLogger(StaleSubmissionCleanupService::class.java)
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
 
     companion object {
-        const val RETENTION_TIMEOUT_HOURS = 1L
+        const val IDLE_TIMEOUT_HOURS = 1L
     }
 
-    suspend fun runRetention() {
+    suspend fun runCleanup() {
         val span = tracer.spanBuilder("submission.retention").startSpan()
         val scope = span.makeCurrent()
         try {
-            val cutoff = OffsetDateTime.now().minus(retentionTimeout)
+            val cutoff = OffsetDateTime.now().minus(idleTimeout)
             val staleSubmissions =
                 withContext(ioDispatcher) {
                     dsl.transactionResult { tx ->
@@ -51,7 +51,7 @@ class RetentionService(
             if (staleSubmissions.isNotEmpty()) {
                 log.info(
                     "Found ${staleSubmissions.size} stale submission(s) to clean up " +
-                        "(idle for >${RETENTION_TIMEOUT_HOURS}h without being submitted)",
+                        "(idle for >${IDLE_TIMEOUT_HOURS}h without being submitted)",
                 )
             }
             for (submission in staleSubmissions) {
@@ -67,7 +67,7 @@ class RetentionService(
         }
     }
 
-    private suspend fun deleteStaleSubmission(submission: SubmissionRetentionQueries.StaleSubmission) {
+    private suspend fun deleteStaleSubmission(submission: StaleSubmissionQueries.StaleSubmission) {
         try {
             val gcsKeys =
                 withContext(ioDispatcher) {

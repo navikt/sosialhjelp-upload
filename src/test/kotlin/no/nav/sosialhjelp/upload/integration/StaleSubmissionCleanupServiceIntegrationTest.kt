@@ -11,8 +11,8 @@ import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
-import no.nav.sosialhjelp.upload.upload.RetentionService
-import no.nav.sosialhjelp.upload.upload.SubmissionRetentionQueries
+import no.nav.sosialhjelp.upload.upload.StaleSubmissionCleanupService
+import no.nav.sosialhjelp.upload.upload.StaleSubmissionQueries
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
@@ -24,9 +24,9 @@ import java.util.UUID
 import kotlin.test.assertNull
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class RetentionServiceIntegrationTest {
+class StaleSubmissionCleanupServiceIntegrationTest {
     private val dsl: DSLContext = PostgresTestContainer.dsl
-    private val submissionRetentionQueries = SubmissionRetentionQueries()
+    private val staleSubmissionQueries = StaleSubmissionQueries()
     private val submissionQueries = SubmissionQueries(dsl)
     private val uploadRepository = UploadRepository()
     private val mellomlagringClient = mockk<MellomlagringClient>(relaxed = true)
@@ -38,17 +38,17 @@ class RetentionServiceIntegrationTest {
         dsl.deleteFrom(SUBMISSION).execute()
     }
 
-    private fun retentionService(timeout: Duration = Duration.ofSeconds(1)) =
-        RetentionService(
+    private fun cleanupService(timeout: Duration = Duration.ofSeconds(1)) =
+        StaleSubmissionCleanupService(
             dsl = dsl,
-            submissionRetentionQueries = submissionRetentionQueries,
+            submissionRetentionQueries = staleSubmissionQueries,
             submissionQueries = submissionQueries,
             uploadRepository = uploadRepository,
             mellomlagringClient = mellomlagringClient,
             chunkStorage = chunkStorage,
             notificationService = mockk(relaxed = true),
             meterRegistry = SimpleMeterRegistry(),
-            retentionTimeout = timeout,
+            idleTimeout = timeout,
         )
 
     @Test
@@ -66,7 +66,7 @@ class RetentionServiceIntegrationTest {
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now().minusSeconds(5))
             .execute()
 
-        runBlocking { retentionService().runRetention() }
+        runBlocking { cleanupService().runCleanup() }
 
         val sub = dsl.selectFrom(SUBMISSION).where(SUBMISSION.ID.eq(submissionId)).fetchOne()
         assertNull(sub, "Submission should be deleted after retention run")
@@ -88,8 +88,8 @@ class RetentionServiceIntegrationTest {
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .execute()
 
-        // Use a long retention timeout so the submission is NOT stale yet
-        runBlocking { retentionService(Duration.ofHours(1)).runRetention() }
+        // Use a long idle timeout so the submission is NOT stale yet
+        runBlocking { cleanupService(Duration.ofHours(1)).runCleanup() }
 
         val sub = dsl.selectFrom(SUBMISSION).where(SUBMISSION.ID.eq(submissionId)).fetchOne()
         kotlin.test.assertNotNull(sub, "Submission should still exist when not past retention period")
@@ -109,7 +109,7 @@ class RetentionServiceIntegrationTest {
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now().minusSeconds(5))
             .execute()
 
-        runBlocking { retentionService().runRetention() }
+        runBlocking { cleanupService().runCleanup() }
 
         val sub = dsl.selectFrom(SUBMISSION).where(SUBMISSION.ID.eq(submissionId)).fetchOne()
         kotlin.test.assertNotNull(sub, "Submission with PENDING uploads should not be cleaned up")
