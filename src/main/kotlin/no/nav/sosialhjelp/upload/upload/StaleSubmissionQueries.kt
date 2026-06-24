@@ -8,9 +8,9 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 /**
- * DB queries for the submission retention job: finding stale submissions to clean up.
+ * DB queries for the submission cleanup job: finding stale submissions to clean up.
  */
-class SubmissionRetentionQueries {
+class StaleSubmissionQueries {
     data class StaleSubmission(val id: UUID, val navEksternRefId: String)
 
     /**

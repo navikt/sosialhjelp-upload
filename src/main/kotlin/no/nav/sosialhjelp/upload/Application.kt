@@ -38,7 +38,7 @@ import no.nav.sosialhjelp.upload.tus.storage.GcsBucketStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
-import no.nav.sosialhjelp.upload.upload.RetentionService
+import no.nav.sosialhjelp.upload.upload.StaleSubmissionCleanupService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.upload.UploadRecoveryService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
@@ -141,7 +141,7 @@ fun Application.module() {
         provide(SubmissionQueries::class)
         provide(no.nav.sosialhjelp.upload.tus.TusSubmissionQueries::class)
         provide(no.nav.sosialhjelp.upload.action.EttersendelseSubmissionQueries::class)
-        provide(no.nav.sosialhjelp.upload.upload.SubmissionRetentionQueries::class)
+        provide(no.nav.sosialhjelp.upload.upload.StaleSubmissionQueries::class)
         provide(no.nav.sosialhjelp.upload.tus.TusUploadQueries::class)
         provide(no.nav.sosialhjelp.upload.upload.UploadProcessingQueries::class)
         provide(no.nav.sosialhjelp.upload.upload.UploadRecoveryQueries::class)
@@ -154,7 +154,7 @@ fun Application.module() {
         provide(GotenbergService::class)
         provide(EttersendelseService::class)
         provide(UploadRecoveryService::class)
-        provide(RetentionService::class)
+        provide(StaleSubmissionCleanupService::class)
         provide(VedleggService::class)
     }
     configureSecurity()
@@ -175,16 +175,16 @@ fun Application.module() {
                 }
             }
 
-            val retentionService: RetentionService by dependencies
-            val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-            retentionScope.launch {
+            val cleanupService: StaleSubmissionCleanupService by dependencies
+            val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            cleanupScope.launch {
                 while (true) {
                     delay(1.minutes)
-                    runCatching { retentionService.runRetention() }
+                    runCatching { cleanupService.runCleanup() }
                         .onFailure { log.warn("Retention sweep failed", it) }
                 }
             }
-            listOf(retentionScope, recoveryScope)
+            listOf(cleanupScope, recoveryScope)
         } else {
             emptyList()
         }
