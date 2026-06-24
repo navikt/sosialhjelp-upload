@@ -1,49 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TusUploadService.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.tus</a> &gt; <span class="el_source">TusUploadService.kt</span></div><h1>TusUploadService.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.tus
 
-import io.ktor.http.ContentType
-import io.ktor.http.defaultForFile
-import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
-import org.slf4j.MDC
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.SubmissionRepository.SubmissionOwnedByAnotherUserException
-import no.nav.sosialhjelp.upload.database.UploadRepository
-import no.nav.sosialhjelp.upload.pdf.GotenbergService
-import no.nav.sosialhjelp.upload.storage.ChunkStorage
+import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
+import no.nav.sosialhjelp.upload.upload.UploadProcessingService
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.UploadValidator
+import io.micrometer.core.instrument.MeterRegistry
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.security.MessageDigest
-import java.time.Duration
 import java.util.UUID
 
-<span class="fc" id="L30">class TusUploadService(</span>
-<span class="fc" id="L31">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L32">    private val submissionRepository: SubmissionRepository,</span>
-<span class="fc" id="L33">    private val dsl: DSLContext,</span>
-<span class="fc" id="L34">    private val validator: UploadValidator,</span>
-<span class="fc" id="L35">    private val gotenbergService: GotenbergService,</span>
-<span class="fc" id="L36">    private val fiksClient: FiksClient,</span>
-<span class="fc" id="L37">    private val mellomlagringClient: MellomlagringClient,</span>
-<span class="fc" id="L38">    private val encryptionService: EncryptionService,</span>
-<span class="fc" id="L39">    private val chunkStorage: ChunkStorage,</span>
-<span class="fc" id="L40">    private val processingScope: CoroutineScope,</span>
-<span class="fc" id="L41">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L42">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L43">) {</span>
-<span class="fc" id="L44">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L23">class TusUploadService(</span>
+<span class="fc" id="L24">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L25">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L26">    private val dsl: DSLContext,</span>
+<span class="fc" id="L27">    private val validator: UploadValidator,</span>
+<span class="fc" id="L28">    private val fiksClient: FiksClient,</span>
+<span class="fc" id="L29">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L30">    private val chunkStorage: ChunkStorage,</span>
+<span class="fc" id="L31">    private val uploadProcessingService: UploadProcessingService,</span>
+<span class="fc" id="L32">    private val processingScope: CoroutineScope,</span>
+<span class="fc" id="L33">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L34">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L35">) {</span>
+<span class="fc" id="L36">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
 
-<span class="fc" id="L46">    suspend fun create(</span>
+<span class="fc" id="L38">    suspend fun create(</span>
         contextId: String,
         filename: String,
         size: Long,
@@ -51,286 +43,122 @@ import java.util.UUID
         token: String,
         fiksDigisosId: String?,
         navEksternRefId: String?,
-<span class="fc" id="L54">        kategori: String? = null,</span>
+<span class="fc" id="L46">        kategori: String? = null,</span>
     ): UUID {
-<span class="fc" id="L56">        return try {</span>
-<span class="pc bpc" id="L57" title="2 of 3 branches missed.">            dsl.transactionCoroutine { tx -&gt;</span>
+<span class="fc" id="L48">        return try {</span>
+<span class="pc bpc" id="L49" title="2 of 3 branches missed.">            dsl.transactionCoroutine { tx -&gt;</span>
                 // Acquire a per-fiksDigisosId advisory lock before deriving navEksternRefId.
                 // This serializes concurrent upload creations for the same case across all
                 // service instances, preventing two submissions from reading the same Fiks
                 // state and deriving the same navEksternRefId.
-<span class="fc bfc" id="L62" title="All 2 branches covered.">                if (fiksDigisosId != null) {</span>
-<span class="fc" id="L63">                    submissionRepository.acquireAdvisoryLock(tx, fiksDigisosId)</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (fiksDigisosId != null) {</span>
+<span class="fc" id="L55">                    submissionRepository.acquireAdvisoryLock(tx, fiksDigisosId)</span>
                 }
 
-<span class="fc" id="L66">                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)</span>
+<span class="fc" id="L58">                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)</span>
 
-<span class="fc" id="L68">                val eksternRef =</span>
+<span class="fc" id="L60">                val eksternRef =</span>
                 // If navEksternRefId is already set on this submission (e.g. a second
                     // upload on the same contextId), reuse it without calling Fiks.
-<span class="pc bpc" id="L71" title="2 of 6 branches missed.">                    submissionRepository.getNavEksternRefIdByContextId(tx, contextId)</span>
-<span class="fc" id="L72">                        ?: navEksternRefId</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                        ?: fiksDigisosId?.let {</span>
+<span class="pc bpc" id="L63" title="2 of 6 branches missed.">                    submissionRepository.getNavEksternRefIdByContextId(tx, contextId)</span>
+<span class="fc" id="L64">                        ?: navEksternRefId</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                        ?: fiksDigisosId?.let {</span>
                             // Read the highest navEksternRefId stored locally for this
                             // fiksDigisosId. This accounts for other in-flight submissions
                             // that have been created locally but not yet submitted to Fiks,
                             // and therefore don't appear in ettersendtInfoNAV.ettersendelser.
-<span class="fc" id="L78">                            val localMax = submissionRepository.getMaxNavEksternRefIdForFiksDigisosId(tx, it)</span>
+<span class="fc" id="L70">                            val localMax = submissionRepository.getMaxNavEksternRefIdForFiksDigisosId(tx, it)</span>
                             // We intentionally call Fiks inside a DB transaction to keep the
                             // lock → read-from-Fiks → write sequence atomic. The risk of
                             // holding a DB connection across a network call is accepted here
                             // because contention on the same fiksDigisosId is expected to be
                             // near zero in practice (fiksDigisosId is unique per application).
-<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                            fiksClient.getNewNavEksternRefId(it, token, localMax)</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">                            fiksClient.getNewNavEksternRefId(it, token, localMax)</span>
                         }
-<span class="nc" id="L86">                        ?: error(&quot;Verken navEksternRefId eller fiksDigisosId tilgjengelig&quot;)</span>
+<span class="nc" id="L78">                        ?: error(&quot;Verken navEksternRefId eller fiksDigisosId tilgjengelig&quot;)</span>
 
-<span class="fc" id="L88">                submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)</span>
-<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                val uploadId = uploadRepository</span>
-<span class="fc" id="L90">                    .create(tx, submissionId, filename, size)</span>
-<span class="fc" id="L91">                    .also {</span>
-<span class="fc" id="L92">                        meterRegistry.counter(&quot;upload.created&quot;).increment()</span>
-<span class="pc bpc" id="L93" title="2 of 4 branches missed.">                        val extension = File(filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
-<span class="fc" id="L94">                        meterRegistry.counter(&quot;upload.file_extension&quot;, &quot;extension&quot;, extension).increment()</span>
-<span class="fc" id="L95">                    }</span>
-<span class="nc" id="L96">                    ?: error(&quot;Failed to create upload record&quot;)</span>
-<span class="fc" id="L97">                val validations = validator.validate(filename, fileSize = size)</span>
-<span class="fc bfc" id="L98" title="All 4 branches covered.">                if (validations.isNotEmpty()) {</span>
-<span class="fc" id="L99">                    uploadRepository.addErrors(tx, uploadId, validations)</span>
+<span class="fc" id="L80">                submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                val uploadId = uploadRepository</span>
+<span class="fc" id="L82">                    .create(tx, submissionId, filename, size)</span>
+<span class="fc" id="L83">                    .also {</span>
+<span class="fc" id="L84">                        meterRegistry.counter(&quot;upload.created&quot;).increment()</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">                        val extension = File(filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
+<span class="fc" id="L86">                        meterRegistry.counter(&quot;upload.file_extension&quot;, &quot;extension&quot;, extension).increment()</span>
+<span class="fc" id="L87">                    }</span>
+<span class="nc" id="L88">                    ?: error(&quot;Failed to create upload record&quot;)</span>
+<span class="fc" id="L89">                val validations = validator.validate(filename, fileSize = size)</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">                if (validations.isNotEmpty()) {</span>
+<span class="fc" id="L91">                    uploadRepository.addErrors(tx, uploadId, validations)</span>
                 }
-<span class="fc" id="L101">                uploadId</span>
+<span class="fc" id="L93">                uploadId</span>
             }
-<span class="fc" id="L103">        } catch (_: SubmissionOwnedByAnotherUserException) {</span>
-<span class="fc" id="L104">            throw UploadForbiddenException(&quot;Document is owned by another user&quot;)</span>
+<span class="fc" id="L95">        } catch (_: SubmissionOwnedByAnotherUserException) {</span>
+<span class="fc" id="L96">            throw UploadForbiddenException(&quot;Document is owned by another user&quot;)</span>
         }
     }
 
     fun getUploadInfo(uploadId: UUID): Pair&lt;Long, Long&gt; =
-<span class="fc" id="L109">        dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L110">            uploadRepository.getUploadInfo(tx, uploadId)</span>
-<span class="fc" id="L111">        }</span>
+<span class="fc" id="L101">        dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L102">            uploadRepository.getUploadInfo(tx, uploadId)</span>
+<span class="fc" id="L103">        }</span>
 
-<span class="fc" id="L113">    suspend fun appendChunk(</span>
+<span class="fc" id="L105">    suspend fun appendChunk(</span>
         uploadId: UUID,
         expectedOffset: Long,
         data: ByteArray,
     ): Long {
-<span class="fc" id="L118">        val chunkKey = &quot;uploads/$uploadId-chunk-$expectedOffset&quot;</span>
-<span class="fc" id="L119">        withContext(ioDispatcher) { chunkStorage.writeChunk(chunkKey, data) }</span>
+<span class="fc" id="L110">        val chunkKey = &quot;uploads/$uploadId-chunk-$expectedOffset&quot;</span>
+<span class="fc" id="L111">        withContext(ioDispatcher) { chunkStorage.writeChunk(chunkKey, data) }</span>
 
-<span class="fc" id="L121">        val (totalSize, newOffset) =</span>
-<span class="fc" id="L122">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L123">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L113">        val (totalSize, newOffset) =</span>
+<span class="fc" id="L114">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L115">                dsl.transactionResult { tx -&gt;</span>
                     // Throws OffsetMismatchException if offset doesn't match (→ 409 in route)
-<span class="fc" id="L125">                    uploadRepository.appendChunk(tx, uploadId, expectedOffset, data.size)</span>
-<span class="fc" id="L126">                }</span>
+<span class="fc" id="L117">                    uploadRepository.appendChunk(tx, uploadId, expectedOffset, data.size)</span>
+<span class="fc" id="L118">                }</span>
             }
-<span class="fc" id="L128">        meterRegistry.summary(&quot;upload.chunk.bytes&quot;).record(data.size.toDouble())</span>
+<span class="fc" id="L120">        meterRegistry.summary(&quot;upload.chunk.bytes&quot;).record(data.size.toDouble())</span>
 
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (newOffset == totalSize) {</span>
-<span class="fc" id="L131">            val claimed = withContext(ioDispatcher) {</span>
-<span class="fc" id="L132">                dsl.transactionResult { tx -&gt; uploadRepository.claimForProcessing(tx, uploadId) }</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (newOffset == totalSize) {</span>
+<span class="fc" id="L123">            val claimed = withContext(ioDispatcher) {</span>
+<span class="fc" id="L124">                dsl.transactionResult { tx -&gt; uploadRepository.claimForProcessing(tx, uploadId) }</span>
             }
-<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (claimed) {</span>
-<span class="fc" id="L135">                logger.info(&quot;Upload $uploadId complete — launching background processing&quot;)</span>
-<span class="pc bpc" id="L136" title="1 of 3 branches missed.">                processingScope.launch {</span>
-<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                    runCatching { processCompletedUpload(uploadId) }</span>
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                        .onFailure { logger.error(&quot;Unhandled error processing upload $uploadId&quot;, it) }</span>
-<span class="fc" id="L139">                }</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (claimed) {</span>
+<span class="fc" id="L127">                logger.info(&quot;Upload $uploadId complete — launching background processing&quot;)</span>
+<span class="pc bpc" id="L128" title="1 of 3 branches missed.">                processingScope.launch {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                    runCatching { uploadProcessingService.process(uploadId) }</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                        .onFailure { logger.error(&quot;Unhandled error processing upload $uploadId&quot;, it) }</span>
+<span class="fc" id="L131">                }</span>
             } else {
-<span class="fc" id="L141">                logger.info(&quot;Upload $uploadId already claimed for processing, skipping&quot;)</span>
+<span class="fc" id="L133">                logger.info(&quot;Upload $uploadId already claimed for processing, skipping&quot;)</span>
             }
         }
 
-<span class="fc" id="L145">        return newOffset</span>
+<span class="fc" id="L137">        return newOffset</span>
     }
 
-<span class="fc" id="L148">    private suspend fun processCompletedUpload(</span>
-        uploadId: UUID,
-    ) {
-<span class="fc" id="L151">        val startTime = System.nanoTime()</span>
-<span class="fc" id="L152">        val upload =</span>
-<span class="fc" id="L153">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L154">                dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L155">                    uploadRepository.getUploadForProcessing(tx, uploadId)</span>
-<span class="fc" id="L156">                }</span>
-            }
-<span class="pc bpc" id="L158" title="2 of 4 branches missed.">        val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
-
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        upload.fiksDigisosId?.let { MDC.put(&quot;fiksDigisosId&quot;, it) }</span>
-<span class="fc" id="L161">        MDC.put(&quot;navEksternRefId&quot;, upload.navEksternRefId)</span>
-<span class="fc" id="L162">        try {</span>
-<span class="fc" id="L163">            withContext(MDCContext()) {</span>
-<span class="fc" id="L164">                val (chunkData, composedKey) = withContext(ioDispatcher) {</span>
-<span class="fc" id="L165">                    val chunkPrefix = &quot;uploads/$uploadId-chunk-&quot;</span>
-<span class="fc" id="L166">                    val chunkKeys = chunkStorage.listKeys(chunkPrefix).sortedBy { key -&gt;</span>
-<span class="nc" id="L167">                        key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L</span>
-                    }
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                    if (chunkKeys.isEmpty()) {</span>
-<span class="nc" id="L170">                        error(&quot;No chunk objects found for upload $uploadId at prefix $chunkPrefix&quot;)</span>
-                    }
-                    // Use a unique key per attempt so we never try to overwrite an existing GCS object,
-                    // which would be rejected with 403 if a previous composed object is still present.
-<span class="fc" id="L174">                    val composedKey = &quot;${upload.gcsKey}-${UUID.randomUUID()}&quot;</span>
-<span class="fc" id="L175">                    chunkStorage.composeChunks(chunkKeys, composedKey)</span>
-<span class="fc" id="L176">                    chunkStorage.readObject(composedKey) to composedKey</span>
-                }
-
-<span class="fc" id="L179">                val errors = validator.validate(upload.filename, chunkData, chunkData.size.toLong())</span>
-<span class="fc bfc" id="L180" title="All 4 branches covered.">                if (errors.isNotEmpty()) {</span>
-<span class="fc" id="L181">                    logger.info(&quot;Upload $uploadId (*$fileExtension) failed validation: ${errors.map { &quot;${it.code}: ${it.message}&quot; }}&quot;)</span>
-<span class="fc" id="L182">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L183">                        dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L184">                            uploadRepository.addErrors(tx, uploadId, errors)</span>
-<span class="fc" id="L185">                        }</span>
-<span class="fc" id="L186">                        deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L187">                    }</span>
-<span class="fc" id="L188">                    meterRegistry.timer(&quot;upload.processing&quot;, &quot;result&quot;, &quot;validation_failure&quot;, &quot;extension&quot;, fileExtension)</span>
-<span class="fc" id="L189">                        .record(Duration.ofNanos(System.nanoTime() - startTime))</span>
-<span class="fc" id="L190">                    return@withContext</span>
-                }
-
-<span class="fc" id="L193">                val (finalFilename, finalData) = try {</span>
-<span class="fc" id="L194">                    convertIfNeeded(upload.filename, chunkData)</span>
-<span class="fc" id="L195">                } catch (e: Exception) {</span>
-<span class="fc" id="L196">                    logger.error(&quot;Upload $uploadId failed during PDF conversion&quot;, e)</span>
-<span class="fc" id="L197">                    markUploadFailed(uploadId, composedKey)</span>
-<span class="fc" id="L198">                    meterRegistry.timer(&quot;upload.processing&quot;, &quot;result&quot;, &quot;conversion_failure&quot;, &quot;extension&quot;, fileExtension)</span>
-<span class="fc" id="L199">                        .record(Duration.ofNanos(System.nanoTime() - startTime))</span>
-<span class="fc" id="L200">                    return@withContext</span>
-                }
-<span class="pc bpc" id="L202" title="2 of 4 branches missed.">                val finalExtension = File(finalFilename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
-<span class="fc" id="L203">                meterRegistry.counter(&quot;upload.converted_file_extension&quot;, &quot;extension&quot;, finalExtension).increment()</span>
-<span class="fc" id="L204">                val mellomlagringFilnavn = makeUniqueMellomlagringFilename(finalFilename, uploadId)</span>
-<span class="fc" id="L205">                val encrypted = encryptionService.encryptBytes(finalData)</span>
-
-<span class="fc" id="L207">                val contentType =</span>
-<span class="fc" id="L208">                    ContentType</span>
-<span class="fc" id="L209">                        .defaultForFile(File(finalFilename))</span>
-<span class="fc" id="L210">                        .toString()</span>
-
-<span class="fc" id="L212">                logger.info(&quot;Uploading file (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}&quot;)</span>
-<span class="fc" id="L213">                val filId =</span>
-<span class="fc" id="L214">                    try {</span>
-<span class="fc" id="L215">                        mellomlagringClient.uploadFile(</span>
-<span class="fc" id="L216">                            navEksternRefId = upload.navEksternRefId,</span>
-<span class="fc" id="L217">                            filename = mellomlagringFilnavn,</span>
-<span class="fc" id="L218">                            contentType = contentType,</span>
-<span class="fc" id="L219">                            data = encrypted,</span>
-                        )
-<span class="nc" id="L221">                    } catch (e: Exception) {</span>
-<span class="nc" id="L222">                        logger.error(&quot;Upload $uploadId failed during mellomlagring upload&quot;, e)</span>
-<span class="nc" id="L223">                        markUploadFailed(uploadId, composedKey)</span>
-<span class="nc" id="L224">                        meterRegistry.timer(&quot;upload.processing&quot;, &quot;result&quot;, &quot;mellomlagring_failure&quot;, &quot;extension&quot;, fileExtension)</span>
-<span class="nc" id="L225">                            .record(Duration.ofNanos(System.nanoTime() - startTime))</span>
-<span class="nc" id="L226">                        return@withContext</span>
-                    }
-<span class="fc" id="L228">                logger.info(&quot;Upload $uploadId stored in mellomlagring as $filId&quot;)</span>
-
-<span class="fc" id="L230">                withContext(ioDispatcher) {</span>
-<span class="fc" id="L231">                    dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L232">                        uploadRepository.setFilId(tx, uploadId, filId, mellomlagringFilnavn, finalData.size.toLong(), getSha512(finalData))</span>
-<span class="fc" id="L233">                        uploadRepository.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L234">                    }</span>
-<span class="fc" id="L235">                    deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L236">                }</span>
-<span class="fc" id="L237">                meterRegistry.timer(&quot;upload.processing&quot;, &quot;result&quot;, &quot;success&quot;, &quot;extension&quot;, fileExtension)</span>
-<span class="fc" id="L238">                    .record(Duration.ofNanos(System.nanoTime() - startTime))</span>
-<span class="fc" id="L239">            }</span>
-        } finally {
-<span class="fc" id="L241">            MDC.remove(&quot;fiksDigisosId&quot;)</span>
-<span class="fc" id="L242">            MDC.remove(&quot;navEksternRefId&quot;)</span>
-        }
-<span class="fc" id="L244">    }</span>
-
-<span class="nc" id="L246">    private suspend fun markUploadFailed(uploadId: UUID, composedKey: String? = null) {</span>
-<span class="pc" id="L247">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L248">            dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L249">                uploadRepository.markFailed(tx, uploadId)</span>
-<span class="fc" id="L250">                uploadRepository.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L251">            }</span>
-<span class="fc" id="L252">            deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L253">        }</span>
-<span class="nc" id="L254">    }</span>
-
-<span class="fc" id="L256">    private suspend fun deleteGcsObjects(uploadId: UUID, composedKey: String? = null) {</span>
-<span class="fc" id="L257">        val chunkPrefix = &quot;uploads/$uploadId-chunk-&quot;</span>
-<span class="fc" id="L258">        val keysToDelete = buildList {</span>
-<span class="fc bfc" id="L259" title="All 2 branches covered.">            add(composedKey ?: &quot;uploads/$uploadId&quot;)</span>
-<span class="fc" id="L260">        }</span>
-<span class="pc" id="L261">        runCatching {</span>
-<span class="fc" id="L262">            val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
-<span class="fc" id="L263">            (chunkKeys + keysToDelete).distinct().forEach { key -&gt;</span>
-<span class="pc" id="L264">                runCatching { chunkStorage.deleteObject(key) }</span>
-<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    .onFailure { logger.warn(&quot;Failed to delete GCS object $key&quot;, it) }</span>
-<span class="fc" id="L266">            }</span>
-<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        }.onFailure { logger.warn(&quot;Failed to list GCS chunks for cleanup of upload $uploadId&quot;, it) }</span>
-<span class="fc" id="L268">    }</span>
-
-<span class="fc" id="L270">    private suspend fun convertIfNeeded(</span>
-        filename: String,
-        data: ByteArray,
-    ): Pair&lt;String, ByteArray&gt; {
-<span class="fc" id="L274">        val extension = File(filename).extension.lowercase()</span>
-<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (extension in listOf(&quot;pdf&quot;, &quot;jpeg&quot;, &quot;jpg&quot;, &quot;png&quot;)) {</span>
-<span class="fc" id="L276">            return filename to data</span>
-        }
-<span class="fc" id="L278">        val pdfName = File(filename).nameWithoutExtension + &quot;.pdf&quot;</span>
-<span class="fc" id="L279">        val converted = gotenbergService.convertToPdf(data, extension)</span>
-<span class="fc" id="L280">        return pdfName to converted</span>
-    }
-
-    suspend fun delete(
-        uploadId: UUID,
-    ) {
-<span class="fc" id="L286">        val (filId, navEksternRefId) = withContext(ioDispatcher) {</span>
-<span class="fc" id="L287">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L288">                val upload = uploadRepository.getUpload(tx, uploadId)</span>
-<span class="fc" id="L289">                uploadRepository.deleteUpload(tx, uploadId)</span>
-<span class="fc" id="L290">                upload.filId to upload.navEksternRefId</span>
-<span class="fc" id="L291">            }</span>
+    suspend fun delete(uploadId: UUID) {
+<span class="fc" id="L141">        val (filId, navEksternRefId) = withContext(ioDispatcher) {</span>
+<span class="fc" id="L142">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L143">                val upload = uploadRepository.getUpload(tx, uploadId)</span>
+<span class="fc" id="L144">                uploadRepository.deleteUpload(tx, uploadId)</span>
+<span class="fc" id="L145">                upload.filId to upload.navEksternRefId</span>
+<span class="fc" id="L146">            }</span>
         }
 
-<span class="pc bpc" id="L294" title="1 of 4 branches missed.">        if (filId != null &amp;&amp; navEksternRefId != null) {</span>
-<span class="pc" id="L295">            runCatching {</span>
-<span class="fc" id="L296">                mellomlagringClient.deleteFile(navEksternRefId, filId)</span>
-<span class="pc bpc" id="L297" title="1 of 2 branches missed.">            }.onFailure {</span>
-<span class="nc" id="L298">                logger.warn(&quot;Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned&quot;, it)</span>
-<span class="nc" id="L299">            }</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">        if (filId != null &amp;&amp; navEksternRefId != null) {</span>
+<span class="pc" id="L150">            runCatching {</span>
+<span class="fc" id="L151">                mellomlagringClient.deleteFile(navEksternRefId, filId)</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            }.onFailure {</span>
+<span class="nc" id="L153">                logger.warn(&quot;Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned&quot;, it)</span>
+<span class="nc" id="L154">            }</span>
         }
 
-<span class="fc" id="L302">        deleteGcsObjects(uploadId)</span>
-<span class="fc" id="L303">    }</span>
+<span class="fc" id="L157">        uploadProcessingService.deleteGcsObjects(uploadId)</span>
+<span class="fc" id="L158">    }</span>
 
-<span class="fc" id="L305">    class UploadForbiddenException(</span>
+<span class="fc" id="L160">    class UploadForbiddenException(</span>
         message: String,
-<span class="fc" id="L307">    ) : RuntimeException(message)</span>
-}
-
-
-fun getSha512(data: ByteArray): String {
-<span class="fc" id="L312">    val md = MessageDigest.getInstance(&quot;SHA-512&quot;)</span>
-<span class="fc" id="L313">    md.update(data)</span>
-<span class="fc" id="L314">    val digest = md.digest()</span>
-<span class="fc" id="L315">    return buildString(digest.size * 2) {</span>
-<span class="fc" id="L316">        digest.forEach { append(&quot;%02x&quot;.format(it)) }</span>
-<span class="fc" id="L317">    }</span>
-}
-
-/**
- * Generates a unique mellomlagring filename by appending the first segment of [uploadId]
- * (8 hex characters) before the extension. The base name is truncated to 50 characters
- * to keep total filenames manageable.
- *
- * Examples:
- *   &quot;document.pdf&quot;  + UUID b1f7f6d1-... → &quot;document-b1f7f6d1.pdf&quot;
- *   &quot;a&quot;.repeat(60) + &quot;.pdf&quot; → &quot;a&quot;.repeat(50) + &quot;-b1f7f6d1.pdf&quot;
- */
-internal fun makeUniqueMellomlagringFilename(filename: String, uploadId: UUID): String {
-<span class="fc" id="L330">    val file = File(filename)</span>
-<span class="fc" id="L331">    val extension = file.extension</span>
-<span class="fc" id="L332">    val baseName = file.nameWithoutExtension.take(50)</span>
-<span class="fc" id="L333">    val uuidSuffix = uploadId.toString().substringBefore('-')</span>
-<span class="pc bpc" id="L334" title="2 of 4 branches missed.">    return if (extension.isNotEmpty()) &quot;$baseName-$uuidSuffix.$extension&quot; else &quot;$baseName-$uuidSuffix&quot;</span>
+<span class="fc" id="L162">    ) : RuntimeException(message)</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

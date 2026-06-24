@@ -14,7 +14,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.routing.get
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 import java.io.File
 import java.util.UUID
