@@ -262,7 +262,6 @@ class EttersendelseAlreadyExistsException(
 @Serializable
 data class Fil(val filnavn: String, val sha512: String)
 
-// AKA metadata
 @Serializable
 data class Vedlegg(
     val type: String,

@@ -48,12 +48,12 @@ object EttersendelsePdfGenerator {
         }
 }
 
-/** Replace illegal characters bacause there is no glyph for that in the font we use (SourceSansPro-Regular):
- * - U+0009: Tab character (\t)
- * - U+000D: Carriage return (CR)
- * - U+F0B7: Bullet point?
- * - U+001F: No idea
- * - U+000A: EOF/LF/NL
+/** Replaces characters that have no glyph in SourceSansPro-Regular:
+ * - U+0009: Tab (\t)
+ * - U+000A: Line feed (\n)
+ * - U+000D: Carriage return (\r)
+ * - U+001F: Unit separator (ASCII control character)
+ * - U+F0B7: Private use area bullet (used by some Windows fonts)
  **/
 private fun String.replaceUnsupportedCharacters() =
     replace(Regex("[\\x09\\x0D\\x0A]"), " ")

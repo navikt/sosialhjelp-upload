@@ -48,10 +48,8 @@ class SubmissionStatusServiceTest {
         val submissionId = createMockSubmission(dsl)
         val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
 
-        // When: retrieving submission status
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
 
-        // Then: the returned state should have the matching submissionId and no uploads.
         assertEquals(submissionId.toString(), result.submissionId)
         assertTrue(result.uploads.isEmpty())
     }
@@ -79,7 +77,6 @@ class SubmissionStatusServiceTest {
      */
     @Test
     fun `getSubmissionStatus returns multiple uploads each with their corresponding pages`() {
-        // Given
         val submissionId = createMockSubmission(dsl)
 
         val uploadId1 =
@@ -89,10 +86,8 @@ class SubmissionStatusServiceTest {
 
         val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
 
-        // When
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
 
-        // Then
         assertEquals(result.status, SubmissionState.Status.ACTIVE)
         assertEquals(submissionId.toString(), result.submissionId)
         assertEquals(2, result.uploads.size)

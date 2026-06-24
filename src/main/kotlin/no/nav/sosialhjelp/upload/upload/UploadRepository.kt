@@ -42,9 +42,6 @@ data class UploadForVedlegg(
     val sha512: String?,
 )
 
-/**
- * Cross-cutting upload read queries used by status, vedlegg and retention features.
- */
 class UploadRepository {
     fun getUploads(
         tx: Configuration,

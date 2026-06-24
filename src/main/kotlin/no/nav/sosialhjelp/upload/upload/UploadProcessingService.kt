@@ -18,10 +18,6 @@ import java.util.UUID
 /**
  * Orchestrates the post-upload processing pipeline:
  * assemble → validate → convert → store → finalize.
- *
- * Each step is delegated to a dedicated service. This class is responsible
- * for reading upload metadata, coordinating the steps, updating the DB,
- * recording metrics, and handling failures.
  */
 class UploadProcessingService(
     private val dsl: DSLContext,
