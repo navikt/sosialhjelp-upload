@@ -23,7 +23,7 @@ import java.util.UUID
  */
 class UploadProcessingService(
     private val dsl: DSLContext,
-    private val uploadRepository: UploadRepository,
+    private val uploadProcessingQueries: UploadProcessingQueries,
     private val chunkAssemblyService: ChunkAssemblyService,
     private val validator: UploadValidator,
     private val fileConversionService: FileConversionService,
@@ -36,7 +36,7 @@ class UploadProcessingService(
     suspend fun process(uploadId: UUID) {
         val startTime = System.nanoTime()
         val upload = withContext(ioDispatcher) {
-            dsl.transactionResult { tx -> uploadRepository.getUploadForProcessing(tx, uploadId) }
+            dsl.transactionResult { tx -> uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }
         }
         val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { "none" }
 
@@ -52,7 +52,7 @@ class UploadProcessingService(
                 if (errors.isNotEmpty()) {
                     logger.info("Upload $uploadId (*$fileExtension) failed validation: ${errors.map { "${it.code}: ${it.message}" }}")
                     withContext(ioDispatcher) {
-                        dsl.transaction { tx -> uploadRepository.addErrors(tx, uploadId, errors) }
+                        dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, errors) }
                     }
                     chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
                     meterRegistry.timer("upload.processing", "result", "validation_failure", "extension", fileExtension)
@@ -88,14 +88,14 @@ class UploadProcessingService(
                 // Step 5: Finalize — update DB and clean up GCS
                 withContext(ioDispatcher) {
                     dsl.transaction { tx ->
-                        uploadRepository.setFilId(
+                        uploadProcessingQueries.setFilId(
                             tx, uploadId,
                             storageResult.filId,
                             storageResult.mellomlagringFilnavn,
                             storageResult.storedSize,
                             getSha512(finalData),
                         )
-                        uploadRepository.notifyChange(tx, uploadId)
+                        UploadNotifications.notifyChange(tx, uploadId)
                     }
                 }
                 chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
@@ -111,8 +111,8 @@ class UploadProcessingService(
     suspend fun markUploadFailed(uploadId: UUID, composedKey: String? = null) {
         withContext(ioDispatcher) {
             dsl.transaction { tx ->
-                uploadRepository.markFailed(tx, uploadId)
-                uploadRepository.notifyChange(tx, uploadId)
+                uploadProcessingQueries.markFailed(tx, uploadId)
+                UploadNotifications.notifyChange(tx, uploadId)
             }
         }
         chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)

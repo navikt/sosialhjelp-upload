@@ -13,7 +13,7 @@ import io.ktor.util.AttributeKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.VerifiedPersonident
 import org.jooq.DSLContext
 import java.util.UUID
 
@@ -23,7 +23,7 @@ val VerifiedUploadId = AttributeKey<UUID>("VerifiedUploadId")
 private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     createRouteScopedPlugin("VerifyUploadOwnership") {
         val dsl: DSLContext by application.dependencies
-        val uploadRepository: UploadRepository by application.dependencies
+        val tusUploadQueries: TusUploadQueries by application.dependencies
 
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
@@ -41,7 +41,7 @@ private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Disp
             }
 
             val owned = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.isOwnedByUser(tx, uploadId, personident) }
+                dsl.transactionResult { tx -> tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }
             }
             if (!owned) {
                 // Return 404 rather than 403 to avoid leaking whether the resource exists.
@@ -50,7 +50,7 @@ private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Disp
             }
 
             call.attributes.put(VerifiedUploadId, uploadId)
-            call.attributes.put(no.nav.sosialhjelp.upload.VerifiedPersonident, personident)
+            call.attributes.put(VerifiedPersonident, personident)
         }
     }
 
@@ -67,7 +67,7 @@ private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Disp
  * ```
  *
  * Every route nested under the group will have ownership verified before the handler runs.
- * On success, [VerifiedUploadId] and [no.nav.sosialhjelp.upload.VerifiedPersonident] are available in `call.attributes`.
+ * On success, [VerifiedUploadId] and [VerifiedPersonident] are available in `call.attributes`.
  * On failure the pipeline is short-circuited via `call.respond` (404/401); the handler never runs.
  */
 fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {

@@ -7,6 +7,9 @@ import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLO
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.tus.TusUploadQueries
+import no.nav.sosialhjelp.upload.upload.UploadNotifications
+import no.nav.sosialhjelp.upload.upload.UploadRecoveryQueries
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -19,7 +22,9 @@ import kotlin.test.Test
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UploadRepositoryTest {
     private lateinit var submissionRepository: SubmissionRepository
+    private lateinit var tusUploadQueries: TusUploadQueries
     private lateinit var uploadRepository: UploadRepository
+    private lateinit var uploadRecoveryQueries: UploadRecoveryQueries
     private val dsl: DSLContext = PostgresTestContainer.dsl
     private lateinit var notificationServiceMock: SubmissionNotificationService
 
@@ -28,7 +33,9 @@ class UploadRepositoryTest {
         PostgresTestContainer.migrate()
         submissionRepository = SubmissionRepository(dsl)
         notificationServiceMock = mockk<SubmissionNotificationService>()
+        tusUploadQueries = TusUploadQueries()
         uploadRepository = UploadRepository()
+        uploadRecoveryQueries = UploadRecoveryQueries()
     }
 
     @BeforeEach
@@ -43,7 +50,7 @@ class UploadRepositoryTest {
         val submissionId = TestUtils.createMockSubmission(dsl)
         val filename = "testfile.txt"
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { tx -> uploadRepository.create(tx, submissionId, filename, 10L) }
+        val uploadId = dsl.transactionResult { tx -> tusUploadQueries.create(tx, submissionId, filename, 10L) }
 
         dsl.transaction { tx ->
             val upload =
@@ -64,11 +71,11 @@ class UploadRepositoryTest {
     fun `test getUploadsByDocumentId returns correct uploads`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId1 = dsl.transactionResult { it -> uploadRepository.create(it, submissionId, "file1.txt", 10L) }
-        val uploadId2 = dsl.transactionResult { it -> uploadRepository.create(it, submissionId, "file2.txt", 190L) }
+        val uploadId1 = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "file1.txt", 10L) }
+        val uploadId2 = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "file2.txt", 190L) }
         // Create an upload for a different submission to ensure filtering works.
         val otherSubmissionId = TestUtils.createMockSubmission(dsl)
-        dsl.transaction { it -> uploadRepository.create(it, otherSubmissionId, "otherfile.txt", 19L) }
+        dsl.transaction { it -> tusUploadQueries.create(it, otherSubmissionId, "otherfile.txt", 19L) }
 
         val uploads =
             dsl
@@ -84,9 +91,8 @@ class UploadRepositoryTest {
     fun `test getSubmissionIdFromUploadId returns correct submission id`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, submissionId, "file.txt", 10L) } ?: error("Ingen uploadId")
-        // Retrieve the submission id using the upload id.
-        val retrievedSubmissionId = dsl.transactionResult { it -> uploadRepository.getSubmissionIdFromUploadId(it, uploadId) }
+        val uploadId = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "file.txt", 10L) } ?: error("Ingen uploadId")
+        val retrievedSubmissionId = dsl.transactionResult { it -> tusUploadQueries.getSubmissionIdFromUploadId(it, uploadId) }
         assertEquals(submissionId, retrievedSubmissionId)
     }
 
@@ -94,10 +100,10 @@ class UploadRepositoryTest {
     fun `test notifyChange does not throw`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { it -> uploadRepository.create(it, submissionId, "notify.txt", 10L) } ?: error("Ingen uploadId")
+        val uploadId = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "notify.txt", 10L) } ?: error("Ingen uploadId")
 
         // notifyChange now sends pg_notify within the transaction; just verify it doesn't throw
-        dsl.transaction { it -> uploadRepository.notifyChange(it, uploadId) }
+        dsl.transaction { it -> UploadNotifications.notifyChange(it, uploadId) }
     }
 
     @Test
@@ -105,7 +111,7 @@ class UploadRepositoryTest {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId = dsl.transactionResult { tx ->
-            uploadRepository.create(tx, submissionId, "stuck.txt", 100L)
+            tusUploadQueries.create(tx, submissionId, "stuck.txt", 100L)
         } ?: error("No uploadId")
 
         // Set PROCESSING state with an old updated_at
@@ -116,7 +122,7 @@ class UploadRepositoryTest {
 
         val cutoff = java.time.OffsetDateTime.now()
         val staleUploads = dsl.transactionResult { tx ->
-            uploadRepository.markStaleProcessingAsFailed(tx, cutoff)
+            uploadRecoveryQueries.markStaleProcessingAsFailed(tx, cutoff)
         }
 
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
@@ -135,7 +141,7 @@ class UploadRepositoryTest {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId = dsl.transactionResult { tx ->
-            uploadRepository.create(tx, submissionId, "halted.txt", 100L)
+            tusUploadQueries.create(tx, submissionId, "halted.txt", 100L)
         } ?: error("No uploadId")
 
         // Set upload_offset > 0 and old updated_at
@@ -146,7 +152,7 @@ class UploadRepositoryTest {
 
         val cutoff = java.time.OffsetDateTime.now()
         val staleUploads = dsl.transactionResult { tx ->
-            uploadRepository.markHaltedPendingAsFailed(tx, cutoff)
+            uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
         }
 
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
@@ -165,7 +171,7 @@ class UploadRepositoryTest {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId = dsl.transactionResult { tx ->
-            uploadRepository.create(tx, submissionId, "never-started.txt", 100L)
+            tusUploadQueries.create(tx, submissionId, "never-started.txt", 100L)
         } ?: error("No uploadId")
 
         // upload_offset stays 0 (no chunks received), just set old updated_at
@@ -176,7 +182,7 @@ class UploadRepositoryTest {
 
         val cutoff = java.time.OffsetDateTime.now()
         val staleUploads = dsl.transactionResult { tx ->
-            uploadRepository.markHaltedPendingAsFailed(tx, cutoff)
+            uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
         }
 
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })

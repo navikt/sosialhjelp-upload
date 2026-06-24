@@ -2,7 +2,6 @@ package no.nav.sosialhjelp.upload.upload
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
-import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.StatusCode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +15,7 @@ import java.time.temporal.ChronoUnit
 
 class UploadRecoveryService(
     private val dsl: DSLContext,
-    private val uploadRepository: UploadRepository,
+    private val uploadRecoveryQueries: UploadRecoveryQueries,
     private val notificationService: SubmissionNotificationService,
     private val chunkStorage: ChunkStorage,
     private val meterRegistry: MeterRegistry,
@@ -53,7 +52,7 @@ class UploadRecoveryService(
             val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
             val staleUploads = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    uploadRepository.markStaleProcessingAsFailed(tx, cutoff)
+                    uploadRecoveryQueries.markStaleProcessingAsFailed(tx, cutoff)
                 }
             }
             span.setAttribute("upload.recovery.count", staleUploads.size.toLong())
@@ -83,7 +82,7 @@ class UploadRecoveryService(
             val cutoff = OffsetDateTime.now().minus(PENDING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
             val staleUploads = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    uploadRepository.markHaltedPendingAsFailed(tx, cutoff)
+                    uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
                 }
             }
             span.setAttribute("upload.recovery.count", staleUploads.size.toLong())

@@ -13,7 +13,6 @@ import no.nav.sosialhjelp.upload.database.SubmissionRepository.SubmissionOwnedBy
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
-import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
@@ -22,7 +21,7 @@ import java.io.File
 import java.util.UUID
 
 class TusUploadService(
-    private val uploadRepository: UploadRepository,
+    private val tusUploadQueries: TusUploadQueries,
     private val submissionRepository: SubmissionRepository,
     private val dsl: DSLContext,
     private val validator: UploadValidator,
@@ -60,7 +59,7 @@ class TusUploadService(
                 val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)
 
                 val eksternRef =
-                // If navEksternRefId is already set on this submission (e.g. a second
+                    // If navEksternRefId is already set on this submission (e.g. a second
                     // upload on the same contextId), reuse it without calling Fiks.
                     submissionRepository.getNavEksternRefIdByContextId(tx, contextId)
                         ?: navEksternRefId
@@ -80,7 +79,7 @@ class TusUploadService(
                         ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
 
                 submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)
-                val uploadId = uploadRepository
+                val uploadId = tusUploadQueries
                     .create(tx, submissionId, filename, size)
                     .also {
                         meterRegistry.counter("upload.created").increment()
@@ -90,7 +89,8 @@ class TusUploadService(
                     ?: error("Failed to create upload record")
                 val validations = validator.validate(filename, fileSize = size)
                 if (validations.isNotEmpty()) {
-                    uploadRepository.addErrors(tx, uploadId, validations)
+                    // Reuse processing queries for recording pre-upload validation errors
+                    no.nav.sosialhjelp.upload.upload.UploadProcessingQueries().addErrors(tx, uploadId, validations)
                 }
                 uploadId
             }
@@ -101,7 +101,7 @@ class TusUploadService(
 
     fun getUploadInfo(uploadId: UUID): Pair<Long, Long> =
         dsl.transactionResult { tx ->
-            uploadRepository.getUploadInfo(tx, uploadId)
+            tusUploadQueries.getUploadInfo(tx, uploadId)
         }
 
     suspend fun appendChunk(
@@ -116,14 +116,14 @@ class TusUploadService(
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     // Throws OffsetMismatchException if offset doesn't match (→ 409 in route)
-                    uploadRepository.appendChunk(tx, uploadId, expectedOffset, data.size)
+                    tusUploadQueries.appendChunk(tx, uploadId, expectedOffset, data.size)
                 }
             }
         meterRegistry.summary("upload.chunk.bytes").record(data.size.toDouble())
 
         if (newOffset == totalSize) {
             val claimed = withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.claimForProcessing(tx, uploadId) }
+                dsl.transactionResult { tx -> tusUploadQueries.claimForProcessing(tx, uploadId) }
             }
             if (claimed) {
                 logger.info("Upload $uploadId complete — launching background processing")
@@ -142,8 +142,8 @@ class TusUploadService(
     suspend fun delete(uploadId: UUID) {
         val (filId, navEksternRefId) = withContext(ioDispatcher) {
             dsl.transactionResult { tx ->
-                val upload = uploadRepository.getUpload(tx, uploadId)
-                uploadRepository.deleteUpload(tx, uploadId)
+                val upload = tusUploadQueries.getUpload(tx, uploadId)
+                tusUploadQueries.deleteUpload(tx, uploadId)
                 upload.filId to upload.navEksternRefId
             }
         }
@@ -159,7 +159,5 @@ class TusUploadService(
         chunkAssemblyService.deleteGcsObjects(uploadId)
     }
 
-    class UploadForbiddenException(
-        message: String,
-    ) : RuntimeException(message)
+    class UploadForbiddenException(message: String) : RuntimeException(message)
 }
