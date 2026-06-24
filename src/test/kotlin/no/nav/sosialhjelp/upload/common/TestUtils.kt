@@ -24,8 +24,8 @@ object TestUtils {
         navEksternRefId: String? = null,
     ): UUID {
         val uuid = UUID.randomUUID()
-        tx.transactionResult {
-            it
+        tx.transactionResult { config ->
+            config
                 .dsl()
                 .insertInto(Submission.SUBMISSION)
                 .set(Submission.SUBMISSION.ID, uuid)

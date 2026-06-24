@@ -150,7 +150,7 @@ private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) 
             when (e) {
                 is OffsetMismatchException -> return call.respond(HttpStatusCode.Conflict)
                 else -> {
-                    environment.log.error("Error appending chunk to upload $uploadId", e)
+                    call.application.environment.log.error("Error appending chunk to upload $uploadId", e)
                     return call.respond(HttpStatusCode.InternalServerError)
                 }
             }

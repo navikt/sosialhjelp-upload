@@ -57,8 +57,8 @@ class SubmissionStatusServiceTest {
     private fun createUpload(
         submissionId: UUID,
         filename: String,
-    ) = dsl.transactionResult {
-        it
+    ) = dsl.transactionResult { config ->
+        config
             .dsl()
             .insertInto(
                 UPLOAD,

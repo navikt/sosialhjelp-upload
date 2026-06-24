@@ -152,7 +152,7 @@ class DocumentRoutesTest {
         appTest {
             val token = JwtTestUtils.issueToken(subject = "12345678910")
             val submissionId = createMockSubmission(dsl, ownerIdent = "12345678910")
-            val uploadId = createCompletedUpload(submissionId, owner = "12345678910")
+            val uploadId = createCompletedUpload(submissionId)
 
             coEvery { mellomlagringClient.getFile(any(), any()) } returns "hello".toByteArray()
 
