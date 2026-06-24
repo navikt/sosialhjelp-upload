@@ -1,7 +1,4 @@
-@file:Suppress("LongMethod")
-
 package no.nav.sosialhjelp.upload
-
 import com.google.cloud.storage.StorageOptions
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
@@ -115,6 +112,32 @@ fun Application.module() {
             val bucketName = environment.config.property("gcs.bucketName").getString()
             GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
         }
+    configureDependencies(dataSource, notificationScope, processingScope, appMicrometerRegistry, chunkStorage, isMock)
+    configureSecurity()
+    configureHTTP()
+    configureMonitoring(appMicrometerRegistry)
+    configureStatusPages()
+    configureRouting()
+
+    val scopes =
+        if (!isTest) startBackgroundJobs() else emptyList()
+
+    monitor.subscribe(ApplicationStopped) {
+        processingScope.cancel()
+        notificationScope.cancel()
+        scopes.forEach { it.cancel() }
+    }
+}
+
+@Suppress("LongParameterList")
+private fun Application.configureDependencies(
+    dataSource: DataSource,
+    notificationScope: CoroutineScope,
+    processingScope: CoroutineScope,
+    appMicrometerRegistry: PrometheusMeterRegistry,
+    chunkStorage: ChunkStorage,
+    isMock: Boolean,
+) {
     dependencies {
         provide<PrometheusMeterRegistry> { appMicrometerRegistry }
         provide<MeterRegistry> { appMicrometerRegistry }
@@ -157,43 +180,27 @@ fun Application.module() {
         provide(StaleSubmissionCleanupService::class)
         provide(VedleggService::class)
     }
-    configureSecurity()
-    configureHTTP()
-    configureMonitoring(appMicrometerRegistry)
-    configureStatusPages()
-    configureRouting()
+}
 
-    val scopes =
-        if (!isTest) {
-            val recoveryService: UploadRecoveryService by dependencies
-            val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-            recoveryScope.launch {
-                while (true) {
-                    delay(1.minutes)
-                    runCatching { recoveryService.recoverAll() }
-                        .onFailure { log.warn("Upload recovery sweep failed", it) }
-                }
-            }
-
-            val cleanupService: StaleSubmissionCleanupService by dependencies
-            val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-            cleanupScope.launch {
-                while (true) {
-                    delay(1.minutes)
-                    runCatching { cleanupService.runCleanup() }
-                        .onFailure { log.warn("Retention sweep failed", it) }
-                }
-            }
-            listOf(cleanupScope, recoveryScope)
-        } else {
-            emptyList()
-        }
-
-    monitor.subscribe(ApplicationStopped) {
-        processingScope.cancel()
-        notificationScope.cancel()
-        scopes.forEach {
-            it.cancel()
+private fun Application.startBackgroundJobs(): List<CoroutineScope> {
+    val recoveryService: UploadRecoveryService by dependencies
+    val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    recoveryScope.launch {
+        while (true) {
+            delay(1.minutes)
+            runCatching { recoveryService.recoverAll() }
+                .onFailure { log.warn("Upload recovery sweep failed", it) }
         }
     }
+
+    val cleanupService: StaleSubmissionCleanupService by dependencies
+    val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    cleanupScope.launch {
+        while (true) {
+            delay(1.minutes)
+            runCatching { cleanupService.runCleanup() }
+                .onFailure { log.warn("Retention sweep failed", it) }
+        }
+    }
+    return listOf(cleanupScope, recoveryScope)
 }
