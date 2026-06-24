@@ -25,6 +25,9 @@ import com.google.cloud.storage.StorageOptions
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.upload.RetentionService
+import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
+import no.nav.sosialhjelp.upload.upload.FileConversionService
+import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.upload.UploadRecoveryService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
@@ -130,6 +133,9 @@ fun Application.module() {
         provide(MellomlagringClient::class)
         provide(UploadRepository::class)
         provide(SubmissionRepository::class)
+        provide(ChunkAssemblyService::class)
+        provide(FileConversionService::class)
+        provide(MellomlagringStorageService::class)
         provide(UploadProcessingService::class)
         provide(TusUploadService::class)
         provide(SubmissionService::class)
