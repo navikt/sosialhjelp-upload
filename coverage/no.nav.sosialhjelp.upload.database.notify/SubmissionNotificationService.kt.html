@@ -90,7 +90,7 @@ import kotlin.time.Duration.Companion.seconds
      * If called before commit (or if the transaction rolls back), subscribers will
      * receive a spurious notification for a change that was never persisted.
      *
-     * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
+     * Prefer [no.nav.sosialhjelp.upload.upload.UploadNotifications.notifyChange] for
      * notifications that must be atomic with a write transaction.
      */
     fun notifyUpdate(submissionId: UUID) {
@@ -109,7 +109,7 @@ import kotlin.time.Duration.Companion.seconds
      * If called before commit (or if the transaction rolls back), subscribers will
      * receive a spurious notification for a change that was never persisted.
      *
-     * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
+     * Prefer [no.nav.sosialhjelp.upload.upload.UploadNotifications.notifyChange] for
      * notifications that must be atomic with a write transaction.
      */
     fun notifyDeleted(submissionId: UUID) {
