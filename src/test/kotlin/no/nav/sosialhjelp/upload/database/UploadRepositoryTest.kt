@@ -38,8 +38,8 @@ class UploadRepositoryTest {
 
     @BeforeEach
     fun cleanup() {
-        dsl.transaction {
-            it.dsl().deleteFrom(SUBMISSION).execute()
+        dsl.transaction { config ->
+            config.dsl().deleteFrom(SUBMISSION).execute()
         }
     }
 
@@ -69,11 +69,17 @@ class UploadRepositoryTest {
     fun `test getUploadsByDocumentId returns correct uploads`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId1 = dsl.transactionResult { tusUploadQueries.create(it, submissionId, "file1.txt", 10L) }
-        val uploadId2 = dsl.transactionResult { tusUploadQueries.create(it, submissionId, "file2.txt", 190L) }
+        val uploadId1 =
+            dsl.transactionResult { config ->
+                tusUploadQueries.create(config, submissionId, "file1.txt", 10L)
+            }
+        val uploadId2 =
+            dsl.transactionResult { config ->
+                tusUploadQueries.create(config, submissionId, "file2.txt", 190L)
+            }
         // Create an upload for a different submission to ensure filtering works.
         val otherSubmissionId = TestUtils.createMockSubmission(dsl)
-        dsl.transaction { tusUploadQueries.create(it, otherSubmissionId, "otherfile.txt", 19L) }
+        dsl.transaction { config -> tusUploadQueries.create(config, otherSubmissionId, "otherfile.txt", 19L) }
 
         val uploads =
             dsl
@@ -90,12 +96,12 @@ class UploadRepositoryTest {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId =
-            dsl.transactionResult {
-                tusUploadQueries.create(it, submissionId, "file.txt", 10L)
+            dsl.transactionResult { config ->
+                tusUploadQueries.create(config, submissionId, "file.txt", 10L)
             } ?: error("Ingen uploadId")
         val retrievedSubmissionId =
-            dsl.transactionResult {
-                tusUploadQueries.getSubmissionIdFromUploadId(it, uploadId)
+            dsl.transactionResult { config ->
+                tusUploadQueries.getSubmissionIdFromUploadId(config, uploadId)
             }
         assertEquals(submissionId, retrievedSubmissionId)
     }
@@ -105,12 +111,12 @@ class UploadRepositoryTest {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId =
-            dsl.transactionResult {
-                tusUploadQueries.create(it, submissionId, "notify.txt", 10L)
+            dsl.transactionResult { config ->
+                tusUploadQueries.create(config, submissionId, "notify.txt", 10L)
             } ?: error("Ingen uploadId")
 
         // notifyChange now sends pg_notify within the transaction; just verify it doesn't throw
-        dsl.transaction { UploadNotifications.notifyChange(it, uploadId) }
+        dsl.transaction { config -> UploadNotifications.notifyChange(config, uploadId) }
     }
 
     @Test
