@@ -13,7 +13,7 @@ import io.ktor.util.AttributeKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.VerifiedPersonident
 import org.jooq.DSLContext
 import java.util.UUID
 
@@ -23,7 +23,7 @@ import java.util.UUID
 <span class="nc" id="L23">private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
 <span class="fc" id="L24">    createRouteScopedPlugin(&quot;VerifyUploadOwnership&quot;) {</span>
 <span class="fc" id="L25">        val dsl: DSLContext by application.dependencies</span>
-<span class="fc" id="L26">        val uploadRepository: UploadRepository by application.dependencies</span>
+<span class="fc" id="L26">        val tusUploadQueries: TusUploadQueries by application.dependencies</span>
 
 <span class="pc bpc" id="L28" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
 <span class="pc bpc" id="L29" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
@@ -41,7 +41,7 @@ import java.util.UUID
             }
 
 <span class="fc bfc" id="L43" title="All 2 branches covered.">            val owned = withContext(ioDispatcher) {</span>
-<span class="fc" id="L44">                dsl.transactionResult { tx -&gt; uploadRepository.isOwnedByUser(tx, uploadId, personident) }</span>
+<span class="fc" id="L44">                dsl.transactionResult { tx -&gt; tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }</span>
             }
 <span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (!owned) {</span>
                 // Return 404 rather than 403 to avoid leaking whether the resource exists.
@@ -50,7 +50,7 @@ import java.util.UUID
             }
 
 <span class="fc" id="L52">            call.attributes.put(VerifiedUploadId, uploadId)</span>
-<span class="fc" id="L53">            call.attributes.put(no.nav.sosialhjelp.upload.VerifiedPersonident, personident)</span>
+<span class="fc" id="L53">            call.attributes.put(VerifiedPersonident, personident)</span>
 <span class="fc" id="L54">        }</span>
 <span class="fc" id="L55">    }</span>
 
@@ -67,7 +67,7 @@ import java.util.UUID
  * ```
  *
  * Every route nested under the group will have ownership verified before the handler runs.
- * On success, [VerifiedUploadId] and [no.nav.sosialhjelp.upload.VerifiedPersonident] are available in `call.attributes`.
+ * On success, [VerifiedUploadId] and [VerifiedPersonident] are available in `call.attributes`.
  * On failure the pipeline is short-circuited via `call.respond` (404/401); the handler never runs.
  */
 <span class="fc" id="L73">fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>

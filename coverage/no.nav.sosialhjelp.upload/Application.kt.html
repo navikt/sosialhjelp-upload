@@ -133,6 +133,9 @@ fun Application.module() {
         provide(MellomlagringClient::class)
         provide(UploadRepository::class)
         provide(SubmissionRepository::class)
+        provide(no.nav.sosialhjelp.upload.tus.TusUploadQueries::class)
+        provide(no.nav.sosialhjelp.upload.upload.UploadProcessingQueries::class)
+        provide(no.nav.sosialhjelp.upload.upload.UploadRecoveryQueries::class)
         provide(ChunkAssemblyService::class)
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
@@ -154,21 +157,21 @@ fun Application.module() {
     val scopes = if (!isTest) {
         val recoveryService: UploadRecoveryService by dependencies
         val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="nc bnc" id="L157" title="All 4 branches missed.">        recoveryScope.launch {</span>
-<span class="nc" id="L158">            while (true) {</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">                delay(1.minutes)</span>
-<span class="nc bnc" id="L160" title="All 2 branches missed.">                runCatching { recoveryService.recoverAll() }</span>
-<span class="nc bnc" id="L161" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        recoveryScope.launch {</span>
+<span class="nc" id="L161">            while (true) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
             }
         }
 
         val retentionService: RetentionService by dependencies
         val retentionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-<span class="nc bnc" id="L167" title="All 4 branches missed.">        retentionScope.launch {</span>
-<span class="nc" id="L168">            while (true) {</span>
-<span class="nc bnc" id="L169" title="All 2 branches missed.">                delay(1.minutes)</span>
-<span class="nc bnc" id="L170" title="All 2 branches missed.">                runCatching { retentionService.runRetention() }</span>
-<span class="nc bnc" id="L171" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        retentionScope.launch {</span>
+<span class="nc" id="L171">            while (true) {</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                delay(1.minutes)</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                runCatching { retentionService.runRetention() }</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
             }
         }
         listOf(retentionScope, recoveryScope)

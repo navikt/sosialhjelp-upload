@@ -23,7 +23,7 @@ import java.util.UUID
  */
 <span class="fc" id="L24">class UploadProcessingService(</span>
 <span class="fc" id="L25">    private val dsl: DSLContext,</span>
-<span class="fc" id="L26">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L26">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
 <span class="fc" id="L27">    private val chunkAssemblyService: ChunkAssemblyService,</span>
 <span class="fc" id="L28">    private val validator: UploadValidator,</span>
 <span class="fc" id="L29">    private val fileConversionService: FileConversionService,</span>
@@ -36,7 +36,7 @@ import java.util.UUID
 <span class="fc" id="L36">    suspend fun process(uploadId: UUID) {</span>
 <span class="fc" id="L37">        val startTime = System.nanoTime()</span>
 <span class="fc" id="L38">        val upload = withContext(ioDispatcher) {</span>
-<span class="fc" id="L39">            dsl.transactionResult { tx -&gt; uploadRepository.getUploadForProcessing(tx, uploadId) }</span>
+<span class="fc" id="L39">            dsl.transactionResult { tx -&gt; uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }</span>
         }
 <span class="pc bpc" id="L41" title="2 of 4 branches missed.">        val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
 
@@ -52,7 +52,7 @@ import java.util.UUID
 <span class="fc bfc" id="L52" title="All 4 branches covered.">                if (errors.isNotEmpty()) {</span>
 <span class="fc" id="L53">                    logger.info(&quot;Upload $uploadId (*$fileExtension) failed validation: ${errors.map { &quot;${it.code}: ${it.message}&quot; }}&quot;)</span>
 <span class="fc" id="L54">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L55">                        dsl.transaction { tx -&gt; uploadRepository.addErrors(tx, uploadId, errors) }</span>
+<span class="fc" id="L55">                        dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, errors) }</span>
 <span class="fc" id="L56">                    }</span>
 <span class="fc" id="L57">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
 <span class="fc" id="L58">                    meterRegistry.timer(&quot;upload.processing&quot;, &quot;result&quot;, &quot;validation_failure&quot;, &quot;extension&quot;, fileExtension)</span>
@@ -88,14 +88,14 @@ import java.util.UUID
                 // Step 5: Finalize — update DB and clean up GCS
 <span class="fc" id="L89">                withContext(ioDispatcher) {</span>
 <span class="fc" id="L90">                    dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L91">                        uploadRepository.setFilId(</span>
+<span class="fc" id="L91">                        uploadProcessingQueries.setFilId(</span>
 <span class="fc" id="L92">                            tx, uploadId,</span>
 <span class="fc" id="L93">                            storageResult.filId,</span>
 <span class="fc" id="L94">                            storageResult.mellomlagringFilnavn,</span>
 <span class="fc" id="L95">                            storageResult.storedSize,</span>
 <span class="fc" id="L96">                            getSha512(finalData),</span>
                         )
-<span class="fc" id="L98">                        uploadRepository.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L98">                        UploadNotifications.notifyChange(tx, uploadId)</span>
 <span class="fc" id="L99">                    }</span>
 <span class="fc" id="L100">                }</span>
 <span class="fc" id="L101">                chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
@@ -111,8 +111,8 @@ import java.util.UUID
 <span class="nc" id="L111">    suspend fun markUploadFailed(uploadId: UUID, composedKey: String? = null) {</span>
 <span class="fc" id="L112">        withContext(ioDispatcher) {</span>
 <span class="fc" id="L113">            dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L114">                uploadRepository.markFailed(tx, uploadId)</span>
-<span class="fc" id="L115">                uploadRepository.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L114">                uploadProcessingQueries.markFailed(tx, uploadId)</span>
+<span class="fc" id="L115">                UploadNotifications.notifyChange(tx, uploadId)</span>
 <span class="fc" id="L116">            }</span>
 <span class="fc" id="L117">        }</span>
 <span class="fc" id="L118">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
