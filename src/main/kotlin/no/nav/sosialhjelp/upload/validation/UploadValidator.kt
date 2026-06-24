@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
 
-// 10 MB
 const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
 val SUPPORTED_MIME_TYPES =

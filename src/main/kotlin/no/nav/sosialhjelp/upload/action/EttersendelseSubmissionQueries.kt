@@ -4,9 +4,6 @@ import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import org.jooq.Configuration
 import java.util.UUID
 
-/**
- * DB queries for the ettersendelse submission flow.
- */
 class EttersendelseSubmissionQueries {
     fun getNavEksternRefId(
         tx: Configuration,
