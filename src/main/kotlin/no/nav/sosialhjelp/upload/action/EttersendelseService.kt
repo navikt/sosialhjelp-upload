@@ -10,14 +10,14 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
-import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
-import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
+import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
+import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.util.*
@@ -27,7 +27,8 @@ import kotlin.time.toJavaDuration
 class EttersendelseService(
     private val fiksClient: FiksClient,
     private val dsl: DSLContext,
-    private val submissionRepository: SubmissionRepository,
+    private val ettersendelseSubmissionQueries: EttersendelseSubmissionQueries,
+    private val submissionQueries: SubmissionQueries,
     private val notificationService: SubmissionNotificationService,
     private val meterRegistry: MeterRegistry,
     private val uploadRepository: UploadRepository,
@@ -48,7 +49,7 @@ class EttersendelseService(
         val kommunenummer = sak.kommunenummer
         val navEksternRefId = withContext(ioDispatcher) {
             dsl.transactionResult { tx ->
-                submissionRepository.getNavEksternRefId(tx, submissionId, personIdent)
+                ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
             }
         }
 
@@ -90,7 +91,7 @@ class EttersendelseService(
                 )
                 meterRegistry.counter("fiks.submission.already_exists").increment()
                 withContext(ioDispatcher) {
-                    dsl.transactionResult { tx -> submissionRepository.cleanup(tx, submissionId) }
+                    dsl.transactionResult { tx -> submissionQueries.cleanup(tx, submissionId) }
                 }
                 notificationService.notifyDeleted(submissionId)
                 return true
@@ -102,7 +103,7 @@ class EttersendelseService(
         if (response.status.isSuccess()) {
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    submissionRepository.cleanup(tx, submissionId)
+                    submissionQueries.cleanup(tx, submissionId)
                 }
             }
             notificationService.notifyDeleted(submissionId)

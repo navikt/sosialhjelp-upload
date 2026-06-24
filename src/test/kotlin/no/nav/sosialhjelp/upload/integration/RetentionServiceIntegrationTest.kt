@@ -6,13 +6,14 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
-import no.nav.sosialhjelp.upload.upload.RetentionService
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
-import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
+import no.nav.sosialhjelp.upload.upload.RetentionService
+import no.nav.sosialhjelp.upload.upload.SubmissionRetentionQueries
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -26,7 +27,8 @@ import kotlin.test.assertNull
 class RetentionServiceIntegrationTest {
 
     private val dsl: DSLContext = PostgresTestContainer.dsl
-    private val submissionRepository = SubmissionRepository(dsl)
+    private val submissionRetentionQueries = SubmissionRetentionQueries()
+    private val submissionQueries = SubmissionQueries(dsl)
     private val uploadRepository = UploadRepository()
     private val mellomlagringClient = mockk<MellomlagringClient>(relaxed = true)
     private val chunkStorage = FileSystemStorage()
@@ -38,7 +40,17 @@ class RetentionServiceIntegrationTest {
     }
 
     private fun retentionService(timeout: Duration = Duration.ofSeconds(1)) =
-        RetentionService(dsl, submissionRepository, uploadRepository, mellomlagringClient, chunkStorage, mockk(relaxed = true), SimpleMeterRegistry(), timeout)
+        RetentionService(
+            dsl = dsl,
+            submissionRetentionQueries = submissionRetentionQueries,
+            submissionQueries = submissionQueries,
+            uploadRepository = uploadRepository,
+            mellomlagringClient = mellomlagringClient,
+            chunkStorage = chunkStorage,
+            notificationService = mockk(relaxed = true),
+            meterRegistry = SimpleMeterRegistry(),
+            retentionTimeout = timeout,
+        )
 
     @Test
     fun `stale submissions are deleted after retention period`() {

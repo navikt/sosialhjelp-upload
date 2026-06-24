@@ -7,7 +7,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import org.jooq.DSLContext
@@ -17,7 +17,8 @@ import java.time.OffsetDateTime
 
 class RetentionService(
     private val dsl: DSLContext,
-    private val submissionRepository: SubmissionRepository,
+    private val submissionRetentionQueries: SubmissionRetentionQueries,
+    private val submissionQueries: SubmissionQueries,
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
@@ -40,7 +41,7 @@ class RetentionService(
             val cutoff = OffsetDateTime.now().minus(retentionTimeout)
             val staleSubmissions = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    submissionRepository.getStaleSubmissions(tx, cutoff)
+                    submissionRetentionQueries.getStaleSubmissions(tx, cutoff)
                 }
             }
             span.setAttribute("submission.retention.count", staleSubmissions.size.toLong())
@@ -60,7 +61,7 @@ class RetentionService(
         }
     }
 
-    private suspend fun deleteStaleSubmission(submission: SubmissionRepository.StaleSubmission) {
+    private suspend fun deleteStaleSubmission(submission: SubmissionRetentionQueries.StaleSubmission) {
         try {
             val gcsKeys = withContext(ioDispatcher) {
                 dsl.transactionResult { tx -> uploadRepository.getGcsKeysForSubmission(tx, submission.id) }
@@ -69,7 +70,7 @@ class RetentionService(
             // Delete from DB first so that a crash leaves orphaned remote data rather than
             // a dangling DB row that would cause repeated failed deletions on retry.
             withContext(ioDispatcher) {
-                dsl.transaction { tx -> submissionRepository.cleanup(tx, submission.id) }
+                dsl.transaction { tx -> submissionQueries.cleanup(tx, submission.id) }
                 notificationService.notifyDeleted(submission.id)
             }
 

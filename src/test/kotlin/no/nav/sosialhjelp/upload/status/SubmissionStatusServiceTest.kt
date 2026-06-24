@@ -1,7 +1,7 @@
 package no.nav.sosialhjelp.upload.status
 
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SubmissionStatusServiceTest {
-    private lateinit var submissionRepository: SubmissionRepository
+    private lateinit var tusSubmissionQueries: TusSubmissionQueries
     private lateinit var uploadRepository: UploadRepository
     private val dsl: DSLContext = PostgresTestContainer.dsl
     private lateinit var notificationService: SubmissionNotificationService
@@ -29,7 +29,7 @@ class SubmissionStatusServiceTest {
     fun setup() {
         PostgresTestContainer.migrate()
         notificationService = SubmissionNotificationService(PostgresTestContainer.dataSource)
-        submissionRepository = SubmissionRepository(dsl)
+        tusSubmissionQueries = TusSubmissionQueries()
         uploadRepository = UploadRepository()
     }
 
@@ -46,7 +46,7 @@ class SubmissionStatusServiceTest {
     @Test
     fun `getSubmissionStatus returns empty state when no uploads exist`() {
         val submissionId = createMockSubmission(dsl)
-        val service = SubmissionService(uploadRepository, submissionRepository, dsl)
+        val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
 
         // When: retrieving submission status
         val result: SubmissionState = service.getSubmissionStatus(submissionId)
@@ -87,7 +87,7 @@ class SubmissionStatusServiceTest {
         val uploadId2 =
             createUpload(submissionId, "second.pdf")
 
-        val service = SubmissionService(uploadRepository, submissionRepository, dsl)
+        val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
 
         // When
         val result: SubmissionState = service.getSubmissionStatus(submissionId)

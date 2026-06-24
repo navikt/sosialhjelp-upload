@@ -8,10 +8,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.database.SubmissionRepository.SubmissionOwnedByAnotherUserException
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
+import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
@@ -22,7 +22,8 @@ import java.util.UUID
 
 class TusUploadService(
     private val tusUploadQueries: TusUploadQueries,
-    private val submissionRepository: SubmissionRepository,
+    private val tusSubmissionQueries: TusSubmissionQueries,
+    private val uploadProcessingQueries: UploadProcessingQueries,
     private val dsl: DSLContext,
     private val validator: UploadValidator,
     private val fiksClient: FiksClient,
@@ -53,22 +54,22 @@ class TusUploadService(
                 // service instances, preventing two submissions from reading the same Fiks
                 // state and deriving the same navEksternRefId.
                 if (fiksDigisosId != null) {
-                    submissionRepository.acquireAdvisoryLock(tx, fiksDigisosId)
+                    tusSubmissionQueries.acquireAdvisoryLock(tx, fiksDigisosId)
                 }
 
-                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)
+                val submissionId = tusSubmissionQueries.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)
 
                 val eksternRef =
                     // If navEksternRefId is already set on this submission (e.g. a second
                     // upload on the same contextId), reuse it without calling Fiks.
-                    submissionRepository.getNavEksternRefIdByContextId(tx, contextId)
+                    tusSubmissionQueries.getNavEksternRefIdByContextId(tx, contextId)
                         ?: navEksternRefId
                         ?: fiksDigisosId?.let {
                             // Read the highest navEksternRefId stored locally for this
                             // fiksDigisosId. This accounts for other in-flight submissions
                             // that have been created locally but not yet submitted to Fiks,
                             // and therefore don't appear in ettersendtInfoNAV.ettersendelser.
-                            val localMax = submissionRepository.getMaxNavEksternRefIdForFiksDigisosId(tx, it)
+                            val localMax = tusSubmissionQueries.getMaxNavEksternRefIdForFiksDigisosId(tx, it)
                             // We intentionally call Fiks inside a DB transaction to keep the
                             // lock → read-from-Fiks → write sequence atomic. The risk of
                             // holding a DB connection across a network call is accepted here
@@ -78,7 +79,7 @@ class TusUploadService(
                         }
                         ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
 
-                submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)
+                tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)
                 val uploadId = tusUploadQueries
                     .create(tx, submissionId, filename, size)
                     .also {
@@ -89,8 +90,7 @@ class TusUploadService(
                     ?: error("Failed to create upload record")
                 val validations = validator.validate(filename, fileSize = size)
                 if (validations.isNotEmpty()) {
-                    // Reuse processing queries for recording pre-upload validation errors
-                    no.nav.sosialhjelp.upload.upload.UploadProcessingQueries().addErrors(tx, uploadId, validations)
+                    uploadProcessingQueries.addErrors(tx, uploadId, validations)
                 }
                 uploadId
             }

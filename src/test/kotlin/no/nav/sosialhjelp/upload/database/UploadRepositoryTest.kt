@@ -21,7 +21,6 @@ import kotlin.test.Test
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UploadRepositoryTest {
-    private lateinit var submissionRepository: SubmissionRepository
     private lateinit var tusUploadQueries: TusUploadQueries
     private lateinit var uploadRepository: UploadRepository
     private lateinit var uploadRecoveryQueries: UploadRecoveryQueries
@@ -31,7 +30,6 @@ class UploadRepositoryTest {
     @BeforeAll
     fun setupDatabase() {
         PostgresTestContainer.migrate()
-        submissionRepository = SubmissionRepository(dsl)
         notificationServiceMock = mockk<SubmissionNotificationService>()
         tusUploadQueries = TusUploadQueries()
         uploadRepository = UploadRepository()

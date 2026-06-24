@@ -10,7 +10,6 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
@@ -43,7 +42,7 @@ import kotlin.test.assertTrue
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TusUploadServiceIntegrationTest {
     private lateinit var dsl: DSLContext
-    private lateinit var submissionRepository: SubmissionRepository
+    private lateinit var tusSubmissionQueries: TusSubmissionQueries
     private lateinit var tusUploadService: TusUploadService
     private lateinit var mellomlagringClient: MellomlagringClient
     private lateinit var encryptionService: EncryptionService
@@ -57,7 +56,7 @@ class TusUploadServiceIntegrationTest {
         PostgresTestContainer.migrate()
         dsl = PostgresTestContainer.dsl
 
-        submissionRepository = SubmissionRepository(dsl)
+        tusSubmissionQueries = TusSubmissionQueries()
         val tusUploadQueries = TusUploadQueries()
         val uploadProcessingQueries = UploadProcessingQueries()
 
@@ -88,7 +87,8 @@ class TusUploadServiceIntegrationTest {
         tusUploadService =
             TusUploadService(
                 tusUploadQueries = tusUploadQueries,
-                submissionRepository = submissionRepository,
+                tusSubmissionQueries = tusSubmissionQueries,
+                uploadProcessingQueries = uploadProcessingQueries,
                 dsl = dsl,
                 validator = validator,
                 fiksClient = fiksClient,
@@ -366,8 +366,8 @@ class TusUploadServiceIntegrationTest {
             tusUploadService.create(contextId1, "file1.pdf", 100L, personident, "token", fiksDigisosId, null)
             tusUploadService.create(contextId2, "file2.pdf", 100L, personident, "token", fiksDigisosId, null)
 
-            val ref1 = submissionRepository.getNavEksternRefIdByContextId(dsl.configuration(), contextId1)
-            val ref2 = submissionRepository.getNavEksternRefIdByContextId(dsl.configuration(), contextId2)
+            val ref1 = tusSubmissionQueries.getNavEksternRefIdByContextId(dsl.configuration(), contextId1)
+            val ref2 = tusSubmissionQueries.getNavEksternRefIdByContextId(dsl.configuration(), contextId2)
 
             assertNotNull(ref1)
             assertNotNull(ref2)

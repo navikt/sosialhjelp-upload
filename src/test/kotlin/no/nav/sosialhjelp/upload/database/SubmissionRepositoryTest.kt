@@ -3,19 +3,20 @@ package no.nav.sosialhjelp.upload.database
 import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import org.jooq.DSLContext
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SubmissionRepositoryTest {
-    private lateinit var repository: SubmissionRepository
+    private lateinit var tusSubmissionQueries: TusSubmissionQueries
     private val dsl: DSLContext = PostgresTestContainer.dsl
 
     @BeforeAll
     fun setup() {
         PostgresTestContainer.migrate()
-        repository = SubmissionRepository(dsl)
+        tusSubmissionQueries = TusSubmissionQueries()
     }
 
     @BeforeEach
@@ -29,7 +30,7 @@ class SubmissionRepositoryTest {
         runTest {
             val owner = "12345678910"
 
-            val submissionId = dsl.transactionResult { tx -> repository.getOrCreateSubmission(tx, "whatever", owner) }
+            val submissionId = dsl.transactionResult { tx -> tusSubmissionQueries.getOrCreateSubmission(tx, "whatever", owner) }
 
             dsl.transaction { config ->
                 val found =
@@ -49,8 +50,8 @@ class SubmissionRepositoryTest {
         runTest {
             val owner = "12345678910"
 
-            val first = dsl.transaction { it -> repository.getOrCreateSubmission(it, "whatever", owner) }
-            val second = dsl.transaction { it -> repository.getOrCreateSubmission(it, "whatever", owner) }
+            val first = dsl.transaction { it -> tusSubmissionQueries.getOrCreateSubmission(it, "whatever", owner) }
+            val second = dsl.transaction { it -> tusSubmissionQueries.getOrCreateSubmission(it, "whatever", owner) }
 
             assertEquals(first, second)
         }
@@ -62,16 +63,16 @@ class SubmissionRepositoryTest {
             val owner2 = "user2"
 
             dsl.transaction { it ->
-                repository.getOrCreateSubmission(it, "whatever", owner1)
+                tusSubmissionQueries.getOrCreateSubmission(it, "whatever", owner1)
             }
 
             val ex =
-                assertThrows<SubmissionRepository.SubmissionOwnedByAnotherUserException> {
+                assertThrows<TusSubmissionQueries.SubmissionOwnedByAnotherUserException> {
                     dsl.transaction { it ->
-                        repository.getOrCreateSubmission(it, "whatever", owner2)
+                        tusSubmissionQueries.getOrCreateSubmission(it, "whatever", owner2)
                     }
                 }
 
-            assertEquals(SubmissionRepository.SubmissionOwnedByAnotherUserException::class, ex::class)
+            assertEquals(TusSubmissionQueries.SubmissionOwnedByAnotherUserException::class, ex::class)
         }
 }

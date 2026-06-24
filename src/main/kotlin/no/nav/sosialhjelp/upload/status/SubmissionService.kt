@@ -3,7 +3,7 @@ package no.nav.sosialhjelp.upload.status
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
@@ -14,7 +14,7 @@ import java.util.*
 
 class SubmissionService(
     private val uploadRepository: UploadRepository,
-    private val submissionRepository: SubmissionRepository,
+    private val tusSubmissionQueries: TusSubmissionQueries,
     private val dsl: DSLContext,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -24,12 +24,12 @@ class SubmissionService(
     ): UUID {
         return withContext(ioDispatcher) {
             val existing = dsl.transactionResult { tx ->
-                submissionRepository.findSubmission(tx, contextId, personIdent)
+                tusSubmissionQueries.findSubmission(tx, contextId, personIdent)
             }
             if (existing != null) return@withContext existing
 
             dsl.transactionResult { tx ->
-                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent)
+                tusSubmissionQueries.getOrCreateSubmission(tx, contextId, personIdent)
             }
         }
     }

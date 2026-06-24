@@ -14,7 +14,7 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.SubmissionService
@@ -132,7 +132,10 @@ fun Application.module() {
         provide(FiksClient::class)
         provide(MellomlagringClient::class)
         provide(UploadRepository::class)
-        provide(SubmissionRepository::class)
+        provide(SubmissionQueries::class)
+        provide(no.nav.sosialhjelp.upload.tus.TusSubmissionQueries::class)
+        provide(no.nav.sosialhjelp.upload.action.EttersendelseSubmissionQueries::class)
+        provide(no.nav.sosialhjelp.upload.upload.SubmissionRetentionQueries::class)
         provide(no.nav.sosialhjelp.upload.tus.TusUploadQueries::class)
         provide(no.nav.sosialhjelp.upload.upload.UploadProcessingQueries::class)
         provide(no.nav.sosialhjelp.upload.upload.UploadRecoveryQueries::class)
