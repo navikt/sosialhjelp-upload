@@ -1,5 +1,3 @@
-@file:Suppress("LongMethod", "CyclomaticComplexMethod")
-
 package no.nav.sosialhjelp.upload.tus
 
 import io.ktor.http.HttpStatusCode
@@ -27,149 +25,149 @@ private const val PROXY_PATH_SOKNAD = "/sosialhjelp/soknad/api/upload-api"
 fun Route.configureTusRoutes(basePath: String) {
     val tusUploadService: TusUploadService by application.dependencies
 
-    options {
-        call.response.header("Tus-Resumable", TUS_RESUMABLE)
-        call.response.header("Tus-Version", TUS_VERSION)
-        call.response.header("Tus-Extension", TUS_EXTENSION)
-        call.response.header("Tus-Max-Size", MAX_CHUNK_SIZE.toString())
-        call.respond(HttpStatusCode.NoContent)
-    }
-
-    // Create a new upload
-    post {
-        val personident =
-            call.principal<JWTPrincipal>()?.subject
-                ?: return@post call.respond(HttpStatusCode.Unauthorized)
-        val token =
-            call.request.headers["Authorization"]?.removePrefix("Bearer ")
-                ?: return@post call.respond(HttpStatusCode.Unauthorized)
-
-        val tusResumable = call.request.header("Tus-Resumable")
-        if (tusResumable != TUS_RESUMABLE) {
-            call.response.header("Tus-Version", TUS_VERSION)
-            return@post call.respond(HttpStatusCode.PreconditionFailed)
-        }
-
-        val uploadLength =
-            call.request.header("Upload-Length")?.toLongOrNull()
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
-
-        val metadata = parseMetadata(call.request.header("Upload-Metadata"))
-        val filename =
-            metadata["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler filename")
-        val contextId =
-            metadata["contextId"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
-        val fiksDigisosId = metadata["fiksDigisosId"]
-        val navEksternRefId = metadata["navEksternRefId"]
-        val kategori = metadata["kategori"]
-        if (fiksDigisosId == null && navEksternRefId == null) {
-            return@post call.respond(
-                HttpStatusCode.BadRequest,
-                "Mangler fiksDigisosId eller navEksternRefId",
-            )
-        }
-        if (contextId.length > 2048) return@post call.respond(HttpStatusCode.BadRequest, "contextId for lang")
-        if (fiksDigisosId != null && fiksDigisosId.length > 255) {
-            return@post call.respond(
-                HttpStatusCode.BadRequest,
-                "fiksDigisosId for lang",
-            )
-        }
-
-        val uploadId =
-            try {
-                tusUploadService.create(
-                    contextId,
-                    filename,
-                    uploadLength,
-                    personident,
-                    token,
-                    fiksDigisosId,
-                    navEksternRefId,
-                    kategori,
-                )
-            } catch (_: UploadForbiddenException) {
-                return@post call.respond(HttpStatusCode.Forbidden)
-            }
-
-        val forwardedPrefix = call.request.header("x-forwarded-prefix")
-        val proxyPath =
-            forwardedPrefix ?: when {
-                fiksDigisosId != null -> PROXY_PATH_INNSYN
-                else -> PROXY_PATH_SOKNAD
-            }
-
-        call.response.header("Location", "$proxyPath$basePath/$uploadId")
-        call.response.header("Tus-Resumable", TUS_RESUMABLE)
-        call.respond(HttpStatusCode.Created)
-    }
+    options { tusOptions() }
+    post { tusPost(tusUploadService, basePath) }
 
     route("/{id}") {
-        // Ownership is verified here for all routes in this group.
-        // VerifiedUploadId and VerifiedPersonident are available in call.attributes after this runs.
         verifyUploadOwnership()
-
-        // Get current upload offset (resume support)
-        head {
-            val uploadId = call.attributes[VerifiedUploadId]
-
-            val (offset, size) =
-                runCatching { tusUploadService.getUploadInfo(uploadId) }.getOrElse {
-                    return@head call.respond(HttpStatusCode.NotFound)
-                }
-
-            call.response.header("Upload-Offset", offset.toString())
-            call.response.header("Upload-Length", size.toString())
-            call.response.header("Tus-Resumable", TUS_RESUMABLE)
-            call.response.header("Cache-Control", "no-store")
-            call.respond(HttpStatusCode.OK)
-        }
-
-        // Append a chunk
-        patch {
-            val uploadId = call.attributes[VerifiedUploadId]
-
-            val contentType = call.request.header("Content-Type")
-            if (contentType != "application/offset+octet-stream") {
-                return@patch call.respond(HttpStatusCode.UnsupportedMediaType)
-            }
-            val uploadOffset =
-                call.request.header("Upload-Offset")?.toLongOrNull()
-                    ?: return@patch call.respond(HttpStatusCode.BadRequest)
-
-            val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()
-            if (data.size > MAX_CHUNK_SIZE) {
-                return@patch call.respond(HttpStatusCode.PayloadTooLarge)
-            }
-
-            val newOffset =
-                runCatching {
-                    tusUploadService.appendChunk(uploadId, uploadOffset, data)
-                }.getOrElse { e ->
-                    when (e) {
-                        is OffsetMismatchException -> return@patch call.respond(HttpStatusCode.Conflict)
-                        else -> {
-                            environment.log.error("Error appending chunk to upload $uploadId", e)
-                            return@patch call.respond(HttpStatusCode.InternalServerError)
-                        }
-                    }
-                }
-
-            call.response.header("Upload-Offset", newOffset.toString())
-            call.response.header("Tus-Resumable", TUS_RESUMABLE)
-            call.respond(HttpStatusCode.NoContent)
-        }
-
-        // Terminate an upload
-        delete {
-            val uploadId = call.attributes[VerifiedUploadId]
-
-            runCatching { tusUploadService.delete(uploadId) }.getOrElse {
-                return@delete call.respond(HttpStatusCode.Forbidden)
-            }
-
-            call.response.header("Tus-Resumable", TUS_RESUMABLE)
-            call.respond(HttpStatusCode.NoContent)
-        }
+        head { tusHead(tusUploadService) }
+        patch { tusPatch(tusUploadService) }
+        delete { tusDelete(tusUploadService) }
     }
+}
+
+private suspend fun RoutingContext.tusOptions() {
+    call.response.header("Tus-Resumable", TUS_RESUMABLE)
+    call.response.header("Tus-Version", TUS_VERSION)
+    call.response.header("Tus-Extension", TUS_EXTENSION)
+    call.response.header("Tus-Max-Size", MAX_CHUNK_SIZE.toString())
+    call.respond(HttpStatusCode.NoContent)
+}
+
+@Suppress("ReturnCount", "CyclomaticComplexMethod")
+private suspend fun RoutingContext.tusPost(
+    tusUploadService: TusUploadService,
+    basePath: String,
+) {
+    val personident =
+        call.principal<JWTPrincipal>()?.subject
+            ?: return call.respond(HttpStatusCode.Unauthorized)
+    val token =
+        call.request.headers["Authorization"]?.removePrefix("Bearer ")
+            ?: return call.respond(HttpStatusCode.Unauthorized)
+
+    val tusResumable = call.request.header("Tus-Resumable")
+    if (tusResumable != TUS_RESUMABLE) {
+        call.response.header("Tus-Version", TUS_VERSION)
+        return call.respond(HttpStatusCode.PreconditionFailed)
+    }
+
+    val uploadLength =
+        call.request.header("Upload-Length")?.toLongOrNull()
+            ?: return call.respond(HttpStatusCode.BadRequest)
+
+    val metadata = parseMetadata(call.request.header("Upload-Metadata"))
+    val filename =
+        metadata["filename"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler filename")
+    val contextId =
+        metadata["contextId"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
+    val fiksDigisosId = metadata["fiksDigisosId"]
+    val navEksternRefId = metadata["navEksternRefId"]
+    val kategori = metadata["kategori"]
+
+    if (fiksDigisosId == null && navEksternRefId == null) {
+        return call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller navEksternRefId")
+    }
+    if (contextId.length > 2048) return call.respond(HttpStatusCode.BadRequest, "contextId for lang")
+    if (fiksDigisosId != null && fiksDigisosId.length > 255) {
+        return call.respond(HttpStatusCode.BadRequest, "fiksDigisosId for lang")
+    }
+
+    val uploadId =
+        try {
+            tusUploadService.create(
+                contextId,
+                filename,
+                uploadLength,
+                personident,
+                token,
+                fiksDigisosId,
+                navEksternRefId,
+                kategori,
+            )
+        } catch (_: UploadForbiddenException) {
+            return call.respond(HttpStatusCode.Forbidden)
+        }
+
+    val forwardedPrefix = call.request.header("x-forwarded-prefix")
+    val proxyPath =
+        forwardedPrefix ?: when {
+            fiksDigisosId != null -> PROXY_PATH_INNSYN
+            else -> PROXY_PATH_SOKNAD
+        }
+
+    call.response.header("Location", "$proxyPath$basePath/$uploadId")
+    call.response.header("Tus-Resumable", TUS_RESUMABLE)
+    call.respond(HttpStatusCode.Created)
+}
+
+private suspend fun RoutingContext.tusHead(tusUploadService: TusUploadService) {
+    val uploadId = call.attributes[VerifiedUploadId]
+
+    val (offset, size) =
+        runCatching { tusUploadService.getUploadInfo(uploadId) }.getOrElse {
+            return call.respond(HttpStatusCode.NotFound)
+        }
+
+    call.response.header("Upload-Offset", offset.toString())
+    call.response.header("Upload-Length", size.toString())
+    call.response.header("Tus-Resumable", TUS_RESUMABLE)
+    call.response.header("Cache-Control", "no-store")
+    call.respond(HttpStatusCode.OK)
+}
+
+@Suppress("ReturnCount")
+private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) {
+    val uploadId = call.attributes[VerifiedUploadId]
+
+    val contentType = call.request.header("Content-Type")
+    if (contentType != "application/offset+octet-stream") {
+        return call.respond(HttpStatusCode.UnsupportedMediaType)
+    }
+    val uploadOffset =
+        call.request.header("Upload-Offset")?.toLongOrNull()
+            ?: return call.respond(HttpStatusCode.BadRequest)
+
+    val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()
+    if (data.size > MAX_CHUNK_SIZE) {
+        return call.respond(HttpStatusCode.PayloadTooLarge)
+    }
+
+    val newOffset =
+        runCatching {
+            tusUploadService.appendChunk(uploadId, uploadOffset, data)
+        }.getOrElse { e ->
+            when (e) {
+                is OffsetMismatchException -> return call.respond(HttpStatusCode.Conflict)
+                else -> {
+                    environment.log.error("Error appending chunk to upload $uploadId", e)
+                    return call.respond(HttpStatusCode.InternalServerError)
+                }
+            }
+        }
+
+    call.response.header("Upload-Offset", newOffset.toString())
+    call.response.header("Tus-Resumable", TUS_RESUMABLE)
+    call.respond(HttpStatusCode.NoContent)
+}
+
+private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService) {
+    val uploadId = call.attributes[VerifiedUploadId]
+
+    runCatching { tusUploadService.delete(uploadId) }.getOrElse {
+        return call.respond(HttpStatusCode.Forbidden)
+    }
+
+    call.response.header("Tus-Resumable", TUS_RESUMABLE)
+    call.respond(HttpStatusCode.NoContent)
 }

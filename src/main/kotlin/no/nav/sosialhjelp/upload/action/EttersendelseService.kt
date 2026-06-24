@@ -1,4 +1,4 @@
-@file:Suppress("LongParameterList", "LongMethod")
+@file:Suppress("LongParameterList")
 
 package no.nav.sosialhjelp.upload.action
 
@@ -58,23 +58,30 @@ class EttersendelseService(
 
         val uploads =
             withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    uploadRepository.getUploads(tx, submissionId)
-                }
+                dsl.transactionResult { tx -> uploadRepository.getUploads(tx, submissionId) }
             }
 
         val violations = validateSubmissionUploads(uploads)
-        if (violations.isNotEmpty()) {
-            throw SubmissionValidationException(violations)
-        }
+        if (violations.isNotEmpty()) throw SubmissionValidationException(violations)
 
+        generateAndUploadPdf(metadata, uploads, navEksternRefId, personIdent)
+
+        val filer = buildFilerList(uploads)
+
+        return submitToFiks(metadata, fiksDigisosId, kommunenummer, navEksternRefId, token, filer, submissionId)
+    }
+
+    private suspend fun generateAndUploadPdf(
+        metadata: Metadata,
+        uploads: List<no.nav.sosialhjelp.upload.upload.Upload>,
+        navEksternRefId: String,
+        personIdent: String,
+    ) {
         val ettersendelsePdf =
             EttersendelsePdfGenerator.generate(
                 PdfMetadata(
                     metadata.type,
-                    uploads.mapNotNull {
-                        it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) }
-                    },
+                    uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } },
                 ),
                 personIdent,
             )
@@ -84,14 +91,23 @@ class EttersendelseService(
             "application/pdf",
             encryptionService.encryptBytes(ettersendelsePdf),
         )
+    }
 
-        val filer =
-            uploads.mapNotNull {
-                if (it.mellomlagringFilnavn == null || it.sha512 == null) {
-                    return@mapNotNull null
-                }
-                Fil(it.mellomlagringFilnavn, it.sha512)
-            }
+    private fun buildFilerList(uploads: List<no.nav.sosialhjelp.upload.upload.Upload>): List<Fil> =
+        uploads.mapNotNull { upload ->
+            if (upload.mellomlagringFilnavn == null || upload.sha512 == null) return@mapNotNull null
+            Fil(upload.mellomlagringFilnavn, upload.sha512)
+        }
+
+    private suspend fun submitToFiks(
+        metadata: Metadata,
+        fiksDigisosId: String,
+        kommunenummer: String,
+        navEksternRefId: String,
+        token: String,
+        filer: List<Fil>,
+        submissionId: UUID,
+    ): Boolean {
         val (response, duration) =
             try {
                 measureTimedValue {
@@ -110,10 +126,7 @@ class EttersendelseService(
                         "— treating as success",
                 )
                 meterRegistry.counter("fiks.submission.already_exists").increment()
-                withContext(ioDispatcher) {
-                    dsl.transactionResult { tx -> submissionQueries.cleanup(tx, submissionId) }
-                }
-                notificationService.notifyDeleted(submissionId)
+                cleanupSubmission(submissionId)
                 return true
             }
 
@@ -121,14 +134,16 @@ class EttersendelseService(
         meterRegistry.timer("fiks.submission", "result", result).record(duration.toJavaDuration())
 
         if (response.status.isSuccess()) {
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    submissionQueries.cleanup(tx, submissionId)
-                }
-            }
-            notificationService.notifyDeleted(submissionId)
+            cleanupSubmission(submissionId)
             return true
         }
         return false
+    }
+
+    private suspend fun cleanupSubmission(submissionId: UUID) {
+        withContext(ioDispatcher) {
+            dsl.transactionResult { tx -> submissionQueries.cleanup(tx, submissionId) }
+        }
+        notificationService.notifyDeleted(submissionId)
     }
 }
