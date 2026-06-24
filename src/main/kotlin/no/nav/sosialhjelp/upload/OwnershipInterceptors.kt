@@ -13,7 +13,7 @@ import io.ktor.util.AttributeKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import org.jooq.DSLContext
 import java.util.UUID
 
@@ -25,7 +25,7 @@ val VerifiedPersonident = AttributeKey<String>("VerifiedPersonident")
 
 private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     createRouteScopedPlugin("VerifySubmissionOwnership") {
-        val submissionRepository: SubmissionRepository by application.dependencies
+        val submissionQueries: SubmissionQueries by application.dependencies
 
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
@@ -43,7 +43,7 @@ private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = 
             }
 
             val owned = withContext(ioDispatcher) {
-                submissionRepository.isOwnedByUser(submissionId, personident)
+                submissionQueries.isOwnedByUser(submissionId, personident)
             }
             if (!owned) {
                 call.respond(HttpStatusCode.NotFound)
@@ -76,7 +76,7 @@ fun Route.verifySubmissionOwnership(ioDispatcher: CoroutineDispatcher = Dispatch
 private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     createRouteScopedPlugin("VerifyNavEksternRefIdOwnership") {
         val dsl: DSLContext by application.dependencies
-        val submissionRepository: SubmissionRepository by application.dependencies
+        val submissionQueries: SubmissionQueries by application.dependencies
 
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
@@ -95,7 +95,7 @@ private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatch
 
             val owned = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
                 }
             }
             if (!owned) {
@@ -114,7 +114,7 @@ private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatch
 private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     createRouteScopedPlugin("VerifyNavEksternRefIdOwnershipByPid") {
         val dsl: DSLContext by application.dependencies
-        val submissionRepository: SubmissionRepository by application.dependencies
+        val submissionQueries: SubmissionQueries by application.dependencies
 
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
@@ -133,7 +133,7 @@ private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDis
 
             val owned = withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
+                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)
                 }
             }
             if (!owned) {
