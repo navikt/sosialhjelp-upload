@@ -1,3 +1,5 @@
+@file:Suppress("TooGenericExceptionCaught", "NestedBlockDepth")
+
 package no.nav.sosialhjelp.upload.upload
 
 import io.micrometer.core.instrument.MeterRegistry
@@ -50,14 +52,18 @@ class UploadRecoveryService(
         val scope = span.makeCurrent()
         try {
             val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
-            val staleUploads = withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    uploadRecoveryQueries.markStaleProcessingAsFailed(tx, cutoff)
+            val staleUploads =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx ->
+                        uploadRecoveryQueries.markStaleProcessingAsFailed(tx, cutoff)
+                    }
                 }
-            }
             span.setAttribute("upload.recovery.count", staleUploads.size.toLong())
             if (staleUploads.isNotEmpty()) {
-                log.warn("Recovered ${staleUploads.size} upload(s) stuck in PROCESSING (older than ${PROCESSING_TIMEOUT_MINUTES}m)")
+                log.warn(
+                    "Recovered ${staleUploads.size} upload(s) stuck in PROCESSING " +
+                        "(older than ${PROCESSING_TIMEOUT_MINUTES}m)",
+                )
                 meterRegistry.counter("upload.recovery", "reason", "stuck_processing")
                     .increment(staleUploads.size.toDouble())
                 staleUploads.forEach { info ->
@@ -80,14 +86,18 @@ class UploadRecoveryService(
         val scope = span.makeCurrent()
         try {
             val cutoff = OffsetDateTime.now().minus(PENDING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
-            val staleUploads = withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
+            val staleUploads =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx ->
+                        uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
+                    }
                 }
-            }
             span.setAttribute("upload.recovery.count", staleUploads.size.toLong())
             if (staleUploads.isNotEmpty()) {
-                log.info("Cleaned up ${staleUploads.size} halted PENDING upload(s) (stalled for >${PENDING_TIMEOUT_MINUTES}m)")
+                log.info(
+                    "Cleaned up ${staleUploads.size} halted PENDING upload(s) " +
+                        "(stalled for >${PENDING_TIMEOUT_MINUTES}m)",
+                )
                 meterRegistry.counter("upload.recovery", "reason", "halted_pending")
                     .increment(staleUploads.size.toDouble())
                 staleUploads.forEach { info ->

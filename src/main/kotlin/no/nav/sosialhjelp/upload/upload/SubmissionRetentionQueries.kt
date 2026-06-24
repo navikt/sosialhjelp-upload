@@ -11,7 +11,6 @@ import java.util.UUID
  * DB queries for the submission retention job: finding stale submissions to clean up.
  */
 class SubmissionRetentionQueries {
-
     data class StaleSubmission(val id: UUID, val navEksternRefId: String)
 
     /**

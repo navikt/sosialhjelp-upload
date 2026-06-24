@@ -15,7 +15,10 @@ class FileConversionService(
      * Returns the file unchanged if it is already a supported direct-store format.
      * Otherwise converts to PDF via Gotenberg and returns the new filename + converted bytes.
      */
-    suspend fun convertIfNeeded(filename: String, data: ByteArray): Pair<String, ByteArray> {
+    suspend fun convertIfNeeded(
+        filename: String,
+        data: ByteArray,
+    ): Pair<String, ByteArray> {
         val extension = File(filename).extension.lowercase()
         if (extension in listOf("pdf", "jpeg", "jpg", "png")) {
             return filename to data

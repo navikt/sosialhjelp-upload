@@ -13,20 +13,28 @@ class GcsBucketStorage(
     private val bucketName: String,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ChunkStorage {
-    override suspend fun writeChunk(key: String, data: ByteArray) {
+    override suspend fun writeChunk(
+        key: String,
+        data: ByteArray,
+    ) {
         withContext(ioDispatcher) {
             val blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, key)).build()
             storage.create(blobInfo, data)
         }
     }
 
-    override suspend fun composeChunks(sourceKeys: List<String>, destKey: String) {
+    override suspend fun composeChunks(
+        sourceKeys: List<String>,
+        destKey: String,
+    ) {
         withContext(ioDispatcher) {
             val destBlobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, destKey)).build()
-            val composeRequest = Storage.ComposeRequest.newBuilder()
-                .addSource(*sourceKeys.toTypedArray())
-                .setTarget(destBlobInfo)
-                .build()
+            val composeRequest =
+                @Suppress("SpreadOperator")
+                Storage.ComposeRequest.newBuilder()
+                    .addSource(*sourceKeys.toTypedArray())
+                    .setTarget(destBlobInfo)
+                    .build()
             storage.compose(composeRequest)
         }
     }

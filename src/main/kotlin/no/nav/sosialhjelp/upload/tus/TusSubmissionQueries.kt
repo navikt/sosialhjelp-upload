@@ -10,7 +10,6 @@ import java.util.UUID
  * finding or creating submissions, managing navEksternRefId, and advisory locking.
  */
 class TusSubmissionQueries {
-
     class SubmissionOwnedByAnotherUserException : RuntimeException()
 
     /**
@@ -18,7 +17,11 @@ class TusSubmissionQueries {
      * Throws [SubmissionOwnedByAnotherUserException] if the contextId is owned by someone else.
      * Returns null if no submission exists yet.
      */
-    fun findSubmission(tx: Configuration, contextId: String, personIdent: String): UUID? {
+    fun findSubmission(
+        tx: Configuration,
+        contextId: String,
+        personIdent: String,
+    ): UUID? {
         if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
             throw SubmissionOwnedByAnotherUserException()
         }
@@ -50,18 +53,19 @@ class TusSubmissionQueries {
             throw SubmissionOwnedByAnotherUserException()
         }
 
-        val insertedId = tx
-            .dsl()
-            .insertInto(SUBMISSION)
-            .set(SUBMISSION.ID, UUID.randomUUID())
-            .set(SUBMISSION.OWNER_IDENT, personIdent)
-            .set(SUBMISSION.CONTEXT_ID, contextId)
-            .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
-            .set(SUBMISSION.KATEGORI, kategori)
-            .onDuplicateKeyIgnore()
-            .returning(SUBMISSION.ID)
-            .fetchOne()
-            ?.get(SUBMISSION.ID)
+        val insertedId =
+            tx
+                .dsl()
+                .insertInto(SUBMISSION)
+                .set(SUBMISSION.ID, UUID.randomUUID())
+                .set(SUBMISSION.OWNER_IDENT, personIdent)
+                .set(SUBMISSION.CONTEXT_ID, contextId)
+                .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
+                .set(SUBMISSION.KATEGORI, kategori)
+                .onDuplicateKeyIgnore()
+                .returning(SUBMISSION.ID)
+                .fetchOne()
+                ?.get(SUBMISSION.ID)
 
         if (insertedId != null) return insertedId
 
@@ -110,13 +114,20 @@ class TusSubmissionQueries {
      * The key is derived by XOR-ing the two 64-bit halves of the UUID, giving a
      * collision-free mapping within the UUID space.
      */
-    fun acquireAdvisoryLock(tx: Configuration, fiksDigisosId: String) {
+    fun acquireAdvisoryLock(
+        tx: Configuration,
+        fiksDigisosId: String,
+    ) {
         val uuid = UUID.fromString(fiksDigisosId)
         val key = uuid.mostSignificantBits xor uuid.leastSignificantBits
         tx.dsl().query("SELECT pg_advisory_xact_lock({0})", param("key", key)).execute()
     }
 
-    fun setNavEksternRefId(tx: Configuration, submissionId: UUID, navEksternRefId: String) {
+    fun setNavEksternRefId(
+        tx: Configuration,
+        submissionId: UUID,
+        navEksternRefId: String,
+    ) {
         tx.dsl()
             .update(SUBMISSION)
             .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
@@ -124,7 +135,10 @@ class TusSubmissionQueries {
             .execute()
     }
 
-    fun getNavEksternRefIdByContextId(tx: Configuration, contextId: String): String? =
+    fun getNavEksternRefIdByContextId(
+        tx: Configuration,
+        contextId: String,
+    ): String? =
         tx.dsl()
             .select(SUBMISSION.NAV_EKSTERN_REF_ID)
             .from(SUBMISSION)
@@ -139,7 +153,10 @@ class TusSubmissionQueries {
      * Used to seed the counter when generating a new navEksternRefId so that in-flight
      * submissions that haven't been submitted to Fiks yet are accounted for.
      */
-    fun getMaxNavEksternRefIdForFiksDigisosId(tx: Configuration, fiksDigisosId: String): String? =
+    fun getMaxNavEksternRefIdForFiksDigisosId(
+        tx: Configuration,
+        fiksDigisosId: String,
+    ): String? =
         tx.dsl()
             .select(SUBMISSION.NAV_EKSTERN_REF_ID)
             .from(SUBMISSION)

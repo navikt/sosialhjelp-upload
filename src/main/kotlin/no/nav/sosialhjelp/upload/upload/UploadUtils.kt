@@ -22,7 +22,10 @@ fun getSha512(data: ByteArray): String {
  *   "document.pdf"  + UUID b1f7f6d1-... → "document-b1f7f6d1.pdf"
  *   "a".repeat(60) + ".pdf" → "a".repeat(50) + "-b1f7f6d1.pdf"
  */
-internal fun makeUniqueMellomlagringFilename(filename: String, uploadId: UUID): String {
+internal fun makeUniqueMellomlagringFilename(
+    filename: String,
+    uploadId: UUID,
+): String {
     val file = File(filename)
     val extension = file.extension
     val baseName = file.nameWithoutExtension.take(50)

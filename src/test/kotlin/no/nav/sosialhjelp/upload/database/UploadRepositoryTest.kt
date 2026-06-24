@@ -38,7 +38,7 @@ class UploadRepositoryTest {
 
     @BeforeEach
     fun cleanup() {
-        dsl.transaction { it ->
+        dsl.transaction {
             it.dsl().deleteFrom(SUBMISSION).execute()
         }
     }
@@ -69,11 +69,11 @@ class UploadRepositoryTest {
     fun `test getUploadsByDocumentId returns correct uploads`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId1 = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "file1.txt", 10L) }
-        val uploadId2 = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "file2.txt", 190L) }
+        val uploadId1 = dsl.transactionResult { tusUploadQueries.create(it, submissionId, "file1.txt", 10L) }
+        val uploadId2 = dsl.transactionResult { tusUploadQueries.create(it, submissionId, "file2.txt", 190L) }
         // Create an upload for a different submission to ensure filtering works.
         val otherSubmissionId = TestUtils.createMockSubmission(dsl)
-        dsl.transaction { it -> tusUploadQueries.create(it, otherSubmissionId, "otherfile.txt", 19L) }
+        dsl.transaction { tusUploadQueries.create(it, otherSubmissionId, "otherfile.txt", 19L) }
 
         val uploads =
             dsl
@@ -89,8 +89,14 @@ class UploadRepositoryTest {
     fun `test getSubmissionIdFromUploadId returns correct submission id`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "file.txt", 10L) } ?: error("Ingen uploadId")
-        val retrievedSubmissionId = dsl.transactionResult { it -> tusUploadQueries.getSubmissionIdFromUploadId(it, uploadId) }
+        val uploadId =
+            dsl.transactionResult {
+                tusUploadQueries.create(it, submissionId, "file.txt", 10L)
+            } ?: error("Ingen uploadId")
+        val retrievedSubmissionId =
+            dsl.transactionResult {
+                tusUploadQueries.getSubmissionIdFromUploadId(it, uploadId)
+            }
         assertEquals(submissionId, retrievedSubmissionId)
     }
 
@@ -98,38 +104,45 @@ class UploadRepositoryTest {
     fun `test notifyChange does not throw`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { it -> tusUploadQueries.create(it, submissionId, "notify.txt", 10L) } ?: error("Ingen uploadId")
+        val uploadId =
+            dsl.transactionResult {
+                tusUploadQueries.create(it, submissionId, "notify.txt", 10L)
+            } ?: error("Ingen uploadId")
 
         // notifyChange now sends pg_notify within the transaction; just verify it doesn't throw
-        dsl.transaction { it -> UploadNotifications.notifyChange(it, uploadId) }
+        dsl.transaction { UploadNotifications.notifyChange(it, uploadId) }
     }
 
     @Test
     fun `markStaleProcessingAsFailed marks stuck uploads as failed`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { tx ->
-            tusUploadQueries.create(tx, submissionId, "stuck.txt", 100L)
-        } ?: error("No uploadId")
+        val uploadId =
+            dsl.transactionResult { tx ->
+                tusUploadQueries.create(tx, submissionId, "stuck.txt", 100L)
+            } ?: error("No uploadId")
 
         // Set PROCESSING state with an old updated_at
         dsl.execute(
-            "UPDATE upload SET processing_status = 'PROCESSING', updated_at = NOW() - INTERVAL '10 minutes' WHERE id = ?",
+            "UPDATE upload SET processing_status = 'PROCESSING', updated_at = NOW() - INTERVAL '10 minutes'" +
+                " WHERE id = ?",
             uploadId,
         )
 
         val cutoff = java.time.OffsetDateTime.now()
-        val staleUploads = dsl.transactionResult { tx ->
-            uploadRecoveryQueries.markStaleProcessingAsFailed(tx, cutoff)
-        }
+        val staleUploads =
+            dsl.transactionResult { tx ->
+                uploadRecoveryQueries.markStaleProcessingAsFailed(tx, cutoff)
+            }
 
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
         dsl.transaction { tx ->
-            val record = tx.dsl()
-                .select(UPLOAD.PROCESSING_STATUS)
-                .from(UPLOAD)
-                .where(UPLOAD.ID.eq(uploadId))
-                .fetchSingle()
+            val record =
+                tx.dsl()
+                    .select(UPLOAD.PROCESSING_STATUS)
+                    .from(UPLOAD)
+                    .where(UPLOAD.ID.eq(uploadId))
+                    .fetchSingle()
             assertEquals("FAILED", record[UPLOAD.PROCESSING_STATUS])
         }
     }
@@ -138,9 +151,10 @@ class UploadRepositoryTest {
     fun `markHaltedPendingAsFailed clears stalled uploads`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { tx ->
-            tusUploadQueries.create(tx, submissionId, "halted.txt", 100L)
-        } ?: error("No uploadId")
+        val uploadId =
+            dsl.transactionResult { tx ->
+                tusUploadQueries.create(tx, submissionId, "halted.txt", 100L)
+            } ?: error("No uploadId")
 
         // Set upload_offset > 0 and old updated_at
         dsl.execute(
@@ -149,17 +163,19 @@ class UploadRepositoryTest {
         )
 
         val cutoff = java.time.OffsetDateTime.now()
-        val staleUploads = dsl.transactionResult { tx ->
-            uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
-        }
+        val staleUploads =
+            dsl.transactionResult { tx ->
+                uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
+            }
 
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
         dsl.transaction { tx ->
-            val record = tx.dsl()
-                .select(UPLOAD.PROCESSING_STATUS)
-                .from(UPLOAD)
-                .where(UPLOAD.ID.eq(uploadId))
-                .fetchSingle()
+            val record =
+                tx.dsl()
+                    .select(UPLOAD.PROCESSING_STATUS)
+                    .from(UPLOAD)
+                    .where(UPLOAD.ID.eq(uploadId))
+                    .fetchSingle()
             assertEquals("FAILED", record[UPLOAD.PROCESSING_STATUS])
         }
     }
@@ -168,9 +184,10 @@ class UploadRepositoryTest {
     fun `markHaltedPendingAsFailed marks uploads with zero offset as failed`() {
         val submissionId = TestUtils.createMockSubmission(dsl)
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
-        val uploadId = dsl.transactionResult { tx ->
-            tusUploadQueries.create(tx, submissionId, "never-started.txt", 100L)
-        } ?: error("No uploadId")
+        val uploadId =
+            dsl.transactionResult { tx ->
+                tusUploadQueries.create(tx, submissionId, "never-started.txt", 100L)
+            } ?: error("No uploadId")
 
         // upload_offset stays 0 (no chunks received), just set old updated_at
         dsl.execute(
@@ -179,17 +196,19 @@ class UploadRepositoryTest {
         )
 
         val cutoff = java.time.OffsetDateTime.now()
-        val staleUploads = dsl.transactionResult { tx ->
-            uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
-        }
+        val staleUploads =
+            dsl.transactionResult { tx ->
+                uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
+            }
 
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
         dsl.transaction { tx ->
-            val record = tx.dsl()
-                .select(UPLOAD.PROCESSING_STATUS)
-                .from(UPLOAD)
-                .where(UPLOAD.ID.eq(uploadId))
-                .fetchSingle()
+            val record =
+                tx.dsl()
+                    .select(UPLOAD.PROCESSING_STATUS)
+                    .from(UPLOAD)
+                    .where(UPLOAD.ID.eq(uploadId))
+                    .fetchSingle()
             assertEquals("FAILED", record[UPLOAD.PROCESSING_STATUS])
         }
     }

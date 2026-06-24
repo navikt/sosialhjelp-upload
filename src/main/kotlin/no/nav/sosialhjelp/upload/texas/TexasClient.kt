@@ -31,6 +31,7 @@ class TexasClient(
     }
 
     @Volatile private var cachedToken: String? = null
+
     @Volatile private var tokenExpiresAt: Instant = Instant.MIN
 
     suspend fun getMaskinportenToken(): String {
@@ -49,6 +50,8 @@ class TexasClient(
                     contentType(ContentType.Application.Json)
                     setBody(maskinportenParams)
                 }
+
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
         val body =
             try {
                 response.body<TokenResponse.Success>()
@@ -61,13 +64,18 @@ class TexasClient(
             tokenExpiresAt = Instant.now().plusSeconds(body.expiresInSeconds.toLong() - 30)
             return body.accessToken
         } else {
-            logger.error("Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}")
-            throw RuntimeException("Failed to get token from Texas")
+            logger.error(
+                "Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}",
+            )
+            throw TexasTokenException("Failed to get token from Texas")
         }
     }
 }
 
-private val maskinportenParams: Map<String, String> = mapOf("identity_provider" to "maskinporten", "target" to "ks:fiks")
+class TexasTokenException(message: String) : RuntimeException(message)
+
+private val maskinportenParams: Map<String, String> =
+    mapOf("identity_provider" to "maskinporten", "target" to "ks:fiks")
 
 @Serializable
 sealed class TokenResponse {

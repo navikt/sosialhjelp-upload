@@ -1,9 +1,14 @@
+@file:Suppress("TooGenericExceptionCaught", "TooGenericExceptionThrown", "LongParameterList")
+
 package no.nav.sosialhjelp.upload.action.fiks
 
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -12,16 +17,12 @@ import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Serializer
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
@@ -56,9 +57,10 @@ class FiksClient(
                 jackson()
             }
             install(Logging) {
-                logger = object : Logger {
-                    override fun log(message: String) = this@FiksClient.logger.info(message)
-                }
+                logger =
+                    object : Logger {
+                        override fun log(message: String) = this@FiksClient.logger.info(message)
+                    }
                 level = LogLevel.INFO
             }
         }
@@ -71,9 +73,10 @@ class FiksClient(
                 json()
             }
             install(Logging) {
-                logger = object : Logger {
-                    override fun log(message: String) = this@FiksClient.logger.info(message)
-                }
+                logger =
+                    object : Logger {
+                        override fun log(message: String) = this@FiksClient.logger.info(message)
+                    }
                 level = LogLevel.INFO
             }
         }
@@ -115,7 +118,7 @@ class FiksClient(
                     }.apply {
                         if (!status.isSuccess()) {
                             logger.error("Feil ved henting av public key fra dokumentlager: $status")
-                            throw Exception("Feil ved henting av public key fra dokumentlager: $status")
+                            throw FiksException("Feil ved henting av public key fra dokumentlager: $status")
                         }
                     }.bodyAsChannel()
                     .also {
@@ -141,17 +144,18 @@ class FiksClient(
         withContext(ioDispatcher) {
             val vedleggJson =
                 VedleggSpesifikasjon(
-                    vedlegg = listOf(
-                        Vedlegg(
-                            type = metadata.type,
-                            tilleggsinfo = metadata.tilleggsinfo,
-                            hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },
-                            hendelseReferanse = metadata.hendelsereferanse,
-                            status = Vedlegg.Status.LastetOpp,
-                            filer = filer,
-                            klageId = null
-                        )
-                    )
+                    vedlegg =
+                        listOf(
+                            Vedlegg(
+                                type = metadata.type,
+                                tilleggsinfo = metadata.tilleggsinfo,
+                                hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },
+                                hendelseReferanse = metadata.hendelsereferanse,
+                                status = Vedlegg.Status.LastetOpp,
+                                filer = filer,
+                                klageId = null,
+                            ),
+                        ),
                 )
             val formData =
                 formData {
@@ -198,8 +202,7 @@ class FiksClient(
     ): DigisosSak =
         withContext(ioDispatcher) {
             jacksonClient
-                .get(digisosSakUrl(id))
-                {
+                .get(digisosSakUrl(id)) {
                     headers {
                         integrasjonsid?.let {
                             append("IntegrasjonId", integrasjonsid)
@@ -211,7 +214,11 @@ class FiksClient(
                 }.body()
         }
 
-    suspend fun getNewNavEksternRefId(fiksDigisosId: String, token: String, localMax: String? = null): String {
+    suspend fun getNewNavEksternRefId(
+        fiksDigisosId: String,
+        token: String,
+        localMax: String? = null,
+    ): String {
         val digisosSak = getSak(fiksDigisosId, token)
         return lagNavEksternRefId(digisosSak, localMax)
     }
@@ -219,7 +226,10 @@ class FiksClient(
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-internal fun lagNavEksternRefId(digisosSak: DigisosSak, localMax: String? = null): String {
+internal fun lagNavEksternRefId(
+    digisosSak: DigisosSak,
+    localMax: String? = null,
+): String {
     val remoteMax: String? =
         digisosSak.ettersendtInfoNAV
             ?.ettersendelser
@@ -244,7 +254,6 @@ internal fun lagIdSuffix(previousId: String): String {
     return suffix.toString().padStart(4, '0')
 }
 
-
 class EttersendelseAlreadyExistsException(
     val navEksternRefId: String,
     val fiksDigisosId: String,
@@ -265,14 +274,17 @@ data class Vedlegg(
     val hendelseReferanse: String?,
 ) {
     enum class Status {
-        LastetOpp, VedleggKreves, VedleggAlleredeSendt
+        LastetOpp,
+        VedleggKreves,
+        VedleggAlleredeSendt,
     }
 
     enum class HendelseType(val value: String) {
         DOKUMENTASJON_ETTERSPURT("dokumentasjonEtterspurt"),
         DOKUMENTASJONKRAV("dokumentasjonkrav"),
         SOKNAD("soknad"),
-        BRUKER("bruker");
+        BRUKER("bruker"),
+        ;
 
         companion object {
             fun fromValue(value: String): HendelseType =
@@ -291,3 +303,5 @@ data class Vedlegg(
 data class VedleggSpesifikasjon(
     val vedlegg: List<Vedlegg>,
 )
+
+class FiksException(message: String) : RuntimeException(message)

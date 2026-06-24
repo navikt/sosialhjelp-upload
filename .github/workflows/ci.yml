@@ -25,6 +25,12 @@ jobs:
       - name: Grant Gradle permissions
         run: chmod +x gradlew
 
+      - name: Lint
+        env:
+          ORG_GRADLE_PROJECT_githubUser: x-access-token
+          ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew ktlintCheck detekt --no-daemon
+
       - name: Build and test with coverage
         env:
           ORG_GRADLE_PROJECT_githubUser: x-access-token

@@ -12,6 +12,7 @@ data class SubmissionState(
     val status: Status,
 ) {
     enum class Status {
-        DELETED, ACTIVE
+        DELETED,
+        ACTIVE,
     }
 }

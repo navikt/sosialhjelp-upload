@@ -35,8 +35,9 @@ fun Route.configureActionRoutes() {
         post("/submit") {
             val submissionId = call.attributes[VerifiedSubmissionId]
             val input = call.receive<SubmitInput>()
-            val fiksDigisosId = input.fiksDigisosId
-                ?: return@post call.respondText("fiksDigisosId is required", status = HttpStatusCode.BadRequest)
+            val fiksDigisosId =
+                input.fiksDigisosId
+                    ?: return@post call.respondText("fiksDigisosId is required", status = HttpStatusCode.BadRequest)
 
             val result =
                 ettersendelseService.upload(

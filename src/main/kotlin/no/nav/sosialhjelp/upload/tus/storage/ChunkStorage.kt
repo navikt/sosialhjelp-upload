@@ -9,14 +9,20 @@ package no.nav.sosialhjelp.upload.tus.storage
  */
 interface ChunkStorage {
     /** Write a chunk. Key format: `uploads/{uploadId}-chunk-{offset}`. */
-    suspend fun writeChunk(key: String, data: ByteArray)
+    suspend fun writeChunk(
+        key: String,
+        data: ByteArray,
+    )
 
     /**
      * Compose multiple source objects into a single destination object.
      * Sources must be provided in order. After composition the caller is responsible
      * for deleting the source objects.
      */
-    suspend fun composeChunks(sourceKeys: List<String>, destKey: String)
+    suspend fun composeChunks(
+        sourceKeys: List<String>,
+        destKey: String,
+    )
 
     /** Read all bytes from an object. Used after compose to retrieve the assembled file. */
     suspend fun readObject(key: String): ByteArray

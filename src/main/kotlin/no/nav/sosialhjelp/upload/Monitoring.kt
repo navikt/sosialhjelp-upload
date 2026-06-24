@@ -6,34 +6,36 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import no.nav.sosialhjelp.upload.tus.parseMetadata
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+import no.nav.sosialhjelp.upload.tus.parseMetadata
 import org.slf4j.event.Level
 
 fun Application.configureMonitoring(registry: PrometheusMeterRegistry) {
     install(MicrometerMetrics) {
         this.registry = registry
-        distributionStatisticConfig = DistributionStatisticConfig.Builder()
-            .percentilesHistogram(true)
-            .percentiles(0.5, 0.95, 0.99)
-            .build()
-        meterBinders = listOf(
-            JvmMemoryMetrics(),
-            JvmGcMetrics(),
-            JvmThreadMetrics(),
-            ProcessorMetrics(),
-        )
+        distributionStatisticConfig =
+            DistributionStatisticConfig.Builder()
+                .percentilesHistogram(true)
+                .percentiles(0.5, 0.95, 0.99)
+                .build()
+        meterBinders =
+            listOf(
+                JvmMemoryMetrics(),
+                JvmGcMetrics(),
+                JvmThreadMetrics(),
+                ProcessorMetrics(),
+            )
     }
     install(CallLogging) {
         level = Level.INFO
         filter { call ->
             !call.request.path().contains("/internal") &&
-            !call.request.path().contains("/metrics")
+                !call.request.path().contains("/metrics")
         }
         mdc("fiksDigisosId") { call ->
             parseMetadata(call.request.header("Upload-Metadata"))["fiksDigisosId"]

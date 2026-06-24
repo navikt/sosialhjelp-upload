@@ -1,3 +1,5 @@
+@file:Suppress("TooGenericExceptionCaught", "LongParameterList", "LongMethod")
+
 package no.nav.sosialhjelp.upload.upload
 
 import io.micrometer.core.instrument.MeterRegistry
@@ -35,9 +37,10 @@ class UploadProcessingService(
 
     suspend fun process(uploadId: UUID) {
         val startTime = System.nanoTime()
-        val upload = withContext(ioDispatcher) {
-            dsl.transactionResult { tx -> uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }
-        }
+        val upload =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }
+            }
         val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { "none" }
 
         upload.fiksDigisosId?.let { MDC.put("fiksDigisosId", it) }
@@ -50,7 +53,10 @@ class UploadProcessingService(
                 // Step 2: Validate
                 val errors = validator.validate(upload.filename, rawData, rawData.size.toLong())
                 if (errors.isNotEmpty()) {
-                    logger.info("Upload $uploadId (*$fileExtension) failed validation: ${errors.map { "${it.code}: ${it.message}" }}")
+                    logger.info(
+                        "Upload $uploadId (*$fileExtension) failed validation: " +
+                            "${errors.map { "${it.code}: ${it.message}" }}",
+                    )
                     withContext(ioDispatcher) {
                         dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, errors) }
                     }
@@ -61,35 +67,50 @@ class UploadProcessingService(
                 }
 
                 // Step 3: Convert
-                val (finalFilename, finalData) = try {
-                    fileConversionService.convertIfNeeded(upload.filename, rawData)
-                } catch (e: Exception) {
-                    logger.error("Upload $uploadId failed during PDF conversion", e)
-                    markUploadFailed(uploadId, composedKey)
-                    meterRegistry.timer("upload.processing", "result", "conversion_failure", "extension", fileExtension)
-                        .record(Duration.ofNanos(System.nanoTime() - startTime))
-                    return@withContext
-                }
+                val (finalFilename, finalData) =
+                    try {
+                        fileConversionService.convertIfNeeded(upload.filename, rawData)
+                    } catch (e: Exception) {
+                        logger.error("Upload $uploadId failed during PDF conversion", e)
+                        markUploadFailed(uploadId, composedKey)
+                        meterRegistry.timer(
+                            "upload.processing",
+                            "result",
+                            "conversion_failure",
+                            "extension",
+                            fileExtension,
+                        )
+                            .record(Duration.ofNanos(System.nanoTime() - startTime))
+                        return@withContext
+                    }
                 val finalExtension = File(finalFilename).extension.lowercase().ifEmpty { "none" }
                 meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
 
                 // Step 4: Store in mellomlagring
-                val storageResult = try {
-                    mellomlagringStorageService.store(upload.navEksternRefId, finalFilename, uploadId, finalData)
-                } catch (e: Exception) {
-                    logger.error("Upload $uploadId failed during mellomlagring upload", e)
-                    markUploadFailed(uploadId, composedKey)
-                    meterRegistry.timer("upload.processing", "result", "mellomlagring_failure", "extension", fileExtension)
-                        .record(Duration.ofNanos(System.nanoTime() - startTime))
-                    return@withContext
-                }
+                val storageResult =
+                    try {
+                        mellomlagringStorageService.store(upload.navEksternRefId, finalFilename, uploadId, finalData)
+                    } catch (e: Exception) {
+                        logger.error("Upload $uploadId failed during mellomlagring upload", e)
+                        markUploadFailed(uploadId, composedKey)
+                        meterRegistry.timer(
+                            "upload.processing",
+                            "result",
+                            "mellomlagring_failure",
+                            "extension",
+                            fileExtension,
+                        )
+                            .record(Duration.ofNanos(System.nanoTime() - startTime))
+                        return@withContext
+                    }
                 logger.info("Upload $uploadId stored in mellomlagring as ${storageResult.filId}")
 
                 // Step 5: Finalize — update DB and clean up GCS
                 withContext(ioDispatcher) {
                     dsl.transaction { tx ->
                         uploadProcessingQueries.setFilId(
-                            tx, uploadId,
+                            tx,
+                            uploadId,
                             storageResult.filId,
                             storageResult.mellomlagringFilnavn,
                             storageResult.storedSize,
@@ -108,7 +129,10 @@ class UploadProcessingService(
         }
     }
 
-    suspend fun markUploadFailed(uploadId: UUID, composedKey: String? = null) {
+    suspend fun markUploadFailed(
+        uploadId: UUID,
+        composedKey: String? = null,
+    ) {
         withContext(ioDispatcher) {
             dsl.transaction { tx ->
                 uploadProcessingQueries.markFailed(tx, uploadId)

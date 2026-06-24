@@ -1,3 +1,5 @@
+@file:Suppress("TooGenericExceptionCaught")
+
 package no.nav.sosialhjelp.upload.validation
 
 import io.ktor.client.HttpClient
@@ -31,25 +33,22 @@ class VirusScanner(
         }
 
     suspend fun scan(data: ByteArray): Result {
-        try {
-            if (url.isEmpty()) {
-                meterRegistry.counter("virus.scan.skipped", "reason", "not_configured").increment()
-                return Result.OK
-            }
+        if (url.isEmpty()) {
+            meterRegistry.counter("virus.scan.skipped", "reason", "not_configured").increment()
+            return Result.OK
+        }
+        return try {
             val body =
                 httpClient
                     .put(url) {
                         contentType(ContentType.Application.OctetStream)
                         setBody(data)
                     }.body<List<ScanResult>>()
-            if (body.all { it.result == Result.OK }) {
-                return Result.OK
-            }
-            return Result.FOUND
+            if (body.all { it.result == Result.OK }) Result.OK else Result.FOUND
         } catch (e: Exception) {
             logger.warn("Virus scanner error: ${e.message}, treating file as unverified", e)
             meterRegistry.counter("virus.scan.skipped", "reason", "error").increment()
-            return Result.ERROR
+            Result.ERROR
         }
     }
 }

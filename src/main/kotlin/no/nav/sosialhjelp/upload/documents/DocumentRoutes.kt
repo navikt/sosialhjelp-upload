@@ -26,24 +26,29 @@ fun Route.configureDocumentRoutes() {
 
     get("/upload/{uploadId}") {
         val id = call.parameters["uploadId"] ?: error("uploadId is required")
-        val subject = call.principal<JWTPrincipal>()?.subject
-            ?: return@get call.respond(HttpStatusCode.Unauthorized, "Missing subject in token")
+        val subject =
+            call.principal<JWTPrincipal>()?.subject
+                ?: return@get call.respond(HttpStatusCode.Unauthorized, "Missing subject in token")
 
         val uploadId = UUID.fromString(id)
-        val owned = dsl.transactionResult { tx ->
-            tusUploadQueries.isOwnedByUser(tx, uploadId, subject)
-        }
+        val owned =
+            dsl.transactionResult { tx ->
+                tusUploadQueries.isOwnedByUser(tx, uploadId, subject)
+            }
         if (!owned) return@get call.respond(HttpStatusCode.Forbidden, "Access denied")
 
-        val upload = dsl.transactionResult { tx ->
-            tusUploadQueries.getUpload(tx, uploadId)
-        }
+        val upload =
+            dsl.transactionResult { tx ->
+                tusUploadQueries.getUpload(tx, uploadId)
+            }
         checkNotNull(upload.navEksternRefId) { "Mangler navEksternRefId. Er ikke fil ferdig opplastet?" }
         checkNotNull(upload.filId) { "Mangler filId. Er ikke fil ferdig opplastet?" }
         checkNotNull(upload.mellomlagringFilnavn) { "Mangler originalFilename. Er ikke fil ferdig opplastet?" }
 
-
         call.response.header(HttpHeaders.ContentDisposition, "inline; filename=\"${upload.mellomlagringFilnavn}\"")
-        call.respondBytes(mellomlagringClient.getFile(upload.navEksternRefId, upload.filId), ContentType.defaultForFile(File(upload.mellomlagringFilnavn)))
+        call.respondBytes(
+            mellomlagringClient.getFile(upload.navEksternRefId, upload.filId),
+            ContentType.defaultForFile(File(upload.mellomlagringFilnavn)),
+        )
     }
 }
