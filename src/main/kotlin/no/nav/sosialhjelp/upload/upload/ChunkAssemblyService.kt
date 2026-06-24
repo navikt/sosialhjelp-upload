@@ -51,10 +51,7 @@ class ChunkAssemblyService(
         composedKey: String? = null,
     ) {
         val chunkPrefix = "uploads/$uploadId-chunk-"
-        val keysToDelete =
-            buildList {
-                add(composedKey ?: "uploads/$uploadId")
-            }
+        val keysToDelete = listOf(composedKey ?: "uploads/$uploadId")
         runCatching {
             val chunkKeys = chunkStorage.listKeys(chunkPrefix)
             (chunkKeys + keysToDelete).distinct().forEach { key ->
