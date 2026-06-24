@@ -7,7 +7,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
+import org.slf4j.MDC
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
@@ -64,7 +66,7 @@ class TusUploadService(
                 val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)
 
                 val eksternRef =
-                    // If navEksternRefId is already set on this submission (e.g. a second
+                // If navEksternRefId is already set on this submission (e.g. a second
                     // upload on the same contextId), reuse it without calling Fiks.
                     submissionRepository.getNavEksternRefIdByContextId(tx, contextId)
                         ?: navEksternRefId
@@ -155,81 +157,90 @@ class TusUploadService(
             }
         val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { "none" }
 
-        val (chunkData, composedKey) = withContext(ioDispatcher) {
-            val chunkPrefix = "uploads/$uploadId-chunk-"
-            val chunkKeys = chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
-                key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
-            }
-            if (chunkKeys.isEmpty()) {
-                error("No chunk objects found for upload $uploadId at prefix $chunkPrefix")
-            }
-            // Use a unique key per attempt so we never try to overwrite an existing GCS object,
-            // which would be rejected with 403 if a previous composed object is still present.
-            val composedKey = "${upload.gcsKey}-${UUID.randomUUID()}"
-            chunkStorage.composeChunks(chunkKeys, composedKey)
-            chunkStorage.readObject(composedKey) to composedKey
-        }
-
-        val errors = validator.validate(upload.filename, chunkData, chunkData.size.toLong())
-        if (errors.isNotEmpty()) {
-            logger.info("Upload $uploadId failed validation: ${errors.map { "${it.code}: ${it.message}" }}")
-            withContext(ioDispatcher) {
-                dsl.transaction { tx ->
-                    uploadRepository.addErrors(tx, uploadId, errors)
+        upload.fiksDigisosId?.let { MDC.put("fiksDigisosId", it) }
+        MDC.put("navEksternRefId", upload.navEksternRefId)
+        try {
+            withContext(MDCContext()) {
+                val (chunkData, composedKey) = withContext(ioDispatcher) {
+                    val chunkPrefix = "uploads/$uploadId-chunk-"
+                    val chunkKeys = chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
+                        key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
+                    }
+                    if (chunkKeys.isEmpty()) {
+                        error("No chunk objects found for upload $uploadId at prefix $chunkPrefix")
+                    }
+                    // Use a unique key per attempt so we never try to overwrite an existing GCS object,
+                    // which would be rejected with 403 if a previous composed object is still present.
+                    val composedKey = "${upload.gcsKey}-${UUID.randomUUID()}"
+                    chunkStorage.composeChunks(chunkKeys, composedKey)
+                    chunkStorage.readObject(composedKey) to composedKey
                 }
-                deleteGcsObjects(uploadId, composedKey)
-            }
-            meterRegistry.timer("upload.processing", "result", "validation_failure", "extension", fileExtension)
-                .record(Duration.ofNanos(System.nanoTime() - startTime))
-            return
-        }
 
-        val (finalFilename, finalData) = try {
-            convertIfNeeded(upload.filename, chunkData)
-        } catch (e: Exception) {
-            logger.error("Upload $uploadId failed during PDF conversion", e)
-            markUploadFailed(uploadId, composedKey)
-            meterRegistry.timer("upload.processing", "result", "conversion_failure", "extension", fileExtension)
-                .record(Duration.ofNanos(System.nanoTime() - startTime))
-            return
-        }
-        val finalExtension = File(finalFilename).extension.lowercase().ifEmpty { "none" }
-        meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
-        val mellomlagringFilnavn = makeUniqueMellomlagringFilename(finalFilename, uploadId)
-        val encrypted = encryptionService.encryptBytes(finalData)
+                val errors = validator.validate(upload.filename, chunkData, chunkData.size.toLong())
+                if (errors.isNotEmpty()) {
+                    logger.info("Upload $uploadId (*$fileExtension) failed validation: ${errors.map { "${it.code}: ${it.message}" }}")
+                    withContext(ioDispatcher) {
+                        dsl.transaction { tx ->
+                            uploadRepository.addErrors(tx, uploadId, errors)
+                        }
+                        deleteGcsObjects(uploadId, composedKey)
+                    }
+                    meterRegistry.timer("upload.processing", "result", "validation_failure", "extension", fileExtension)
+                        .record(Duration.ofNanos(System.nanoTime() - startTime))
+                    return@withContext
+                }
 
-        val contentType =
-            ContentType
-                .defaultForFile(File(finalFilename))
-                .toString()
+                val (finalFilename, finalData) = try {
+                    convertIfNeeded(upload.filename, chunkData)
+                } catch (e: Exception) {
+                    logger.error("Upload $uploadId failed during PDF conversion", e)
+                    markUploadFailed(uploadId, composedKey)
+                    meterRegistry.timer("upload.processing", "result", "conversion_failure", "extension", fileExtension)
+                        .record(Duration.ofNanos(System.nanoTime() - startTime))
+                    return@withContext
+                }
+                val finalExtension = File(finalFilename).extension.lowercase().ifEmpty { "none" }
+                meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
+                val mellomlagringFilnavn = makeUniqueMellomlagringFilename(finalFilename, uploadId)
+                val encrypted = encryptionService.encryptBytes(finalData)
 
-        logger.info("Uploading file (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}")
-        val filId =
-            try {
-                mellomlagringClient.uploadFile(
-                    navEksternRefId = upload.navEksternRefId,
-                    filename = mellomlagringFilnavn,
-                    contentType = contentType,
-                    data = encrypted,
-                )
-            } catch (e: Exception) {
-                logger.error("Upload $uploadId failed during mellomlagring upload", e)
-                markUploadFailed(uploadId, composedKey)
-                meterRegistry.timer("upload.processing", "result", "mellomlagring_failure", "extension", fileExtension)
+                val contentType =
+                    ContentType
+                        .defaultForFile(File(finalFilename))
+                        .toString()
+
+                logger.info("Uploading file (${encrypted.size} bytes) to mellomlagring for ${upload.navEksternRefId}")
+                val filId =
+                    try {
+                        mellomlagringClient.uploadFile(
+                            navEksternRefId = upload.navEksternRefId,
+                            filename = mellomlagringFilnavn,
+                            contentType = contentType,
+                            data = encrypted,
+                        )
+                    } catch (e: Exception) {
+                        logger.error("Upload $uploadId failed during mellomlagring upload", e)
+                        markUploadFailed(uploadId, composedKey)
+                        meterRegistry.timer("upload.processing", "result", "mellomlagring_failure", "extension", fileExtension)
+                            .record(Duration.ofNanos(System.nanoTime() - startTime))
+                        return@withContext
+                    }
+                logger.info("Upload $uploadId stored in mellomlagring as $filId")
+
+                withContext(ioDispatcher) {
+                    dsl.transaction { tx ->
+                        uploadRepository.setFilId(tx, uploadId, filId, mellomlagringFilnavn, finalData.size.toLong(), getSha512(finalData))
+                        uploadRepository.notifyChange(tx, uploadId)
+                    }
+                    deleteGcsObjects(uploadId, composedKey)
+                }
+                meterRegistry.timer("upload.processing", "result", "success", "extension", fileExtension)
                     .record(Duration.ofNanos(System.nanoTime() - startTime))
-                return
             }
-        logger.info("Upload $uploadId stored in mellomlagring as $filId")
-
-        withContext(ioDispatcher) {
-            dsl.transaction { tx ->
-                uploadRepository.setFilId(tx, uploadId, filId, mellomlagringFilnavn, finalData.size.toLong(), getSha512(finalData))
-                uploadRepository.notifyChange(tx, uploadId)
-            }
-            deleteGcsObjects(uploadId, composedKey)
+        } finally {
+            MDC.remove("fiksDigisosId")
+            MDC.remove("navEksternRefId")
         }
-        meterRegistry.timer("upload.processing", "result", "success", "extension", fileExtension)
-            .record(Duration.ofNanos(System.nanoTime() - startTime))
     }
 
     private suspend fun markUploadFailed(uploadId: UUID, composedKey: String? = null) {

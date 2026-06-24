@@ -1,7 +1,7 @@
 <configuration>
     <appender name="STDOUT_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [fiksDigisosId=%X{fiksDigisosId} navEksternRefId=%X{navEksternRefId}] - %msg%n</pattern>
         </encoder>
     </appender>
     <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">

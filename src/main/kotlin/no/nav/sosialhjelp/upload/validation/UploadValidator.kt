@@ -44,6 +44,8 @@ val SUPPORTED_MIME_TYPES =
         "text/rtf",
         // .txt
         "text/plain",
+        // .m (plain text files misidentified as MATLAB by Tika due to file extension)
+        "text/x-matlab",
         // .wpd
         "application/wordperfect",
         "application/vnd.wordperfect",

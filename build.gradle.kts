@@ -62,6 +62,7 @@ dependencies {
 
     // Other dependencies
     implementation(libs.kotlinx.coroutines.reactive)
+    implementation(libs.kotlinx.coroutines.slf4j)
     implementation(libs.ktor.server.netty)
     implementation(libs.logback.classic)
     implementation(libs.logback.janino)
