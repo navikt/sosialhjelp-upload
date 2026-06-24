@@ -13,7 +13,7 @@ import io.ktor.util.AttributeKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import org.jooq.DSLContext
 import java.util.UUID
 
@@ -25,7 +25,7 @@ import java.util.UUID
 
 <span class="nc" id="L26">private fun verifySubmissionOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
 <span class="fc" id="L27">    createRouteScopedPlugin(&quot;VerifySubmissionOwnership&quot;) {</span>
-<span class="fc" id="L28">        val submissionRepository: SubmissionRepository by application.dependencies</span>
+<span class="fc" id="L28">        val submissionQueries: SubmissionQueries by application.dependencies</span>
 
 <span class="pc bpc" id="L30" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
 <span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
@@ -43,7 +43,7 @@ import java.util.UUID
             }
 
 <span class="fc bfc" id="L45" title="All 2 branches covered.">            val owned = withContext(ioDispatcher) {</span>
-<span class="fc" id="L46">                submissionRepository.isOwnedByUser(submissionId, personident)</span>
+<span class="fc" id="L46">                submissionQueries.isOwnedByUser(submissionId, personident)</span>
             }
 <span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (!owned) {</span>
 <span class="nc" id="L49">                call.respond(HttpStatusCode.NotFound)</span>
@@ -76,7 +76,7 @@ import java.util.UUID
 <span class="nc" id="L76">private fun verifyNavEksternRefIdOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
 <span class="nc" id="L77">    createRouteScopedPlugin(&quot;VerifyNavEksternRefIdOwnership&quot;) {</span>
 <span class="nc" id="L78">        val dsl: DSLContext by application.dependencies</span>
-<span class="nc" id="L79">        val submissionRepository: SubmissionRepository by application.dependencies</span>
+<span class="nc" id="L79">        val submissionQueries: SubmissionQueries by application.dependencies</span>
 
 <span class="nc bnc" id="L81" title="All 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
 <span class="nc bnc" id="L82" title="All 2 branches missed.">            if (call.isHandled) return@on</span>
@@ -95,7 +95,7 @@ import java.util.UUID
 
 <span class="nc bnc" id="L96" title="All 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
 <span class="nc" id="L97">                dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L98">                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
+<span class="nc" id="L98">                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
 <span class="nc" id="L99">                }</span>
             }
 <span class="nc bnc" id="L101" title="All 2 branches missed.">            if (!owned) {</span>
@@ -114,7 +114,7 @@ import java.util.UUID
 <span class="nc" id="L114">private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
 <span class="fc" id="L115">    createRouteScopedPlugin(&quot;VerifyNavEksternRefIdOwnershipByPid&quot;) {</span>
 <span class="pc" id="L116">        val dsl: DSLContext by application.dependencies</span>
-<span class="pc" id="L117">        val submissionRepository: SubmissionRepository by application.dependencies</span>
+<span class="pc" id="L117">        val submissionQueries: SubmissionQueries by application.dependencies</span>
 
 <span class="pc bnc" id="L119" title="All 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
 <span class="nc bnc" id="L120" title="All 2 branches missed.">            if (call.isHandled) return@on</span>
@@ -133,7 +133,7 @@ import java.util.UUID
 
 <span class="nc bnc" id="L134" title="All 2 branches missed.">            val owned = withContext(ioDispatcher) {</span>
 <span class="nc" id="L135">                dsl.transactionResult { tx -&gt;</span>
-<span class="nc" id="L136">                    submissionRepository.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
+<span class="nc" id="L136">                    submissionQueries.isNavEksternRefIdOwnedByUser(tx, navEksternRefId, personident)</span>
 <span class="nc" id="L137">                }</span>
             }
 <span class="nc bnc" id="L139" title="All 2 branches missed.">            if (!owned) {</span>

@@ -8,10 +8,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.database.SubmissionRepository.SubmissionOwnedByAnotherUserException
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
+import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
@@ -22,21 +22,22 @@ import java.util.UUID
 
 <span class="fc" id="L23">class TusUploadService(</span>
 <span class="fc" id="L24">    private val tusUploadQueries: TusUploadQueries,</span>
-<span class="fc" id="L25">    private val submissionRepository: SubmissionRepository,</span>
-<span class="fc" id="L26">    private val dsl: DSLContext,</span>
-<span class="fc" id="L27">    private val validator: UploadValidator,</span>
-<span class="fc" id="L28">    private val fiksClient: FiksClient,</span>
-<span class="fc" id="L29">    private val mellomlagringClient: MellomlagringClient,</span>
-<span class="fc" id="L30">    private val chunkStorage: ChunkStorage,</span>
-<span class="fc" id="L31">    private val chunkAssemblyService: ChunkAssemblyService,</span>
-<span class="fc" id="L32">    private val uploadProcessingService: UploadProcessingService,</span>
-<span class="fc" id="L33">    private val processingScope: CoroutineScope,</span>
-<span class="fc" id="L34">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L35">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L36">) {</span>
-<span class="fc" id="L37">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L25">    private val tusSubmissionQueries: TusSubmissionQueries,</span>
+<span class="fc" id="L26">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
+<span class="fc" id="L27">    private val dsl: DSLContext,</span>
+<span class="fc" id="L28">    private val validator: UploadValidator,</span>
+<span class="fc" id="L29">    private val fiksClient: FiksClient,</span>
+<span class="fc" id="L30">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L31">    private val chunkStorage: ChunkStorage,</span>
+<span class="fc" id="L32">    private val chunkAssemblyService: ChunkAssemblyService,</span>
+<span class="fc" id="L33">    private val uploadProcessingService: UploadProcessingService,</span>
+<span class="fc" id="L34">    private val processingScope: CoroutineScope,</span>
+<span class="fc" id="L35">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L36">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L37">) {</span>
+<span class="fc" id="L38">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
 
-<span class="fc" id="L39">    suspend fun create(</span>
+<span class="fc" id="L40">    suspend fun create(</span>
         contextId: String,
         filename: String,
         size: Long,
@@ -44,53 +45,52 @@ import java.util.UUID
         token: String,
         fiksDigisosId: String?,
         navEksternRefId: String?,
-<span class="fc" id="L47">        kategori: String? = null,</span>
+<span class="fc" id="L48">        kategori: String? = null,</span>
     ): UUID {
-<span class="fc" id="L49">        return try {</span>
-<span class="pc bpc" id="L50" title="2 of 3 branches missed.">            dsl.transactionCoroutine { tx -&gt;</span>
+<span class="fc" id="L50">        return try {</span>
+<span class="pc bpc" id="L51" title="2 of 3 branches missed.">            dsl.transactionCoroutine { tx -&gt;</span>
                 // Acquire a per-fiksDigisosId advisory lock before deriving navEksternRefId.
                 // This serializes concurrent upload creations for the same case across all
                 // service instances, preventing two submissions from reading the same Fiks
                 // state and deriving the same navEksternRefId.
-<span class="fc bfc" id="L55" title="All 2 branches covered.">                if (fiksDigisosId != null) {</span>
-<span class="fc" id="L56">                    submissionRepository.acquireAdvisoryLock(tx, fiksDigisosId)</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                if (fiksDigisosId != null) {</span>
+<span class="fc" id="L57">                    tusSubmissionQueries.acquireAdvisoryLock(tx, fiksDigisosId)</span>
                 }
 
-<span class="fc" id="L59">                val submissionId = submissionRepository.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)</span>
+<span class="fc" id="L60">                val submissionId = tusSubmissionQueries.getOrCreateSubmission(tx, contextId, personident, fiksDigisosId, kategori)</span>
 
-<span class="fc" id="L61">                val eksternRef =</span>
+<span class="fc" id="L62">                val eksternRef =</span>
                     // If navEksternRefId is already set on this submission (e.g. a second
                     // upload on the same contextId), reuse it without calling Fiks.
-<span class="pc bpc" id="L64" title="2 of 6 branches missed.">                    submissionRepository.getNavEksternRefIdByContextId(tx, contextId)</span>
-<span class="fc" id="L65">                        ?: navEksternRefId</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                        ?: fiksDigisosId?.let {</span>
+<span class="pc bpc" id="L65" title="2 of 6 branches missed.">                    tusSubmissionQueries.getNavEksternRefIdByContextId(tx, contextId)</span>
+<span class="fc" id="L66">                        ?: navEksternRefId</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                        ?: fiksDigisosId?.let {</span>
                             // Read the highest navEksternRefId stored locally for this
                             // fiksDigisosId. This accounts for other in-flight submissions
                             // that have been created locally but not yet submitted to Fiks,
                             // and therefore don't appear in ettersendtInfoNAV.ettersendelser.
-<span class="fc" id="L71">                            val localMax = submissionRepository.getMaxNavEksternRefIdForFiksDigisosId(tx, it)</span>
+<span class="fc" id="L72">                            val localMax = tusSubmissionQueries.getMaxNavEksternRefIdForFiksDigisosId(tx, it)</span>
                             // We intentionally call Fiks inside a DB transaction to keep the
                             // lock → read-from-Fiks → write sequence atomic. The risk of
                             // holding a DB connection across a network call is accepted here
                             // because contention on the same fiksDigisosId is expected to be
                             // near zero in practice (fiksDigisosId is unique per application).
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                            fiksClient.getNewNavEksternRefId(it, token, localMax)</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                            fiksClient.getNewNavEksternRefId(it, token, localMax)</span>
                         }
-<span class="nc" id="L79">                        ?: error(&quot;Verken navEksternRefId eller fiksDigisosId tilgjengelig&quot;)</span>
+<span class="nc" id="L80">                        ?: error(&quot;Verken navEksternRefId eller fiksDigisosId tilgjengelig&quot;)</span>
 
-<span class="fc" id="L81">                submissionRepository.setNavEksternRefId(tx, submissionId, eksternRef)</span>
-<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                val uploadId = tusUploadQueries</span>
-<span class="fc" id="L83">                    .create(tx, submissionId, filename, size)</span>
-<span class="fc" id="L84">                    .also {</span>
-<span class="fc" id="L85">                        meterRegistry.counter(&quot;upload.created&quot;).increment()</span>
-<span class="pc bpc" id="L86" title="2 of 4 branches missed.">                        val extension = File(filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
-<span class="fc" id="L87">                        meterRegistry.counter(&quot;upload.file_extension&quot;, &quot;extension&quot;, extension).increment()</span>
-<span class="fc" id="L88">                    }</span>
-<span class="nc" id="L89">                    ?: error(&quot;Failed to create upload record&quot;)</span>
-<span class="fc" id="L90">                val validations = validator.validate(filename, fileSize = size)</span>
-<span class="fc bfc" id="L91" title="All 4 branches covered.">                if (validations.isNotEmpty()) {</span>
-                    // Reuse processing queries for recording pre-upload validation errors
-<span class="fc" id="L93">                    no.nav.sosialhjelp.upload.upload.UploadProcessingQueries().addErrors(tx, uploadId, validations)</span>
+<span class="fc" id="L82">                tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                val uploadId = tusUploadQueries</span>
+<span class="fc" id="L84">                    .create(tx, submissionId, filename, size)</span>
+<span class="fc" id="L85">                    .also {</span>
+<span class="fc" id="L86">                        meterRegistry.counter(&quot;upload.created&quot;).increment()</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">                        val extension = File(filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
+<span class="fc" id="L88">                        meterRegistry.counter(&quot;upload.file_extension&quot;, &quot;extension&quot;, extension).increment()</span>
+<span class="fc" id="L89">                    }</span>
+<span class="nc" id="L90">                    ?: error(&quot;Failed to create upload record&quot;)</span>
+<span class="fc" id="L91">                val validations = validator.validate(filename, fileSize = size)</span>
+<span class="fc bfc" id="L92" title="All 4 branches covered.">                if (validations.isNotEmpty()) {</span>
+<span class="fc" id="L93">                    uploadProcessingQueries.addErrors(tx, uploadId, validations)</span>
                 }
 <span class="fc" id="L95">                uploadId</span>
             }

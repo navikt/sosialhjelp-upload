@@ -3,7 +3,7 @@
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.database.SubmissionRepository
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
@@ -14,7 +14,7 @@ import java.util.*
 
 <span class="fc" id="L15">class SubmissionService(</span>
 <span class="fc" id="L16">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L17">    private val submissionRepository: SubmissionRepository,</span>
+<span class="fc" id="L17">    private val tusSubmissionQueries: TusSubmissionQueries,</span>
 <span class="fc" id="L18">    private val dsl: DSLContext,</span>
 <span class="fc" id="L19">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
 <span class="fc" id="L20">) {</span>
@@ -24,12 +24,12 @@ import java.util.*
     ): UUID {
 <span class="fc" id="L25">        return withContext(ioDispatcher) {</span>
 <span class="fc" id="L26">            val existing = dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L27">                submissionRepository.findSubmission(tx, contextId, personIdent)</span>
+<span class="fc" id="L27">                tusSubmissionQueries.findSubmission(tx, contextId, personIdent)</span>
             }
 <span class="fc bfc" id="L29" title="All 2 branches covered.">            if (existing != null) return@withContext existing</span>
 
 <span class="fc" id="L31">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L32">                submissionRepository.getOrCreateSubmission(tx, contextId, personIdent)</span>
+<span class="fc" id="L32">                tusSubmissionQueries.getOrCreateSubmission(tx, contextId, personIdent)</span>
 <span class="fc" id="L33">            }</span>
         }
     }
