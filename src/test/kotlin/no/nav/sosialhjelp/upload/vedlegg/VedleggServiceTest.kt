@@ -1,7 +1,7 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer

@@ -86,8 +86,8 @@ class SubmissionNotificationService(
      * If called before commit (or if the transaction rolls back), subscribers will
      * receive a spurious notification for a change that was never persisted.
      *
-     * Prefer [no.nav.sosialhjelp.upload.database.UploadRepository.notifyChange] for
-     * notifications that must be atomic with a write transaction.
+      * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
+      * notifications that must be atomic with a write transaction.
      */
     fun notifyUpdate(submissionId: UUID) {
         dataSource.connection.use { conn ->
@@ -105,8 +105,8 @@ class SubmissionNotificationService(
      * If called before commit (or if the transaction rolls back), subscribers will
      * receive a spurious notification for a change that was never persisted.
      *
-     * Prefer [no.nav.sosialhjelp.upload.database.UploadRepository.notifyChange] for
-     * notifications that must be atomic with a write transaction.
+      * Prefer [no.nav.sosialhjelp.upload.upload.UploadRepository.notifyChange] for
+      * notifications that must be atomic with a write transaction.
      */
     fun notifyDeleted(submissionId: UUID) {
         dataSource.connection.use { conn ->

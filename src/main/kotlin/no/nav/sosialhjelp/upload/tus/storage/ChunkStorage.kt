@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.upload.storage
+package no.nav.sosialhjelp.upload.tus.storage
 
 /**
  * Abstraction over chunk storage for in-progress TUS uploads.

@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.upload.storage
+package no.nav.sosialhjelp.upload.tus.storage
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

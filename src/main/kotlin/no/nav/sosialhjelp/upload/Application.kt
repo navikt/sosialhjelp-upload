@@ -14,19 +14,20 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
-import no.nav.sosialhjelp.upload.database.RetentionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.database.UploadRecoveryService
-import no.nav.sosialhjelp.upload.database.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.SubmissionService
-import no.nav.sosialhjelp.upload.storage.ChunkStorage
-import no.nav.sosialhjelp.upload.storage.FileSystemStorage
-import no.nav.sosialhjelp.upload.storage.GcsBucketStorage
+import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
+import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
+import no.nav.sosialhjelp.upload.tus.storage.GcsBucketStorage
 import com.google.cloud.storage.StorageOptions
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
+import no.nav.sosialhjelp.upload.upload.RetentionService
+import no.nav.sosialhjelp.upload.upload.UploadProcessingService
+import no.nav.sosialhjelp.upload.upload.UploadRecoveryService
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
 import no.nav.sosialhjelp.upload.vedlegg.VedleggService
@@ -127,9 +128,10 @@ fun Application.module() {
         provide(UploadValidator::class)
         provide(FiksClient::class)
         provide(MellomlagringClient::class)
-        provide(TusUploadService::class)
         provide(UploadRepository::class)
         provide(SubmissionRepository::class)
+        provide(UploadProcessingService::class)
+        provide(TusUploadService::class)
         provide(SubmissionService::class)
         provide(GotenbergService::class)
         provide(EttersendelseService::class)

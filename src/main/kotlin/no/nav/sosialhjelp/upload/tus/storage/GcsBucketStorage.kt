@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.upload.storage
+package no.nav.sosialhjelp.upload.tus.storage
 
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo

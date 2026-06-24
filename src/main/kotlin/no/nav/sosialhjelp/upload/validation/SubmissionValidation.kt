@@ -1,8 +1,8 @@
 package no.nav.sosialhjelp.upload.validation
 
 import kotlinx.serialization.Serializable
-import no.nav.sosialhjelp.upload.database.Status
-import no.nav.sosialhjelp.upload.database.Upload
+import no.nav.sosialhjelp.upload.upload.Status
+import no.nav.sosialhjelp.upload.upload.Upload
 
 const val MAX_FILES_PER_SUBMISSION = 30
 const val MAX_TOTAL_SIZE_BYTES = 150L * 1024 * 1024

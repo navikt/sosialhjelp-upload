@@ -2,7 +2,7 @@ package no.nav.sosialhjelp.upload.status
 
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState

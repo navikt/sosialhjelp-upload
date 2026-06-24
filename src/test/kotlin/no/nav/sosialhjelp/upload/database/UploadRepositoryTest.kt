@@ -7,6 +7,7 @@ import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLO
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue

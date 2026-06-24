@@ -11,7 +11,7 @@ import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
