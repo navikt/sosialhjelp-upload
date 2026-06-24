@@ -34,6 +34,7 @@ data class UploadForProcessing(
     val gcsKey: String,
     val submissionId: UUID,
     val navEksternRefId: String,
+    val fiksDigisosId: String?,
 )
 
 data class UploadForVedlegg(
@@ -183,19 +184,19 @@ class UploadRepository {
                 .where(UPLOAD.ID.eq(uploadId))
                 .fetchSingle()
         val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!
-        val navEksternRefId =
+        val submissionRecord =
             tx
                 .dsl()
-                .select(SUBMISSION.NAV_EKSTERN_REF_ID)
+                .select(SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.FIKS_DIGISOS_ID)
                 .from(SUBMISSION)
                 .where(SUBMISSION.ID.eq(submissionId))
                 .fetchSingle()
-                .get(SUBMISSION.NAV_EKSTERN_REF_ID)!!
         return UploadForProcessing(
             filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,
             gcsKey = record.get(UPLOAD.GCS_KEY)!!,
             submissionId = submissionId,
-            navEksternRefId = navEksternRefId,
+            navEksternRefId = submissionRecord.get(SUBMISSION.NAV_EKSTERN_REF_ID)!!,
+            fiksDigisosId = submissionRecord.get(SUBMISSION.FIKS_DIGISOS_ID),
         )
     }
 

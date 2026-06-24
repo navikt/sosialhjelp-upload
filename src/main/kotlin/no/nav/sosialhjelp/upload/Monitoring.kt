@@ -6,6 +6,7 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import no.nav.sosialhjelp.upload.tus.parseMetadata
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
@@ -33,6 +34,12 @@ fun Application.configureMonitoring(registry: PrometheusMeterRegistry) {
         filter { call ->
             !call.request.path().contains("/internal") &&
             !call.request.path().contains("/metrics")
+        }
+        mdc("fiksDigisosId") { call ->
+            parseMetadata(call.request.header("Upload-Metadata"))["fiksDigisosId"]
+        }
+        mdc("navEksternRefId") { call ->
+            parseMetadata(call.request.header("Upload-Metadata"))["navEksternRefId"]
         }
     }
     routing {
