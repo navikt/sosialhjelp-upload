@@ -14,14 +14,14 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.routing.get
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.tus.TusUploadQueries
 import org.jooq.DSLContext
 import java.io.File
 import java.util.UUID
 
 fun Route.configureDocumentRoutes() {
     val mellomlagringClient: MellomlagringClient by application.dependencies
-    val uploadRepository: UploadRepository by application.dependencies
+    val tusUploadQueries: TusUploadQueries by application.dependencies
     val dsl: DSLContext by application.dependencies
 
     get("/upload/{uploadId}") {
@@ -31,12 +31,12 @@ fun Route.configureDocumentRoutes() {
 
         val uploadId = UUID.fromString(id)
         val owned = dsl.transactionResult { tx ->
-            uploadRepository.isOwnedByUser(tx, uploadId, subject)
+            tusUploadQueries.isOwnedByUser(tx, uploadId, subject)
         }
         if (!owned) return@get call.respond(HttpStatusCode.Forbidden, "Access denied")
 
         val upload = dsl.transactionResult { tx ->
-            uploadRepository.getUpload(tx, uploadId)
+            tusUploadQueries.getUpload(tx, uploadId)
         }
         checkNotNull(upload.navEksternRefId) { "Mangler navEksternRefId. Er ikke fil ferdig opplastet?" }
         checkNotNull(upload.filId) { "Mangler filId. Er ikke fil ferdig opplastet?" }

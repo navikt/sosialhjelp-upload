@@ -11,7 +11,6 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
@@ -23,6 +22,7 @@ import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
+import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.validation.Result
 import no.nav.sosialhjelp.upload.validation.UploadValidator
@@ -43,7 +43,6 @@ import kotlin.test.assertTrue
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TusUploadServiceIntegrationTest {
     private lateinit var dsl: DSLContext
-    private lateinit var uploadRepository: UploadRepository
     private lateinit var submissionRepository: SubmissionRepository
     private lateinit var tusUploadService: TusUploadService
     private lateinit var mellomlagringClient: MellomlagringClient
@@ -58,8 +57,9 @@ class TusUploadServiceIntegrationTest {
         PostgresTestContainer.migrate()
         dsl = PostgresTestContainer.dsl
 
-        uploadRepository = UploadRepository()
         submissionRepository = SubmissionRepository(dsl)
+        val tusUploadQueries = TusUploadQueries()
+        val uploadProcessingQueries = UploadProcessingQueries()
 
         virusScanner = mockk()
         gotenbergService = mockk()
@@ -77,7 +77,7 @@ class TusUploadServiceIntegrationTest {
         val mellomlagringStorageService = MellomlagringStorageService(encryptionService, mellomlagringClient)
         val uploadProcessingService = UploadProcessingService(
             dsl = dsl,
-            uploadRepository = uploadRepository,
+            uploadProcessingQueries = uploadProcessingQueries,
             chunkAssemblyService = chunkAssemblyService,
             validator = validator,
             fileConversionService = fileConversionService,
@@ -87,7 +87,7 @@ class TusUploadServiceIntegrationTest {
 
         tusUploadService =
             TusUploadService(
-                uploadRepository = uploadRepository,
+                tusUploadQueries = tusUploadQueries,
                 submissionRepository = submissionRepository,
                 dsl = dsl,
                 validator = validator,

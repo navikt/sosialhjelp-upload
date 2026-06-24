@@ -12,7 +12,7 @@ import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
-import no.nav.sosialhjelp.upload.upload.UploadRepository.OffsetMismatchException
+import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
 
 private const val TUS_RESUMABLE = "1.0.0"
 private const val TUS_VERSION = "1.0.0"
