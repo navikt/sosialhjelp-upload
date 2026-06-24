@@ -4,7 +4,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
 import no.nav.sosialhjelp.upload.validation.ValidationCode

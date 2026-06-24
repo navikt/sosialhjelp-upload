@@ -17,7 +17,7 @@ import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.module
 import no.nav.sosialhjelp.upload.testutils.JwtTestUtils

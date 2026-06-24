@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.upload.database
+package no.nav.sosialhjelp.upload.upload
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR
@@ -414,5 +414,3 @@ class UploadRepository {
                 )
             }
 }
-
-

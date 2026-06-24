@@ -11,10 +11,9 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
-import no.nav.sosialhjelp.upload.VerifiedUploadId
-import no.nav.sosialhjelp.upload.database.UploadRepository.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
-import no.nav.sosialhjelp.upload.verifyUploadOwnership
+import no.nav.sosialhjelp.upload.upload.UploadRepository.OffsetMismatchException
+
 private const val TUS_RESUMABLE = "1.0.0"
 private const val TUS_VERSION = "1.0.0"
 private const val TUS_EXTENSION = "creation,termination"

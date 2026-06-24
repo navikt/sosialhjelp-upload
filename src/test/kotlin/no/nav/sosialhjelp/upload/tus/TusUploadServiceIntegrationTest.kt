@@ -11,15 +11,16 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.database.SubmissionRepository
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.SUBMISSION
-import no.nav.sosialhjelp.upload.storage.FileSystemStorage
+import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.validation.Result
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
@@ -66,19 +67,31 @@ class TusUploadServiceIntegrationTest {
         encryptionService = mockk()
         coEvery { encryptionService.encryptBytes(any()) } answers { firstArg() }
 
+        val chunkStorage = FileSystemStorage()
+        val meterRegistry = SimpleMeterRegistry()
+        val uploadProcessingService = UploadProcessingService(
+            dsl = dsl,
+            uploadRepository = uploadRepository,
+            validator = validator,
+            gotenbergService = gotenbergService,
+            mellomlagringClient = mellomlagringClient,
+            encryptionService = encryptionService,
+            chunkStorage = chunkStorage,
+            meterRegistry = meterRegistry,
+        )
+
         tusUploadService =
             TusUploadService(
                 uploadRepository = uploadRepository,
                 submissionRepository = submissionRepository,
                 dsl = dsl,
                 validator = validator,
-                gotenbergService = gotenbergService,
                 fiksClient = fiksClient,
                 mellomlagringClient = mellomlagringClient,
-                encryptionService = encryptionService,
-                chunkStorage = FileSystemStorage(),
+                chunkStorage = chunkStorage,
+                uploadProcessingService = uploadProcessingService,
                 processingScope = processingScope,
-                meterRegistry = SimpleMeterRegistry(),
+                meterRegistry = meterRegistry,
             )
     }
 

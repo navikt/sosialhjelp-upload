@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.upload.database
+package no.nav.sosialhjelp.upload.upload
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
@@ -7,8 +7,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.database.SubmissionRepository
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
-import no.nav.sosialhjelp.upload.storage.ChunkStorage
+import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.Duration

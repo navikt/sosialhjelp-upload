@@ -1,7 +1,7 @@
 package no.nav.sosialhjelp.upload.action
 
-import no.nav.sosialhjelp.upload.database.Status
-import no.nav.sosialhjelp.upload.database.Upload
+import no.nav.sosialhjelp.upload.upload.Status
+import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.validation.MAX_FILES_PER_SUBMISSION
 import no.nav.sosialhjelp.upload.validation.MAX_TOTAL_SIZE_BYTES
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationCode

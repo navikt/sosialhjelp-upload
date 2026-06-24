@@ -1,6 +1,6 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
-import no.nav.sosialhjelp.upload.database.UploadRepository
+import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 
 class VedleggService(
