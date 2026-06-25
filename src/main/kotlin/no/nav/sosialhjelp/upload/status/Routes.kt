@@ -15,6 +15,7 @@ import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.database.notify.SubmissionUpdateNotification
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
@@ -32,6 +33,7 @@ fun Route.configureStatusRoutes() {
         Default.encodeToString(serializer, value)
     }) {
         activeConnections.incrementAndGet()
+        val id = call.parameters["id"].orEmpty()
         try {
             val personident = call.principal<JWTPrincipal>()?.subject ?: error("personident is required")
 
@@ -40,7 +42,6 @@ fun Route.configureStatusRoutes() {
                 event = ServerSentEvent("""{"heartbeat": "Beating"}""")
             }
 
-            val id = call.parameters["id"].orEmpty()
             if (id.isBlank()) {
                 error("id parameter is required")
             }
@@ -57,6 +58,13 @@ fun Route.configureStatusRoutes() {
                     }
                 }
                 .first { it == SubmissionUpdateNotification.UpdateType.DELETE }
+        } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {
+            application.environment.log.warn("SSE /status/$id: submission owned by another user, closing connection")
+            runCatching {
+                send(ServerSentEvent("""{"error":"forbidden"}"""))
+            }.onFailure {
+                application.environment.log.info("Fikk feil ved sending av forbidden event. Ignorerer", it)
+            }
         } catch (_: ChannelWriteException) {
             // Client disconnected (tab closed, navigated away, network drop) — expected for SSE
         } catch (_: IOException) {
