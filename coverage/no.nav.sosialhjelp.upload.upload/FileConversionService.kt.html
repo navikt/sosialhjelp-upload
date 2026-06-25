@@ -20,7 +20,7 @@ import java.io.File
         data: ByteArray,
     ): Pair&lt;String, ByteArray&gt; {
 <span class="fc" id="L22">        val extension = File(filename).extension.lowercase()</span>
-<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (extension in listOf(&quot;pdf&quot;, &quot;jpeg&quot;, &quot;jpg&quot;, &quot;png&quot;)) {</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (extension == &quot;pdf&quot;) {</span>
 <span class="fc" id="L24">            return filename to data</span>
         }
 <span class="fc" id="L26">        val pdfName = File(filename).nameWithoutExtension + &quot;.pdf&quot;</span>
