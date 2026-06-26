@@ -334,7 +334,7 @@ class UploadValidator(
     }
 
     private fun validateFilename(filename: Filename): Validation? {
-        if (filename.containsDangerousSequences()) {
+        if (filename.containsDangerousSequences() || filename.containsIllegalCharacters()) {
             return FilenameValidation()
         }
         return null
@@ -346,6 +346,8 @@ private value class Filename(
     val value: String,
 ) {
     fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()
+
+    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(":")
 
     fun containsDangerousSequences(): Boolean {
         val normalized = sanitize()
