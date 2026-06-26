@@ -36,7 +36,7 @@ object EttersendelsePdfGenerator {
 <span class="fc" id="L36">                pdf.addText(&quot;Følgende vedlegg er sendt &quot; + formatLocalDateTime(LocalDateTime.now()))</span>
 
 <span class="fc" id="L38">                pdf.addBlankLine()</span>
-<span class="fc" id="L39">                pdf.addText(&quot;Type: &quot; + metadata.type.replaceUnsupportedCharacters())</span>
+<span class="fc" id="L39">                pdf.addText(&quot;Type: &quot; + metadata.type)</span>
 <span class="fc" id="L40">                metadata.filer.forEach { fil -&gt;</span>
 <span class="fc" id="L41">                    pdf.addText(&quot;Filnavn: &quot; + fil.filnavn)</span>
 <span class="fc" id="L42">                }</span>
@@ -48,21 +48,10 @@ object EttersendelsePdfGenerator {
 <span class="fc" id="L48">        }</span>
 }
 
-/** Replaces characters that have no glyph in SourceSansPro-Regular:
- * - U+0009: Tab (\t)
- * - U+000A: Line feed (\n)
- * - U+000D: Carriage return (\r)
- * - U+001F: Unit separator (ASCII control character)
- * - U+F0B7: Private use area bullet (used by some Windows fonts)
- **/
-private fun String.replaceUnsupportedCharacters() =
-<span class="fc" id="L59">    replace(Regex(&quot;[\\x09\\x0D\\x0A]&quot;), &quot; &quot;)</span>
-<span class="fc" id="L60">        .replace(Regex(&quot;[\\uF0B7\\x1F]&quot;), &quot;&quot;)</span>
-
 fun formatLocalDateTime(dato: LocalDateTime): String {
-<span class="fc" id="L63">    val datoFormatter = DateTimeFormatter.ofPattern(&quot;d. MMMM yyyy 'kl.' HH.mm&quot;, Locale.forLanguageTag(&quot;nb&quot;))</span>
-<span class="fc" id="L64">    return dato.format(datoFormatter)</span>
+<span class="fc" id="L52">    val datoFormatter = DateTimeFormatter.ofPattern(&quot;d. MMMM yyyy 'kl.' HH.mm&quot;, Locale.forLanguageTag(&quot;nb&quot;))</span>
+<span class="fc" id="L53">    return dato.format(datoFormatter)</span>
 }
 
-<span class="nc" id="L67">class PdfGenerationException(message: String, cause: Throwable) : RuntimeException(message, cause)</span>
+<span class="nc" id="L56">class PdfGenerationException(message: String, cause: Throwable) : RuntimeException(message, cause)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

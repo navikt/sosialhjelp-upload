@@ -263,7 +263,7 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
         data: ByteArray,
         fileSize: Long,
     ): List&lt;Validation&gt; =
-<span class="pc bpc" id="L266" title="2 of 5 branches missed.">        coroutineScope {</span>
+<span class="pc bpc" id="L266" title="1 of 5 branches missed.">        coroutineScope {</span>
 <span class="fc" id="L267">            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }</span>
 <span class="fc bfc" id="L268" title="All 2 branches covered.">            val (mimeType, fileTypeValidation) = validateFileType(data, filename)</span>
 <span class="fc" id="L269">            meterRegistry.counter(&quot;upload.tika_mime_type&quot;, &quot;mime_type&quot;, mimeType).increment()</span>
@@ -271,7 +271,7 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 <span class="fc" id="L271">                validateFileSize(fileSize),</span>
 <span class="fc" id="L272">                fileTypeValidation,</span>
 <span class="fc bfc" id="L273" title="All 4 branches covered.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
-<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                virusScanValidation.await(),</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                virusScanValidation.await(),</span>
 <span class="fc" id="L275">            )</span>
 <span class="fc" id="L276">        }</span>
 
@@ -334,7 +334,7 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
     }
 
     private fun validateFilename(filename: Filename): Validation? {
-<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (filename.containsIllegalCharacters()) {</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (filename.containsDangerousSequences()) {</span>
 <span class="nc" id="L338">            return FilenameValidation()</span>
         }
 <span class="fc" id="L340">        return null</span>
@@ -347,6 +347,13 @@ private value class Filename(
 ) {
 <span class="fc" id="L348">    fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()</span>
 
-<span class="fc" id="L350">    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(&quot;[^a-zæøåA-ZÆØÅ0-9 (),._–-]&quot;.toRegex())</span>
+    fun containsDangerousSequences(): Boolean {
+<span class="fc" id="L351">        val normalized = sanitize()</span>
+<span class="pc bpc" id="L352" title="3 of 6 branches missed.">        return normalized.any { it.code &lt; 32 || it.code == 127 } || // control characters and DEL</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">            normalized.contains('\u0000') || // null byte</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            normalized.contains(&quot;..&quot;) || // path traversal</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            normalized.startsWith(&quot;/&quot;) || // absolute path (Unix)</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            normalized.startsWith(&quot;\\&quot;) // absolute path (Windows)</span>
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
