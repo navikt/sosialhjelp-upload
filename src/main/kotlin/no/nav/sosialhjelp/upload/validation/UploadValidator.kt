@@ -15,6 +15,7 @@ import org.apache.tika.Tika
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
+import org.checkerframework.checker.regex.qual.Regex
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
@@ -347,7 +348,7 @@ private value class Filename(
 ) {
     fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()
 
-    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(":")
+    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(Regex("[*:<>|?\\/]"))
 
     fun containsDangerousSequences(): Boolean {
         val normalized = sanitize()
