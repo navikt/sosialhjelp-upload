@@ -14,16 +14,18 @@ import no.nav.sosialhjelp.upload.verifySubmissionOwnership
 @Serializable
 data class Metadata(
     val type: String,
-    val tilleggsinfo: String,
+    val tilleggsinfo: String?,
     val innsendelsesfrist: String? = null,
     val hendelsetype: String? = null,
     val hendelsereferanse: String? = null,
+    val klageId: String? = null,
 )
 
 @Serializable
 data class SubmitInput(
     val fiksDigisosId: String? = null,
-    val metadata: Metadata,
+    val klageId: String? = null,
+    val metadata: Metadata? = null,
 )
 
 fun Route.configureActionRoutes() {
@@ -38,16 +40,31 @@ fun Route.configureActionRoutes() {
             val fiksDigisosId =
                 input.fiksDigisosId
                     ?: return@post call.respondText("fiksDigisosId is required", status = HttpStatusCode.BadRequest)
+            if (input.klageId == null && input.metadata == null) {
+                return@post call.respondText("Metadata kreves for ettersendelse", status = HttpStatusCode.BadRequest)
+            }
 
             val result =
-                ettersendelseService.upload(
-                    input.metadata,
-                    fiksDigisosId = fiksDigisosId,
-                    call.request.header("Authorization")?.removePrefix("Bearer ")
-                        ?: return@post call.respond(HttpStatusCode.Unauthorized),
-                    submissionId,
-                    personIdent = call.attributes[VerifiedPersonident],
-                )
+                if (input.klageId != null) {
+                    ettersendelseService.uploadKlageEttersendelse(
+                        submissionId,
+                        klageId = input.klageId,
+                        fiksDigisosId = fiksDigisosId,
+                        token =
+                            call.request.header("Authorization")?.removePrefix("Bearer ")
+                                ?: return@post call.respond(HttpStatusCode.Unauthorized),
+                        personIdent = call.attributes[VerifiedPersonident],
+                    )
+                } else {
+                    ettersendelseService.upload(
+                        input.metadata!!,
+                        fiksDigisosId = fiksDigisosId,
+                        call.request.header("Authorization")?.removePrefix("Bearer ")
+                            ?: return@post call.respond(HttpStatusCode.Unauthorized),
+                        submissionId,
+                        personIdent = call.attributes[VerifiedPersonident],
+                    )
+                }
             if (result) {
                 return@post call.respond(HttpStatusCode.Created)
             } else {

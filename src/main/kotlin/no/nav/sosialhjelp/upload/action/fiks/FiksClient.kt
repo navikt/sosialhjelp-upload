@@ -48,6 +48,12 @@ class FiksClient(
         navEksternRefId: String,
     ) = "$fiksBaseUrl/digisos/api/v2/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId"
 
+    private fun klageEttersendelseUrl(
+        fiksDigisosId: String,
+        klageId: String,
+        navEksternRefId: String,
+    ) = "$fiksBaseUrl/digisos/klage/api/v1/$fiksDigisosId/$navEksternRefId/$klageId/vedlegg"
+
     private fun digisosSakUrl(fiksDigisosId: String) = "$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId"
 
     private val jacksonClient by lazy {
@@ -132,6 +138,69 @@ class FiksClient(
             throw IllegalStateException(e)
         }
     }
+
+    suspend fun uploadKlageEttersendelse(
+        fiksDigisosId: String,
+        klageId: String,
+        navEksternRefId: String,
+        metadata: Metadata,
+        token: String,
+        filer: List<Fil>,
+    ): HttpResponse =
+        withContext(ioDispatcher) {
+            val vedleggJson =
+                VedleggSpesifikasjon(
+                    vedlegg =
+                        listOf(
+                            Vedlegg(
+                                type = metadata.type,
+                                tilleggsinfo = metadata.tilleggsinfo,
+                                hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },
+                                hendelseReferanse = metadata.hendelsereferanse,
+                                status = Vedlegg.Status.LastetOpp,
+                                filer = filer,
+                                klageId = null,
+                            ),
+                        ),
+                )
+            val formData =
+                formData {
+                    append(
+                        "vedlegg.json",
+                        Json.encodeToString(vedleggJson),
+                        Headers.build {
+                            append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        },
+                    )
+                }
+            try {
+                client
+                    .submitFormWithBinaryData(
+                        klageEttersendelseUrl(fiksDigisosId, klageId, navEksternRefId),
+                        formData,
+                    ) {
+                        headers {
+                            integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
+                            integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+                        }
+                        bearerAuth(token)
+                        contentType(ContentType.MultiPart.FormData)
+                    }.also {
+                        if (!it.status.isSuccess()) {
+                            val body = it.bodyAsText()
+                            if (it.status == HttpStatusCode.BadRequest && body.contains("finnes all")) {
+                                throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
+                            }
+                            logger.error("Feil ved opplasting av klageettersendelse til fiks: ${it.status}: $body")
+                        } else {
+                            logger.info("Opplasting av klageettersendelse til fiks vellykket: ${it.status}")
+                        }
+                    }
+            } catch (e: Exception) {
+                logger.error("Feil ved opplasting til fiks: ${e.message}", e)
+                throw e
+            }
+        }
 
     suspend fun uploadEttersendelse(
         fiksDigisosId: String,
@@ -265,7 +334,7 @@ data class Fil(val filnavn: String, val sha512: String)
 @Serializable
 data class Vedlegg(
     val type: String,
-    val tilleggsinfo: String,
+    val tilleggsinfo: String? = null,
     val klageId: String? = null,
     val status: Status?,
     val filer: List<Fil>,

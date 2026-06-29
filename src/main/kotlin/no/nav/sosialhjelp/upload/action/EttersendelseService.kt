@@ -11,9 +11,11 @@ import no.nav.sosialhjelp.upload.action.fiks.EttersendelseAlreadyExistsException
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.action.fiks.Vedlegg
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import no.nav.sosialhjelp.upload.database.schema.HendelseType
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
@@ -39,6 +41,40 @@ class EttersendelseService(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
+
+    suspend fun uploadKlageEttersendelse(
+        submissionId: UUID,
+        fiksDigisosId: String,
+        token: String,
+        personIdent: String,
+        klageId: String,
+    ): Boolean {
+        val navEksternRefId =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
+                }
+            }
+
+        val uploads =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> uploadRepository.getUploads(tx, submissionId) }
+            }
+
+        val violations = validateSubmissionUploads(uploads)
+        if (violations.isNotEmpty()) throw SubmissionValidationException(violations)
+
+        val filer = buildFilerList(uploads)
+
+        return submitKlageEttersendelseToFiks(
+            fiksDigisosId = fiksDigisosId,
+            klageId = klageId,
+            navEksternRefId = navEksternRefId,
+            filer = filer,
+            token = token,
+            submissionId = submissionId,
+        )
+    }
 
     suspend fun upload(
         metadata: Metadata,
@@ -98,6 +134,53 @@ class EttersendelseService(
             if (upload.mellomlagringFilnavn == null || upload.sha512 == null) return@mapNotNull null
             Fil(upload.mellomlagringFilnavn, upload.sha512)
         }
+
+    private suspend fun submitKlageEttersendelseToFiks(
+        fiksDigisosId: String,
+        klageId: String,
+        navEksternRefId: String,
+        token: String,
+        filer: List<Fil>,
+        submissionId: UUID,
+    ): Boolean {
+        val (response, duration) =
+            try {
+                measureTimedValue {
+                    fiksClient.uploadKlageEttersendelse(
+                        fiksDigisosId,
+                        klageId,
+                        navEksternRefId,
+                        Metadata(
+                            "klage_ettersendelse",
+                            null,
+                            null,
+                            Vedlegg.HendelseType.BRUKER.value,
+                            navEksternRefId,
+                            klageId,
+                        ),
+                        token,
+                        filer,
+                    )
+                }
+            } catch (e: EttersendelseAlreadyExistsException) {
+                logger.warn(
+                    "Ettersendelse ${e.navEksternRefId} already exists in Fiks for $fiksDigisosId " +
+                        "— treating as success",
+                )
+                meterRegistry.counter("fiks.submission.already_exists").increment()
+                cleanupSubmission(submissionId)
+                return true
+            }
+
+        val result = if (response.status.isSuccess()) "success" else "failure"
+        meterRegistry.timer("fiks.submission", "result", result, "klage", "true").record(duration.toJavaDuration())
+
+        if (response.status.isSuccess()) {
+            cleanupSubmission(submissionId)
+            return true
+        }
+        return false
+    }
 
     private suspend fun submitToFiks(
         metadata: Metadata,

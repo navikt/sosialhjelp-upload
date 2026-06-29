@@ -118,7 +118,17 @@ class TusUploadServiceIntegrationTest {
             val personident = "12345678910"
             createMockSubmission(dsl, externalId)
 
-            val uploadId = tusUploadService.create(externalId, "test.pdf", 100L, personident, "test-token", null, "id")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "test.pdf",
+                    100L,
+                    personident,
+                    "test-token",
+                    null,
+                    "id",
+                    klageId = klageId,
+                )
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertNotNull(row)
@@ -131,10 +141,28 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             createMockSubmission(dsl, externalId, ownerIdent = "11111111111")
-            tusUploadService.create(externalId, "first.pdf", 50L, "11111111111", "test-token", null, "id")
+            tusUploadService.create(
+                externalId,
+                "first.pdf",
+                50L,
+                "11111111111",
+                "test-token",
+                null,
+                "id",
+                klageId = klageId,
+            )
 
             assertFailsWith<TusUploadService.UploadForbiddenException> {
-                tusUploadService.create(externalId, "second.pdf", 50L, "99999999999", "test-token", null, "id")
+                tusUploadService.create(
+                    externalId,
+                    "second.pdf",
+                    50L,
+                    "99999999999",
+                    "test-token",
+                    null,
+                    "id",
+                    klageId = klageId,
+                )
             }
         }
 
@@ -148,7 +176,17 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
             createMockSubmission(dsl, externalId)
-            val uploadId = tusUploadService.create(externalId, "info.pdf", 42L, personident, "test-token", null, "id")
+            val uploadId =
+                tusUploadService.create(
+                    externalId,
+                    "info.pdf",
+                    42L,
+                    personident,
+                    "test-token",
+                    null,
+                    "id",
+                    klageId = klageId,
+                )
 
             val (offset, total) = tusUploadService.getUploadInfo(uploadId)
 
@@ -176,6 +214,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "id",
+                    klageId = klageId,
                 )
 
             val newOffset = tusUploadService.appendChunk(uploadId, 0L, content)
@@ -206,6 +245,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "id",
+                    klageId = klageId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -234,6 +274,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "id",
+                    klageId = klageId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
 
@@ -267,6 +308,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "id",
+                    klageId = klageId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -310,6 +352,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "id",
+                    klageId = klageId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -337,6 +380,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "id",
+                    klageId = klageId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, zipContent)
 
@@ -373,6 +417,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "id",
+                    klageId = klageId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -406,6 +451,7 @@ class TusUploadServiceIntegrationTest {
                     "test-token",
                     null,
                     "",
+                    klageId = klageId,
                 )
 
             tusUploadService.delete(uploadId)
@@ -428,8 +474,26 @@ class TusUploadServiceIntegrationTest {
             coEvery { fiksClient.getNewNavEksternRefId(fiksDigisosId, any(), null) } returns "base-ref-0001"
             coEvery { fiksClient.getNewNavEksternRefId(fiksDigisosId, any(), "base-ref-0001") } returns "base-ref-0002"
 
-            tusUploadService.create(contextId1, "file1.pdf", 100L, personident, "token", fiksDigisosId, null)
-            tusUploadService.create(contextId2, "file2.pdf", 100L, personident, "token", fiksDigisosId, null)
+            tusUploadService.create(
+                contextId1,
+                "file1.pdf",
+                100L,
+                personident,
+                "token",
+                fiksDigisosId,
+                null,
+                klageId = klageId,
+            )
+            tusUploadService.create(
+                contextId2,
+                "file2.pdf",
+                100L,
+                personident,
+                "token",
+                fiksDigisosId,
+                null,
+                klageId = klageId,
+            )
 
             val ref1 = tusSubmissionQueries.getNavEksternRefIdByContextId(dsl.configuration(), contextId1)
             val ref2 = tusSubmissionQueries.getNavEksternRefIdByContextId(dsl.configuration(), contextId2)
