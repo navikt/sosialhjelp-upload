@@ -20,7 +20,7 @@ class FileConversionService(
         data: ByteArray,
     ): Pair<String, ByteArray> {
         val extension = File(filename).extension.lowercase()
-        if (extension == "pdf") {
+        if (extension in listOf("pdf", "jpeg", "jpg", "png")) {
             return filename to data
         }
         val pdfName = File(filename).nameWithoutExtension + ".pdf"
