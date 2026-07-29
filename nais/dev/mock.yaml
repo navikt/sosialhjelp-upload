@@ -67,6 +67,8 @@ spec:
       value: "mock"
     - name: GCS_BUCKET_NAME
       value: "sosialhjelp-upload-mock"
+    - name: IDPORTEN_CLIENT_ID
+      value: "default"
     - name: IDPORTEN_ISSUER
       value: "https://sosiauth2.ekstern.dev.nav.no/default"
     - name: IDPORTEN_JWKS_URI
