@@ -184,9 +184,41 @@ class MellomlagringClient(
             }.value
         }
 
+    suspend fun listFiles(navEksternRefId: String): List<MellomlagringFilInfo> =
+        withContext(ioDispatcher) {
+            val response =
+                client.get(mellomlagringUrl(navEksternRefId)) {
+                    headers {
+                        integrasjonsid?.let { append("IntegrasjonId", it) }
+                        integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+                    }
+                    accept(ContentType.Application.Json)
+                    bearerAuth(texasClient.getMaskinportenToken())
+                }
+            if (response.status == HttpStatusCode.NotFound) return@withContext emptyList()
+            check(response.status.isSuccess()) {
+                "Mellomlagring listFiles failed for $navEksternRefId: ${response.status}. " +
+                    "Body: ${response.bodyAsText()}"
+            }
+            response.body<MellomlagringResponse>().mellomlagringMetadataList
+        }
+
+    suspend fun replaceFile(
+        navEksternRefId: String,
+        filename: String,
+        contentType: String,
+        data: ByteArray,
+    ): UUID {
+        listFiles(navEksternRefId)
+            .filter { it.filnavn == filename }
+            .forEach { deleteFile(navEksternRefId, UUID.fromString(it.filId), throwOnError = true) }
+        return uploadFile(navEksternRefId, filename, contentType, data)
+    }
+
     suspend fun deleteFile(
         navEksternRefId: String,
         filId: UUID,
+        throwOnError: Boolean = false,
     ) {
         withContext(ioDispatcher) {
             val response =
@@ -198,7 +230,8 @@ class MellomlagringClient(
                     bearerAuth(texasClient.getMaskinportenToken())
                 }
             if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
-                logger.warn("Failed to delete file $filId from mellomlagring: ${response.status}")
+                val message = "Failed to delete file $filId from mellomlagring: ${response.status}"
+                if (throwOnError) error(message) else logger.warn(message)
             }
         }
     }
