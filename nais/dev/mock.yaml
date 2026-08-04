@@ -80,6 +80,6 @@ spec:
     - name: TOKEN_X_ISSUER
       value: "https://sosiauth2.ekstern.dev.nav.no/tokenx"
     - name: TOKEN_X_CLIENT_ID
-      value: "local:teamdigisos:sosialhjelp-upload"
+      value: "dev-gcp:teamdigisos:sosialhjelp-upload-mock"
 
 
