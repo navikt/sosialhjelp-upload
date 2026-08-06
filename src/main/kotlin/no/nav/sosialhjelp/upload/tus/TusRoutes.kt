@@ -13,7 +13,6 @@ import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
-import java.util.UUID
 
 private const val TUS_RESUMABLE = "1.0.0"
 private const val TUS_VERSION = "1.0.0"
@@ -67,25 +66,19 @@ private suspend fun RoutingContext.tusPost(
         call.request.header("Upload-Length")?.toLongOrNull()
             ?: return call.respond(HttpStatusCode.BadRequest)
 
-    val metadata = parseMetadata(call.request.header("Upload-Metadata"))
-    val filename =
-        metadata["filename"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler filename")
-    val contextId =
-        metadata["contextId"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
-    val correlationId =
-        metadata["correlationId"]?.let {
-            runCatching { UUID.fromString(it) }.getOrNull() ?: return call.respond(
-                HttpStatusCode.BadRequest,
-                "Ugyldig correlationId. Må være uuid",
-            )
+    val (metadata, badRequestMessage) = parseMetadata(call.request.header("Upload-Metadata")).toTusMetadata()
+    if (metadata == null) {
+        if (badRequestMessage == null) {
+            return call.respond(HttpStatusCode.BadRequest)
         }
-    val fiksDigisosId = metadata["fiksDigisosId"]
-    val navEksternRefId = metadata["navEksternRefId"]
-    val kategori = metadata["kategori"]
-
+        return call.respond(HttpStatusCode.BadRequest, badRequestMessage)
+    }
+    val fiksDigisosId = metadata.fiksDigisosId
+    val navEksternRefId = metadata.navEksternRefId
     if (fiksDigisosId == null && navEksternRefId == null) {
         return call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller navEksternRefId")
     }
+    val contextId = metadata.contextId
     if (contextId.length > 2048) return call.respond(HttpStatusCode.BadRequest, "contextId for lang")
     if (fiksDigisosId != null && fiksDigisosId.length > 255) {
         return call.respond(HttpStatusCode.BadRequest, "fiksDigisosId for lang")
@@ -95,14 +88,14 @@ private suspend fun RoutingContext.tusPost(
         try {
             tusUploadService.create(
                 contextId,
-                filename,
+                metadata.filename,
                 uploadLength,
                 personident,
                 token,
                 fiksDigisosId,
                 navEksternRefId,
-                kategori,
-                correlationId,
+                metadata.kategori,
+                metadata.correlationId,
             )
         } catch (_: UploadForbiddenException) {
             return call.respond(HttpStatusCode.Forbidden)
