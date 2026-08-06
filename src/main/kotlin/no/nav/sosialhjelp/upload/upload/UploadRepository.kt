@@ -19,6 +19,7 @@ data class Upload(
     val status: Status,
     val sha512: String? = null,
     val kategori: String? = null,
+    val correlationId: UUID? = null,
 )
 
 enum class Status {
@@ -61,6 +62,7 @@ class UploadRepository {
                 UPLOAD.PROCESSING_STATUS,
                 UPLOAD.SHA512,
                 SUBMISSION.KATEGORI,
+                UPLOAD.CORRELATION_ID,
             )
             .from(UPLOAD)
             .leftJoin(ERROR).on(ERROR.UPLOAD.eq(UPLOAD.ID))
@@ -84,6 +86,7 @@ class UploadRepository {
                             ?: error("No processing status. Was it not selected?"),
                     sha512 = records.first().get(UPLOAD.SHA512),
                     kategori = records.first().get(SUBMISSION.KATEGORI),
+                    correlationId = records.first().get(UPLOAD.CORRELATION_ID),
                 )
             }
 

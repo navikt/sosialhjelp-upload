@@ -13,6 +13,7 @@ import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
+import java.util.UUID
 
 private const val TUS_RESUMABLE = "1.0.0"
 private const val TUS_VERSION = "1.0.0"
@@ -71,6 +72,13 @@ private suspend fun RoutingContext.tusPost(
         metadata["filename"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler filename")
     val contextId =
         metadata["contextId"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
+    val correlationId =
+        metadata["correlationId"]?.let {
+            runCatching { UUID.fromString(it) }.getOrNull() ?: return call.respond(
+                HttpStatusCode.BadRequest,
+                "Ugyldig correlationId. Må være uuid",
+            )
+        }
     val fiksDigisosId = metadata["fiksDigisosId"]
     val navEksternRefId = metadata["navEksternRefId"]
     val kategori = metadata["kategori"]
@@ -94,6 +102,7 @@ private suspend fun RoutingContext.tusPost(
                 fiksDigisosId,
                 navEksternRefId,
                 kategori,
+                correlationId,
             )
         } catch (_: UploadForbiddenException) {
             return call.respond(HttpStatusCode.Forbidden)

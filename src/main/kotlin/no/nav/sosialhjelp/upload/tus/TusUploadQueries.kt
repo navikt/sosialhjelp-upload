@@ -21,6 +21,7 @@ class TusUploadQueries {
         submissionId: UUID,
         filename: String,
         filesize: Long,
+        correlationId: UUID?,
     ): UUID? {
         val uploadId = UUID.randomUUID()
         val gcsKey = "uploads/$uploadId"
@@ -33,6 +34,7 @@ class TusUploadQueries {
             .set(UPLOAD.SIZE, filesize)
             .set(UPLOAD.UPLOAD_OFFSET, 0L)
             .set(UPLOAD.GCS_KEY, gcsKey)
+            .set(UPLOAD.CORRELATION_ID, correlationId)
             .returning(UPLOAD.ID)
             .fetchOne()
             ?.get(UPLOAD.ID)
