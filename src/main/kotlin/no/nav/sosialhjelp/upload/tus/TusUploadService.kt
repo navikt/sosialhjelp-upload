@@ -40,16 +40,17 @@ class TusUploadService(
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     suspend fun create(
-        contextId: String,
-        filename: String,
+        metadata: TusMetadata,
         size: Long,
         personident: String,
         token: String,
-        fiksDigisosId: String?,
-        navEksternRefId: String?,
-        kategori: String? = null,
-        correlationId: UUID?,
     ): UUID {
+        val contextId = metadata.contextId
+        val filename = metadata.filename
+        val fiksDigisosId = metadata.fiksDigisosId
+        val navEksternRefId = metadata.navEksternRefId
+        val kategori = metadata.kategori
+        val correlationId = metadata.correlationId
         return try {
             dsl.transactionCoroutine { tx ->
                 // Acquire a per-fiksDigisosId advisory lock before deriving navEksternRefId.
