@@ -48,6 +48,7 @@ class TusUploadService(
         fiksDigisosId: String?,
         navEksternRefId: String?,
         kategori: String? = null,
+        correlationId: UUID?,
     ): UUID {
         return try {
             dsl.transactionCoroutine { tx ->
@@ -91,7 +92,7 @@ class TusUploadService(
                 tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)
                 val uploadId =
                     tusUploadQueries
-                        .create(tx, submissionId, filename, size)
+                        .create(tx, submissionId, filename, size, correlationId)
                         .also {
                             meterRegistry.counter("upload.created").increment()
                             val extension = File(filename).extension.lowercase().ifEmpty { "none" }

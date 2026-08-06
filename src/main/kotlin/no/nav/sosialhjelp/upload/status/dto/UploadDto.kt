@@ -18,6 +18,8 @@ data class UploadDto(
     val status: Status,
     val size: Long?,
     val kategori: String?,
+    @property:Serializable(with = UUIDSerializer::class)
+    val correlationId: UUID?,
 ) {
     enum class Status {
         COMPLETE,
