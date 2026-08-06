@@ -33,24 +33,28 @@ internal fun parseMetadata(header: String?): Map<String, String> {
         }.toMap()
 }
 
-fun Map<String, String>.toTusMetadata(): Pair<TusMetadata?, String?> {
-    val filename = this["filename"] ?: return null to "Mangler filename"
-    val contextId = this["contextId"] ?: return null to "Mangler contextId"
+@Suppress("ReturnCount")
+fun Map<String, String>.toTusMetadata(): Result<TusMetadata> {
+    val filename = this["filename"] ?: return Result.failure(IllegalArgumentException("Mangler filename"))
+    val contextId = this["contextId"] ?: return Result.failure(IllegalArgumentException("Mangler contextId"))
     val correlationId = this["correlationId"]?.let {
-        runCatching { UUID.fromString(it) }.getOrNull() ?: return null to "Ugyldig correlationId. Må være uuid"
+        runCatching { UUID.fromString(it) }.getOrNull()
+            ?: return Result.failure(IllegalArgumentException("Ugyldig correlationId. Må være uuid"))
     }
     val fiksDigisosId = this["fiksDigisosId"]
     val navEksternRefId = this["navEksternRefId"]
     val kategori = this["kategori"]
 
-    return TusMetadata(
-        filename = filename,
-        contextId = contextId,
-        correlationId = correlationId,
-        fiksDigisosId = fiksDigisosId,
-        navEksternRefId = navEksternRefId,
-        kategori = kategori
-    ) to null
+    return Result.success(
+        TusMetadata(
+            filename = filename,
+            contextId = contextId,
+            correlationId = correlationId,
+            fiksDigisosId = fiksDigisosId,
+            navEksternRefId = navEksternRefId,
+            kategori = kategori,
+        ),
+    )
 }
 
 data class TusMetadata(
