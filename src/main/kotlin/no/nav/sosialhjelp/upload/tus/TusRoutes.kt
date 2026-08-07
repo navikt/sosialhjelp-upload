@@ -49,33 +49,17 @@ private suspend fun RoutingContext.tusPost(
     tusUploadService: TusUploadService,
     basePath: String,
 ) {
-    val personident =
-        call.principal<JWTPrincipal>()?.subject
-            ?: return call.respond(HttpStatusCode.Unauthorized)
-    val token =
-        call.request.headers["Authorization"]?.removePrefix("Bearer ")
-            ?: return call.respond(HttpStatusCode.Unauthorized)
-
-    val tusResumable = call.request.header("Tus-Resumable")
-    if (tusResumable != TUS_RESUMABLE) {
-        call.response.header("Tus-Version", TUS_VERSION)
-        return call.respond(HttpStatusCode.PreconditionFailed)
-    }
-
-    val uploadLength =
-        call.request.header("Upload-Length")?.toLongOrNull()
-            ?: return call.respond(HttpStatusCode.BadRequest)
-
-    val metadata = validateAndParseMetadata() ?: return
+    val requestMetadata = validateRequest() ?: return
+    val metadata = parseAndValidateTusMetadata() ?: return
     val fiksDigisosId = metadata.fiksDigisosId
 
     val uploadId =
         try {
             tusUploadService.create(
                 metadata,
-                uploadLength,
-                personident,
-                token,
+                requestMetadata.uploadLength,
+                requestMetadata.personIdent,
+                requestMetadata.token,
             )
         } catch (_: UploadForbiddenException) {
             return call.respond(HttpStatusCode.Forbidden)
@@ -144,7 +128,50 @@ private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) 
 }
 
 @Suppress("ReturnCount")
-private suspend fun RoutingContext.validateAndParseMetadata(): TusMetadata? {
+private suspend fun RoutingContext.validateRequest(): RequestMetadata? {
+    val personident =
+        call.principal<JWTPrincipal>()?.subject
+            ?: run {
+                call.respond(HttpStatusCode.Unauthorized)
+                return null
+            }
+    val token =
+        call.request.headers["Authorization"]?.removePrefix("Bearer ")
+            ?: run {
+                call.respond(HttpStatusCode.Unauthorized)
+                return null
+            }
+
+    val tusResumable = call.request.header("Tus-Resumable")
+    if (tusResumable != TUS_RESUMABLE) {
+        call.response.header("Tus-Version", TUS_VERSION)
+        call.respond(HttpStatusCode.PreconditionFailed)
+        return null
+    }
+
+    val uploadLength =
+        call.request.header("Upload-Length")?.toLongOrNull()
+            ?: run {
+                call.respond(HttpStatusCode.BadRequest)
+                return null
+            }
+
+    return RequestMetadata(personident, token, uploadLength)
+}
+
+private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService) {
+    val uploadId = call.attributes[VerifiedUploadId]
+
+    runCatching { tusUploadService.delete(uploadId) }.getOrElse {
+        return call.respond(HttpStatusCode.Forbidden)
+    }
+
+    call.response.header("Tus-Resumable", TUS_RESUMABLE)
+    call.respond(HttpStatusCode.NoContent)
+}
+
+@Suppress("ReturnCount")
+private suspend fun RoutingContext.parseAndValidateTusMetadata(): TusMetadata? {
     val metadata =
         parseMetadata(call.request.header("Upload-Metadata"))
             .toTusMetadata()
@@ -167,13 +194,8 @@ private suspend fun RoutingContext.validateAndParseMetadata(): TusMetadata? {
     return metadata
 }
 
-private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService) {
-    val uploadId = call.attributes[VerifiedUploadId]
-
-    runCatching { tusUploadService.delete(uploadId) }.getOrElse {
-        return call.respond(HttpStatusCode.Forbidden)
-    }
-
-    call.response.header("Tus-Resumable", TUS_RESUMABLE)
-    call.respond(HttpStatusCode.NoContent)
-}
+private data class RequestMetadata(
+    val personIdent: String,
+    val token: String,
+    val uploadLength: Long,
+)
