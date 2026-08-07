@@ -37,10 +37,11 @@ internal fun parseMetadata(header: String?): Map<String, String> {
 fun Map<String, String>.toTusMetadata(): Result<TusMetadata> {
     val filename = this["filename"] ?: return Result.failure(IllegalArgumentException("Mangler filename"))
     val contextId = this["contextId"] ?: return Result.failure(IllegalArgumentException("Mangler contextId"))
-    val correlationId = this["correlationId"]?.let {
-        runCatching { UUID.fromString(it) }.getOrNull()
-            ?: return Result.failure(IllegalArgumentException("Ugyldig correlationId. Må være uuid"))
-    }
+    val correlationId =
+        this["correlationId"]?.let {
+            runCatching { UUID.fromString(it) }.getOrNull()
+                ?: return Result.failure(IllegalArgumentException("Ugyldig correlationId. Må være uuid"))
+        }
     val fiksDigisosId = this["fiksDigisosId"]
     val navEksternRefId = this["navEksternRefId"]
     val kategori = this["kategori"]

@@ -121,14 +121,10 @@ class TusUploadServiceIntegrationTest {
 
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "test.pdf",
+                    TusMetadata("test.pdf", externalId, correlationId, null, "id", null),
                     100L,
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
@@ -143,26 +139,18 @@ class TusUploadServiceIntegrationTest {
             val externalId = UUID.randomUUID().toString()
             createMockSubmission(dsl, externalId, ownerIdent = "11111111111")
             tusUploadService.create(
-                externalId,
-                "first.pdf",
+                TusMetadata("first.pdf", externalId, correlationId, null, "id", null),
                 50L,
                 "11111111111",
                 "test-token",
-                null,
-                "id",
-                correlationId = correlationId,
             )
 
             assertFailsWith<TusUploadService.UploadForbiddenException> {
                 tusUploadService.create(
-                    externalId,
-                    "second.pdf",
+                    TusMetadata("second.pdf", externalId, correlationId, null, "id", null),
                     50L,
                     "99999999999",
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
             }
         }
@@ -179,14 +167,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "info.pdf",
+                    TusMetadata("info.pdf", externalId, correlationId, null, "id", null),
                     42L,
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
 
             val (offset, total) = tusUploadService.getUploadInfo(uploadId)
@@ -208,14 +192,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "partial.pdf",
+                    TusMetadata("partial.pdf", externalId, correlationId, null, "id", null),
                     (content.size * 2).toLong(),
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
 
             val newOffset = tusUploadService.appendChunk(uploadId, 0L, content)
@@ -239,14 +219,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "complete.pdf",
+                    TusMetadata("complete.pdf", externalId, correlationId, null, "id", null),
                     content.size.toLong(),
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -268,14 +244,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "toobig.pdf",
+                    TusMetadata("toobig.pdf", externalId, correlationId, null, "id", null),
                     (MAX_FILE_SIZE + 1).toLong(),
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
 
@@ -302,14 +274,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "virus.pdf",
+                    TusMetadata("virus.pdf", externalId, correlationId, null, "id", null),
                     content.size.toLong(),
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -346,14 +314,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "document.docx",
+                    TusMetadata("document.docx", externalId, correlationId, null, "id", null),
                     content.size.toLong(),
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -374,14 +338,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "archive.zip",
+                    TusMetadata("archive.zip", externalId, correlationId, null, "id", null),
                     zipContent.size.toLong(),
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, zipContent)
 
@@ -411,14 +371,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "document.docx",
+                    TusMetadata("document.docx", externalId, correlationId, null, "id", null),
                     content.size.toLong(),
                     personident,
                     "test-token",
-                    null,
-                    "id",
-                    correlationId = correlationId,
                 )
             tusUploadService.appendChunk(uploadId, 0L, content)
 
@@ -445,14 +401,10 @@ class TusUploadServiceIntegrationTest {
             createMockSubmission(dsl, externalId)
             val uploadId =
                 tusUploadService.create(
-                    externalId,
-                    "delete-me.pdf",
+                    TusMetadata("delete-me.pdf", externalId, correlationId, null, "", null),
                     10L,
                     personident,
                     "test-token",
-                    null,
-                    "",
-                    correlationId = correlationId,
                 )
 
             tusUploadService.delete(uploadId)
@@ -476,24 +428,16 @@ class TusUploadServiceIntegrationTest {
             coEvery { fiksClient.getNewNavEksternRefId(fiksDigisosId, any(), "base-ref-0001") } returns "base-ref-0002"
 
             tusUploadService.create(
-                contextId1,
-                "file1.pdf",
+                TusMetadata("file1.pdf", contextId1, correlationId, fiksDigisosId, null, null),
                 100L,
                 personident,
                 "token",
-                fiksDigisosId,
-                null,
-                correlationId = correlationId,
             )
             tusUploadService.create(
-                contextId2,
-                "file2.pdf",
+                TusMetadata("file2.pdf", contextId2, correlationId, fiksDigisosId, null, null),
                 100L,
                 personident,
                 "token",
-                fiksDigisosId,
-                null,
-                correlationId = correlationId,
             )
 
             val ref1 = tusSubmissionQueries.getNavEksternRefIdByContextId(dsl.configuration(), contextId1)
