@@ -85,7 +85,7 @@ class EttersendelseService(
                 ),
                 personIdent,
             )
-        mellomlagringClient.uploadFile(
+        mellomlagringClient.replaceFile(
             navEksternRefId,
             "ettersendelse.pdf",
             "application/pdf",
