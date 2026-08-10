@@ -1,10 +1,23 @@
 <configuration>
+    <!--
+        Appender selection (plain console for local dev vs. JSON console otherwise) is
+        done via RuntimeEnvFilter rather than Logback's <if>/<condition> mechanism.
+        As of Logback 1.6.1, Joran's appender-ref dependency tracking does not correctly
+        handle conditional or property-substituted appender-ref selection on <root>,
+        resulting in silently dropped log output. See RuntimeEnvFilter for details.
+    -->
     <appender name="STDOUT_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="no.nav.sosialhjelp.upload.common.logging.RuntimeEnvFilter">
+            <activeWhenLocal>true</activeWhenLocal>
+        </filter>
         <encoder>
             <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [fiksDigisosId=%X{fiksDigisosId} navEksternRefId=%X{navEksternRefId}] - %msg%n</pattern>
         </encoder>
     </appender>
     <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="no.nav.sosialhjelp.upload.common.logging.RuntimeEnvFilter">
+            <activeWhenLocal>false</activeWhenLocal>
+        </filter>
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
                 <inlineHash>true</inlineHash>
@@ -12,18 +25,10 @@
         </encoder>
     </appender>
 
-    <if condition='"local".equals(System.getenv("RUNTIME_ENV")) || System.getenv("RUNTIME_ENV") == null'>
-        <then>
-            <root level="INFO">
-                <appender-ref ref="STDOUT_PLAIN"/>
-            </root>
-        </then>
-        <else>
-            <root level="INFO">
-                <appender-ref ref="STDOUT_JSON"/>
-            </root>
-        </else>
-    </if>
+    <root level="INFO">
+        <appender-ref ref="STDOUT_PLAIN"/>
+        <appender-ref ref="STDOUT_JSON"/>
+    </root>
 
     <logger name="org.eclipse.jetty" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
