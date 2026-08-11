@@ -59,9 +59,10 @@ import java.io.File
 <span class="fc" id="L59">            val prefixFile = File(root, prefix)</span>
 <span class="pc bpc" id="L60" title="1 of 2 branches missed.">            val dir = prefixFile.parentFile ?: root</span>
 <span class="fc" id="L61">            val namePrefix = prefixFile.name</span>
-<span class="fc" id="L62">            dir.listFiles { f -&gt; f.name.startsWith(namePrefix) }</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                ?.map { root.toURI().relativize(it.toURI()).path }</span>
-<span class="pc" id="L64">                ?: emptyList()</span>
-<span class="fc" id="L65">        }</span>
+<span class="fc" id="L62">            dir</span>
+<span class="fc" id="L63">                .listFiles { f -&gt; f.name.startsWith(namePrefix) }</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                ?.map { root.toURI().relativize(it.toURI()).path }</span>
+<span class="pc" id="L65">                ?: emptyList()</span>
+<span class="fc" id="L66">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

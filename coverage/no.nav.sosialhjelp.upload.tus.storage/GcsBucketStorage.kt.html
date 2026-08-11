@@ -31,43 +31,45 @@ import kotlinx.coroutines.withContext
 <span class="nc" id="L31">            val destBlobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, destKey)).build()</span>
 <span class="nc" id="L32">            val composeRequest =</span>
                 @Suppress(&quot;SpreadOperator&quot;)
-<span class="nc" id="L34">                Storage.ComposeRequest.newBuilder()</span>
-<span class="nc" id="L35">                    .addSource(*sourceKeys.toTypedArray())</span>
-<span class="nc" id="L36">                    .setTarget(destBlobInfo)</span>
-<span class="nc" id="L37">                    .build()</span>
-<span class="nc" id="L38">            storage.compose(composeRequest)</span>
+                Storage.ComposeRequest
+<span class="nc" id="L35">                    .newBuilder()</span>
+<span class="nc" id="L36">                    .addSource(*sourceKeys.toTypedArray())</span>
+<span class="nc" id="L37">                    .setTarget(destBlobInfo)</span>
+<span class="nc" id="L38">                    .build()</span>
+<span class="nc" id="L39">            storage.compose(composeRequest)</span>
         }
-<span class="nc" id="L40">    }</span>
+<span class="nc" id="L41">    }</span>
 
     override suspend fun readObject(key: String): ByteArray =
-<span class="nc" id="L43">        withContext(ioDispatcher) {</span>
-<span class="nc" id="L44">            storage.readAllBytes(BlobId.of(bucketName, key))</span>
-<span class="nc" id="L45">        }</span>
+<span class="nc" id="L44">        withContext(ioDispatcher) {</span>
+<span class="nc" id="L45">            storage.readAllBytes(BlobId.of(bucketName, key))</span>
+<span class="nc" id="L46">        }</span>
 
     override suspend fun deleteObject(key: String) {
-<span class="nc" id="L48">        withContext(ioDispatcher) {</span>
-<span class="nc" id="L49">            try {</span>
-<span class="nc" id="L50">                storage.delete(BlobId.of(bucketName, key))</span>
-<span class="nc" id="L51">            } catch (e: StorageException) {</span>
-<span class="nc bnc" id="L52" title="All 2 branches missed.">                if (e.code == 404) {</span>
+<span class="nc" id="L49">        withContext(ioDispatcher) {</span>
+<span class="nc" id="L50">            try {</span>
+<span class="nc" id="L51">                storage.delete(BlobId.of(bucketName, key))</span>
+<span class="nc" id="L52">            } catch (e: StorageException) {</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">                if (e.code == 404) {</span>
                     // Object already gone — expected, ignore
                 } else {
-<span class="nc" id="L55">                    throw e</span>
+<span class="nc" id="L56">                    throw e</span>
                 }
-<span class="nc" id="L57">            }</span>
+<span class="nc" id="L58">            }</span>
         }
-<span class="nc" id="L59">    }</span>
+<span class="nc" id="L60">    }</span>
 
     override suspend fun exists(key: String): Boolean =
-<span class="nc" id="L62">        withContext(ioDispatcher) {</span>
-<span class="nc bnc" id="L63" title="All 2 branches missed.">            storage.get(BlobId.of(bucketName, key)) != null</span>
-<span class="nc" id="L64">        }</span>
+<span class="nc" id="L63">        withContext(ioDispatcher) {</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            storage.get(BlobId.of(bucketName, key)) != null</span>
+<span class="nc" id="L65">        }</span>
 
     override suspend fun listKeys(prefix: String): List&lt;String&gt; =
-<span class="nc" id="L67">        withContext(ioDispatcher) {</span>
-<span class="nc" id="L68">            storage.list(bucketName, Storage.BlobListOption.prefix(prefix))</span>
-<span class="nc" id="L69">                .iterateAll()</span>
-<span class="nc" id="L70">                .map { it.name }</span>
-<span class="nc" id="L71">        }</span>
+<span class="nc" id="L68">        withContext(ioDispatcher) {</span>
+<span class="nc" id="L69">            storage</span>
+<span class="nc" id="L70">                .list(bucketName, Storage.BlobListOption.prefix(prefix))</span>
+<span class="nc" id="L71">                .iterateAll()</span>
+<span class="nc" id="L72">                .map { it.name }</span>
+<span class="nc" id="L73">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
