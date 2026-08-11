@@ -102,7 +102,8 @@ class DocumentRoutesTest {
         val uploadId = UUID.randomUUID()
         val gcsKey = "uploads/$uploadId"
         dsl.transactionResult { tx ->
-            tx.dsl()
+            tx
+                .dsl()
                 .insertInto(UPLOAD)
                 .set(UPLOAD.ID, uploadId)
                 .set(UPLOAD.SUBMISSION_ID, submissionId)
@@ -140,11 +141,12 @@ class DocumentRoutesTest {
 
             coEvery { mellomlagringClient.getFile(any(), any()) } returns ByteArray(0)
 
-            client.get("/sosialhjelp/upload/upload/$uploadId") {
-                header("Authorization", "Bearer $otherToken")
-            }.apply {
-                assertEquals(HttpStatusCode.Forbidden, status)
-            }
+            client
+                .get("/sosialhjelp/upload/upload/$uploadId") {
+                    header("Authorization", "Bearer $otherToken")
+                }.apply {
+                    assertEquals(HttpStatusCode.Forbidden, status)
+                }
         }
 
     @Test
@@ -156,10 +158,11 @@ class DocumentRoutesTest {
 
             coEvery { mellomlagringClient.getFile(any(), any()) } returns "hello".toByteArray()
 
-            client.get("/sosialhjelp/upload/upload/$uploadId") {
-                header("Authorization", "Bearer $token")
-            }.apply {
-                assertEquals(HttpStatusCode.OK, status)
-            }
+            client
+                .get("/sosialhjelp/upload/upload/$uploadId") {
+                    header("Authorization", "Bearer $token")
+                }.apply {
+                    assertEquals(HttpStatusCode.OK, status)
+                }
         }
 }

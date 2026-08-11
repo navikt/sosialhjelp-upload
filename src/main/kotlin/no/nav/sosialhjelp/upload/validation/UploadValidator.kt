@@ -252,12 +252,11 @@ class UploadValidator(
     fun validate(
         filename: String,
         fileSize: Long,
-    ): List<Validation> {
-        return listOfNotNull(
+    ): List<Validation> =
+        listOfNotNull(
             validateFileSize(fileSize),
             validateFilename(Filename(filename)),
         )
-    }
 
     suspend fun validate(
         filename: String,
@@ -352,10 +351,14 @@ private value class Filename(
 
     fun containsDangerousSequences(): Boolean {
         val normalized = sanitize()
-        return normalized.any { it.code < 32 || it.code == 127 } || // control characters and DEL
-            normalized.contains('\u0000') || // null byte
-            normalized.contains("..") || // path traversal
-            normalized.startsWith("/") || // absolute path (Unix)
+        return normalized.any { it.code < 32 || it.code == 127 } ||
+            // control characters and DEL
+            normalized.contains('\u0000') ||
+            // null byte
+            normalized.contains("..") ||
+            // path traversal
+            normalized.startsWith("/") ||
+            // absolute path (Unix)
             normalized.startsWith("\\") // absolute path (Windows)
     }
 }

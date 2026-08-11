@@ -176,5 +176,7 @@ class TusUploadService(
         chunkAssemblyService.deleteGcsObjects(uploadId)
     }
 
-    class UploadForbiddenException(message: String) : RuntimeException(message)
+    class UploadForbiddenException(
+        message: String,
+    ) : RuntimeException(message)
 }

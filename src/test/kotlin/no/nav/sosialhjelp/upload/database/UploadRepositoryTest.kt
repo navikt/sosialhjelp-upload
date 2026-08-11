@@ -51,8 +51,7 @@ class UploadRepositoryTest {
         val filename = "testfile.txt"
         every { notificationServiceMock.notifyUpdate(any()) } returns Unit
         val uploadId =
-            dsl.transactionResult {
-                    tx ->
+            dsl.transactionResult { tx ->
                 tusUploadQueries.create(tx, submissionId, filename, 10L, correlationId)
             }
 
@@ -85,8 +84,7 @@ class UploadRepositoryTest {
             }
         // Create an upload for a different submission to ensure filtering works.
         val otherSubmissionId = TestUtils.createMockSubmission(dsl)
-        dsl.transaction {
-                config ->
+        dsl.transaction { config ->
             tusUploadQueries.create(config, otherSubmissionId, "otherfile.txt", 19L, correlationId)
         }
 
@@ -153,7 +151,8 @@ class UploadRepositoryTest {
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
         dsl.transaction { tx ->
             val record =
-                tx.dsl()
+                tx
+                    .dsl()
                     .select(UPLOAD.PROCESSING_STATUS)
                     .from(UPLOAD)
                     .where(UPLOAD.ID.eq(uploadId))
@@ -186,7 +185,8 @@ class UploadRepositoryTest {
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
         dsl.transaction { tx ->
             val record =
-                tx.dsl()
+                tx
+                    .dsl()
                     .select(UPLOAD.PROCESSING_STATUS)
                     .from(UPLOAD)
                     .where(UPLOAD.ID.eq(uploadId))
@@ -219,7 +219,8 @@ class UploadRepositoryTest {
         assertEquals(listOf(submissionId), staleUploads.map { it.submissionId })
         dsl.transaction { tx ->
             val record =
-                tx.dsl()
+                tx
+                    .dsl()
                     .select(UPLOAD.PROCESSING_STATUS)
                     .from(UPLOAD)
                     .where(UPLOAD.ID.eq(uploadId))

@@ -51,13 +51,13 @@ fun Route.configureStatusRoutes() {
 
             send(submissionService.getSubmissionStatus(submissionId))
 
-            statusChannelFactory.getSubmissionFlow(submissionId)
+            statusChannelFactory
+                .getSubmissionFlow(submissionId)
                 .onEach {
                     if (it == SubmissionUpdateNotification.UpdateType.UPDATE) {
                         send(submissionService.getSubmissionStatus(submissionId))
                     }
-                }
-                .first { it == SubmissionUpdateNotification.UpdateType.DELETE }
+                }.first { it == SubmissionUpdateNotification.UpdateType.DELETE }
         } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {
             application.environment.log.warn("SSE /status/$id: submission owned by another user, closing connection")
             runCatching {

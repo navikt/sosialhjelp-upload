@@ -14,7 +14,9 @@ import java.util.UUID
  * ownership checks, and deletion.
  */
 class TusUploadQueries {
-    class OffsetMismatchException(message: String) : RuntimeException(message)
+    class OffsetMismatchException(
+        message: String,
+    ) : RuntimeException(message)
 
     fun create(
         tx: Configuration,
@@ -93,11 +95,19 @@ class TusUploadQueries {
         chunkSize: Int,
     ): Pair<Long, Long> {
         // Lock the row to serialize concurrent chunk uploads to the same upload ID.
-        tx.dsl().select(UPLOAD.ID).from(UPLOAD).where(UPLOAD.ID.eq(uploadId)).forUpdate().fetchOne()
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.ID.eq(uploadId))
+            .forUpdate()
+            .fetchOne()
             ?: throw OffsetMismatchException("Upload $uploadId not found")
         val newOffset = expectedOffset + chunkSize
         val affected =
-            tx.dsl().update(UPLOAD)
+            tx
+                .dsl()
+                .update(UPLOAD)
                 .set(UPLOAD.UPLOAD_OFFSET, newOffset)
                 .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
                 .where(UPLOAD.ID.eq(uploadId))
@@ -149,9 +159,9 @@ class TusUploadQueries {
                 UPLOAD.SIZE,
                 UPLOAD.MELLOMLAGRING_STORRELSE,
                 UPLOAD.PROCESSING_STATUS,
-            )
-            .from(UPLOAD)
-            .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            ).from(UPLOAD)
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
             .where(UPLOAD.ID.eq(uploadId))
             .fetchSingle()
             .let {
@@ -165,7 +175,8 @@ class TusUploadQueries {
                     fileSize = it.get(UPLOAD.SIZE),
                     mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),
                     status =
-                        it.get(UPLOAD.PROCESSING_STATUS)
+                        it
+                            .get(UPLOAD.PROCESSING_STATUS)
                             ?.let { s -> Status.valueOf(s) }
                             ?: error("No processing status. Was it not selected?"),
                 )

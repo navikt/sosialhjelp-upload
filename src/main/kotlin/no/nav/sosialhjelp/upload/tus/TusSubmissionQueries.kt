@@ -30,10 +30,10 @@ class TusSubmissionQueries {
             .select(SUBMISSION.ID)
             .from(SUBMISSION)
             .where(
-                SUBMISSION.CONTEXT_ID.eq(contextId)
+                SUBMISSION.CONTEXT_ID
+                    .eq(contextId)
                     .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
-            )
-            .fetchOne()
+            ).fetchOne()
             ?.get(SUBMISSION.ID)
     }
 
@@ -71,28 +71,30 @@ class TusSubmissionQueries {
 
         // Update fiksDigisosId if not yet set on the existing row
         if (fiksDigisosId != null) {
-            tx.dsl()
+            tx
+                .dsl()
                 .update(SUBMISSION)
                 .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
                 .where(
-                    SUBMISSION.CONTEXT_ID.eq(contextId)
+                    SUBMISSION.CONTEXT_ID
+                        .eq(contextId)
                         .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
                         .and(SUBMISSION.FIKS_DIGISOS_ID.isNull),
-                )
-                .execute()
+                ).execute()
         }
 
         // Update kategori if not yet set on the existing row
         if (kategori != null) {
-            tx.dsl()
+            tx
+                .dsl()
                 .update(SUBMISSION)
                 .set(SUBMISSION.KATEGORI, kategori)
                 .where(
-                    SUBMISSION.CONTEXT_ID.eq(contextId)
+                    SUBMISSION.CONTEXT_ID
+                        .eq(contextId)
                         .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
                         .and(SUBMISSION.KATEGORI.isNull),
-                )
-                .execute()
+                ).execute()
         }
 
         return tx
@@ -100,10 +102,10 @@ class TusSubmissionQueries {
             .select(SUBMISSION.ID)
             .from(SUBMISSION)
             .where(
-                SUBMISSION.CONTEXT_ID.eq(contextId)
+                SUBMISSION.CONTEXT_ID
+                    .eq(contextId)
                     .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
-            )
-            .fetchOne()
+            ).fetchOne()
             ?.get(SUBMISSION.ID) ?: error("Could not find or create submission")
     }
 
@@ -128,7 +130,8 @@ class TusSubmissionQueries {
         submissionId: UUID,
         navEksternRefId: String,
     ) {
-        tx.dsl()
+        tx
+            .dsl()
             .update(SUBMISSION)
             .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
             .where(SUBMISSION.ID.eq(submissionId).and(SUBMISSION.NAV_EKSTERN_REF_ID.isNull))
@@ -139,7 +142,8 @@ class TusSubmissionQueries {
         tx: Configuration,
         contextId: String,
     ): String? =
-        tx.dsl()
+        tx
+            .dsl()
             .select(SUBMISSION.NAV_EKSTERN_REF_ID)
             .from(SUBMISSION)
             .where(SUBMISSION.CONTEXT_ID.eq(contextId))
@@ -157,14 +161,15 @@ class TusSubmissionQueries {
         tx: Configuration,
         fiksDigisosId: String,
     ): String? =
-        tx.dsl()
+        tx
+            .dsl()
             .select(SUBMISSION.NAV_EKSTERN_REF_ID)
             .from(SUBMISSION)
             .where(
-                SUBMISSION.FIKS_DIGISOS_ID.eq(fiksDigisosId)
+                SUBMISSION.FIKS_DIGISOS_ID
+                    .eq(fiksDigisosId)
                     .and(SUBMISSION.NAV_EKSTERN_REF_ID.isNotNull),
-            )
-            .fetch()
+            ).fetch()
             .map { it[SUBMISSION.NAV_EKSTERN_REF_ID]!! }
             .maxByOrNull { it.takeLast(4).toLong() }
 
@@ -173,13 +178,14 @@ class TusSubmissionQueries {
         contextId: String,
         personIdent: String,
     ): Boolean =
-        tx.dsl()
+        tx
+            .dsl()
             .selectCount()
             .from(SUBMISSION)
             .where(
-                SUBMISSION.CONTEXT_ID.eq(contextId)
+                SUBMISSION.CONTEXT_ID
+                    .eq(contextId)
                     .and(SUBMISSION.OWNER_IDENT.ne(personIdent)),
-            )
-            .fetchSingle()
+            ).fetchSingle()
             .value1() > 0
 }

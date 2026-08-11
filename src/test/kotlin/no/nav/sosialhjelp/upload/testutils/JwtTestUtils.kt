@@ -32,7 +32,8 @@ object JwtTestUtils {
         acr: String = "idporten-loa-high",
     ): String {
         val algorithm = Algorithm.RSA256(null, keyPair.private as RSAPrivateKey)
-        return JWT.create()
+        return JWT
+            .create()
             .withIssuer(ISSUER)
             .withSubject(subject)
             .withClaim("client_id", CLIENT_ID)

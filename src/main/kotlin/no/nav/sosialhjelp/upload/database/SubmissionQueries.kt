@@ -24,10 +24,10 @@ class SubmissionQueries(
             .selectCount()
             .from(SUBMISSION)
             .where(
-                SUBMISSION.ID.eq(id)
+                SUBMISSION.ID
+                    .eq(id)
                     .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
-            )
-            .fetchOne()
+            ).fetchOne()
             ?.value1()
             .let { (it ?: 0) != 0 }
 
@@ -41,10 +41,10 @@ class SubmissionQueries(
             .selectCount()
             .from(SUBMISSION)
             .where(
-                SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId)
+                SUBMISSION.NAV_EKSTERN_REF_ID
+                    .eq(navEksternRefId)
                     .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
-            )
-            .fetchSingle()
+            ).fetchSingle()
             .value1() > 0
 
     fun cleanup(

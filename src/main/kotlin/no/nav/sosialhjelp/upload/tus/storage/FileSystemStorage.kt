@@ -59,7 +59,8 @@ class FileSystemStorage(
             val prefixFile = File(root, prefix)
             val dir = prefixFile.parentFile ?: root
             val namePrefix = prefixFile.name
-            dir.listFiles { f -> f.name.startsWith(namePrefix) }
+            dir
+                .listFiles { f -> f.name.startsWith(namePrefix) }
                 ?.map { root.toURI().relativize(it.toURI()).path }
                 ?: emptyList()
         }

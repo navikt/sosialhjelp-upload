@@ -18,8 +18,9 @@ data class SubmissionValidationErrorResponse(
     val errors: List<SubmissionValidationCode>,
 )
 
-class SubmissionValidationException(val violations: List<SubmissionValidationCode>) :
-    Exception("Submission validation failed: ${violations.joinToString()}")
+class SubmissionValidationException(
+    val violations: List<SubmissionValidationCode>,
+) : Exception("Submission validation failed: ${violations.joinToString()}")
 
 fun validateSubmissionUploads(uploads: List<Upload>): List<SubmissionValidationCode> {
     val completeUploads = uploads.filter { it.status == Status.COMPLETE }

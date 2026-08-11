@@ -64,7 +64,8 @@ class UploadRecoveryService(
                     "Recovered ${staleUploads.size} upload(s) stuck in PROCESSING " +
                         "(older than ${PROCESSING_TIMEOUT_MINUTES}m)",
                 )
-                meterRegistry.counter("upload.recovery", "reason", "stuck_processing")
+                meterRegistry
+                    .counter("upload.recovery", "reason", "stuck_processing")
                     .increment(staleUploads.size.toDouble())
                 staleUploads.forEach { info ->
                     notificationService.notifyUpdate(info.submissionId)
@@ -98,7 +99,8 @@ class UploadRecoveryService(
                     "Cleaned up ${staleUploads.size} halted PENDING upload(s) " +
                         "(stalled for >${PENDING_TIMEOUT_MINUTES}m)",
                 )
-                meterRegistry.counter("upload.recovery", "reason", "halted_pending")
+                meterRegistry
+                    .counter("upload.recovery", "reason", "halted_pending")
                     .increment(staleUploads.size.toDouble())
                 staleUploads.forEach { info ->
                     notificationService.notifyUpdate(info.submissionId)
