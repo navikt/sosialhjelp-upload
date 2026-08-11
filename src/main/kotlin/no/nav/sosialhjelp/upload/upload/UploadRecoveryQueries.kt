@@ -9,7 +9,10 @@ import java.util.UUID
  * DB queries for the upload recovery job: finding and marking stale uploads as failed.
  */
 class UploadRecoveryQueries {
-    data class StaleUploadInfo(val submissionId: UUID, val gcsKey: String?)
+    data class StaleUploadInfo(
+        val submissionId: UUID,
+        val gcsKey: String?,
+    )
 
     /**
      * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.

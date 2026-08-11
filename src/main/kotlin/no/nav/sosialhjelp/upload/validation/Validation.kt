@@ -34,7 +34,9 @@ class VirusValidation : Validation {
     override val code: ValidationCode = ValidationCode.POSSIBLY_INFECTED
 }
 
-class FileTypeValidation(actual: String) : Validation {
+class FileTypeValidation(
+    actual: String,
+) : Validation {
     override val message: String = "File type is not supported. Was $actual."
     override val code: ValidationCode = ValidationCode.FILETYPE_NOT_SUPPORTED
 }

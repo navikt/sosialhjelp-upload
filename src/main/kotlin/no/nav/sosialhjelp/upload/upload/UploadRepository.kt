@@ -63,10 +63,11 @@ class UploadRepository {
                 UPLOAD.SHA512,
                 SUBMISSION.KATEGORI,
                 UPLOAD.CORRELATION_ID,
-            )
-            .from(UPLOAD)
-            .leftJoin(ERROR).on(ERROR.UPLOAD.eq(UPLOAD.ID))
-            .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            ).from(UPLOAD)
+            .leftJoin(ERROR)
+            .on(ERROR.UPLOAD.eq(UPLOAD.ID))
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
             .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
             .fetch()
             .groupBy { it.get(UPLOAD.ID) }
@@ -81,7 +82,9 @@ class UploadRepository {
                     fileSize = records.first().get(UPLOAD.SIZE),
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
                     status =
-                        records.first().get(UPLOAD.PROCESSING_STATUS)
+                        records
+                            .first()
+                            .get(UPLOAD.PROCESSING_STATUS)
                             ?.let { Status.valueOf(it) }
                             ?: error("No processing status. Was it not selected?"),
                     sha512 = records.first().get(UPLOAD.SHA512),
@@ -113,9 +116,9 @@ class UploadRepository {
                 SUBMISSION.KATEGORI,
                 UPLOAD.MELLOMLAGRING_FILNAVN,
                 UPLOAD.SHA512,
-            )
-            .from(UPLOAD)
-            .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            ).from(UPLOAD)
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
             .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
             .and(UPLOAD.PROCESSING_STATUS.eq(Status.COMPLETE.name))
             .fetch()

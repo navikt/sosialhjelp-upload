@@ -15,10 +15,10 @@ class EttersendelseSubmissionQueries {
             .select(SUBMISSION.NAV_EKSTERN_REF_ID)
             .from(SUBMISSION)
             .where(
-                SUBMISSION.ID.eq(submissionId)
+                SUBMISSION.ID
+                    .eq(submissionId)
                     .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
-            )
-            .fetchOne()
+            ).fetchOne()
             ?.get(SUBMISSION.NAV_EKSTERN_REF_ID)
             ?: error("Could not find submission $submissionId for personIdent")
 }

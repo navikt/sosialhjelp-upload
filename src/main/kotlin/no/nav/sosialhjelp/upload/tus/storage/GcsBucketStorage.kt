@@ -31,7 +31,8 @@ class GcsBucketStorage(
             val destBlobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, destKey)).build()
             val composeRequest =
                 @Suppress("SpreadOperator")
-                Storage.ComposeRequest.newBuilder()
+                Storage.ComposeRequest
+                    .newBuilder()
                     .addSource(*sourceKeys.toTypedArray())
                     .setTarget(destBlobInfo)
                     .build()
@@ -65,7 +66,8 @@ class GcsBucketStorage(
 
     override suspend fun listKeys(prefix: String): List<String> =
         withContext(ioDispatcher) {
-            storage.list(bucketName, Storage.BlobListOption.prefix(prefix))
+            storage
+                .list(bucketName, Storage.BlobListOption.prefix(prefix))
                 .iterateAll()
                 .map { it.name }
         }

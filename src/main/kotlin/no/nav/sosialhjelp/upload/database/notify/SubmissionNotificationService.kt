@@ -21,7 +21,10 @@ import java.util.*
 import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 
-data class SubmissionUpdateNotification(val submissionId: UUID, val type: UpdateType) {
+data class SubmissionUpdateNotification(
+    val submissionId: UUID,
+    val type: UpdateType,
+) {
     enum class UpdateType {
         UPDATE,
         DELETE,

@@ -260,7 +260,10 @@ class EttersendelseAlreadyExistsException(
 ) : RuntimeException("Ettersendelse $navEksternRefId already exists for fiksDigisosId $fiksDigisosId")
 
 @Serializable
-data class Fil(val filnavn: String, val sha512: String)
+data class Fil(
+    val filnavn: String,
+    val sha512: String,
+)
 
 @Serializable
 data class Vedlegg(
@@ -278,7 +281,9 @@ data class Vedlegg(
         VedleggAlleredeSendt,
     }
 
-    enum class HendelseType(val value: String) {
+    enum class HendelseType(
+        val value: String,
+    ) {
         DOKUMENTASJON_ETTERSPURT("dokumentasjonEtterspurt"),
         DOKUMENTASJONKRAV("dokumentasjonkrav"),
         SOKNAD("soknad"),
@@ -303,4 +308,6 @@ data class VedleggSpesifikasjon(
     val vedlegg: List<Vedlegg>,
 )
 
-class FiksException(message: String) : RuntimeException(message)
+class FiksException(
+    message: String,
+) : RuntimeException(message)

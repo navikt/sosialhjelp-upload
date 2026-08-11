@@ -55,8 +55,13 @@ class UploadProcessingService(
 
                 val storageResult =
                     storeUpload(
-                        uploadId, fileExtension, upload.navEksternRefId,
-                        finalFilename, finalData, composedKey, startTime,
+                        uploadId,
+                        fileExtension,
+                        upload.navEksternRefId,
+                        finalFilename,
+                        finalData,
+                        composedKey,
+                        startTime,
                     ) ?: return@withContext
 
                 finalizeUpload(uploadId, fileExtension, finalData, storageResult, composedKey, startTime)

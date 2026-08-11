@@ -58,7 +58,8 @@ class StaleSubmissionCleanupServiceIntegrationTest {
 
         // Insert a COMPLETE upload with updated_at in the past
         val uploadId = UUID.randomUUID()
-        dsl.insertInto(UPLOAD)
+        dsl
+            .insertInto(UPLOAD)
             .set(UPLOAD.ID, uploadId)
             .set(UPLOAD.SUBMISSION_ID, submissionId)
             .set(UPLOAD.ORIGINAL_FILENAME, "test.pdf")
@@ -80,7 +81,8 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
 
         val uploadId = UUID.randomUUID()
-        dsl.insertInto(UPLOAD)
+        dsl
+            .insertInto(UPLOAD)
             .set(UPLOAD.ID, uploadId)
             .set(UPLOAD.SUBMISSION_ID, submissionId)
             .set(UPLOAD.ORIGINAL_FILENAME, "test.pdf")
@@ -101,7 +103,8 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
 
         val uploadId = UUID.randomUUID()
-        dsl.insertInto(UPLOAD)
+        dsl
+            .insertInto(UPLOAD)
             .set(UPLOAD.ID, uploadId)
             .set(UPLOAD.SUBMISSION_ID, submissionId)
             .set(UPLOAD.ORIGINAL_FILENAME, "test.pdf")

@@ -19,7 +19,8 @@ fun Application.configureMonitoring(registry: PrometheusMeterRegistry) {
     install(MicrometerMetrics) {
         this.registry = registry
         distributionStatisticConfig =
-            DistributionStatisticConfig.Builder()
+            DistributionStatisticConfig
+                .Builder()
                 .percentilesHistogram(true)
                 .percentiles(0.5, 0.95, 0.99)
                 .build()

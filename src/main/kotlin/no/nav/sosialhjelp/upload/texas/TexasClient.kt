@@ -72,7 +72,9 @@ class TexasClient(
     }
 }
 
-class TexasTokenException(message: String) : RuntimeException(message)
+class TexasTokenException(
+    message: String,
+) : RuntimeException(message)
 
 private val maskinportenParams: Map<String, String> =
     mapOf("identity_provider" to "maskinporten", "target" to "ks:fiks")

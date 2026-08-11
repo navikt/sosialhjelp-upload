@@ -176,7 +176,13 @@ class UploadFlowIntegrationTest {
                 dependencies.provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(Int.MAX_VALUE) }
             }
         server.start()
-        val port = kotlinx.coroutines.runBlocking { server.engine.resolvedConnectors().first().port }
+        val port =
+            kotlinx.coroutines.runBlocking {
+                server.engine
+                    .resolvedConnectors()
+                    .first()
+                    .port
+            }
         val client =
             HttpClient(CIO) {
                 install(SSE)
@@ -288,7 +294,11 @@ class UploadFlowIntegrationTest {
 
             awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
 
-            val row = PostgresTestContainer.dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            val row =
+                PostgresTestContainer.dsl
+                    .selectFrom(UPLOAD)
+                    .where(UPLOAD.ID.eq(uploadId))
+                    .fetchOne()
             assertNotNull(row, "Upload row should exist in DB")
             assertEquals(filId, row[UPLOAD.FIL_ID], "FIL_ID should be set to mellomlagring ID")
             assertNull(row[UPLOAD.GCS_KEY], "gcs_key should be cleared after processing")
@@ -315,7 +325,11 @@ class UploadFlowIntegrationTest {
                 }
             assertEquals(HttpStatusCode.NoContent, deleteResp.status)
 
-            val row = PostgresTestContainer.dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            val row =
+                PostgresTestContainer.dsl
+                    .selectFrom(UPLOAD)
+                    .where(UPLOAD.ID.eq(uploadId))
+                    .fetchOne()
             assertNull(row, "Upload row should be removed from DB after deletion")
 
             coVerify { mellomlagringClient.deleteFile(any(), filId) }
@@ -352,7 +366,11 @@ class UploadFlowIntegrationTest {
                 }
             assertEquals(HttpStatusCode.Created, submitResp.status)
 
-            val sub = PostgresTestContainer.dsl.selectFrom(SUBMISSION).where(SUBMISSION.ID.eq(submissionId)).fetchOne()
+            val sub =
+                PostgresTestContainer.dsl
+                    .selectFrom(SUBMISSION)
+                    .where(SUBMISSION.ID.eq(submissionId))
+                    .fetchOne()
             assertNull(sub, "Submission should be deleted after successful submit")
         }
 
@@ -384,7 +402,11 @@ class UploadFlowIntegrationTest {
                 }
             assertEquals(HttpStatusCode.Created, submitResp.status)
 
-            val sub = PostgresTestContainer.dsl.selectFrom(SUBMISSION).where(SUBMISSION.ID.eq(submissionId)).fetchOne()
+            val sub =
+                PostgresTestContainer.dsl
+                    .selectFrom(SUBMISSION)
+                    .where(SUBMISSION.ID.eq(submissionId))
+                    .fetchOne()
             assertNull(sub, "Submission should be cleaned up even when Fiks reports already exists")
         }
 
@@ -576,15 +598,19 @@ class UploadFlowIntegrationTest {
             val soknadId = UUID.randomUUID().toString()
             val token = JwtTestUtils.issueToken()
 
-            data class Headers(val status: HttpStatusCode, val contentType: String?)
+            data class Headers(
+                val status: HttpStatusCode,
+                val contentType: String?,
+            )
 
             val deferredHeaders =
                 async {
-                    client.prepareGet("/sosialhjelp/upload/status/$contextId?soknadId=$soknadId") {
-                        header("Authorization", "Bearer $token")
-                    }.execute { response ->
-                        Headers(response.status, response.headers[HttpHeaders.ContentType])
-                    }
+                    client
+                        .prepareGet("/sosialhjelp/upload/status/$contextId?soknadId=$soknadId") {
+                            header("Authorization", "Bearer $token")
+                        }.execute { response ->
+                            Headers(response.status, response.headers[HttpHeaders.ContentType])
+                        }
                 }
             val (statusCode, contentTypeHeader) = deferredHeaders.await()
             // Cancel the SSE connection — the server-side handler will run indefinitely otherwise.

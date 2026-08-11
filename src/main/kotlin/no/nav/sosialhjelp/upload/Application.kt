@@ -85,14 +85,12 @@ private fun migrateDatabase(
             if (clean) {
                 it.cleanDisabled(false)
             }
-        }
-        .load()
+        }.load()
         .also {
             if (clean) {
                 it.clean()
             }
-        }
-        .migrate()
+        }.migrate()
 }
 
 fun Application.module() {

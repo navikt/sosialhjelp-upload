@@ -44,7 +44,8 @@ class VedleggServiceTest {
     ): UUID {
         val uploadId = UUID.randomUUID()
         dsl.transaction { config ->
-            config.dsl()
+            config
+                .dsl()
                 .insertInto(UPLOAD)
                 .set(UPLOAD.ID, uploadId)
                 .set(UPLOAD.SUBMISSION_ID, submissionId)
@@ -63,7 +64,8 @@ class VedleggServiceTest {
     ): UUID {
         val uuid = UUID.randomUUID()
         dsl.transaction { config ->
-            config.dsl()
+            config
+                .dsl()
                 .insertInto(SUBMISSION)
                 .set(SUBMISSION.ID, uuid)
                 .set(SUBMISSION.OWNER_IDENT, "12345678910")
@@ -107,7 +109,9 @@ class VedleggServiceTest {
         val submissionB = createMockSubmissionWithKategori(navEksternRefId + "-b", kategori = "annet")
 
         dsl.transaction { config ->
-            config.dsl().update(SUBMISSION)
+            config
+                .dsl()
+                .update(SUBMISSION)
                 .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
                 .where(SUBMISSION.ID.`in`(submissionA, submissionB))
                 .execute()
@@ -130,7 +134,8 @@ class VedleggServiceTest {
 
         val uploadId = UUID.randomUUID()
         dsl.transaction { config ->
-            config.dsl()
+            config
+                .dsl()
                 .insertInto(UPLOAD)
                 .set(UPLOAD.ID, uploadId)
                 .set(UPLOAD.SUBMISSION_ID, submissionId)
