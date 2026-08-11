@@ -11,10 +11,7 @@ import java.util.UUID
  * DB queries for the submission cleanup job: finding stale submissions to clean up.
  */
 <span class="fc" id="L13">class StaleSubmissionQueries {</span>
-<span class="fc" id="L14">    data class StaleSubmission(</span>
-<span class="fc" id="L15">        val id: UUID,</span>
-<span class="fc" id="L16">        val navEksternRefId: String,</span>
-    )
+<span class="fc" id="L14">    data class StaleSubmission(val id: UUID, val navEksternRefId: String)</span>
 
     /**
      * Returns submissions whose uploads have all reached a terminal state (not PENDING or PROCESSING)
@@ -24,25 +21,21 @@ import java.util.UUID
         tx: Configuration,
         cutoff: OffsetDateTime,
     ): List&lt;StaleSubmission&gt; =
-<span class="fc" id="L27">        tx</span>
-<span class="fc" id="L28">            .dsl()</span>
-<span class="fc" id="L29">            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
-<span class="fc" id="L30">            .from(SUBMISSION)</span>
-<span class="fc" id="L31">            .join(UPLOAD)</span>
-<span class="fc" id="L32">            .on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))</span>
-<span class="fc" id="L33">            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
-<span class="fc" id="L34">            .having(</span>
-                DSL
-<span class="fc" id="L36">                    .max(UPLOAD.UPDATED_AT)</span>
-<span class="fc" id="L37">                    .lt(cutoff)</span>
-<span class="fc" id="L38">                    .and(</span>
-                        DSL
-<span class="fc" id="L40">                            .count()</span>
-<span class="fc" id="L41">                            .filterWhere(</span>
-<span class="fc" id="L42">                                UPLOAD.PROCESSING_STATUS.`in`(&quot;PENDING&quot;, &quot;PROCESSING&quot;),</span>
-<span class="fc" id="L43">                            ).eq(0),</span>
+<span class="fc" id="L24">        tx</span>
+<span class="fc" id="L25">            .dsl()</span>
+<span class="fc" id="L26">            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L27">            .from(SUBMISSION)</span>
+<span class="fc" id="L28">            .join(UPLOAD).on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))</span>
+<span class="fc" id="L29">            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)</span>
+<span class="fc" id="L30">            .having(</span>
+<span class="fc" id="L31">                DSL.max(UPLOAD.UPDATED_AT).lt(cutoff)</span>
+<span class="fc" id="L32">                    .and(</span>
+<span class="fc" id="L33">                        DSL.count().filterWhere(</span>
+<span class="fc" id="L34">                            UPLOAD.PROCESSING_STATUS.`in`(&quot;PENDING&quot;, &quot;PROCESSING&quot;),</span>
+<span class="fc" id="L35">                        ).eq(0),</span>
                     ),
-<span class="fc" id="L45">            ).fetch()</span>
-<span class="fc" id="L46">            .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }</span>
+            )
+<span class="fc" id="L38">            .fetch()</span>
+<span class="fc" id="L39">            .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -17,7 +17,8 @@ import no.nav.sosialhjelp.upload.action.fiks.Vedlegg
 <span class="nc" id="L17">        encoder.encodeString(value.value)</span>
 <span class="nc" id="L18">    }</span>
 
-    override fun deserialize(decoder: Decoder): Vedlegg.HendelseType =
-<span class="nc" id="L21">        Vedlegg.HendelseType.fromValue(decoder.decodeString())</span>
+    override fun deserialize(decoder: Decoder): Vedlegg.HendelseType {
+<span class="nc" id="L21">        return Vedlegg.HendelseType.fromValue(decoder.decodeString())</span>
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

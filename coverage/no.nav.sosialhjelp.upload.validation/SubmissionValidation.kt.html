@@ -18,20 +18,19 @@ enum class SubmissionValidationCode {
 <span class="nc" id="L18">    val errors: List&lt;SubmissionValidationCode&gt;,</span>
 )
 
-<span class="nc" id="L21">class SubmissionValidationException(</span>
-<span class="nc" id="L22">    val violations: List&lt;SubmissionValidationCode&gt;,</span>
-<span class="nc" id="L23">) : Exception(&quot;Submission validation failed: ${violations.joinToString()}&quot;)</span>
+<span class="nc" id="L21">class SubmissionValidationException(val violations: List&lt;SubmissionValidationCode&gt;) :</span>
+<span class="nc" id="L22">    Exception(&quot;Submission validation failed: ${violations.joinToString()}&quot;)</span>
 
 fun validateSubmissionUploads(uploads: List&lt;Upload&gt;): List&lt;SubmissionValidationCode&gt; {
-<span class="fc bfc" id="L26" title="All 2 branches covered.">    val completeUploads = uploads.filter { it.status == Status.COMPLETE }</span>
-<span class="fc" id="L27">    val violations = mutableListOf&lt;SubmissionValidationCode&gt;()</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">    if (completeUploads.size &gt; MAX_FILES_PER_SUBMISSION) {</span>
-<span class="fc" id="L29">        violations += SubmissionValidationCode.TOO_MANY_FILES</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">    val completeUploads = uploads.filter { it.status == Status.COMPLETE }</span>
+<span class="fc" id="L26">    val violations = mutableListOf&lt;SubmissionValidationCode&gt;()</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    if (completeUploads.size &gt; MAX_FILES_PER_SUBMISSION) {</span>
+<span class="fc" id="L28">        violations += SubmissionValidationCode.TOO_MANY_FILES</span>
     }
-<span class="fc bfc" id="L31" title="All 4 branches covered.">    val totalSize = completeUploads.sumOf { it.mellomlagringStorrelse ?: 0L }</span>
-<span class="fc bfc" id="L32" title="All 2 branches covered.">    if (totalSize &gt; MAX_TOTAL_SIZE_BYTES) {</span>
-<span class="fc" id="L33">        violations += SubmissionValidationCode.TOTAL_SIZE_TOO_LARGE</span>
+<span class="fc bfc" id="L30" title="All 4 branches covered.">    val totalSize = completeUploads.sumOf { it.mellomlagringStorrelse ?: 0L }</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">    if (totalSize &gt; MAX_TOTAL_SIZE_BYTES) {</span>
+<span class="fc" id="L32">        violations += SubmissionValidationCode.TOTAL_SIZE_TOO_LARGE</span>
     }
-<span class="fc" id="L35">    return violations</span>
+<span class="fc" id="L34">    return violations</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

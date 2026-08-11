@@ -252,92 +252,93 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
     fun validate(
         filename: String,
         fileSize: Long,
-    ): List&lt;Validation&gt; =
-<span class="fc" id="L256">        listOfNotNull(</span>
+    ): List&lt;Validation&gt; {
+<span class="fc" id="L256">        return listOfNotNull(</span>
 <span class="fc" id="L257">            validateFileSize(fileSize),</span>
 <span class="fc" id="L258">            validateFilename(Filename(filename)),</span>
-<span class="fc" id="L259">        )</span>
+        )
+    }
 
     suspend fun validate(
         filename: String,
         data: ByteArray,
         fileSize: Long,
     ): List&lt;Validation&gt; =
-<span class="pc bpc" id="L266" title="2 of 5 branches missed.">        coroutineScope {</span>
-<span class="fc" id="L267">            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }</span>
-<span class="fc bfc" id="L268" title="All 2 branches covered.">            val (mimeType, fileTypeValidation) = validateFileType(data, filename)</span>
-<span class="fc" id="L269">            meterRegistry.counter(&quot;upload.tika_mime_type&quot;, &quot;mime_type&quot;, mimeType).increment()</span>
-<span class="fc" id="L270">            listOfNotNull(</span>
-<span class="fc" id="L271">                validateFileSize(fileSize),</span>
-<span class="fc" id="L272">                fileTypeValidation,</span>
-<span class="fc bfc" id="L273" title="All 4 branches covered.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
-<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                virusScanValidation.await(),</span>
-<span class="fc" id="L275">            )</span>
-<span class="fc" id="L276">        }</span>
+<span class="pc bpc" id="L267" title="2 of 5 branches missed.">        coroutineScope {</span>
+<span class="fc" id="L268">            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            val (mimeType, fileTypeValidation) = validateFileType(data, filename)</span>
+<span class="fc" id="L270">            meterRegistry.counter(&quot;upload.tika_mime_type&quot;, &quot;mime_type&quot;, mimeType).increment()</span>
+<span class="fc" id="L271">            listOfNotNull(</span>
+<span class="fc" id="L272">                validateFileSize(fileSize),</span>
+<span class="fc" id="L273">                fileTypeValidation,</span>
+<span class="fc bfc" id="L274" title="All 4 branches covered.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                virusScanValidation.await(),</span>
+<span class="fc" id="L276">            )</span>
+<span class="fc" id="L277">        }</span>
 
     private suspend fun validatePdf(data: ByteArray): Validation? =
-<span class="fc" id="L279">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L280">            try {</span>
-<span class="fc" id="L281">                val randomAccessRead = RandomAccessReadBuffer(data.inputStream())</span>
+<span class="fc" id="L280">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L281">            try {</span>
+<span class="fc" id="L282">                val randomAccessRead = RandomAccessReadBuffer(data.inputStream())</span>
                 Loader
-<span class="fc" id="L283">                    .loadPDF(randomAccessRead)</span>
-<span class="pc" id="L284">                    .use { document -&gt;</span>
-<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                        if (document.isEncrypted) {</span>
-<span class="nc" id="L286">                            EncryptedPdfValidation()</span>
+<span class="fc" id="L284">                    .loadPDF(randomAccessRead)</span>
+<span class="pc" id="L285">                    .use { document -&gt;</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                        if (document.isEncrypted) {</span>
+<span class="nc" id="L287">                            EncryptedPdfValidation()</span>
                         } else {
-<span class="fc" id="L288">                            null</span>
-<span class="fc" id="L289">                        }</span>
+<span class="fc" id="L289">                            null</span>
+<span class="fc" id="L290">                        }</span>
                     }
-<span class="nc" id="L291">            } catch (e: InvalidPasswordException) {</span>
-<span class="nc" id="L292">                logger.warn(ValidationCode.ENCRYPTED_PDF.name + &quot; &quot; + e.message)</span>
-<span class="nc" id="L293">                EncryptedPdfValidation()</span>
-<span class="nc" id="L294">            } catch (e: IOException) {</span>
-<span class="nc" id="L295">                logger.warn(ValidationCode.INVALID_PDF.name, e)</span>
-<span class="nc" id="L296">                InvalidPdfValidation()</span>
-<span class="nc" id="L297">            } catch (e: Exception) {</span>
-<span class="nc" id="L298">                logger.warn(ValidationCode.INVALID_PDF.name + &quot; &quot; + e.message, e)</span>
-<span class="pc" id="L299">                InvalidPdfValidation()</span>
-<span class="fc" id="L300">            }</span>
-<span class="fc" id="L301">        }</span>
+<span class="nc" id="L292">            } catch (e: InvalidPasswordException) {</span>
+<span class="nc" id="L293">                logger.warn(ValidationCode.ENCRYPTED_PDF.name + &quot; &quot; + e.message)</span>
+<span class="nc" id="L294">                EncryptedPdfValidation()</span>
+<span class="nc" id="L295">            } catch (e: IOException) {</span>
+<span class="nc" id="L296">                logger.warn(ValidationCode.INVALID_PDF.name, e)</span>
+<span class="nc" id="L297">                InvalidPdfValidation()</span>
+<span class="nc" id="L298">            } catch (e: Exception) {</span>
+<span class="nc" id="L299">                logger.warn(ValidationCode.INVALID_PDF.name + &quot; &quot; + e.message, e)</span>
+<span class="pc" id="L300">                InvalidPdfValidation()</span>
+<span class="fc" id="L301">            }</span>
+<span class="fc" id="L302">        }</span>
 
     private suspend fun validateFileType(
         data: ByteArray,
         filename: String,
     ): Pair&lt;String, Validation?&gt; =
-<span class="fc" id="L307">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L308">            val tikaIS = TikaInputStream.get(data.inputStream())</span>
-<span class="fc" id="L309">            val tikaMetadata = Metadata()</span>
-<span class="fc" id="L310">            tikaMetadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)</span>
-<span class="pc" id="L311">            val mimeType = tikaIS.use { tika.detect(tikaIS, tikaMetadata) }</span>
-<span class="fc bfc" id="L312" title="All 2 branches covered.">            if (mimeType !in SUPPORTED_MIME_TYPES) {</span>
-<span class="fc" id="L313">                return@withContext mimeType to FileTypeValidation(actual = mimeType)</span>
+<span class="fc" id="L308">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L309">            val tikaIS = TikaInputStream.get(data.inputStream())</span>
+<span class="fc" id="L310">            val tikaMetadata = Metadata()</span>
+<span class="fc" id="L311">            tikaMetadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)</span>
+<span class="pc" id="L312">            val mimeType = tikaIS.use { tika.detect(tikaIS, tikaMetadata) }</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (mimeType !in SUPPORTED_MIME_TYPES) {</span>
+<span class="fc" id="L314">                return@withContext mimeType to FileTypeValidation(actual = mimeType)</span>
             }
-<span class="fc" id="L315">            return@withContext mimeType to null</span>
-<span class="fc" id="L316">        }</span>
+<span class="fc" id="L316">            return@withContext mimeType to null</span>
+<span class="fc" id="L317">        }</span>
 
     private suspend fun runVirusScan(data: ByteArray): Validation? =
-<span class="pc bpc" id="L319" title="1 of 3 branches missed.">        when (virusScanner.scan(data)) {</span>
-<span class="fc" id="L320">            Result.FOUND -&gt; VirusValidation()</span>
+<span class="pc bpc" id="L320" title="1 of 3 branches missed.">        when (virusScanner.scan(data)) {</span>
+<span class="fc" id="L321">            Result.FOUND -&gt; VirusValidation()</span>
             Result.ERROR -&gt; {
-<span class="nc" id="L322">                logger.warn(&quot;Virus scanner returned ERROR, treating file as clean&quot;)</span>
-<span class="nc" id="L323">                null</span>
+<span class="nc" id="L323">                logger.warn(&quot;Virus scanner returned ERROR, treating file as clean&quot;)</span>
+<span class="nc" id="L324">                null</span>
             }
 
-<span class="fc" id="L326">            Result.OK -&gt; null</span>
-<span class="fc" id="L327">        }</span>
+<span class="fc" id="L327">            Result.OK -&gt; null</span>
+<span class="fc" id="L328">        }</span>
 
     private fun validateFileSize(filesize: Long): Validation? {
-<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (filesize &gt; MAX_FILE_SIZE) {</span>
-<span class="fc" id="L331">            return FileSizeValidation()</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (filesize &gt; MAX_FILE_SIZE) {</span>
+<span class="fc" id="L332">            return FileSizeValidation()</span>
         }
-<span class="fc" id="L333">        return null</span>
+<span class="fc" id="L334">        return null</span>
     }
 
     private fun validateFilename(filename: Filename): Validation? {
-<span class="pc bpc" id="L337" title="2 of 4 branches missed.">        if (filename.containsDangerousSequences() || filename.containsIllegalCharacters()) {</span>
-<span class="nc" id="L338">            return FilenameValidation()</span>
+<span class="pc bpc" id="L338" title="2 of 4 branches missed.">        if (filename.containsDangerousSequences() || filename.containsIllegalCharacters()) {</span>
+<span class="nc" id="L339">            return FilenameValidation()</span>
         }
-<span class="fc" id="L340">        return null</span>
+<span class="fc" id="L341">        return null</span>
     }
 }
 
@@ -345,21 +346,17 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 private value class Filename(
     val value: String,
 ) {
-<span class="fc" id="L348">    fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()</span>
+<span class="fc" id="L349">    fun sanitize() = Normalizer.normalize(value, Normalizer.Form.NFC).trim()</span>
 
-<span class="fc" id="L350">    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(Regex(&quot;[*:&lt;&gt;|?\\/]&quot;))</span>
+<span class="fc" id="L351">    fun containsIllegalCharacters(): Boolean = this.sanitize().contains(Regex(&quot;[*:&lt;&gt;|?\\/]&quot;))</span>
 
     fun containsDangerousSequences(): Boolean {
-<span class="fc" id="L353">        val normalized = sanitize()</span>
-<span class="pc bpc" id="L354" title="3 of 6 branches missed.">        return normalized.any { it.code &lt; 32 || it.code == 127 } ||</span>
-            // control characters and DEL
-<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            normalized.contains('\u0000') ||</span>
-            // null byte
-<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            normalized.contains(&quot;..&quot;) ||</span>
-            // path traversal
-<span class="pc bpc" id="L360" title="1 of 2 branches missed.">            normalized.startsWith(&quot;/&quot;) ||</span>
-            // absolute path (Unix)
-<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            normalized.startsWith(&quot;\\&quot;) // absolute path (Windows)</span>
+<span class="fc" id="L354">        val normalized = sanitize()</span>
+<span class="pc bpc" id="L355" title="3 of 6 branches missed.">        return normalized.any { it.code &lt; 32 || it.code == 127 } || // control characters and DEL</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            normalized.contains('\u0000') || // null byte</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            normalized.contains(&quot;..&quot;) || // path traversal</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            normalized.startsWith(&quot;/&quot;) || // absolute path (Unix)</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            normalized.startsWith(&quot;\\&quot;) // absolute path (Windows)</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
