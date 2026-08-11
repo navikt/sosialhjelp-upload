@@ -19,35 +19,36 @@ fun Application.configureMonitoring(registry: PrometheusMeterRegistry) {
 <span class="fc" id="L19">    install(MicrometerMetrics) {</span>
 <span class="fc" id="L20">        this.registry = registry</span>
 <span class="fc" id="L21">        distributionStatisticConfig =</span>
-<span class="fc" id="L22">            DistributionStatisticConfig.Builder()</span>
-<span class="fc" id="L23">                .percentilesHistogram(true)</span>
-<span class="fc" id="L24">                .percentiles(0.5, 0.95, 0.99)</span>
-<span class="fc" id="L25">                .build()</span>
-<span class="fc" id="L26">        meterBinders =</span>
-<span class="fc" id="L27">            listOf(</span>
-<span class="fc" id="L28">                JvmMemoryMetrics(),</span>
-<span class="fc" id="L29">                JvmGcMetrics(),</span>
-<span class="fc" id="L30">                JvmThreadMetrics(),</span>
-<span class="fc" id="L31">                ProcessorMetrics(),</span>
+            DistributionStatisticConfig
+<span class="fc" id="L23">                .Builder()</span>
+<span class="fc" id="L24">                .percentilesHistogram(true)</span>
+<span class="fc" id="L25">                .percentiles(0.5, 0.95, 0.99)</span>
+<span class="fc" id="L26">                .build()</span>
+<span class="fc" id="L27">        meterBinders =</span>
+<span class="fc" id="L28">            listOf(</span>
+<span class="fc" id="L29">                JvmMemoryMetrics(),</span>
+<span class="fc" id="L30">                JvmGcMetrics(),</span>
+<span class="fc" id="L31">                JvmThreadMetrics(),</span>
+<span class="fc" id="L32">                ProcessorMetrics(),</span>
             )
-<span class="fc" id="L33">    }</span>
-<span class="fc" id="L34">    install(CallLogging) {</span>
-<span class="fc" id="L35">        level = Level.INFO</span>
-<span class="fc" id="L36">        filter { call -&gt;</span>
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            !call.request.path().contains(&quot;/internal&quot;) &amp;&amp;</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                !call.request.path().contains(&quot;/metrics&quot;)</span>
+<span class="fc" id="L34">    }</span>
+<span class="fc" id="L35">    install(CallLogging) {</span>
+<span class="fc" id="L36">        level = Level.INFO</span>
+<span class="fc" id="L37">        filter { call -&gt;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            !call.request.path().contains(&quot;/internal&quot;) &amp;&amp;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                !call.request.path().contains(&quot;/metrics&quot;)</span>
         }
-<span class="fc" id="L40">        mdc(&quot;fiksDigisosId&quot;) { call -&gt;</span>
-<span class="fc" id="L41">            parseMetadata(call.request.header(&quot;Upload-Metadata&quot;))[&quot;fiksDigisosId&quot;]</span>
+<span class="fc" id="L41">        mdc(&quot;fiksDigisosId&quot;) { call -&gt;</span>
+<span class="fc" id="L42">            parseMetadata(call.request.header(&quot;Upload-Metadata&quot;))[&quot;fiksDigisosId&quot;]</span>
         }
-<span class="fc" id="L43">        mdc(&quot;navEksternRefId&quot;) { call -&gt;</span>
-<span class="fc" id="L44">            parseMetadata(call.request.header(&quot;Upload-Metadata&quot;))[&quot;navEksternRefId&quot;]</span>
+<span class="fc" id="L44">        mdc(&quot;navEksternRefId&quot;) { call -&gt;</span>
+<span class="fc" id="L45">            parseMetadata(call.request.header(&quot;Upload-Metadata&quot;))[&quot;navEksternRefId&quot;]</span>
         }
-<span class="fc" id="L46">    }</span>
-<span class="fc" id="L47">    routing {</span>
-<span class="pc bnc" id="L48" title="All 3 branches missed.">        get(&quot;/metrics-micrometer&quot;) {</span>
-<span class="nc" id="L49">            call.respond(registry.scrape())</span>
-<span class="nc" id="L50">        }</span>
-<span class="fc" id="L51">    }</span>
-<span class="fc" id="L52">}</span>
+<span class="fc" id="L47">    }</span>
+<span class="fc" id="L48">    routing {</span>
+<span class="pc bnc" id="L49" title="All 3 branches missed.">        get(&quot;/metrics-micrometer&quot;) {</span>
+<span class="nc" id="L50">            call.respond(registry.scrape())</span>
+<span class="nc" id="L51">        }</span>
+<span class="fc" id="L52">    }</span>
+<span class="fc" id="L53">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

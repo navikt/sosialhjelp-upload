@@ -24,10 +24,10 @@ import java.util.UUID
 <span class="fc" id="L24">            .selectCount()</span>
 <span class="fc" id="L25">            .from(SUBMISSION)</span>
 <span class="fc" id="L26">            .where(</span>
-<span class="fc" id="L27">                SUBMISSION.ID.eq(id)</span>
-<span class="fc" id="L28">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-            )
-<span class="fc" id="L30">            .fetchOne()</span>
+<span class="fc" id="L27">                SUBMISSION.ID</span>
+<span class="fc" id="L28">                    .eq(id)</span>
+<span class="fc" id="L29">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L30">            ).fetchOne()</span>
 <span class="pc bpc" id="L31" title="1 of 2 branches missed.">            ?.value1()</span>
 <span class="pc bpc" id="L32" title="2 of 4 branches missed.">            .let { (it ?: 0) != 0 }</span>
 
@@ -41,10 +41,10 @@ import java.util.UUID
 <span class="nc" id="L41">            .selectCount()</span>
 <span class="nc" id="L42">            .from(SUBMISSION)</span>
 <span class="nc" id="L43">            .where(</span>
-<span class="nc" id="L44">                SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId)</span>
-<span class="nc" id="L45">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-            )
-<span class="nc" id="L47">            .fetchSingle()</span>
+<span class="nc" id="L44">                SUBMISSION.NAV_EKSTERN_REF_ID</span>
+<span class="nc" id="L45">                    .eq(navEksternRefId)</span>
+<span class="nc" id="L46">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="nc" id="L47">            ).fetchSingle()</span>
 <span class="nc" id="L48">            .value1() &gt; 0</span>
 
     fun cleanup(

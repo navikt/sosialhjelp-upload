@@ -260,48 +260,55 @@ internal fun lagIdSuffix(previousId: String): String {
 <span class="fc" id="L260">) : RuntimeException(&quot;Ettersendelse $navEksternRefId already exists for fiksDigisosId $fiksDigisosId&quot;)</span>
 
 <span class="pc bnc" id="L262" title="All 2 branches missed.">@Serializable</span>
-<span class="pc" id="L263">data class Fil(val filnavn: String, val sha512: String)</span>
+<span class="fc" id="L263">data class Fil(</span>
+<span class="fc" id="L264">    val filnavn: String,</span>
+<span class="pc" id="L265">    val sha512: String,</span>
+)
 
-<span class="nc bnc" id="L265" title="All 10 branches missed.">@Serializable</span>
-<span class="nc" id="L266">data class Vedlegg(</span>
-<span class="nc" id="L267">    val type: String,</span>
-<span class="nc" id="L268">    val tilleggsinfo: String,</span>
-<span class="nc" id="L269">    val klageId: String? = null,</span>
-<span class="nc" id="L270">    val status: Status?,</span>
-<span class="nc" id="L271">    val filer: List&lt;Fil&gt;,</span>
-<span class="nc" id="L272">    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,</span>
-<span class="nc" id="L273">    val hendelseReferanse: String?,</span>
-<span class="nc" id="L274">) {</span>
+<span class="nc bnc" id="L268" title="All 10 branches missed.">@Serializable</span>
+<span class="nc" id="L269">data class Vedlegg(</span>
+<span class="nc" id="L270">    val type: String,</span>
+<span class="nc" id="L271">    val tilleggsinfo: String,</span>
+<span class="nc" id="L272">    val klageId: String? = null,</span>
+<span class="nc" id="L273">    val status: Status?,</span>
+<span class="nc" id="L274">    val filer: List&lt;Fil&gt;,</span>
+<span class="nc" id="L275">    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,</span>
+<span class="nc" id="L276">    val hendelseReferanse: String?,</span>
+<span class="nc" id="L277">) {</span>
     enum class Status {
-<span class="nc" id="L276">        LastetOpp,</span>
-<span class="nc" id="L277">        VedleggKreves,</span>
-<span class="nc" id="L278">        VedleggAlleredeSendt,</span>
+<span class="nc" id="L279">        LastetOpp,</span>
+<span class="nc" id="L280">        VedleggKreves,</span>
+<span class="nc" id="L281">        VedleggAlleredeSendt,</span>
     }
 
-<span class="nc" id="L281">    enum class HendelseType(val value: String) {</span>
-<span class="nc" id="L282">        DOKUMENTASJON_ETTERSPURT(&quot;dokumentasjonEtterspurt&quot;),</span>
-<span class="nc" id="L283">        DOKUMENTASJONKRAV(&quot;dokumentasjonkrav&quot;),</span>
-<span class="nc" id="L284">        SOKNAD(&quot;soknad&quot;),</span>
-<span class="nc" id="L285">        BRUKER(&quot;bruker&quot;),</span>
+<span class="nc" id="L284">    enum class HendelseType(</span>
+<span class="nc" id="L285">        val value: String,</span>
+    ) {
+<span class="nc" id="L287">        DOKUMENTASJON_ETTERSPURT(&quot;dokumentasjonEtterspurt&quot;),</span>
+<span class="nc" id="L288">        DOKUMENTASJONKRAV(&quot;dokumentasjonkrav&quot;),</span>
+<span class="nc" id="L289">        SOKNAD(&quot;soknad&quot;),</span>
+<span class="nc" id="L290">        BRUKER(&quot;bruker&quot;),</span>
         ;
 
         companion object {
             fun fromValue(value: String): HendelseType =
-<span class="nc bnc" id="L290" title="All 5 branches missed.">                when (value) {</span>
-<span class="nc" id="L291">                    &quot;dokumentasjonEtterspurt&quot; -&gt; DOKUMENTASJON_ETTERSPURT</span>
-<span class="nc" id="L292">                    &quot;dokumentasjonkrav&quot; -&gt; DOKUMENTASJONKRAV</span>
-<span class="nc" id="L293">                    &quot;soknad&quot; -&gt; SOKNAD</span>
-<span class="nc" id="L294">                    &quot;bruker&quot; -&gt; BRUKER</span>
-<span class="nc" id="L295">                    else -&gt; error(&quot;Unknown hendelse type: $value&quot;)</span>
-<span class="nc" id="L296">                }</span>
+<span class="nc bnc" id="L295" title="All 5 branches missed.">                when (value) {</span>
+<span class="nc" id="L296">                    &quot;dokumentasjonEtterspurt&quot; -&gt; DOKUMENTASJON_ETTERSPURT</span>
+<span class="nc" id="L297">                    &quot;dokumentasjonkrav&quot; -&gt; DOKUMENTASJONKRAV</span>
+<span class="nc" id="L298">                    &quot;soknad&quot; -&gt; SOKNAD</span>
+<span class="nc" id="L299">                    &quot;bruker&quot; -&gt; BRUKER</span>
+<span class="nc" id="L300">                    else -&gt; error(&quot;Unknown hendelse type: $value&quot;)</span>
+<span class="nc" id="L301">                }</span>
         }
     }
 }
 
-<span class="nc bnc" id="L301" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L302">data class VedleggSpesifikasjon(</span>
-<span class="nc" id="L303">    val vedlegg: List&lt;Vedlegg&gt;,</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L307">data class VedleggSpesifikasjon(</span>
+<span class="nc" id="L308">    val vedlegg: List&lt;Vedlegg&gt;,</span>
 )
 
-<span class="nc" id="L306">class FiksException(message: String) : RuntimeException(message)</span>
+<span class="nc" id="L311">class FiksException(</span>
+    message: String,
+<span class="nc" id="L313">) : RuntimeException(message)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
