@@ -23,15 +23,28 @@ class GotenbergService(
     suspend fun convertToPdf(
         data: ByteArray,
         extension: String,
-    ): ByteArray {
+    ): GotenbergConversionResult {
         val res =
             gotenbergClient
                 .submitFormWithBinaryData(
                     formData { append("file", data, buildHeaders(extension)) },
                 )
 
+        if (res.status == HttpStatusCode.BadRequest) {
+            return GotenbergConversionResult.UnsupportedFiletype(extension)
+        }
         check(res.status.isSuccess()) { "Failed to convert file type $extension to PDF: ${res.status}" }
 
-        return res.readRawBytes()
+        return GotenbergConversionResult.Success(res.readRawBytes())
     }
+}
+
+sealed class GotenbergConversionResult {
+    class UnsupportedFiletype(
+        val extension: String,
+    ) : GotenbergConversionResult()
+
+    class Success(
+        val bytes: ByteArray,
+    ) : GotenbergConversionResult()
 }

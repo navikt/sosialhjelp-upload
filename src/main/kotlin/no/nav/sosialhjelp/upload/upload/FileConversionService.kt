@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.upload
 
+import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import java.io.File
 
@@ -18,13 +19,13 @@ class FileConversionService(
     suspend fun convertIfNeeded(
         filename: String,
         data: ByteArray,
-    ): Pair<String, ByteArray> {
+    ): Pair<String, GotenbergConversionResult> {
         val extension = File(filename).extension.lowercase()
         if (extension in listOf("pdf", "jpeg", "jpg", "png")) {
-            return filename to data
+            return filename to GotenbergConversionResult.Success(data)
         }
-        val pdfName = File(filename).nameWithoutExtension + ".pdf"
         val converted = gotenbergService.convertToPdf(data, extension)
+        val pdfName = File(filename).nameWithoutExtension + ".pdf"
         return pdfName to converted
     }
 }
