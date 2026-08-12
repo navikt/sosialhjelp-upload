@@ -8,31 +8,48 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.Property
 
-<span class="fc" id="L11">class GotenbergService(</span>
+<span class="nc" id="L11">class UnsupportedConversionException(</span>
+<span class="nc" id="L12">    val extension: String,</span>
+<span class="nc" id="L13">) : Exception(&quot;Gotenberg returned 400 for file type $extension — format not supported for conversion&quot;)</span>
+
+<span class="fc" id="L15">class GotenbergService(</span>
     @Property(&quot;gotenberg.url&quot;) gotenbergUrl: String,
 ) {
     private val gotenbergClient =
-<span class="fc" id="L15">        HttpClient(CIO) {</span>
-<span class="fc" id="L16">            expectSuccess = false</span>
-<span class="pc" id="L17">            defaultRequest { url(gotenbergUrl) }</span>
-<span class="fc" id="L18">        }</span>
+<span class="fc" id="L19">        HttpClient(CIO) {</span>
+<span class="fc" id="L20">            expectSuccess = false</span>
+<span class="pc" id="L21">            defaultRequest { url(gotenbergUrl) }</span>
+<span class="fc" id="L22">        }</span>
 
     private fun buildHeaders(filetype: String): Headers =
-<span class="nc" id="L21">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$filetype&quot;&quot;&quot;&quot;) }</span>
+<span class="nc" id="L25">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$filetype&quot;&quot;&quot;&quot;) }</span>
 
     suspend fun convertToPdf(
         data: ByteArray,
         extension: String,
-    ): ByteArray {
-<span class="nc" id="L27">        val res =</span>
-<span class="nc" id="L28">            gotenbergClient</span>
-<span class="nc" id="L29">                .submitFormWithBinaryData(</span>
-<span class="nc" id="L30">                    formData { append(&quot;file&quot;, data, buildHeaders(extension)) },</span>
+    ): GotenbergConversionResult {
+<span class="nc" id="L31">        val res =</span>
+<span class="nc" id="L32">            gotenbergClient</span>
+<span class="nc" id="L33">                .submitFormWithBinaryData(</span>
+<span class="nc" id="L34">                    formData { append(&quot;file&quot;, data, buildHeaders(extension)) },</span>
                 )
 
-<span class="nc bnc" id="L33" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to convert file type $extension to PDF: ${res.status}&quot; }</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        if (res.status == HttpStatusCode.BadRequest) {</span>
+<span class="nc" id="L38">            return GotenbergConversionResult.UnsupportedFiletype(extension)</span>
+        }
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to convert file type $extension to PDF: ${res.status}&quot; }</span>
 
-<span class="nc" id="L35">        return res.readRawBytes()</span>
+<span class="nc" id="L42">        return GotenbergConversionResult.Success(res.readRawBytes())</span>
     }
+}
+
+sealed class GotenbergConversionResult {
+<span class="fc" id="L47">    class UnsupportedFiletype(</span>
+<span class="fc" id="L48">        val extension: String,</span>
+    ) : GotenbergConversionResult()
+
+<span class="fc" id="L51">    class Success(</span>
+<span class="fc" id="L52">        val bytes: ByteArray,</span>
+    ) : GotenbergConversionResult()
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
