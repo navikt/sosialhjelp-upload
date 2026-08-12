@@ -15,6 +15,7 @@ import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.Error.Companion.ERROR
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
+import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
@@ -70,7 +71,12 @@ class TusUploadServiceIntegrationTest {
         encryptionService = mockk()
         coEvery { encryptionService.encryptBytes(any()) } answers { firstArg() }
 
-        val chunkStorage = FileSystemStorage()
+        val chunkStorage =
+            FileSystemStorage(
+                java.nio.file.Files
+                    .createTempDirectory("sosialhjelp-upload-test")
+                    .toFile(),
+            )
         val meterRegistry = SimpleMeterRegistry()
         val chunkAssemblyService = ChunkAssemblyService(chunkStorage)
         val fileConversionService = FileConversionService(gotenbergService)
@@ -301,7 +307,7 @@ class TusUploadServiceIntegrationTest {
             val filId = UUID.randomUUID()
             val pdfBytes = "converted-pdf-content".toByteArray()
 
-            coEvery { gotenbergService.convertToPdf(any(), any()) } returns pdfBytes
+            coEvery { gotenbergService.convertToPdf(any(), any()) } returns GotenbergConversionResult.Success(pdfBytes)
             coEvery {
                 mellomlagringClient.uploadFile(
                     navEksternRefId = any(),
@@ -387,6 +393,44 @@ class TusUploadServiceIntegrationTest {
                 "Upload should be marked as FAILED when conversion fails",
             )
             assertNull(row[UPLOAD.FIL_ID], "Upload should not have filId when conversion fails")
+        }
+
+    @Test
+    fun `appendChunk records FILETYPE_NOT_SUPPORTED validation when Gotenberg returns 400`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            val content = "unsupported-content".toByteArray()
+
+            coEvery { gotenbergService.convertToPdf(any(), any()) } returns
+                GotenbergConversionResult.UnsupportedFiletype("xyz")
+
+            createMockSubmission(dsl, externalId)
+            val uploadId =
+                tusUploadService.create(
+                    TusMetadata("document.xyz", externalId, correlationId, null, "id", null),
+                    content.size.toLong(),
+                    personident,
+                    "test-token",
+                )
+            tusUploadService.appendChunk(uploadId, 0L, content)
+
+            awaitUploadTerminal(dsl, uploadId)
+
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            assertEquals("FAILED", row!![UPLOAD.PROCESSING_STATUS])
+            assertNull(row[UPLOAD.FIL_ID])
+
+            val errors =
+                dsl
+                    .selectFrom(ERROR)
+                    .where(ERROR.UPLOAD.eq(uploadId))
+                    .fetch()
+            assertTrue(errors.isNotEmpty, "Validation error should be recorded when Gotenberg returns 400")
+            assertTrue(
+                errors.any { it[ERROR.CODE]?.contains("FILETYPE_NOT_SUPPORTED") == true },
+                "Error code should be FILETYPE_NOT_SUPPORTED",
+            )
         }
 
     // endregion

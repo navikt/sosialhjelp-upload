@@ -7,6 +7,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
+import no.nav.sosialhjelp.upload.validation.FileTypeValidation
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
@@ -104,10 +106,27 @@ class UploadProcessingService(
         startTime: Long,
     ): Pair<String, ByteArray>? =
         try {
-            val result = fileConversionService.convertIfNeeded(filename, rawData)
-            val finalExtension = File(result.first).extension.lowercase().ifEmpty { "none" }
-            meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
-            result
+            val (extension, result) = fileConversionService.convertIfNeeded(filename, rawData)
+            return when (result) {
+                is GotenbergConversionResult.UnsupportedFiletype -> {
+                    logger.info(
+                        "Upload $uploadId (*$fileExtension) rejected by Gotenberg: format not supported for conversion",
+                    )
+                    val validation = FileTypeValidation(fileExtension)
+                    withContext(ioDispatcher) {
+                        dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, listOf(validation)) }
+                    }
+                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
+                    meterRegistry.counter("upload.gotenberg_unsupported", "extension", fileExtension).increment()
+                    recordTimer(fileExtension, "validation_failure", startTime)
+                    null
+                }
+                is GotenbergConversionResult.Success -> {
+                    val finalExtension = File(extension).extension.lowercase().ifEmpty { "none" }
+                    meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
+                    extension to result.bytes
+                }
+            }
         } catch (e: Exception) {
             logger.error("Upload $uploadId failed during PDF conversion", e)
             markUploadFailed(uploadId, composedKey)
