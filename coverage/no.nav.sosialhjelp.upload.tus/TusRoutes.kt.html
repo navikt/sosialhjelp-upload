@@ -31,7 +31,7 @@ fun Route.configureTusRoutes(basePath: String) {
 <span class="fc" id="L31">    route(&quot;/{id}&quot;) {</span>
 <span class="fc" id="L32">        verifyUploadOwnership()</span>
 <span class="pc bnc" id="L33" title="All 5 branches missed.">        head { tusHead(tusUploadService) }</span>
-<span class="pc bpc" id="L34" title="2 of 5 branches missed.">        patch { tusPatch(tusUploadService) }</span>
+<span class="pc bpc" id="L34" title="1 of 5 branches missed.">        patch { tusPatch(tusUploadService) }</span>
 <span class="pc bpc" id="L35" title="1 of 5 branches missed.">        delete { tusDelete(tusUploadService) }</span>
 <span class="fc" id="L36">    }</span>
 <span class="fc" id="L37">}</span>
