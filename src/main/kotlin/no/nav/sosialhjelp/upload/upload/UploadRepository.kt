@@ -44,6 +44,19 @@ data class UploadForVedlegg(
 )
 
 class UploadRepository {
+    fun deleteUploads(
+        tx: Configuration,
+        navEksternRefId: String,
+        kategori: String,
+    ) {
+        tx
+            .dsl()
+            .deleteFrom(SUBMISSION)
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .and(SUBMISSION.KATEGORI.eq(kategori))
+            .execute()
+    }
+
     fun getUploads(
         tx: Configuration,
         submissionId: UUID,

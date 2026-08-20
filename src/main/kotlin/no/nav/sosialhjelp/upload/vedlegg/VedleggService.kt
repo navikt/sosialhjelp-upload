@@ -7,6 +7,15 @@ class VedleggService(
     private val dsl: DSLContext,
     private val uploadRepository: UploadRepository,
 ) {
+    fun deleteVedlegg(
+        navEksternRefId: String,
+        kategori: String,
+    ) {
+        dsl.transaction { tx ->
+            uploadRepository.deleteUploads(tx, navEksternRefId, kategori)
+        }
+    }
+
     fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
         val uploads =
             dsl.transactionResult { tx ->
