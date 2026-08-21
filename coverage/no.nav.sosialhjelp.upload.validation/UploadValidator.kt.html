@@ -263,7 +263,7 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
         data: ByteArray,
         fileSize: Long,
     ): List&lt;Validation&gt; =
-<span class="pc bpc" id="L266" title="2 of 5 branches missed.">        coroutineScope {</span>
+<span class="pc bpc" id="L266" title="1 of 5 branches missed.">        coroutineScope {</span>
 <span class="fc" id="L267">            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }</span>
 <span class="fc bfc" id="L268" title="All 2 branches covered.">            val (mimeType, fileTypeValidation) = validateFileType(data, filename)</span>
 <span class="fc" id="L269">            meterRegistry.counter(&quot;upload.tika_mime_type&quot;, &quot;mime_type&quot;, mimeType).increment()</span>
@@ -271,7 +271,7 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 <span class="fc" id="L271">                validateFileSize(fileSize),</span>
 <span class="fc" id="L272">                fileTypeValidation,</span>
 <span class="fc bfc" id="L273" title="All 4 branches covered.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
-<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                virusScanValidation.await(),</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                virusScanValidation.await(),</span>
 <span class="fc" id="L275">            )</span>
 <span class="fc" id="L276">        }</span>
 
