@@ -44,90 +44,103 @@ enum class Status {
 )
 
 <span class="fc" id="L46">class UploadRepository {</span>
+    fun deleteUploads(
+        tx: Configuration,
+        navEksternRefId: String,
+        kategori: String,
+    ) {
+<span class="nc" id="L52">        tx</span>
+<span class="nc" id="L53">            .dsl()</span>
+<span class="nc" id="L54">            .deleteFrom(SUBMISSION)</span>
+<span class="nc" id="L55">            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))</span>
+<span class="nc" id="L56">            .and(SUBMISSION.KATEGORI.eq(kategori))</span>
+<span class="nc" id="L57">            .execute()</span>
+<span class="nc" id="L58">    }</span>
+
     fun getUploads(
         tx: Configuration,
         submissionId: UUID,
     ): List&lt;Upload&gt; =
-<span class="fc" id="L51">        tx</span>
-<span class="fc" id="L52">            .dsl()</span>
-<span class="fc" id="L53">            .select(</span>
-<span class="fc" id="L54">                UPLOAD.ID,</span>
-<span class="fc" id="L55">                UPLOAD.ORIGINAL_FILENAME,</span>
-<span class="fc" id="L56">                ERROR.CODE,</span>
-<span class="fc" id="L57">                UPLOAD.FIL_ID,</span>
-<span class="fc" id="L58">                SUBMISSION.NAV_EKSTERN_REF_ID,</span>
-<span class="fc" id="L59">                UPLOAD.MELLOMLAGRING_FILNAVN,</span>
-<span class="fc" id="L60">                UPLOAD.SIZE,</span>
-<span class="fc" id="L61">                UPLOAD.MELLOMLAGRING_STORRELSE,</span>
-<span class="fc" id="L62">                UPLOAD.PROCESSING_STATUS,</span>
-<span class="fc" id="L63">                UPLOAD.SHA512,</span>
-<span class="fc" id="L64">                SUBMISSION.KATEGORI,</span>
-<span class="fc" id="L65">                UPLOAD.CORRELATION_ID,</span>
-<span class="fc" id="L66">            ).from(UPLOAD)</span>
-<span class="fc" id="L67">            .leftJoin(ERROR)</span>
-<span class="fc" id="L68">            .on(ERROR.UPLOAD.eq(UPLOAD.ID))</span>
-<span class="fc" id="L69">            .join(SUBMISSION)</span>
-<span class="fc" id="L70">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
-<span class="fc" id="L71">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
-<span class="fc" id="L72">            .fetch()</span>
-<span class="fc" id="L73">            .groupBy { it.get(UPLOAD.ID) }</span>
-<span class="fc" id="L74">            .map { (id, records) -&gt;</span>
-<span class="fc" id="L75">                Upload(</span>
-<span class="fc" id="L76">                    id = id,</span>
-<span class="fc" id="L77">                    originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),</span>
-<span class="pc" id="L78">                    errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },</span>
-<span class="fc" id="L79">                    filId = records.first().get(UPLOAD.FIL_ID),</span>
-<span class="fc" id="L80">                    navEksternRefId = records.first().get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
-<span class="fc" id="L81">                    mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
-<span class="fc" id="L82">                    fileSize = records.first().get(UPLOAD.SIZE),</span>
-<span class="fc" id="L83">                    mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
+<span class="fc" id="L64">        tx</span>
+<span class="fc" id="L65">            .dsl()</span>
+<span class="fc" id="L66">            .select(</span>
+<span class="fc" id="L67">                UPLOAD.ID,</span>
+<span class="fc" id="L68">                UPLOAD.ORIGINAL_FILENAME,</span>
+<span class="fc" id="L69">                ERROR.CODE,</span>
+<span class="fc" id="L70">                UPLOAD.FIL_ID,</span>
+<span class="fc" id="L71">                SUBMISSION.NAV_EKSTERN_REF_ID,</span>
+<span class="fc" id="L72">                UPLOAD.MELLOMLAGRING_FILNAVN,</span>
+<span class="fc" id="L73">                UPLOAD.SIZE,</span>
+<span class="fc" id="L74">                UPLOAD.MELLOMLAGRING_STORRELSE,</span>
+<span class="fc" id="L75">                UPLOAD.PROCESSING_STATUS,</span>
+<span class="fc" id="L76">                UPLOAD.SHA512,</span>
+<span class="fc" id="L77">                SUBMISSION.KATEGORI,</span>
+<span class="fc" id="L78">                UPLOAD.CORRELATION_ID,</span>
+<span class="fc" id="L79">            ).from(UPLOAD)</span>
+<span class="fc" id="L80">            .leftJoin(ERROR)</span>
+<span class="fc" id="L81">            .on(ERROR.UPLOAD.eq(UPLOAD.ID))</span>
+<span class="fc" id="L82">            .join(SUBMISSION)</span>
+<span class="fc" id="L83">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L84">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
+<span class="fc" id="L85">            .fetch()</span>
+<span class="fc" id="L86">            .groupBy { it.get(UPLOAD.ID) }</span>
+<span class="fc" id="L87">            .map { (id, records) -&gt;</span>
+<span class="fc" id="L88">                Upload(</span>
+<span class="fc" id="L89">                    id = id,</span>
+<span class="fc" id="L90">                    originalFilename = records.first().get(UPLOAD.ORIGINAL_FILENAME),</span>
+<span class="pc" id="L91">                    errors = records.mapNotNull { it.get(ERROR.CODE) }.map { ValidationCode.valueOf(it) },</span>
+<span class="fc" id="L92">                    filId = records.first().get(UPLOAD.FIL_ID),</span>
+<span class="fc" id="L93">                    navEksternRefId = records.first().get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
+<span class="fc" id="L94">                    mellomlagringFilnavn = records.first().get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
+<span class="fc" id="L95">                    fileSize = records.first().get(UPLOAD.SIZE),</span>
+<span class="fc" id="L96">                    mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
                     status =
-<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                        records</span>
-<span class="fc" id="L86">                            .first()</span>
-<span class="fc" id="L87">                            .get(UPLOAD.PROCESSING_STATUS)</span>
-<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                            ?.let { Status.valueOf(it) }</span>
-<span class="nc" id="L89">                            ?: error(&quot;No processing status. Was it not selected?&quot;),</span>
-<span class="fc" id="L90">                    sha512 = records.first().get(UPLOAD.SHA512),</span>
-<span class="fc" id="L91">                    kategori = records.first().get(SUBMISSION.KATEGORI),</span>
-<span class="fc" id="L92">                    correlationId = records.first().get(UPLOAD.CORRELATION_ID),</span>
-<span class="fc" id="L93">                )</span>
-<span class="fc" id="L94">            }</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                        records</span>
+<span class="fc" id="L99">                            .first()</span>
+<span class="fc" id="L100">                            .get(UPLOAD.PROCESSING_STATUS)</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                            ?.let { Status.valueOf(it) }</span>
+<span class="nc" id="L102">                            ?: error(&quot;No processing status. Was it not selected?&quot;),</span>
+<span class="fc" id="L103">                    sha512 = records.first().get(UPLOAD.SHA512),</span>
+<span class="fc" id="L104">                    kategori = records.first().get(SUBMISSION.KATEGORI),</span>
+<span class="fc" id="L105">                    correlationId = records.first().get(UPLOAD.CORRELATION_ID),</span>
+<span class="fc" id="L106">                )</span>
+<span class="fc" id="L107">            }</span>
 
     fun getGcsKeysForSubmission(
         tx: Configuration,
         submissionId: UUID,
     ): List&lt;String&gt; =
-<span class="fc" id="L100">        tx</span>
-<span class="fc" id="L101">            .dsl()</span>
-<span class="fc" id="L102">            .select(UPLOAD.GCS_KEY)</span>
-<span class="fc" id="L103">            .from(UPLOAD)</span>
-<span class="fc" id="L104">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
-<span class="fc" id="L105">            .and(UPLOAD.GCS_KEY.isNotNull)</span>
-<span class="fc" id="L106">            .fetch()</span>
-<span class="pc" id="L107">            .mapNotNull { it.get(UPLOAD.GCS_KEY) }</span>
+<span class="fc" id="L113">        tx</span>
+<span class="fc" id="L114">            .dsl()</span>
+<span class="fc" id="L115">            .select(UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L116">            .from(UPLOAD)</span>
+<span class="fc" id="L117">            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
+<span class="fc" id="L118">            .and(UPLOAD.GCS_KEY.isNotNull)</span>
+<span class="fc" id="L119">            .fetch()</span>
+<span class="pc" id="L120">            .mapNotNull { it.get(UPLOAD.GCS_KEY) }</span>
 
     fun getCompletedUploadsByNavEksternRefId(
         tx: Configuration,
         navEksternRefId: String,
     ): List&lt;UploadForVedlegg&gt; =
-<span class="fc" id="L113">        tx</span>
-<span class="fc" id="L114">            .dsl()</span>
-<span class="fc" id="L115">            .select(</span>
-<span class="fc" id="L116">                SUBMISSION.KATEGORI,</span>
-<span class="fc" id="L117">                UPLOAD.MELLOMLAGRING_FILNAVN,</span>
-<span class="fc" id="L118">                UPLOAD.SHA512,</span>
-<span class="fc" id="L119">            ).from(UPLOAD)</span>
-<span class="fc" id="L120">            .join(SUBMISSION)</span>
-<span class="fc" id="L121">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
-<span class="fc" id="L122">            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))</span>
-<span class="fc" id="L123">            .and(UPLOAD.PROCESSING_STATUS.eq(Status.COMPLETE.name))</span>
-<span class="fc" id="L124">            .fetch()</span>
-<span class="fc" id="L125">            .map {</span>
-<span class="fc" id="L126">                UploadForVedlegg(</span>
-<span class="fc" id="L127">                    category = it.get(SUBMISSION.KATEGORI),</span>
-<span class="fc" id="L128">                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN)!!,</span>
-<span class="fc" id="L129">                    sha512 = it.get(UPLOAD.SHA512),</span>
-<span class="fc" id="L130">                )</span>
-<span class="fc" id="L131">            }</span>
+<span class="fc" id="L126">        tx</span>
+<span class="fc" id="L127">            .dsl()</span>
+<span class="fc" id="L128">            .select(</span>
+<span class="fc" id="L129">                SUBMISSION.KATEGORI,</span>
+<span class="fc" id="L130">                UPLOAD.MELLOMLAGRING_FILNAVN,</span>
+<span class="fc" id="L131">                UPLOAD.SHA512,</span>
+<span class="fc" id="L132">            ).from(UPLOAD)</span>
+<span class="fc" id="L133">            .join(SUBMISSION)</span>
+<span class="fc" id="L134">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L135">            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))</span>
+<span class="fc" id="L136">            .and(UPLOAD.PROCESSING_STATUS.eq(Status.COMPLETE.name))</span>
+<span class="fc" id="L137">            .fetch()</span>
+<span class="fc" id="L138">            .map {</span>
+<span class="fc" id="L139">                UploadForVedlegg(</span>
+<span class="fc" id="L140">                    category = it.get(SUBMISSION.KATEGORI),</span>
+<span class="fc" id="L141">                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN)!!,</span>
+<span class="fc" id="L142">                    sha512 = it.get(UPLOAD.SHA512),</span>
+<span class="fc" id="L143">                )</span>
+<span class="fc" id="L144">            }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

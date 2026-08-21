@@ -7,29 +7,38 @@ import org.jooq.DSLContext
 <span class="fc" id="L7">    private val dsl: DSLContext,</span>
 <span class="fc" id="L8">    private val uploadRepository: UploadRepository,</span>
 ) {
+    fun deleteVedlegg(
+        navEksternRefId: String,
+        kategori: String,
+    ) {
+<span class="nc" id="L14">        dsl.transaction { tx -&gt;</span>
+<span class="nc" id="L15">            uploadRepository.deleteUploads(tx, navEksternRefId, kategori)</span>
+<span class="nc" id="L16">        }</span>
+<span class="nc" id="L17">    }</span>
+
     fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
-<span class="fc" id="L11">        val uploads =</span>
-<span class="fc" id="L12">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L13">                uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
+<span class="fc" id="L20">        val uploads =</span>
+<span class="fc" id="L21">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L22">                uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
             }
 
-<span class="fc" id="L16">        val grouped = uploads.groupBy { it.category }</span>
+<span class="fc" id="L25">        val grouped = uploads.groupBy { it.category }</span>
 
-<span class="fc" id="L18">        val vedleggList =</span>
-<span class="fc" id="L19">            grouped.map { (key, files) -&gt;</span>
-<span class="fc" id="L20">                Vedlegg(</span>
-<span class="fc" id="L21">                    kategori = key,</span>
+<span class="fc" id="L27">        val vedleggList =</span>
+<span class="fc" id="L28">            grouped.map { (key, files) -&gt;</span>
+<span class="fc" id="L29">                Vedlegg(</span>
+<span class="fc" id="L30">                    kategori = key,</span>
                     filer =
-<span class="fc" id="L23">                        files.map { file -&gt;</span>
-<span class="fc" id="L24">                            Fil(</span>
-<span class="fc" id="L25">                                filnavn = file.mellomlagringFilnavn,</span>
-<span class="fc" id="L26">                                sha512 = file.sha512,</span>
-<span class="fc" id="L27">                            )</span>
+<span class="fc" id="L32">                        files.map { file -&gt;</span>
+<span class="fc" id="L33">                            Fil(</span>
+<span class="fc" id="L34">                                filnavn = file.mellomlagringFilnavn,</span>
+<span class="fc" id="L35">                                sha512 = file.sha512,</span>
+<span class="fc" id="L36">                            )</span>
                         },
-<span class="fc" id="L29">                )</span>
+<span class="fc" id="L38">                )</span>
             }
 
-<span class="fc" id="L32">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
+<span class="fc" id="L41">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
