@@ -1,29 +1,31 @@
 <configuration>
-    <appender name="STDOUT_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [fiksDigisosId=%X{fiksDigisosId} navEksternRefId=%X{navEksternRefId}] - %msg%n</pattern>
-        </encoder>
-    </appender>
-    <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
-                <inlineHash>true</inlineHash>
-            </throwableConverter>
-        </encoder>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <condition class="ch.qos.logback.core.boolex.ExpressionPropertyCondition">
+            <expression>
+                isNull("RUNTIME_ENV") || propertyEquals("RUNTIME_ENV", "local")
+            </expression>
+        </condition>
+        <if>
+            <then>
+                <encoder>
+                    <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [fiksDigisosId=%X{fiksDigisosId} navEksternRefId=%X{navEksternRefId}] - %msg%n</pattern>
+                </encoder>
+            </then>
+            <else>
+                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <inlineHash>true</inlineHash>
+                    </throwableConverter>
+                </encoder>
+            </else>
+        </if>
+
+
     </appender>
 
-    <if condition='"local".equals(System.getenv("RUNTIME_ENV")) || System.getenv("RUNTIME_ENV") == null'>
-        <then>
-            <root level="INFO">
-                <appender-ref ref="STDOUT_PLAIN"/>
-            </root>
-        </then>
-        <else>
-            <root level="INFO">
-                <appender-ref ref="STDOUT_JSON"/>
-            </root>
-        </else>
-    </if>
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
 
     <logger name="org.eclipse.jetty" level="INFO"/>
     <logger name="io.netty" level="INFO"/>

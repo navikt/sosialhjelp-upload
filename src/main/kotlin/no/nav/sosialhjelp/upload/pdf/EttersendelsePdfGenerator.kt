@@ -7,7 +7,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-data class PdfFil(val filnavn: String)
+data class PdfFil(
+    val filnavn: String,
+)
 
 data class PdfMetadata(
     val type: String,
@@ -53,4 +55,7 @@ fun formatLocalDateTime(dato: LocalDateTime): String {
     return dato.format(datoFormatter)
 }
 
-class PdfGenerationException(message: String, cause: Throwable) : RuntimeException(message, cause)
+class PdfGenerationException(
+    message: String,
+    cause: Throwable,
+) : RuntimeException(message, cause)

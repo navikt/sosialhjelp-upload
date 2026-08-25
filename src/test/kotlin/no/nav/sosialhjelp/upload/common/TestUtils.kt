@@ -43,32 +43,34 @@ object TestUtils {
         timeout: Duration = 10.seconds,
         notifications: SubmissionNotificationService = PostgresTestContainer.notificationService,
     ) {
-        CoroutineScope(Dispatchers.IO).async {
-            withTimeout(timeout) {
-                fun currentStatus(): String? =
-                    dsl.select(UPLOAD.PROCESSING_STATUS)
-                        .from(UPLOAD)
-                        .where(UPLOAD.ID.eq(uploadId))
-                        .fetchOne()
-                        ?.value1()
+        CoroutineScope(Dispatchers.IO)
+            .async {
+                withTimeout(timeout) {
+                    fun currentStatus(): String? =
+                        dsl
+                            .select(UPLOAD.PROCESSING_STATUS)
+                            .from(UPLOAD)
+                            .where(UPLOAD.ID.eq(uploadId))
+                            .fetchOne()
+                            ?.value1()
 
-                fun isTerminal(s: String?) = s == "COMPLETE" || s == "FAILED"
+                    fun isTerminal(s: String?) = s == "COMPLETE" || s == "FAILED"
 
-                val channel = Channel<Unit>(capacity = Channel.UNLIMITED)
-                val collector =
-                    notifications.allUpdates
-                        .onEach { channel.trySend(Unit) }
-                        .launchIn(this)
-                try {
-                    if (isTerminal(currentStatus())) return@withTimeout
-                    for (ignored in channel) {
+                    val channel = Channel<Unit>(capacity = Channel.UNLIMITED)
+                    val collector =
+                        notifications.allUpdates
+                            .onEach { channel.trySend(Unit) }
+                            .launchIn(this)
+                    try {
                         if (isTerminal(currentStatus())) return@withTimeout
+                        for (ignored in channel) {
+                            if (isTerminal(currentStatus())) return@withTimeout
+                        }
+                    } finally {
+                        collector.cancel()
+                        channel.close()
                     }
-                } finally {
-                    collector.cancel()
-                    channel.close()
                 }
-            }
-        }.await()
+            }.await()
     }
 }

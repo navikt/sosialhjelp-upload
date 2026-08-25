@@ -44,56 +44,22 @@ private suspend fun RoutingContext.tusOptions() {
     call.respond(HttpStatusCode.NoContent)
 }
 
-@Suppress("ReturnCount", "CyclomaticComplexMethod")
+@Suppress("ReturnCount")
 private suspend fun RoutingContext.tusPost(
     tusUploadService: TusUploadService,
     basePath: String,
 ) {
-    val personident =
-        call.principal<JWTPrincipal>()?.subject
-            ?: return call.respond(HttpStatusCode.Unauthorized)
-    val token =
-        call.request.headers["Authorization"]?.removePrefix("Bearer ")
-            ?: return call.respond(HttpStatusCode.Unauthorized)
-
-    val tusResumable = call.request.header("Tus-Resumable")
-    if (tusResumable != TUS_RESUMABLE) {
-        call.response.header("Tus-Version", TUS_VERSION)
-        return call.respond(HttpStatusCode.PreconditionFailed)
-    }
-
-    val uploadLength =
-        call.request.header("Upload-Length")?.toLongOrNull()
-            ?: return call.respond(HttpStatusCode.BadRequest)
-
-    val metadata = parseMetadata(call.request.header("Upload-Metadata"))
-    val filename =
-        metadata["filename"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler filename")
-    val contextId =
-        metadata["contextId"] ?: return call.respond(HttpStatusCode.BadRequest, "Mangler contextId")
-    val fiksDigisosId = metadata["fiksDigisosId"]
-    val navEksternRefId = metadata["navEksternRefId"]
-    val kategori = metadata["kategori"]
-
-    if (fiksDigisosId == null && navEksternRefId == null) {
-        return call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller navEksternRefId")
-    }
-    if (contextId.length > 2048) return call.respond(HttpStatusCode.BadRequest, "contextId for lang")
-    if (fiksDigisosId != null && fiksDigisosId.length > 255) {
-        return call.respond(HttpStatusCode.BadRequest, "fiksDigisosId for lang")
-    }
+    val requestMetadata = validateRequest() ?: return
+    val metadata = parseAndValidateTusMetadata() ?: return
+    val fiksDigisosId = metadata.fiksDigisosId
 
     val uploadId =
         try {
             tusUploadService.create(
-                contextId,
-                filename,
-                uploadLength,
-                personident,
-                token,
-                fiksDigisosId,
-                navEksternRefId,
-                kategori,
+                metadata,
+                requestMetadata.uploadLength,
+                requestMetadata.personIdent,
+                requestMetadata.token,
             )
         } catch (_: UploadForbiddenException) {
             return call.respond(HttpStatusCode.Forbidden)
@@ -150,7 +116,8 @@ private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) 
             when (e) {
                 is OffsetMismatchException -> return call.respond(HttpStatusCode.Conflict)
                 else -> {
-                    call.application.environment.log.error("Error appending chunk to upload $uploadId", e)
+                    call.application.environment.log
+                        .error("Error appending chunk to upload $uploadId", e)
                     return call.respond(HttpStatusCode.InternalServerError)
                 }
             }
@@ -159,6 +126,38 @@ private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) 
     call.response.header("Upload-Offset", newOffset.toString())
     call.response.header("Tus-Resumable", TUS_RESUMABLE)
     call.respond(HttpStatusCode.NoContent)
+}
+
+@Suppress("ReturnCount")
+private suspend fun RoutingContext.validateRequest(): RequestMetadata? {
+    val personident =
+        call.principal<JWTPrincipal>()?.subject
+            ?: run {
+                call.respond(HttpStatusCode.Unauthorized)
+                return null
+            }
+    val token =
+        call.request.headers["Authorization"]?.removePrefix("Bearer ")
+            ?: run {
+                call.respond(HttpStatusCode.Unauthorized)
+                return null
+            }
+
+    val tusResumable = call.request.header("Tus-Resumable")
+    if (tusResumable != TUS_RESUMABLE) {
+        call.response.header("Tus-Version", TUS_VERSION)
+        call.respond(HttpStatusCode.PreconditionFailed)
+        return null
+    }
+
+    val uploadLength =
+        call.request.header("Upload-Length")?.toLongOrNull()
+            ?: run {
+                call.respond(HttpStatusCode.BadRequest)
+                return null
+            }
+
+    return RequestMetadata(personident, token, uploadLength)
 }
 
 private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService) {
@@ -171,3 +170,33 @@ private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService)
     call.response.header("Tus-Resumable", TUS_RESUMABLE)
     call.respond(HttpStatusCode.NoContent)
 }
+
+@Suppress("ReturnCount")
+private suspend fun RoutingContext.parseAndValidateTusMetadata(): TusMetadata? {
+    val metadata =
+        parseMetadata(call.request.header("Upload-Metadata"))
+            .toTusMetadata()
+            .getOrElse {
+                call.respond(HttpStatusCode.BadRequest, it.message ?: "")
+                return null
+            }
+    if (metadata.fiksDigisosId == null && metadata.navEksternRefId == null) {
+        call.respond(HttpStatusCode.BadRequest, "Mangler fiksDigisosId eller navEksternRefId")
+        return null
+    }
+    if (metadata.contextId.length > 2048) {
+        call.respond(HttpStatusCode.BadRequest, "contextId for lang")
+        return null
+    }
+    if (metadata.fiksDigisosId != null && metadata.fiksDigisosId.length > 255) {
+        call.respond(HttpStatusCode.BadRequest, "fiksDigisosId for lang")
+        return null
+    }
+    return metadata
+}
+
+private data class RequestMetadata(
+    val personIdent: String,
+    val token: String,
+    val uploadLength: Long,
+)

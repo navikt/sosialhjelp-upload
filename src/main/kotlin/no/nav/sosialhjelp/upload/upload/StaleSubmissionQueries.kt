@@ -11,7 +11,10 @@ import java.util.UUID
  * DB queries for the submission cleanup job: finding stale submissions to clean up.
  */
 class StaleSubmissionQueries {
-    data class StaleSubmission(val id: UUID, val navEksternRefId: String)
+    data class StaleSubmission(
+        val id: UUID,
+        val navEksternRefId: String,
+    )
 
     /**
      * Returns submissions whose uploads have all reached a terminal state (not PENDING or PROCESSING)
@@ -25,16 +28,20 @@ class StaleSubmissionQueries {
             .dsl()
             .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)
             .from(SUBMISSION)
-            .join(UPLOAD).on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))
+            .join(UPLOAD)
+            .on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))
             .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)
             .having(
-                DSL.max(UPLOAD.UPDATED_AT).lt(cutoff)
+                DSL
+                    .max(UPLOAD.UPDATED_AT)
+                    .lt(cutoff)
                     .and(
-                        DSL.count().filterWhere(
-                            UPLOAD.PROCESSING_STATUS.`in`("PENDING", "PROCESSING"),
-                        ).eq(0),
+                        DSL
+                            .count()
+                            .filterWhere(
+                                UPLOAD.PROCESSING_STATUS.`in`("PENDING", "PROCESSING"),
+                            ).eq(0),
                     ),
-            )
-            .fetch()
+            ).fetch()
             .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }
 }

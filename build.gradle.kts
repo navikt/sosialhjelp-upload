@@ -67,7 +67,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.slf4j)
     implementation(libs.ktor.server.netty)
     implementation(libs.logback.classic)
-    implementation(libs.logback.janino)
     implementation(libs.logstash.logback.encoder)
     implementation(libs.ktor.server.config.yaml)
 

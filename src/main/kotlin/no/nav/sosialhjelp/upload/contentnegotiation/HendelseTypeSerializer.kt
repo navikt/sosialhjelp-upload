@@ -17,7 +17,6 @@ class HendelseTypeSerializer : KSerializer<Vedlegg.HendelseType> {
         encoder.encodeString(value.value)
     }
 
-    override fun deserialize(decoder: Decoder): Vedlegg.HendelseType {
-        return Vedlegg.HendelseType.fromValue(decoder.decodeString())
-    }
+    override fun deserialize(decoder: Decoder): Vedlegg.HendelseType =
+        Vedlegg.HendelseType.fromValue(decoder.decodeString())
 }

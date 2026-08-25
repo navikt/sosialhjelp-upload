@@ -19,6 +19,7 @@ data class Upload(
     val status: Status,
     val sha512: String? = null,
     val kategori: String? = null,
+    val correlationId: UUID? = null,
 )
 
 enum class Status {
@@ -43,6 +44,19 @@ data class UploadForVedlegg(
 )
 
 class UploadRepository {
+    fun deleteUploads(
+        tx: Configuration,
+        navEksternRefId: String,
+        kategori: String,
+    ) {
+        tx
+            .dsl()
+            .deleteFrom(SUBMISSION)
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .and(SUBMISSION.KATEGORI.eq(kategori))
+            .execute()
+    }
+
     fun getUploads(
         tx: Configuration,
         submissionId: UUID,
@@ -61,10 +75,12 @@ class UploadRepository {
                 UPLOAD.PROCESSING_STATUS,
                 UPLOAD.SHA512,
                 SUBMISSION.KATEGORI,
-            )
-            .from(UPLOAD)
-            .leftJoin(ERROR).on(ERROR.UPLOAD.eq(UPLOAD.ID))
-            .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+                UPLOAD.CORRELATION_ID,
+            ).from(UPLOAD)
+            .leftJoin(ERROR)
+            .on(ERROR.UPLOAD.eq(UPLOAD.ID))
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
             .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
             .fetch()
             .groupBy { it.get(UPLOAD.ID) }
@@ -79,11 +95,14 @@ class UploadRepository {
                     fileSize = records.first().get(UPLOAD.SIZE),
                     mellomlagringStorrelse = records.first().get(UPLOAD.MELLOMLAGRING_STORRELSE),
                     status =
-                        records.first().get(UPLOAD.PROCESSING_STATUS)
+                        records
+                            .first()
+                            .get(UPLOAD.PROCESSING_STATUS)
                             ?.let { Status.valueOf(it) }
                             ?: error("No processing status. Was it not selected?"),
                     sha512 = records.first().get(UPLOAD.SHA512),
                     kategori = records.first().get(SUBMISSION.KATEGORI),
+                    correlationId = records.first().get(UPLOAD.CORRELATION_ID),
                 )
             }
 
@@ -110,9 +129,9 @@ class UploadRepository {
                 SUBMISSION.KATEGORI,
                 UPLOAD.MELLOMLAGRING_FILNAVN,
                 UPLOAD.SHA512,
-            )
-            .from(UPLOAD)
-            .join(SUBMISSION).on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            ).from(UPLOAD)
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
             .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
             .and(UPLOAD.PROCESSING_STATUS.eq(Status.COMPLETE.name))
             .fetch()

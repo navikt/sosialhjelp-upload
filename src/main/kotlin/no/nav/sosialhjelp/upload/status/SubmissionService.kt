@@ -60,6 +60,7 @@ class SubmissionService(
                                 status = UploadDto.Status.valueOf(upload.status.name),
                                 upload.fileSize,
                                 upload.kategori,
+                                upload.correlationId,
                             )
                         }
                 }

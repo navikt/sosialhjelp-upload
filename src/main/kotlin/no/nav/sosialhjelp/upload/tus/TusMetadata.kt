@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.tus
 
 import java.util.Base64
+import java.util.UUID
 
 /**
  * Parses the TUS Upload-Metadata header.
@@ -31,3 +32,37 @@ internal fun parseMetadata(header: String?): Map<String, String> {
             }
         }.toMap()
 }
+
+@Suppress("ReturnCount")
+fun Map<String, String>.toTusMetadata(): Result<TusMetadata> {
+    val filename = this["filename"] ?: return Result.failure(IllegalArgumentException("Mangler filename"))
+    val contextId = this["contextId"] ?: return Result.failure(IllegalArgumentException("Mangler contextId"))
+    val correlationId =
+        this["correlationId"]?.let {
+            runCatching { UUID.fromString(it) }.getOrNull()
+                ?: return Result.failure(IllegalArgumentException("Ugyldig correlationId. Må være uuid"))
+        }
+    val fiksDigisosId = this["fiksDigisosId"]
+    val navEksternRefId = this["navEksternRefId"]
+    val kategori = this["kategori"]
+
+    return Result.success(
+        TusMetadata(
+            filename = filename,
+            contextId = contextId,
+            correlationId = correlationId,
+            fiksDigisosId = fiksDigisosId,
+            navEksternRefId = navEksternRefId,
+            kategori = kategori,
+        ),
+    )
+}
+
+data class TusMetadata(
+    val filename: String,
+    val contextId: String,
+    val correlationId: UUID?,
+    val fiksDigisosId: String?,
+    val navEksternRefId: String?,
+    val kategori: String?,
+)

@@ -40,6 +40,7 @@ spec:
       rules:
         - application: sosialhjelp-innsyn-mock
         - application: sosialhjelp-soknad-mock
+        - application: sosialhjelp-soknad-api-mock
   gcp:
     sqlInstances:
       - type: POSTGRES_17
@@ -49,7 +50,8 @@ spec:
             envVarPrefix: POSTGRES
     buckets:
       - name: sosialhjelp-upload-mock
-        retentionPeriodDays: 1
+        lifecycleCondition:
+          age: 1
         cascadingDelete: false
   resources:
     limits:
@@ -74,4 +76,11 @@ spec:
       value: "true"
     - name: NAIS_TOKEN_ENDPOINT
       value: http://sosialhjelp-texas-mock/api/v1/token
+    - name: TOKEN_X_JWKS_URI
+      value: "https://sosiauth2.ekstern.dev.nav.no/tokenx/jwks"
+    - name: TOKEN_X_ISSUER
+      value: "https://sosiauth2.ekstern.dev.nav.no/tokenx"
+    - name: TOKEN_X_CLIENT_ID
+      value: "dev-gcp:teamdigisos:sosialhjelp-upload-mock"
+
 

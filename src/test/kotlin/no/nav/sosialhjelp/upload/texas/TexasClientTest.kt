@@ -83,8 +83,7 @@ class TexasClientTest {
                     .body(
                         """{"error":{"error":"server_error","error_description":"Something went wrong"},""" +
                             """"status":500}""",
-                    )
-                    .build(),
+                    ).build(),
             )
             assertFailsWith<RuntimeException> {
                 client.getMaskinportenToken()

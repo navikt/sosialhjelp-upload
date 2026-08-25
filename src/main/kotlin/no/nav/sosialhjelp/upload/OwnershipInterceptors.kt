@@ -89,7 +89,12 @@ private fun verifyNavEksternRefIdOwnershipByPidPlugin(ioDispatcher: CoroutineDis
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
 
-            val personident = call.principal<JWTPrincipal>()?.payload?.getClaim("pid")?.asString()
+            val personident =
+                call
+                    .principal<JWTPrincipal>()
+                    ?.payload
+                    ?.getClaim("pid")
+                    ?.asString()
             if (personident == null) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@on

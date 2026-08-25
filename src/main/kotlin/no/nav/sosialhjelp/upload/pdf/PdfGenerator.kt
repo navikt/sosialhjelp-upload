@@ -174,9 +174,10 @@ class PdfGenerator internal constructor(
         arabicFont: PDFont,
         fontSize: Float,
     ): Float =
-        splitIntoFontRuns(line).sumOf { (run, isArabic) ->
-            ((if (isArabic) arabicFont else font).getStringWidth(run) / 1000 * fontSize).toDouble()
-        }.toFloat()
+        splitIntoFontRuns(line)
+            .sumOf { (run, isArabic) ->
+                ((if (isArabic) arabicFont else font).getStringWidth(run) / 1000 * fontSize).toDouble()
+            }.toFloat()
 
     /**
      * Splits a string into runs of consecutive characters that share the same script family:
@@ -205,9 +206,12 @@ class PdfGenerator internal constructor(
 
     private fun Char.isArabicScript(): Boolean {
         val cp = this.code
-        return cp in 0x0600..0x06FF || // Arabic
-            cp in 0x0750..0x077F || // Arabic Supplement
-            cp in 0xFB50..0xFDFF || // Arabic Presentation Forms-A
+        return cp in 0x0600..0x06FF ||
+            // Arabic
+            cp in 0x0750..0x077F ||
+            // Arabic Supplement
+            cp in 0xFB50..0xFDFF ||
+            // Arabic Presentation Forms-A
             cp in 0xFE70..0xFEFF // Arabic Presentation Forms-B
     }
 
