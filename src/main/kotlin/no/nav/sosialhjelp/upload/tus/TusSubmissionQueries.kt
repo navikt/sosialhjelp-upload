@@ -43,7 +43,7 @@ class TusSubmissionQueries {
     data class SubmissionAttributes(
         val fiksDigisosId: String? = null,
         val kategori: String? = null,
-        val automaticCleanup: Boolean = false,
+        val automaticCleanup: Boolean? = null,
     )
 
     /**
@@ -51,9 +51,7 @@ class TusSubmissionQueries {
      * Updates fiksDigisosId and kategori on the existing row if they were null.
      * Throws [SubmissionOwnedByAnotherUserException] if the contextId is owned by someone else.
      *
-     * `automaticCleanup` follows "false wins": it can be turned off by a later upload on the same
-     * contextId, but never turned back on. A single upload with inconsistent metadata must not be
-     * able to enable automatic deletion of everything uploaded under this submission.
+     * See [updateExistingSubmission] for how `automaticCleanup` transitions.
      */
     fun getOrCreateSubmission(
         tx: Configuration,
@@ -126,16 +124,23 @@ class TusSubmissionQueries {
                 .execute()
         }
 
-        // "False wins": an upload that opts out disables automatic cleanup for the whole
-        // submission. The reverse transition is deliberately not possible, so that a single
-        // upload with inconsistent metadata can never enable deletion of the others.
-        if (!attributes.automaticCleanup) {
-            tx
-                .dsl()
-                .update(SUBMISSION)
-                .set(SUBMISSION.AUTOMATIC_CLEANUP, false)
-                .where(identifiesSubmission)
-                .execute()
+        when (attributes.automaticCleanup) {
+            null -> Unit
+            true ->
+                tx
+                    .dsl()
+                    .update(SUBMISSION)
+                    .set(SUBMISSION.AUTOMATIC_CLEANUP, true)
+                    .where(identifiesSubmission.and(SUBMISSION.AUTOMATIC_CLEANUP.isNull))
+                    .execute()
+
+            false ->
+                tx
+                    .dsl()
+                    .update(SUBMISSION)
+                    .set(SUBMISSION.AUTOMATIC_CLEANUP, false)
+                    .where(identifiesSubmission)
+                    .execute()
         }
     }
 

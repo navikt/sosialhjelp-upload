@@ -1,1 +1,1 @@
-ALTER TABLE submission ADD COLUMN automatic_cleanup BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE submission ADD COLUMN automatic_cleanup BOOLEAN;

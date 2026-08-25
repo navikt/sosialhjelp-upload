@@ -108,7 +108,7 @@ open class Submission(
     /**
      * The column <code>public.submission.automatic_cleanup</code>.
      */
-    val AUTOMATIC_CLEANUP: TableField<SubmissionRecord, Boolean?> = createField(DSL.name("automatic_cleanup"), SQLDataType.BOOLEAN.nullable(false).defaultValue(DSL.field(DSL.raw("false"), SQLDataType.BOOLEAN)), this, "")
+    val AUTOMATIC_CLEANUP: TableField<SubmissionRecord, Boolean?> = createField(DSL.name("automatic_cleanup"), SQLDataType.BOOLEAN, this, "")
 
     private constructor(alias: Name, aliased: Table<SubmissionRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<SubmissionRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)

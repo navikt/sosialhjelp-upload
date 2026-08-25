@@ -169,6 +169,21 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         coVerify(exactly = 0) { mellomlagringClient.deleteMellomlagring(any()) }
     }
 
+    /**
+     * A submission created by the SSE status route, where no upload has decided the policy yet,
+     * must not be swept. Only an explicit opt-in makes a submission eligible.
+     */
+    @Test
+    fun `submissions with an undecided cleanup policy are never deleted`() {
+        val submissionId = createMockSubmission(dsl, automaticCleanup = null)
+        insertUpload(submissionId, updatedAt = OffsetDateTime.now().minusDays(30), filId = UUID.randomUUID())
+
+        runBlocking { cleanupService().runCleanup() }
+
+        assertNotNull(submissionExists(submissionId), "An undecided submission must never be swept")
+        coVerify(exactly = 0) { mellomlagringClient.deleteFile(any(), any(), any()) }
+    }
+
     @Test
     fun `submissions not yet past retention period are kept`() {
         val submissionId = createMockSubmission(dsl, automaticCleanup = true)

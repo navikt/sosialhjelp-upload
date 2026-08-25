@@ -24,7 +24,7 @@ object TestUtils {
         ownerIdent: String = "12345678910",
         navEksternRefId: String? = null,
         kategori: String? = null,
-        automaticCleanup: Boolean = false,
+        automaticCleanup: Boolean? = null,
     ): UUID {
         val uuid = UUID.randomUUID()
         tx.transactionResult { config ->
