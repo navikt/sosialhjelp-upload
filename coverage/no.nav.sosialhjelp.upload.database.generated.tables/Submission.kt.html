@@ -108,7 +108,7 @@ import org.jooq.impl.TableImpl
     /**
      * The column &lt;code&gt;public.submission.automatic_cleanup&lt;/code&gt;.
      */
-<span class="fc" id="L111">    val AUTOMATIC_CLEANUP: TableField&lt;SubmissionRecord, Boolean?&gt; = createField(DSL.name(&quot;automatic_cleanup&quot;), SQLDataType.BOOLEAN.nullable(false).defaultValue(DSL.field(DSL.raw(&quot;false&quot;), SQLDataType.BOOLEAN)), this, &quot;&quot;)</span>
+<span class="fc" id="L111">    val AUTOMATIC_CLEANUP: TableField&lt;SubmissionRecord, Boolean?&gt; = createField(DSL.name(&quot;automatic_cleanup&quot;), SQLDataType.BOOLEAN, this, &quot;&quot;)</span>
 
 <span class="fc" id="L113">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?): this(alias, null, null, null, aliased, null, null)</span>
 <span class="nc" id="L114">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?, parameters: Array&lt;Field&lt;*&gt;?&gt;?): this(alias, null, null, null, aliased, parameters, null)</span>
