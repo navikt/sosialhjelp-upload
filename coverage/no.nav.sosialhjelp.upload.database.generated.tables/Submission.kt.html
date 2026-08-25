@@ -105,92 +105,97 @@ import org.jooq.impl.TableImpl
      */
 <span class="fc" id="L106">    val KATEGORI: TableField&lt;SubmissionRecord, String?&gt; = createField(DSL.name(&quot;kategori&quot;), SQLDataType.VARCHAR(100), this, &quot;&quot;)</span>
 
-<span class="fc" id="L108">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?): this(alias, null, null, null, aliased, null, null)</span>
-<span class="nc" id="L109">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?, parameters: Array&lt;Field&lt;*&gt;?&gt;?): this(alias, null, null, null, aliased, parameters, null)</span>
-<span class="nc" id="L110">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?, where: Condition?): this(alias, null, null, null, aliased, null, where)</span>
+    /**
+     * The column &lt;code&gt;public.submission.automatic_cleanup&lt;/code&gt;.
+     */
+<span class="fc" id="L111">    val AUTOMATIC_CLEANUP: TableField&lt;SubmissionRecord, Boolean?&gt; = createField(DSL.name(&quot;automatic_cleanup&quot;), SQLDataType.BOOLEAN.nullable(false).defaultValue(DSL.field(DSL.raw(&quot;false&quot;), SQLDataType.BOOLEAN)), this, &quot;&quot;)</span>
+
+<span class="fc" id="L113">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?): this(alias, null, null, null, aliased, null, null)</span>
+<span class="nc" id="L114">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?, parameters: Array&lt;Field&lt;*&gt;?&gt;?): this(alias, null, null, null, aliased, parameters, null)</span>
+<span class="nc" id="L115">    private constructor(alias: Name, aliased: Table&lt;SubmissionRecord&gt;?, where: Condition?): this(alias, null, null, null, aliased, null, where)</span>
 
     /**
      * Create an aliased &lt;code&gt;public.submission&lt;/code&gt; table reference
      */
-<span class="nc" id="L115">    constructor(alias: String): this(DSL.name(alias))</span>
+<span class="nc" id="L120">    constructor(alias: String): this(DSL.name(alias))</span>
 
     /**
      * Create an aliased &lt;code&gt;public.submission&lt;/code&gt; table reference
      */
-<span class="nc" id="L120">    constructor(alias: Name): this(alias, null)</span>
+<span class="nc" id="L125">    constructor(alias: Name): this(alias, null)</span>
 
     /**
      * Create a &lt;code&gt;public.submission&lt;/code&gt; table reference
      */
-<span class="fc" id="L125">    constructor(): this(DSL.name(&quot;submission&quot;), null)</span>
-<span class="pc bpc" id="L126" title="1 of 2 branches missed.">    override fun getSchema(): Schema? = if (aliased()) null else Public.PUBLIC</span>
-<span class="nc" id="L127">    override fun `as`(alias: String): Submission = Submission(DSL.name(alias), this)</span>
-<span class="nc" id="L128">    override fun `as`(alias: Name): Submission = Submission(alias, this)</span>
-<span class="nc" id="L129">    override fun `as`(alias: Table&lt;*&gt;): Submission = Submission(alias.qualifiedName, this)</span>
+<span class="fc" id="L130">    constructor(): this(DSL.name(&quot;submission&quot;), null)</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">    override fun getSchema(): Schema? = if (aliased()) null else Public.PUBLIC</span>
+<span class="nc" id="L132">    override fun `as`(alias: String): Submission = Submission(DSL.name(alias), this)</span>
+<span class="nc" id="L133">    override fun `as`(alias: Name): Submission = Submission(alias, this)</span>
+<span class="nc" id="L134">    override fun `as`(alias: Table&lt;*&gt;): Submission = Submission(alias.qualifiedName, this)</span>
 
     /**
      * Rename this table
      */
-<span class="nc" id="L134">    override fun rename(name: String): Submission = Submission(DSL.name(name), null)</span>
+<span class="nc" id="L139">    override fun rename(name: String): Submission = Submission(DSL.name(name), null)</span>
 
     /**
      * Rename this table
      */
-<span class="nc" id="L139">    override fun rename(name: Name): Submission = Submission(name, null)</span>
+<span class="nc" id="L144">    override fun rename(name: Name): Submission = Submission(name, null)</span>
 
     /**
      * Rename this table
      */
-<span class="nc" id="L144">    override fun rename(name: Table&lt;*&gt;): Submission = Submission(name.qualifiedName, null)</span>
+<span class="nc" id="L149">    override fun rename(name: Table&lt;*&gt;): Submission = Submission(name.qualifiedName, null)</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc bnc" id="L149" title="All 2 branches missed.">    override fun where(condition: Condition?): Submission = Submission(qualifiedName, if (aliased()) this else null, Internal.condition(this, condition))</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">    override fun where(condition: Condition?): Submission = Submission(qualifiedName, if (aliased()) this else null, Internal.condition(this, condition))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L154">    override fun where(conditions: Collection&lt;Condition&gt;): Submission = where(DSL.and(conditions))</span>
+<span class="nc" id="L159">    override fun where(conditions: Collection&lt;Condition&gt;): Submission = where(DSL.and(conditions))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L159">    override fun where(vararg conditions: Condition?): Submission = where(DSL.and(*conditions))</span>
+<span class="nc" id="L164">    override fun where(vararg conditions: Condition?): Submission = where(DSL.and(*conditions))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L164">    override fun where(condition: Field&lt;Boolean?&gt;?): Submission = where(DSL.condition(condition))</span>
+<span class="nc" id="L169">    override fun where(condition: Field&lt;Boolean?&gt;?): Submission = where(DSL.condition(condition))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L169">    @PlainSQL override fun where(condition: SQL): Submission = where(DSL.condition(condition))</span>
+<span class="nc" id="L174">    @PlainSQL override fun where(condition: SQL): Submission = where(DSL.condition(condition))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L174">    @PlainSQL override fun where(@Stringly.SQL condition: String): Submission = where(DSL.condition(condition))</span>
+<span class="nc" id="L179">    @PlainSQL override fun where(@Stringly.SQL condition: String): Submission = where(DSL.condition(condition))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L179">    @PlainSQL override fun where(@Stringly.SQL condition: String, vararg binds: Any?): Submission = where(DSL.condition(condition, *binds))</span>
+<span class="nc" id="L184">    @PlainSQL override fun where(@Stringly.SQL condition: String, vararg binds: Any?): Submission = where(DSL.condition(condition, *binds))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L184">    @PlainSQL override fun where(@Stringly.SQL condition: String, vararg parts: QueryPart): Submission = where(DSL.condition(condition, *parts))</span>
+<span class="nc" id="L189">    @PlainSQL override fun where(@Stringly.SQL condition: String, vararg parts: QueryPart): Submission = where(DSL.condition(condition, *parts))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L189">    override fun whereExists(select: TableLike&lt;*&gt;): Submission = where(DSL.exists(select))</span>
+<span class="nc" id="L194">    override fun whereExists(select: TableLike&lt;*&gt;): Submission = where(DSL.exists(select))</span>
 
     /**
      * Create an inline derived table from this table
      */
-<span class="nc" id="L194">    override fun whereNotExists(select: TableLike&lt;*&gt;): Submission = where(DSL.notExists(select))</span>
+<span class="nc" id="L199">    override fun whereNotExists(select: TableLike&lt;*&gt;): Submission = where(DSL.notExists(select))</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

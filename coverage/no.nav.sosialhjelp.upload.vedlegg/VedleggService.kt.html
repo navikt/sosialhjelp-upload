@@ -1,44 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VedleggService.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.vedlegg</a> &gt; <span class="el_source">VedleggService.kt</span></div><h1>VedleggService.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.vedlegg
 
+import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
 
-<span class="fc" id="L6">class VedleggService(</span>
-<span class="fc" id="L7">    private val dsl: DSLContext,</span>
-<span class="fc" id="L8">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L7">class VedleggService(</span>
+<span class="fc" id="L8">    private val dsl: DSLContext,</span>
+<span class="fc" id="L9">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L10">    private val submissionDeletionService: SubmissionDeletionService,</span>
 ) {
-    fun deleteVedlegg(
+    /**
+     * Deletes every submission for [navEksternRefId], including the files in Fiks mellomlagring.
+     * Called by sosialhjelp-soknad-api once the søknad has been sent.
+     */
+    suspend fun deleteVedlegg(navEksternRefId: String): Int =
+<span class="nc" id="L17">        submissionDeletionService.deleteByNavEksternRefId(navEksternRefId)</span>
+
+    /**
+     * Deletes the submission for [navEksternRefId] + [kategori], including the files in Fiks
+     * mellomlagring. Leaving the files behind would make them orphans that Fiks later rejects the
+     * innsending over.
+     */
+    suspend fun deleteVedlegg(
         navEksternRefId: String,
         kategori: String,
-    ) {
-<span class="nc" id="L14">        dsl.transaction { tx -&gt;</span>
-<span class="nc" id="L15">            uploadRepository.deleteUploads(tx, navEksternRefId, kategori)</span>
-<span class="nc" id="L16">        }</span>
-<span class="nc" id="L17">    }</span>
+<span class="nc" id="L27">    ): Int = submissionDeletionService.deleteByNavEksternRefId(navEksternRefId, kategori)</span>
 
     fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
-<span class="fc" id="L20">        val uploads =</span>
-<span class="fc" id="L21">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L22">                uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
+<span class="fc" id="L30">        val uploads =</span>
+<span class="fc" id="L31">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L32">                uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
             }
 
-<span class="fc" id="L25">        val grouped = uploads.groupBy { it.category }</span>
+<span class="fc" id="L35">        val grouped = uploads.groupBy { it.category }</span>
 
-<span class="fc" id="L27">        val vedleggList =</span>
-<span class="fc" id="L28">            grouped.map { (key, files) -&gt;</span>
-<span class="fc" id="L29">                Vedlegg(</span>
-<span class="fc" id="L30">                    kategori = key,</span>
+<span class="fc" id="L37">        val vedleggList =</span>
+<span class="fc" id="L38">            grouped.map { (key, files) -&gt;</span>
+<span class="fc" id="L39">                Vedlegg(</span>
+<span class="fc" id="L40">                    kategori = key,</span>
                     filer =
-<span class="fc" id="L32">                        files.map { file -&gt;</span>
-<span class="fc" id="L33">                            Fil(</span>
-<span class="fc" id="L34">                                filnavn = file.mellomlagringFilnavn,</span>
-<span class="fc" id="L35">                                sha512 = file.sha512,</span>
-<span class="fc" id="L36">                            )</span>
+<span class="fc" id="L42">                        files.map { file -&gt;</span>
+<span class="fc" id="L43">                            Fil(</span>
+<span class="fc" id="L44">                                filnavn = file.mellomlagringFilnavn,</span>
+<span class="fc" id="L45">                                sha512 = file.sha512,</span>
+<span class="fc" id="L46">                            )</span>
                         },
-<span class="fc" id="L38">                )</span>
+<span class="fc" id="L48">                )</span>
             }
 
-<span class="fc" id="L41">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
+<span class="fc" id="L51">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

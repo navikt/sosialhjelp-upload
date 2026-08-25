@@ -46,18 +46,23 @@ import org.jooq.impl.TableRecordImpl
 <span class="nc" id="L46">        set(value): Unit = set(6, value)</span>
 <span class="nc" id="L47">        get(): String? = get(6) as String?</span>
 
+    open var automaticCleanup: Boolean?
+<span class="nc" id="L50">        set(value): Unit = set(7, value)</span>
+<span class="nc" id="L51">        get(): Boolean? = get(7) as Boolean?</span>
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-<span class="nc" id="L52">    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null): this() {</span>
-<span class="nc" id="L53">        this.id = id</span>
-<span class="nc" id="L54">        this.contextId = contextId</span>
-<span class="nc" id="L55">        this.ownerIdent = ownerIdent</span>
-<span class="nc" id="L56">        this.navEksternRefId = navEksternRefId</span>
-<span class="nc" id="L57">        this.createdAt = createdAt</span>
-<span class="nc" id="L58">        this.fiksDigisosId = fiksDigisosId</span>
-<span class="nc" id="L59">        this.kategori = kategori</span>
-<span class="nc" id="L60">        resetTouchedOnNotNull()</span>
-<span class="nc" id="L61">    }</span>
+<span class="nc" id="L56">    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null, automaticCleanup: Boolean? = null): this() {</span>
+<span class="nc" id="L57">        this.id = id</span>
+<span class="nc" id="L58">        this.contextId = contextId</span>
+<span class="nc" id="L59">        this.ownerIdent = ownerIdent</span>
+<span class="nc" id="L60">        this.navEksternRefId = navEksternRefId</span>
+<span class="nc" id="L61">        this.createdAt = createdAt</span>
+<span class="nc" id="L62">        this.fiksDigisosId = fiksDigisosId</span>
+<span class="nc" id="L63">        this.kategori = kategori</span>
+<span class="nc" id="L64">        this.automaticCleanup = automaticCleanup</span>
+<span class="nc" id="L65">        resetTouchedOnNotNull()</span>
+<span class="nc" id="L66">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

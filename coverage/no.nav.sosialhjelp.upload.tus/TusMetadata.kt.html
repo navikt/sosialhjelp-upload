@@ -45,25 +45,30 @@ fun Map&lt;String, String&gt;.toTusMetadata(): Result&lt;TusMetadata&gt; {
 <span class="fc" id="L45">    val fiksDigisosId = this[&quot;fiksDigisosId&quot;]</span>
 <span class="fc" id="L46">    val navEksternRefId = this[&quot;navEksternRefId&quot;]</span>
 <span class="fc" id="L47">    val kategori = this[&quot;kategori&quot;]</span>
+    // Default false: en manglende eller ugyldig verdi skal aldri kunne føre til at
+    // vedlegg slettes automatisk. Se V1.15__add_automatic_cleanup.sql.
+<span class="fc bfc" id="L50" title="All 2 branches covered.">    val automaticCleanup = this[&quot;automaticCleanup&quot;]?.equals(&quot;true&quot;, ignoreCase = true) ?: false</span>
 
-<span class="fc" id="L49">    return Result.success(</span>
-<span class="fc" id="L50">        TusMetadata(</span>
-<span class="fc" id="L51">            filename = filename,</span>
-<span class="fc" id="L52">            contextId = contextId,</span>
-<span class="fc" id="L53">            correlationId = correlationId,</span>
-<span class="fc" id="L54">            fiksDigisosId = fiksDigisosId,</span>
-<span class="fc" id="L55">            navEksternRefId = navEksternRefId,</span>
-<span class="fc" id="L56">            kategori = kategori,</span>
+<span class="fc" id="L52">    return Result.success(</span>
+<span class="fc" id="L53">        TusMetadata(</span>
+<span class="fc" id="L54">            filename = filename,</span>
+<span class="fc" id="L55">            contextId = contextId,</span>
+<span class="fc" id="L56">            correlationId = correlationId,</span>
+<span class="fc" id="L57">            fiksDigisosId = fiksDigisosId,</span>
+<span class="fc" id="L58">            navEksternRefId = navEksternRefId,</span>
+<span class="fc" id="L59">            kategori = kategori,</span>
+<span class="fc" id="L60">            automaticCleanup = automaticCleanup,</span>
         ),
     )
 }
 
-<span class="fc" id="L61">data class TusMetadata(</span>
-<span class="fc" id="L62">    val filename: String,</span>
-<span class="fc" id="L63">    val contextId: String,</span>
-<span class="fc" id="L64">    val correlationId: UUID?,</span>
-<span class="fc" id="L65">    val fiksDigisosId: String?,</span>
-<span class="fc" id="L66">    val navEksternRefId: String?,</span>
-<span class="fc" id="L67">    val kategori: String?,</span>
-)
+<span class="fc" id="L65">data class TusMetadata(</span>
+<span class="fc" id="L66">    val filename: String,</span>
+<span class="fc" id="L67">    val contextId: String,</span>
+<span class="fc" id="L68">    val correlationId: UUID?,</span>
+<span class="fc" id="L69">    val fiksDigisosId: String?,</span>
+<span class="fc" id="L70">    val navEksternRefId: String?,</span>
+<span class="fc" id="L71">    val kategori: String?,</span>
+<span class="fc" id="L72">    val automaticCleanup: Boolean = false,</span>
+<span class="fc" id="L73">)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
