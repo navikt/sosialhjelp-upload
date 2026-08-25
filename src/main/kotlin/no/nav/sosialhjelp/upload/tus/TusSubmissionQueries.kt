@@ -38,16 +38,26 @@ class TusSubmissionQueries {
     }
 
     /**
+     * Attributes carried by a TUS upload that describe the submission it belongs to.
+     */
+    data class SubmissionAttributes(
+        val fiksDigisosId: String? = null,
+        val kategori: String? = null,
+        val automaticCleanup: Boolean? = null,
+    )
+
+    /**
      * Gets an existing submission for [contextId] + [personIdent], or creates one if none exists.
-     * Updates [fiksDigisosId] and [kategori] on the existing row if they were null.
+     * Updates fiksDigisosId and kategori on the existing row if they were null.
      * Throws [SubmissionOwnedByAnotherUserException] if the contextId is owned by someone else.
+     *
+     * See [updateExistingSubmission] for how `automaticCleanup` transitions.
      */
     fun getOrCreateSubmission(
         tx: Configuration,
         contextId: String,
         personIdent: String,
-        fiksDigisosId: String? = null,
-        kategori: String? = null,
+        attributes: SubmissionAttributes = SubmissionAttributes(),
     ): UUID {
         if (isOwnedByAnotherUser(tx, contextId, personIdent)) {
             throw SubmissionOwnedByAnotherUserException()
@@ -60,8 +70,9 @@ class TusSubmissionQueries {
                 .set(SUBMISSION.ID, UUID.randomUUID())
                 .set(SUBMISSION.OWNER_IDENT, personIdent)
                 .set(SUBMISSION.CONTEXT_ID, contextId)
-                .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
-                .set(SUBMISSION.KATEGORI, kategori)
+                .set(SUBMISSION.FIKS_DIGISOS_ID, attributes.fiksDigisosId)
+                .set(SUBMISSION.KATEGORI, attributes.kategori)
+                .set(SUBMISSION.AUTOMATIC_CLEANUP, attributes.automaticCleanup)
                 .onDuplicateKeyIgnore()
                 .returning(SUBMISSION.ID)
                 .fetchOne()
@@ -69,33 +80,7 @@ class TusSubmissionQueries {
 
         if (insertedId != null) return insertedId
 
-        // Update fiksDigisosId if not yet set on the existing row
-        if (fiksDigisosId != null) {
-            tx
-                .dsl()
-                .update(SUBMISSION)
-                .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
-                .where(
-                    SUBMISSION.CONTEXT_ID
-                        .eq(contextId)
-                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
-                        .and(SUBMISSION.FIKS_DIGISOS_ID.isNull),
-                ).execute()
-        }
-
-        // Update kategori if not yet set on the existing row
-        if (kategori != null) {
-            tx
-                .dsl()
-                .update(SUBMISSION)
-                .set(SUBMISSION.KATEGORI, kategori)
-                .where(
-                    SUBMISSION.CONTEXT_ID
-                        .eq(contextId)
-                        .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
-                        .and(SUBMISSION.KATEGORI.isNull),
-                ).execute()
-        }
+        updateExistingSubmission(tx, contextId, personIdent, attributes)
 
         return tx
             .dsl()
@@ -107,6 +92,56 @@ class TusSubmissionQueries {
                     .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
             ).fetchOne()
             ?.get(SUBMISSION.ID) ?: error("Could not find or create submission")
+    }
+
+    private fun updateExistingSubmission(
+        tx: Configuration,
+        contextId: String,
+        personIdent: String,
+        attributes: SubmissionAttributes,
+    ) {
+        val identifiesSubmission =
+            SUBMISSION.CONTEXT_ID
+                .eq(contextId)
+                .and(SUBMISSION.OWNER_IDENT.eq(personIdent))
+
+        // Set fiksDigisosId and kategori if they were not set by the first upload
+        if (attributes.fiksDigisosId != null) {
+            tx
+                .dsl()
+                .update(SUBMISSION)
+                .set(SUBMISSION.FIKS_DIGISOS_ID, attributes.fiksDigisosId)
+                .where(identifiesSubmission.and(SUBMISSION.FIKS_DIGISOS_ID.isNull))
+                .execute()
+        }
+
+        if (attributes.kategori != null) {
+            tx
+                .dsl()
+                .update(SUBMISSION)
+                .set(SUBMISSION.KATEGORI, attributes.kategori)
+                .where(identifiesSubmission.and(SUBMISSION.KATEGORI.isNull))
+                .execute()
+        }
+
+        when (attributes.automaticCleanup) {
+            null -> Unit
+            true ->
+                tx
+                    .dsl()
+                    .update(SUBMISSION)
+                    .set(SUBMISSION.AUTOMATIC_CLEANUP, true)
+                    .where(identifiesSubmission.and(SUBMISSION.AUTOMATIC_CLEANUP.isNull))
+                    .execute()
+
+            false ->
+                tx
+                    .dsl()
+                    .update(SUBMISSION)
+                    .set(SUBMISSION.AUTOMATIC_CLEANUP, false)
+                    .where(identifiesSubmission)
+                    .execute()
+        }
     }
 
     /**

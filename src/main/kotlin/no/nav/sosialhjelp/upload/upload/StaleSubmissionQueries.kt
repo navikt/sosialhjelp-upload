@@ -14,11 +14,16 @@ class StaleSubmissionQueries {
     data class StaleSubmission(
         val id: UUID,
         val navEksternRefId: String,
+        val kategori: String?,
     )
 
     /**
-     * Returns submissions whose uploads have all reached a terminal state (not PENDING or PROCESSING)
-     * and whose last upload activity was before [cutoff].
+     * Returns submissions that have opted in to automatic cleanup, whose uploads have all reached
+     * a terminal state (not PENDING or PROCESSING) and whose last upload activity was before
+     * [cutoff].
+     *
+     * Submissions with `automatic_cleanup = false` are never returned. Those are owned by another
+     * service (søknadsflyten: sosialhjelp-soknad-api) which decides when they may be deleted.
      */
     fun getStaleSubmissions(
         tx: Configuration,
@@ -26,11 +31,12 @@ class StaleSubmissionQueries {
     ): List<StaleSubmission> =
         tx
             .dsl()
-            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)
+            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.KATEGORI)
             .from(SUBMISSION)
             .join(UPLOAD)
             .on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))
-            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID)
+            .where(SUBMISSION.AUTOMATIC_CLEANUP.isTrue)
+            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.KATEGORI)
             .having(
                 DSL
                     .max(UPLOAD.UPDATED_AT)
@@ -43,5 +49,11 @@ class StaleSubmissionQueries {
                             ).eq(0),
                     ),
             ).fetch()
-            .map { StaleSubmission(it[SUBMISSION.ID]!!, it[SUBMISSION.NAV_EKSTERN_REF_ID]!!) }
+            .map {
+                StaleSubmission(
+                    it[SUBMISSION.ID]!!,
+                    it[SUBMISSION.NAV_EKSTERN_REF_ID]!!,
+                    it[SUBMISSION.KATEGORI],
+                )
+            }
 }

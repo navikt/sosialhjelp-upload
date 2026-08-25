@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
 import io.ktor.http.HttpStatusCode.Companion.BadRequest
+import io.ktor.http.HttpStatusCode.Companion.NoContent
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
@@ -28,6 +29,12 @@ fun Route.configureVedleggRoutes() {
                     call.respond(vedlegg)
                 }
 
+                delete {
+                    val navEksternRefId = call.parameters["navEksternRefId"]!!
+                    vedleggService.deleteVedlegg(navEksternRefId)
+                    call.respond(NoContent)
+                }
+
                 delete("/{kategori}") {
                     val navEksternRefId =
                         call.parameters["navEksternRefId"] ?: return@delete call.respondText(
@@ -41,6 +48,7 @@ fun Route.configureVedleggRoutes() {
                         )
 
                     vedleggService.deleteVedlegg(navEksternRefId, kategori)
+                    call.respond(NoContent)
                 }
             }
         }

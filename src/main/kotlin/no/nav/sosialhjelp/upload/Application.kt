@@ -36,6 +36,7 @@ import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
 import no.nav.sosialhjelp.upload.upload.StaleSubmissionCleanupService
+import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.upload.UploadRecoveryService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
@@ -175,6 +176,7 @@ private fun Application.configureDependencies(
         provide(GotenbergService::class)
         provide(EttersendelseService::class)
         provide(UploadRecoveryService::class)
+        provide(SubmissionDeletionService::class)
         provide(StaleSubmissionCleanupService::class)
         provide(VedleggService::class)
     }

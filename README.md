@@ -72,7 +72,26 @@ Alle ruter under base-path `/sosialhjelp/upload`.
 | `HEAD` | `/tus/files/{id}` | ID-porten JWT | Hent nåværende offset/lengde |
 | `PATCH` | `/tus/files/{id}` | ID-porten JWT | Legg til et chunk |
 | `DELETE` | `/tus/files/{id}` | ID-porten JWT | Avbryt/slett en opplasting |
+| `DELETE` | `/vedlegg/{navEksternRefId}` | TokenX (M2M) | Slett alle vedlegg for søknaden, inkludert filene i Fiks mellomlagring; kalles av sosialhjelp-soknad-api etter innsending |
 | `GET` | `/vedlegg/{navEksternRefId}` | TokenX (M2M) | Returner `JsonVedleggSpesifikasjon`; kalles av sosialhjelp-soknad-api |
+| `DELETE` | `/vedlegg/{navEksternRefId}/{kategori}` | TokenX (M2M) | Slett vedleggene for én kategori, inkludert filene i Fiks mellomlagring |
+
+## Livssyklus for vedlegg
+
+Kolonnen `submission.automatic_cleanup` styrer om denne tjenesten selv har lov til å rydde bort en
+submission. Verdien settes fra TUS-metadatafeltet `automaticCleanup` (`"true"` eller `"false"`).
+Overgangene er:
+
+- `NULL → TRUE` — eneste vei inn i påmeldt tilstand
+- `NULL → FALSE` og `TRUE → FALSE` — alltid tillatt
+- `FALSE → TRUE` — **ikke** tillatt
+
+Opprydding av søknadsvedlegg skjer ved at soknad-api kaller `DELETE /vedlegg/{navEksternRefId}`
+etter innsending.
+
+All sletting er avgrenset til én submission om gangen. Flere submissions deler `navEksternRefId` —
+en søknad har én submission per kategori — så sletting per `navEksternRefId` mot Fiks mellomlagring
+ville fjernet filer som tilhører søsken-submissions som fortsatt er i live.
 
 ## Autentisering og tilgangskontroll
 
