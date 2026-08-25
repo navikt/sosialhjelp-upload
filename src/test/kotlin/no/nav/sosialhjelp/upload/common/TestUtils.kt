@@ -17,11 +17,14 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 object TestUtils {
+    @Suppress("LongParameterList")
     fun createMockSubmission(
         tx: DSLContext,
         contextId: String = UUID.randomUUID().toString(),
         ownerIdent: String = "12345678910",
         navEksternRefId: String? = null,
+        kategori: String? = null,
+        automaticCleanup: Boolean = false,
     ): UUID {
         val uuid = UUID.randomUUID()
         tx.transactionResult { config ->
@@ -32,6 +35,8 @@ object TestUtils {
                 .set(Submission.SUBMISSION.OWNER_IDENT, ownerIdent)
                 .set(Submission.SUBMISSION.CONTEXT_ID, contextId)
                 .set(Submission.SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId ?: uuid.toString())
+                .set(Submission.SUBMISSION.KATEGORI, kategori)
+                .set(Submission.SUBMISSION.AUTOMATIC_CLEANUP, automaticCleanup)
                 .execute()
         }
         return uuid

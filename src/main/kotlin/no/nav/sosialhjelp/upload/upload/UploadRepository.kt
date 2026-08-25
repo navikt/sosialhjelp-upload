@@ -5,6 +5,7 @@ import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.Configuration
+import org.jooq.impl.DSL
 import java.util.UUID
 
 data class Upload(
@@ -43,18 +44,69 @@ data class UploadForVedlegg(
     val sha512: String?,
 )
 
+/**
+ * The remote resources belonging to a single submission, needed to delete it completely.
+ */
+data class SubmissionResources(
+    val submissionId: UUID,
+    val navEksternRefId: String?,
+    val kategori: String?,
+    val filIds: List<UUID>,
+    val gcsKeys: List<String>,
+)
+
 class UploadRepository {
-    fun deleteUploads(
+    /**
+     * Returns the ids of all submissions for [navEksternRefId], optionally narrowed to [kategori].
+     *
+     * Note that several submissions can share a navEksternRefId — a søknad has one submission per
+     * kategori. Any deletion must therefore be scoped per submission, never per navEksternRefId.
+     */
+    fun findSubmissionIds(
         tx: Configuration,
         navEksternRefId: String,
-        kategori: String,
-    ) {
+        kategori: String? = null,
+    ): List<UUID> =
         tx
             .dsl()
-            .deleteFrom(SUBMISSION)
+            .select(SUBMISSION.ID)
+            .from(SUBMISSION)
             .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
-            .and(SUBMISSION.KATEGORI.eq(kategori))
-            .execute()
+            .and(kategori?.let { SUBMISSION.KATEGORI.eq(it) } ?: DSL.noCondition())
+            .fetch()
+            .mapNotNull { it.get(SUBMISSION.ID) }
+
+    /**
+     * Collects the remote resources owned by [submissionId] so they can be deleted individually
+     * after the DB row is gone.
+     */
+    fun getSubmissionResources(
+        tx: Configuration,
+        submissionId: UUID,
+    ): SubmissionResources? {
+        val records =
+            tx
+                .dsl()
+                .select(
+                    SUBMISSION.NAV_EKSTERN_REF_ID,
+                    SUBMISSION.KATEGORI,
+                    UPLOAD.FIL_ID,
+                    UPLOAD.GCS_KEY,
+                ).from(SUBMISSION)
+                .leftJoin(UPLOAD)
+                .on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))
+                .where(SUBMISSION.ID.eq(submissionId))
+                .fetch()
+
+        if (records.isEmpty()) return null
+
+        return SubmissionResources(
+            submissionId = submissionId,
+            navEksternRefId = records.first().get(SUBMISSION.NAV_EKSTERN_REF_ID),
+            kategori = records.first().get(SUBMISSION.KATEGORI),
+            filIds = records.mapNotNull { it.get(UPLOAD.FIL_ID) },
+            gcsKeys = records.mapNotNull { it.get(UPLOAD.GCS_KEY) },
+        )
     }
 
     fun getUploads(

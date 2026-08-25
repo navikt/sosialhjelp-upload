@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
+import io.mockk.mockk
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
@@ -25,7 +26,7 @@ class VedleggServiceTest {
     fun setup() {
         PostgresTestContainer.migrate()
         uploadRepository = UploadRepository()
-        service = VedleggService(dsl, uploadRepository)
+        service = VedleggService(dsl, uploadRepository, mockk(relaxed = true))
     }
 
     @BeforeEach

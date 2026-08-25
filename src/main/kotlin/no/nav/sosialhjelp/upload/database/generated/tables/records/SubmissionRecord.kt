@@ -46,10 +46,14 @@ open class SubmissionRecord() : TableRecordImpl<SubmissionRecord>(Submission.SUB
         set(value): Unit = set(6, value)
         get(): String? = get(6) as String?
 
+    open var automaticCleanup: Boolean?
+        set(value): Unit = set(7, value)
+        get(): Boolean? = get(7) as Boolean?
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null): this() {
+    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null, automaticCleanup: Boolean? = null): this() {
         this.id = id
         this.contextId = contextId
         this.ownerIdent = ownerIdent
@@ -57,6 +61,7 @@ open class SubmissionRecord() : TableRecordImpl<SubmissionRecord>(Submission.SUB
         this.createdAt = createdAt
         this.fiksDigisosId = fiksDigisosId
         this.kategori = kategori
+        this.automaticCleanup = automaticCleanup
         resetTouchedOnNotNull()
     }
 }

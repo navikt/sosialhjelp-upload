@@ -73,6 +73,26 @@ Alle ruter under base-path `/sosialhjelp/upload`.
 | `PATCH` | `/tus/files/{id}` | ID-porten JWT | Legg til et chunk |
 | `DELETE` | `/tus/files/{id}` | ID-porten JWT | Avbryt/slett en opplasting |
 | `GET` | `/vedlegg/{navEksternRefId}` | TokenX (M2M) | Returner `JsonVedleggSpesifikasjon`; kalles av sosialhjelp-soknad-api |
+| `DELETE` | `/vedlegg/{navEksternRefId}` | TokenX (M2M) | Slett alle vedlegg for søknaden, inkludert filene i Fiks mellomlagring; kalles av sosialhjelp-soknad-api etter innsending |
+| `DELETE` | `/vedlegg/{navEksternRefId}/{kategori}` | TokenX (M2M) | Slett vedleggene for én kategori, inkludert filene i Fiks mellomlagring |
+
+## Livssyklus for vedlegg
+
+Kolonnen `submission.automatic_cleanup` styrer om denne tjenesten selv har lov til å rydde bort en
+submission. Verdien settes fra TUS-metadatafeltet `automaticCleanup`, og er `false` som default.
+
+- **Ettersendelse** (`automaticCleanup: true`) — tjenesten sender selv inn til Fiks og vet når det er
+  trygt å rydde. Ubrukte submissions slettes av retention-jobben etter en times inaktivitet.
+- **Søknad** (`automaticCleanup: false`) — en søknadskladd lever langt lenger enn retention-vinduet, og
+  bare `sosialhjelp-soknad-api` vet når søknaden faktisk er sendt. Retention rører aldri disse;
+  opprydding skjer ved at soknad-api kaller `DELETE /vedlegg/{navEksternRefId}`.
+
+Defaulten er `false` med vilje: en klient som glemmer feltet skal ende opp med filer som ligger igjen
+(synlig og ryddbart), ikke med vedlegg som forsvinner (stille og permanent).
+
+All sletting er avgrenset til én submission om gangen. Flere submissions deler `navEksternRefId` —
+en søknad har én submission per kategori — så sletting per `navEksternRefId` mot Fiks mellomlagring
+ville fjernet filer som tilhører søsken-submissions som fortsatt er i live.
 
 ## Autentisering og tilgangskontroll
 

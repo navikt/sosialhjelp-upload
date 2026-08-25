@@ -66,8 +66,11 @@ class TusUploadService(
                         tx,
                         contextId,
                         personident,
-                        fiksDigisosId,
-                        kategori,
+                        TusSubmissionQueries.SubmissionAttributes(
+                            fiksDigisosId = fiksDigisosId,
+                            kategori = kategori,
+                            automaticCleanup = metadata.automaticCleanup,
+                        ),
                     )
 
                 val eksternRef =

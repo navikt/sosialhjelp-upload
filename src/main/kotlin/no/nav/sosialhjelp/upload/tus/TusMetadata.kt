@@ -45,6 +45,9 @@ fun Map<String, String>.toTusMetadata(): Result<TusMetadata> {
     val fiksDigisosId = this["fiksDigisosId"]
     val navEksternRefId = this["navEksternRefId"]
     val kategori = this["kategori"]
+    // Default false: en manglende eller ugyldig verdi skal aldri kunne føre til at
+    // vedlegg slettes automatisk. Se V1.15__add_automatic_cleanup.sql.
+    val automaticCleanup = this["automaticCleanup"]?.equals("true", ignoreCase = true) ?: false
 
     return Result.success(
         TusMetadata(
@@ -54,6 +57,7 @@ fun Map<String, String>.toTusMetadata(): Result<TusMetadata> {
             fiksDigisosId = fiksDigisosId,
             navEksternRefId = navEksternRefId,
             kategori = kategori,
+            automaticCleanup = automaticCleanup,
         ),
     )
 }
@@ -65,4 +69,5 @@ data class TusMetadata(
     val fiksDigisosId: String?,
     val navEksternRefId: String?,
     val kategori: String?,
+    val automaticCleanup: Boolean = false,
 )

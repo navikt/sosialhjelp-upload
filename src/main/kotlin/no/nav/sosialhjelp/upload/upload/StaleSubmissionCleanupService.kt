@@ -8,23 +8,23 @@ import io.opentelemetry.api.trace.StatusCode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
-import no.nav.sosialhjelp.upload.database.SubmissionQueries
-import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
-import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.OffsetDateTime
 
+/**
+ * Deletes submissions that have been idle without being submitted.
+ *
+ * Only applies to submissions that opted in via `automatic_cleanup`. Søknadsvedlegg must never be
+ * removed by this service. a søknad draft outlives the idle timeout by days, and only
+ * sosialhjelp-soknad-api knows when the søknad has actually been sent. Those submissions are
+ * deleted through `DELETE /vedlegg/{navEksternRefId}` instead.
+ */
 class StaleSubmissionCleanupService(
     private val dsl: DSLContext,
     private val submissionRetentionQueries: StaleSubmissionQueries,
-    private val submissionQueries: SubmissionQueries,
-    private val uploadRepository: UploadRepository,
-    private val mellomlagringClient: MellomlagringClient,
-    private val chunkStorage: ChunkStorage,
-    private val notificationService: SubmissionNotificationService,
+    private val submissionDeletionService: SubmissionDeletionService,
     private val meterRegistry: MeterRegistry,
     private val idleTimeout: Duration = Duration.ofHours(IDLE_TIMEOUT_HOURS),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -69,36 +69,29 @@ class StaleSubmissionCleanupService(
 
     private suspend fun deleteStaleSubmission(submission: StaleSubmissionQueries.StaleSubmission) {
         try {
-            val gcsKeys =
-                withContext(ioDispatcher) {
-                    dsl.transactionResult { tx -> uploadRepository.getGcsKeysForSubmission(tx, submission.id) }
-                }
-
-            // Delete from DB first so that a crash leaves orphaned remote data rather than
-            // a dangling DB row that would cause repeated failed deletions on retry.
-            withContext(ioDispatcher) {
-                dsl.transaction { tx -> submissionQueries.cleanup(tx, submission.id) }
-                notificationService.notifyDeleted(submission.id)
-            }
-
-            mellomlagringClient.deleteMellomlagring(submission.navEksternRefId)
-
-            gcsKeys.forEach { gcsKey ->
-                val chunkPrefix = "$gcsKey-chunk-"
-                runCatching {
-                    val chunkKeys = chunkStorage.listKeys(chunkPrefix)
-                    (chunkKeys + listOf(gcsKey)).forEach { key ->
-                        runCatching { chunkStorage.deleteObject(key) }
-                            .onFailure { log.warn("Failed to delete GCS object $key during retention", it) }
-                    }
-                }.onFailure { log.warn("Failed to list/delete GCS objects for $gcsKey during retention", it) }
-            }
-
-            log.info("Deleted stale submission ${submission.id} (navEksternRefId=${submission.navEksternRefId})")
-            meterRegistry.counter("submission.retention", "result", "success").increment()
+            log.info(
+                "Retention deleting submission ${submission.id} " +
+                    "(navEksternRefId=${submission.navEksternRefId}, kategori=${submission.kategori})",
+            )
+            submissionDeletionService.deleteSubmission(submission.id)
+            meterRegistry
+                .counter(
+                    "submission.retention",
+                    "result",
+                    "success",
+                    "kategori",
+                    submission.kategori ?: "none",
+                ).increment()
         } catch (e: Exception) {
             log.warn("Failed to delete stale submission ${submission.id}", e)
-            meterRegistry.counter("submission.retention", "result", "failure").increment()
+            meterRegistry
+                .counter(
+                    "submission.retention",
+                    "result",
+                    "failure",
+                    "kategori",
+                    submission.kategori ?: "none",
+                ).increment()
         }
     }
 }

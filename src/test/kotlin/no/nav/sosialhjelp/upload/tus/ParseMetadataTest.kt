@@ -3,7 +3,9 @@ package no.nav.sosialhjelp.upload.tus
 import org.junit.jupiter.api.Test
 import java.util.Base64
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ParseMetadataTest {
     private fun b64(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
@@ -60,5 +62,28 @@ class ParseMetadataTest {
         val header = "filename ${b64(filename)}"
         val result = parseMetadata(header)
         assertEquals(filename, result["filename"])
+    }
+
+    private fun metadata(vararg extra: Pair<String, String>) =
+        (mapOf("filename" to "test.pdf", "contextId" to "ctx-123") + extra).toTusMetadata().getOrThrow()
+
+    @Test
+    fun `automaticCleanup defaults to false when the field is missing`() {
+        // Fail-safe default: a client that forgets the field must never lose attachments.
+        assertFalse(metadata().automaticCleanup)
+    }
+
+    @Test
+    fun `automaticCleanup defaults to false for an unparseable value`() {
+        assertFalse(metadata("automaticCleanup" to "").automaticCleanup)
+        assertFalse(metadata("automaticCleanup" to "tja").automaticCleanup)
+        assertFalse(metadata("automaticCleanup" to "1").automaticCleanup)
+    }
+
+    @Test
+    fun `automaticCleanup is true only when explicitly opted in`() {
+        assertTrue(metadata("automaticCleanup" to "true").automaticCleanup)
+        assertTrue(metadata("automaticCleanup" to "TRUE").automaticCleanup)
+        assertFalse(metadata("automaticCleanup" to "false").automaticCleanup)
     }
 }
