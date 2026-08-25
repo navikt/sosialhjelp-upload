@@ -54,6 +54,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                     mellomlagringClient = mellomlagringClient,
                     chunkStorage = chunkStorage,
                     notificationService = mockk(relaxed = true),
+                    meterRegistry = SimpleMeterRegistry(),
                 ),
             meterRegistry = SimpleMeterRegistry(),
             idleTimeout = timeout,
@@ -222,6 +223,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                 mellomlagringClient = mellomlagringClient,
                 chunkStorage = chunkStorage,
                 notificationService = mockk(relaxed = true),
+                meterRegistry = SimpleMeterRegistry(),
             )
 
         val deleted = runBlocking { deletionService.deleteByNavEksternRefId(navEksternRefId) }
@@ -251,6 +253,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                 mellomlagringClient = mellomlagringClient,
                 chunkStorage = chunkStorage,
                 notificationService = mockk(relaxed = true),
+                meterRegistry = SimpleMeterRegistry(),
             )
 
         val deleted = runBlocking { deletionService.deleteByNavEksternRefId(navEksternRefId, "husleie") }

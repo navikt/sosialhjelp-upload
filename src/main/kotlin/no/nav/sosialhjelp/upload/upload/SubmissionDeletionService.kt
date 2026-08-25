@@ -2,6 +2,7 @@
 
 package no.nav.sosialhjelp.upload.upload
 
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,14 +21,11 @@ class SubmissionDeletionService(
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
     private val notificationService: SubmissionNotificationService,
+    private val meterRegistry: MeterRegistry,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    /**
-     * Deletes [submissionId] together with its mellomlagring files and GCS chunks.
-     * Returns false if the submission did not exist. Safe to call more than once.
-     */
     suspend fun deleteSubmission(submissionId: UUID): Boolean {
         val resources =
             withContext(ioDispatcher) {
@@ -37,7 +35,9 @@ class SubmissionDeletionService(
         withContext(ioDispatcher) {
             dsl.transaction { tx -> submissionQueries.cleanup(tx, submissionId) }
         }
-        notificationService.notifyDeleted(submissionId)
+
+        runCatching { notificationService.notifyDeleted(submissionId) }
+            .onFailure { logger.warn("Failed to notify deletion of submission $submissionId", it) }
 
         deleteMellomlagringFiles(resources)
         deleteGcsObjects(resources)
@@ -49,10 +49,6 @@ class SubmissionDeletionService(
         return true
     }
 
-    /**
-     * Deletes every submission for [navEksternRefId], optionally narrowed to a single [kategori].
-     * Returns the number of submissions deleted.
-     */
     suspend fun deleteByNavEksternRefId(
         navEksternRefId: String,
         kategori: String? = null,
@@ -68,10 +64,9 @@ class SubmissionDeletionService(
         val navEksternRefId = resources.navEksternRefId ?: return
         resources.filIds.forEach { filId ->
             try {
-                mellomlagringClient.deleteFile(navEksternRefId, filId)
+                mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
             } catch (e: Exception) {
-                // Leaving an orphaned file behind is far less harmful than aborting the deletion,
-                // and the remaining files must still be removed.
+                meterRegistry.counter("mellomlagring.orphaned_file").increment()
                 logger.warn("Failed to delete file $filId from mellomlagring for $navEksternRefId", e)
             }
         }

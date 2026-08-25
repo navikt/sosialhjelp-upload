@@ -74,24 +74,10 @@ class StaleSubmissionCleanupService(
                     "(navEksternRefId=${submission.navEksternRefId}, kategori=${submission.kategori})",
             )
             submissionDeletionService.deleteSubmission(submission.id)
-            meterRegistry
-                .counter(
-                    "submission.retention",
-                    "result",
-                    "success",
-                    "kategori",
-                    submission.kategori ?: "none",
-                ).increment()
+            meterRegistry.counter("submission.retention", "result", "success").increment()
         } catch (e: Exception) {
             log.warn("Failed to delete stale submission ${submission.id}", e)
-            meterRegistry
-                .counter(
-                    "submission.retention",
-                    "result",
-                    "failure",
-                    "kategori",
-                    submission.kategori ?: "none",
-                ).increment()
+            meterRegistry.counter("submission.retention", "result", "failure").increment()
         }
     }
 }
