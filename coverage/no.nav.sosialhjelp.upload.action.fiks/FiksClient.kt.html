@@ -16,13 +16,14 @@ import io.ktor.http.*
 import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
-import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
@@ -30,104 +31,105 @@ import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 
-<span class="nc" id="L33">class FiksClient(</span>
-<span class="nc" id="L34">    @Property(&quot;fiks.baseUrl&quot;) private val fiksBaseUrl: String,</span>
-<span class="nc" id="L35">    @Property(&quot;fiks.integrasjonsid&quot;) private val integrasjonsid: String?,</span>
-<span class="nc" id="L36">    @Property(&quot;fiks.integrasjonspassord&quot;) private val integrasjonspassord: String?,</span>
-<span class="nc" id="L37">    private val texasClient: TexasClient,</span>
-) {
-<span class="nc" id="L39">    private val logger = LoggerFactory.getLogger(this::class.java.name)</span>
+<span class="nc" id="L34">class FiksClient(</span>
+<span class="nc" id="L35">    @Property(&quot;fiks.baseUrl&quot;) private val fiksBaseUrl: String,</span>
+<span class="nc" id="L36">    @Property(&quot;fiks.integrasjonsid&quot;) private val integrasjonsid: String?,</span>
+<span class="nc" id="L37">    @Property(&quot;fiks.integrasjonspassord&quot;) private val integrasjonspassord: String?,</span>
+<span class="nc" id="L38">    private val texasClient: TexasClient,</span>
+<span class="nc" id="L39">    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),</span>
+<span class="nc" id="L40">) {</span>
+<span class="nc" id="L41">    private val logger = LoggerFactory.getLogger(this::class.java.name)</span>
 
     private fun ettersendelseUrl(
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
-<span class="nc" id="L45">    ) = &quot;$fiksBaseUrl/digisos/api/v2/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId&quot;</span>
+<span class="nc" id="L47">    ) = &quot;$fiksBaseUrl/digisos/api/v2/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId&quot;</span>
 
-<span class="nc" id="L47">    private fun digisosSakUrl(fiksDigisosId: String) = &quot;$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId&quot;</span>
+<span class="nc" id="L49">    private fun digisosSakUrl(fiksDigisosId: String) = &quot;$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId&quot;</span>
 
-<span class="nc" id="L49">    private val jacksonClient by lazy {</span>
-<span class="nc" id="L50">        HttpClient(CIO) {</span>
-<span class="nc" id="L51">            expectSuccess = false</span>
-<span class="nc" id="L52">            install(ContentNegotiation) {</span>
-<span class="nc" id="L53">                jackson()</span>
-<span class="nc" id="L54">            }</span>
-<span class="nc" id="L55">            install(Logging) {</span>
-<span class="nc" id="L56">                logger =</span>
-<span class="nc" id="L57">                    object : Logger {</span>
-<span class="nc" id="L58">                        override fun log(message: String) = this@FiksClient.logger.info(message)</span>
+<span class="nc" id="L51">    private val jacksonClient by lazy {</span>
+<span class="nc" id="L52">        HttpClient(CIO) {</span>
+<span class="nc" id="L53">            expectSuccess = false</span>
+<span class="nc" id="L54">            install(ContentNegotiation) {</span>
+<span class="nc" id="L55">                jackson()</span>
+<span class="nc" id="L56">            }</span>
+<span class="nc" id="L57">            install(Logging) {</span>
+<span class="nc" id="L58">                logger =</span>
+<span class="nc" id="L59">                    object : Logger {</span>
+<span class="nc" id="L60">                        override fun log(message: String) = this@FiksClient.logger.info(message)</span>
                     }
-<span class="nc" id="L60">                level = LogLevel.INFO</span>
-<span class="nc" id="L61">            }</span>
-<span class="nc" id="L62">        }</span>
+<span class="nc" id="L62">                level = LogLevel.INFO</span>
+<span class="nc" id="L63">            }</span>
+<span class="nc" id="L64">        }</span>
     }
 
-<span class="nc" id="L65">    private val client by lazy {</span>
-<span class="nc" id="L66">        HttpClient(CIO) {</span>
-<span class="nc" id="L67">            expectSuccess = false</span>
-<span class="nc" id="L68">            install(ContentNegotiation) {</span>
-<span class="nc" id="L69">                json()</span>
-<span class="nc" id="L70">            }</span>
-<span class="nc" id="L71">            install(Logging) {</span>
-<span class="nc" id="L72">                logger =</span>
-<span class="nc" id="L73">                    object : Logger {</span>
-<span class="nc" id="L74">                        override fun log(message: String) = this@FiksClient.logger.info(message)</span>
+<span class="nc" id="L67">    private val client by lazy {</span>
+<span class="nc" id="L68">        HttpClient(CIO) {</span>
+<span class="nc" id="L69">            expectSuccess = false</span>
+<span class="nc" id="L70">            install(ContentNegotiation) {</span>
+<span class="nc" id="L71">                json()</span>
+<span class="nc" id="L72">            }</span>
+<span class="nc" id="L73">            install(Logging) {</span>
+<span class="nc" id="L74">                logger =</span>
+<span class="nc" id="L75">                    object : Logger {</span>
+<span class="nc" id="L76">                        override fun log(message: String) = this@FiksClient.logger.info(message)</span>
                     }
-<span class="nc" id="L76">                level = LogLevel.INFO</span>
-<span class="nc" id="L77">            }</span>
-<span class="nc" id="L78">        }</span>
+<span class="nc" id="L78">                level = LogLevel.INFO</span>
+<span class="nc" id="L79">            }</span>
+<span class="nc" id="L80">        }</span>
     }
 
-<span class="nc" id="L81">    private val certCacheTtlMs = 3_600_000L // 1 hour</span>
-<span class="nc" id="L82">    private val certCacheMutex = Mutex()</span>
+<span class="nc" id="L83">    private val certCacheTtlMs = 3_600_000L // 1 hour</span>
+<span class="nc" id="L84">    private val certCacheMutex = Mutex()</span>
 
     @Volatile
     private var cachedCert: Pair&lt;X509Certificate, Long&gt;? = null
 
-<span class="nc" id="L87">    suspend fun fetchPublicKey(): X509Certificate {</span>
-<span class="nc" id="L88">        val cached = cachedCert</span>
-<span class="nc bnc" id="L89" title="All 4 branches missed.">        if (cached != null &amp;&amp; System.currentTimeMillis() - cached.second &lt; certCacheTtlMs) {</span>
-<span class="nc" id="L90">            return cached.first</span>
+<span class="nc" id="L89">    suspend fun fetchPublicKey(): X509Certificate {</span>
+<span class="nc" id="L90">        val cached = cachedCert</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        if (cached != null &amp;&amp; System.currentTimeMillis() - cached.second &lt; certCacheTtlMs) {</span>
+<span class="nc" id="L92">            return cached.first</span>
         }
-<span class="nc" id="L92">        return certCacheMutex.withLock {</span>
+<span class="nc" id="L94">        return certCacheMutex.withLock {</span>
             // Re-check inside lock — another coroutine may have refreshed while we waited
-<span class="nc" id="L94">            val cachedNow = cachedCert</span>
-<span class="nc bnc" id="L95" title="All 4 branches missed.">            if (cachedNow != null &amp;&amp; System.currentTimeMillis() - cachedNow.second &lt; certCacheTtlMs) {</span>
-<span class="nc" id="L96">                return@withLock cachedNow.first</span>
+<span class="nc" id="L96">            val cachedNow = cachedCert</span>
+<span class="nc bnc" id="L97" title="All 4 branches missed.">            if (cachedNow != null &amp;&amp; System.currentTimeMillis() - cachedNow.second &lt; certCacheTtlMs) {</span>
+<span class="nc" id="L98">                return@withLock cachedNow.first</span>
             }
-<span class="nc" id="L98">            val cert = fetchPublicKeyFromNetwork()</span>
-<span class="nc" id="L99">            cachedCert = cert to System.currentTimeMillis()</span>
-<span class="nc" id="L100">            cert</span>
+<span class="nc" id="L100">            val cert = fetchPublicKeyFromNetwork()</span>
+<span class="nc" id="L101">            cachedCert = cert to System.currentTimeMillis()</span>
+<span class="nc" id="L102">            cert</span>
         }
     }
 
-<span class="nc" id="L104">    private suspend fun fetchPublicKeyFromNetwork(): X509Certificate {</span>
-<span class="nc" id="L105">        val publicKey =</span>
-<span class="nc" id="L106">            client</span>
-<span class="nc" id="L107">                .get(&quot;$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key&quot;) {</span>
-<span class="nc" id="L108">                    headers {</span>
-<span class="nc bnc" id="L109" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L110" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L111">                    }</span>
-<span class="nc" id="L112">                    bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L113">                }.apply {</span>
-<span class="nc bnc" id="L114" title="All 2 branches missed.">                    if (!status.isSuccess()) {</span>
-<span class="nc" id="L115">                        logger.error(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
-<span class="nc" id="L116">                        throw FiksException(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
+<span class="nc" id="L106">    private suspend fun fetchPublicKeyFromNetwork(): X509Certificate {</span>
+<span class="nc" id="L107">        val publicKeyBytes =</span>
+<span class="nc" id="L108">            client</span>
+<span class="nc" id="L109">                .get(&quot;$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key&quot;) {</span>
+<span class="nc" id="L110">                    headers {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L113">                    }</span>
+<span class="nc" id="L114">                    bearerAuth(texasClient.getMaskinportenToken())</span>
+<span class="nc" id="L115">                }.apply {</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                    if (!status.isSuccess()) {</span>
+<span class="nc" id="L117">                        logger.error(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
+<span class="nc" id="L118">                        throw FiksException(&quot;Feil ved henting av public key fra dokumentlager: $status&quot;)</span>
                     }
-<span class="nc" id="L118">                }.bodyAsChannel()</span>
-<span class="nc" id="L119">                .also {</span>
-<span class="nc" id="L120">                    logger.info(&quot;Hentet public key fra dokumentlager&quot;)</span>
-<span class="nc" id="L121">                }</span>
-<span class="nc" id="L122">        return try {</span>
-<span class="nc" id="L123">            val certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;)</span>
-<span class="nc" id="L124">            (certificateFactory.generateCertificate(publicKey.toInputStream())) as X509Certificate</span>
-<span class="nc" id="L125">        } catch (e: CertificateException) {</span>
-<span class="nc" id="L126">            throw IllegalStateException(e)</span>
+<span class="nc" id="L120">                }.bodyAsBytes()</span>
+<span class="nc" id="L121">                .also { logger.info(&quot;Hentet public key fra dokumentlager&quot;) }</span>
+<span class="nc" id="L122">        return withContext(cpuDispatcher) {</span>
+<span class="nc" id="L123">            try {</span>
+<span class="nc" id="L124">                val certificateFactory = CertificateFactory.getInstance(&quot;X.509&quot;)</span>
+<span class="nc" id="L125">                certificateFactory.generateCertificate(publicKeyBytes.inputStream()) as X509Certificate</span>
+<span class="nc" id="L126">            } catch (e: CertificateException) {</span>
+<span class="nc" id="L127">                throw IllegalStateException(e)</span>
+<span class="nc" id="L128">            }</span>
         }
     }
 
-<span class="nc" id="L130">    suspend fun uploadEttersendelse(</span>
+<span class="nc" id="L132">    suspend fun uploadEttersendelse(</span>
         fiksDigisosId: String,
         kommunenummer: String,
         navEksternRefId: String,
@@ -135,57 +137,57 @@ import java.security.cert.X509Certificate
         token: String,
         filer: List&lt;Fil&gt;,
     ): HttpResponse {
-<span class="nc" id="L138">        val vedleggJson =</span>
-<span class="nc" id="L139">            VedleggSpesifikasjon(</span>
+<span class="nc" id="L140">        val vedleggJson =</span>
+<span class="nc" id="L141">            VedleggSpesifikasjon(</span>
                 vedlegg =
-<span class="nc" id="L141">                    listOf(</span>
-<span class="nc" id="L142">                        Vedlegg(</span>
-<span class="nc" id="L143">                            type = metadata.type,</span>
-<span class="nc" id="L144">                            tilleggsinfo = metadata.tilleggsinfo,</span>
-<span class="nc bnc" id="L145" title="All 2 branches missed.">                            hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },</span>
-<span class="nc" id="L146">                            hendelseReferanse = metadata.hendelsereferanse,</span>
-<span class="nc" id="L147">                            status = Vedlegg.Status.LastetOpp,</span>
-<span class="nc" id="L148">                            filer = filer,</span>
-<span class="nc" id="L149">                            klageId = null,</span>
+<span class="nc" id="L143">                    listOf(</span>
+<span class="nc" id="L144">                        Vedlegg(</span>
+<span class="nc" id="L145">                            type = metadata.type,</span>
+<span class="nc" id="L146">                            tilleggsinfo = metadata.tilleggsinfo,</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                            hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },</span>
+<span class="nc" id="L148">                            hendelseReferanse = metadata.hendelsereferanse,</span>
+<span class="nc" id="L149">                            status = Vedlegg.Status.LastetOpp,</span>
+<span class="nc" id="L150">                            filer = filer,</span>
+<span class="nc" id="L151">                            klageId = null,</span>
                         ),
                     ),
             )
-<span class="nc" id="L153">        val formData =</span>
-<span class="nc" id="L154">            formData {</span>
-<span class="nc" id="L155">                append(</span>
-<span class="nc" id="L156">                    &quot;vedlegg.json&quot;,</span>
-<span class="nc" id="L157">                    Json.encodeToString(vedleggJson),</span>
-<span class="nc" id="L158">                    Headers.build {</span>
-<span class="nc" id="L159">                        append(HttpHeaders.ContentType, ContentType.Application.Json.toString())</span>
-<span class="nc" id="L160">                    },</span>
+<span class="nc" id="L155">        val formData =</span>
+<span class="nc" id="L156">            formData {</span>
+<span class="nc" id="L157">                append(</span>
+<span class="nc" id="L158">                    &quot;vedlegg.json&quot;,</span>
+<span class="nc" id="L159">                    Json.encodeToString(vedleggJson),</span>
+<span class="nc" id="L160">                    Headers.build {</span>
+<span class="nc" id="L161">                        append(HttpHeaders.ContentType, ContentType.Application.Json.toString())</span>
+<span class="nc" id="L162">                    },</span>
                 )
-<span class="nc" id="L162">            }</span>
-<span class="nc" id="L163">        try {</span>
-<span class="nc" id="L164">            return client</span>
-<span class="nc" id="L165">                .submitFormWithBinaryData(</span>
-<span class="nc" id="L166">                    ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
-<span class="nc" id="L167">                    formData,</span>
+<span class="nc" id="L164">            }</span>
+<span class="nc" id="L165">        try {</span>
+<span class="nc" id="L166">            return client</span>
+<span class="nc" id="L167">                .submitFormWithBinaryData(</span>
+<span class="nc" id="L168">                    ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),</span>
+<span class="nc" id="L169">                    formData,</span>
                 ) {
-<span class="nc" id="L169">                    headers {</span>
-<span class="nc bnc" id="L170" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
-<span class="nc bnc" id="L171" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L172">                    }</span>
-<span class="nc" id="L173">                    bearerAuth(token)</span>
-<span class="nc" id="L174">                    contentType(ContentType.MultiPart.FormData)</span>
-<span class="nc" id="L175">                }.also {</span>
-<span class="nc bnc" id="L176" title="All 2 branches missed.">                    if (!it.status.isSuccess()) {</span>
-<span class="nc" id="L177">                        val body = it.bodyAsText()</span>
-<span class="nc bnc" id="L178" title="All 4 branches missed.">                        if (it.status == HttpStatusCode.BadRequest &amp;&amp; body.contains(&quot;finnes all&quot;)) {</span>
-<span class="nc" id="L179">                            throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)</span>
+<span class="nc" id="L171">                    headers {</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, integrasjonsid) }</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L174">                    }</span>
+<span class="nc" id="L175">                    bearerAuth(token)</span>
+<span class="nc" id="L176">                    contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L177">                }.also {</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                    if (!it.status.isSuccess()) {</span>
+<span class="nc" id="L179">                        val body = it.bodyAsText()</span>
+<span class="nc bnc" id="L180" title="All 4 branches missed.">                        if (it.status == HttpStatusCode.BadRequest &amp;&amp; body.contains(&quot;finnes all&quot;)) {</span>
+<span class="nc" id="L181">                            throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)</span>
                         }
-<span class="nc" id="L181">                        logger.error(&quot;Feil ved opplasting til fiks: ${it.status}: $body&quot;)</span>
+<span class="nc" id="L183">                        logger.error(&quot;Feil ved opplasting til fiks: ${it.status}: $body&quot;)</span>
                     } else {
-<span class="nc" id="L183">                        logger.info(&quot;Opplasting til fiks vellykket: ${it.status}&quot;)</span>
+<span class="nc" id="L185">                        logger.info(&quot;Opplasting til fiks vellykket: ${it.status}&quot;)</span>
                     }
-<span class="nc" id="L185">                }</span>
-<span class="nc" id="L186">        } catch (e: Exception) {</span>
-<span class="nc" id="L187">            logger.error(&quot;Feil ved opplasting til fiks: ${e.message}&quot;, e)</span>
-<span class="nc" id="L188">            throw e</span>
+<span class="nc" id="L187">                }</span>
+<span class="nc" id="L188">        } catch (e: Exception) {</span>
+<span class="nc" id="L189">            logger.error(&quot;Feil ved opplasting til fiks: ${e.message}&quot;, e)</span>
+<span class="nc" id="L190">            throw e</span>
         }
     }
 
@@ -193,113 +195,113 @@ import java.security.cert.X509Certificate
         id: String,
         token: String,
     ): DigisosSak =
-<span class="nc" id="L196">        jacksonClient</span>
-<span class="nc" id="L197">            .get(digisosSakUrl(id)) {</span>
-<span class="nc" id="L198">                headers {</span>
-<span class="nc bnc" id="L199" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
-<span class="nc" id="L200">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
-<span class="nc" id="L201">                    }</span>
-<span class="nc bnc" id="L202" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
-<span class="nc" id="L203">                }</span>
-<span class="nc" id="L204">                accept(ContentType.Application.Json)</span>
-<span class="nc" id="L205">                bearerAuth(token)</span>
-<span class="nc" id="L206">            }.body()</span>
+<span class="nc" id="L198">        jacksonClient</span>
+<span class="nc" id="L199">            .get(digisosSakUrl(id)) {</span>
+<span class="nc" id="L200">                headers {</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                    integrasjonsid?.let {</span>
+<span class="nc" id="L202">                        append(&quot;IntegrasjonId&quot;, integrasjonsid)</span>
+<span class="nc" id="L203">                    }</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, integrasjonspassord) }</span>
+<span class="nc" id="L205">                }</span>
+<span class="nc" id="L206">                accept(ContentType.Application.Json)</span>
+<span class="nc" id="L207">                bearerAuth(token)</span>
+<span class="nc" id="L208">            }.body()</span>
 
-<span class="nc" id="L208">    suspend fun getNewNavEksternRefId(</span>
+<span class="nc" id="L210">    suspend fun getNewNavEksternRefId(</span>
         fiksDigisosId: String,
         token: String,
-<span class="nc" id="L211">        localMax: String? = null,</span>
+<span class="nc" id="L213">        localMax: String? = null,</span>
     ): String {
-<span class="nc" id="L213">        val digisosSak = getSak(fiksDigisosId, token)</span>
-<span class="nc" id="L214">        return lagNavEksternRefId(digisosSak, localMax)</span>
+<span class="nc" id="L215">        val digisosSak = getSak(fiksDigisosId, token)</span>
+<span class="nc" id="L216">        return lagNavEksternRefId(digisosSak, localMax)</span>
     }
 }
 
 private const val COUNTER_SUFFIX_LENGTH = 4
 
-<span class="fc" id="L220">internal fun lagNavEksternRefId(</span>
+<span class="fc" id="L222">internal fun lagNavEksternRefId(</span>
     digisosSak: DigisosSak,
-<span class="fc" id="L222">    localMax: String? = null,</span>
+<span class="fc" id="L224">    localMax: String? = null,</span>
 ): String {
-<span class="fc" id="L224">    val remoteMax: String? =</span>
-<span class="fc" id="L225">        digisosSak.ettersendtInfoNAV</span>
-<span class="fc bfc" id="L226" title="All 2 branches covered.">            ?.ettersendelser</span>
-<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            ?.map { it.navEksternRefId }</span>
-<span class="pc bpc" id="L228" title="2 of 4 branches missed.">            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L }</span>
+<span class="fc" id="L226">    val remoteMax: String? =</span>
+<span class="fc" id="L227">        digisosSak.ettersendtInfoNAV</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            ?.ettersendelser</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            ?.map { it.navEksternRefId }</span>
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">            ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L }</span>
 
     // Take the highest counter across remote Fiks state and local in-flight submissions.
     // This ensures concurrent submissions that haven't been submitted to Fiks yet (and
     // therefore don't appear in ettersendtInfoNAV.ettersendelser) are still accounted for.
-<span class="fc" id="L233">    val previousId: String =</span>
-<span class="fc bfc" id="L234" title="All 4 branches covered.">        listOfNotNull(remoteMax, localMax)</span>
-<span class="pc" id="L235">            .maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
-<span class="fc bfc" id="L236" title="All 4 branches covered.">            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
-<span class="fc" id="L237">            ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
+<span class="fc" id="L235">    val previousId: String =</span>
+<span class="fc bfc" id="L236" title="All 4 branches covered.">        listOfNotNull(remoteMax, localMax)</span>
+<span class="pc" id="L237">            .maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLong() }</span>
+<span class="fc bfc" id="L238" title="All 4 branches covered.">            ?: digisosSak.originalSoknadNAV?.navEksternRefId?.plus(&quot;0000&quot;)</span>
+<span class="fc" id="L239">            ?: digisosSak.fiksDigisosId.plus(&quot;0000&quot;)</span>
 
-<span class="fc" id="L239">    val nesteSuffix = lagIdSuffix(previousId)</span>
-<span class="fc" id="L240">    return previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix)</span>
+<span class="fc" id="L241">    val nesteSuffix = lagIdSuffix(previousId)</span>
+<span class="fc" id="L242">    return previousId.dropLast(COUNTER_SUFFIX_LENGTH).plus(nesteSuffix)</span>
 }
 
 internal fun lagIdSuffix(previousId: String): String {
-<span class="fc bfc" id="L244" title="All 2 branches covered.">    val suffix = (previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L) + 1</span>
-<span class="fc" id="L245">    return suffix.toString().padStart(4, '0')</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">    val suffix = (previousId.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L) + 1</span>
+<span class="fc" id="L247">    return suffix.toString().padStart(4, '0')</span>
 }
 
-<span class="fc" id="L248">class EttersendelseAlreadyExistsException(</span>
-<span class="fc" id="L249">    val navEksternRefId: String,</span>
-<span class="pc" id="L250">    val fiksDigisosId: String,</span>
-<span class="fc" id="L251">) : RuntimeException(&quot;Ettersendelse $navEksternRefId already exists for fiksDigisosId $fiksDigisosId&quot;)</span>
+<span class="fc" id="L250">class EttersendelseAlreadyExistsException(</span>
+<span class="fc" id="L251">    val navEksternRefId: String,</span>
+<span class="pc" id="L252">    val fiksDigisosId: String,</span>
+<span class="fc" id="L253">) : RuntimeException(&quot;Ettersendelse $navEksternRefId already exists for fiksDigisosId $fiksDigisosId&quot;)</span>
 
-<span class="pc bnc" id="L253" title="All 2 branches missed.">@Serializable</span>
-<span class="fc" id="L254">data class Fil(</span>
-<span class="fc" id="L255">    val filnavn: String,</span>
-<span class="pc" id="L256">    val sha512: String,</span>
+<span class="pc bnc" id="L255" title="All 2 branches missed.">@Serializable</span>
+<span class="fc" id="L256">data class Fil(</span>
+<span class="fc" id="L257">    val filnavn: String,</span>
+<span class="pc" id="L258">    val sha512: String,</span>
 )
 
-<span class="nc bnc" id="L259" title="All 10 branches missed.">@Serializable</span>
-<span class="nc" id="L260">data class Vedlegg(</span>
-<span class="nc" id="L261">    val type: String,</span>
-<span class="nc" id="L262">    val tilleggsinfo: String,</span>
-<span class="nc" id="L263">    val klageId: String? = null,</span>
-<span class="nc" id="L264">    val status: Status?,</span>
-<span class="nc" id="L265">    val filer: List&lt;Fil&gt;,</span>
-<span class="nc" id="L266">    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,</span>
-<span class="nc" id="L267">    val hendelseReferanse: String?,</span>
-<span class="nc" id="L268">) {</span>
+<span class="nc bnc" id="L261" title="All 10 branches missed.">@Serializable</span>
+<span class="nc" id="L262">data class Vedlegg(</span>
+<span class="nc" id="L263">    val type: String,</span>
+<span class="nc" id="L264">    val tilleggsinfo: String,</span>
+<span class="nc" id="L265">    val klageId: String? = null,</span>
+<span class="nc" id="L266">    val status: Status?,</span>
+<span class="nc" id="L267">    val filer: List&lt;Fil&gt;,</span>
+<span class="nc" id="L268">    @Serializable(with = HendelseTypeSerializer::class) val hendelseType: HendelseType?,</span>
+<span class="nc" id="L269">    val hendelseReferanse: String?,</span>
+<span class="nc" id="L270">) {</span>
     enum class Status {
-<span class="nc" id="L270">        LastetOpp,</span>
-<span class="nc" id="L271">        VedleggKreves,</span>
-<span class="nc" id="L272">        VedleggAlleredeSendt,</span>
+<span class="nc" id="L272">        LastetOpp,</span>
+<span class="nc" id="L273">        VedleggKreves,</span>
+<span class="nc" id="L274">        VedleggAlleredeSendt,</span>
     }
 
-<span class="nc" id="L275">    enum class HendelseType(</span>
-<span class="nc" id="L276">        val value: String,</span>
+<span class="nc" id="L277">    enum class HendelseType(</span>
+<span class="nc" id="L278">        val value: String,</span>
     ) {
-<span class="nc" id="L278">        DOKUMENTASJON_ETTERSPURT(&quot;dokumentasjonEtterspurt&quot;),</span>
-<span class="nc" id="L279">        DOKUMENTASJONKRAV(&quot;dokumentasjonkrav&quot;),</span>
-<span class="nc" id="L280">        SOKNAD(&quot;soknad&quot;),</span>
-<span class="nc" id="L281">        BRUKER(&quot;bruker&quot;),</span>
+<span class="nc" id="L280">        DOKUMENTASJON_ETTERSPURT(&quot;dokumentasjonEtterspurt&quot;),</span>
+<span class="nc" id="L281">        DOKUMENTASJONKRAV(&quot;dokumentasjonkrav&quot;),</span>
+<span class="nc" id="L282">        SOKNAD(&quot;soknad&quot;),</span>
+<span class="nc" id="L283">        BRUKER(&quot;bruker&quot;),</span>
         ;
 
         companion object {
             fun fromValue(value: String): HendelseType =
-<span class="nc bnc" id="L286" title="All 5 branches missed.">                when (value) {</span>
-<span class="nc" id="L287">                    &quot;dokumentasjonEtterspurt&quot; -&gt; DOKUMENTASJON_ETTERSPURT</span>
-<span class="nc" id="L288">                    &quot;dokumentasjonkrav&quot; -&gt; DOKUMENTASJONKRAV</span>
-<span class="nc" id="L289">                    &quot;soknad&quot; -&gt; SOKNAD</span>
-<span class="nc" id="L290">                    &quot;bruker&quot; -&gt; BRUKER</span>
-<span class="nc" id="L291">                    else -&gt; error(&quot;Unknown hendelse type: $value&quot;)</span>
-<span class="nc" id="L292">                }</span>
+<span class="nc bnc" id="L288" title="All 5 branches missed.">                when (value) {</span>
+<span class="nc" id="L289">                    &quot;dokumentasjonEtterspurt&quot; -&gt; DOKUMENTASJON_ETTERSPURT</span>
+<span class="nc" id="L290">                    &quot;dokumentasjonkrav&quot; -&gt; DOKUMENTASJONKRAV</span>
+<span class="nc" id="L291">                    &quot;soknad&quot; -&gt; SOKNAD</span>
+<span class="nc" id="L292">                    &quot;bruker&quot; -&gt; BRUKER</span>
+<span class="nc" id="L293">                    else -&gt; error(&quot;Unknown hendelse type: $value&quot;)</span>
+<span class="nc" id="L294">                }</span>
         }
     }
 }
 
-<span class="nc bnc" id="L297" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L298">data class VedleggSpesifikasjon(</span>
-<span class="nc" id="L299">    val vedlegg: List&lt;Vedlegg&gt;,</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L300">data class VedleggSpesifikasjon(</span>
+<span class="nc" id="L301">    val vedlegg: List&lt;Vedlegg&gt;,</span>
 )
 
-<span class="nc" id="L302">class FiksException(</span>
+<span class="nc" id="L304">class FiksException(</span>
     message: String,
-<span class="nc" id="L304">) : RuntimeException(message)</span>
+<span class="nc" id="L306">) : RuntimeException(message)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
