@@ -118,15 +118,13 @@ class UploadRecoveryService(
     }
 
     private suspend fun cleanupGcsObjects(gcsKey: String) {
-        withContext(ioDispatcher) {
-            val chunkPrefix = "$gcsKey-chunk-"
-            runCatching {
-                val chunkKeys = chunkStorage.listKeys(chunkPrefix)
-                (chunkKeys + listOf(gcsKey)).forEach { key ->
-                    runCatching { chunkStorage.deleteObject(key) }
-                        .onFailure { log.warn("Failed to delete GCS object $key during recovery", it) }
-                }
-            }.onFailure { log.warn("Failed to list/delete GCS objects for $gcsKey during recovery", it) }
-        }
+        val chunkPrefix = "$gcsKey-chunk-"
+        runCatching {
+            val chunkKeys = chunkStorage.listKeys(chunkPrefix)
+            (chunkKeys + listOf(gcsKey)).forEach { key ->
+                runCatching { chunkStorage.deleteObject(key) }
+                    .onFailure { log.warn("Failed to delete GCS object $key during recovery", it) }
+            }
+        }.onFailure { log.warn("Failed to list/delete GCS objects for $gcsKey during recovery", it) }
     }
 }

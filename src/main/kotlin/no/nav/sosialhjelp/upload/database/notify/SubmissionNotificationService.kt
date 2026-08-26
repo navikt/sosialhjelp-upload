@@ -96,11 +96,13 @@ class SubmissionNotificationService(
      * Prefer [no.nav.sosialhjelp.upload.upload.UploadNotifications.notifyChange] for
      * notifications that must be atomic with a write transaction.
      */
-    fun notifyUpdate(submissionId: UUID) {
-        dataSource.connection.use { conn ->
-            conn.prepareStatement("SELECT pg_notify('submission_update', ?)").use { ps ->
-                ps.setString(1, submissionId.toString())
-                ps.execute()
+    suspend fun notifyUpdate(submissionId: UUID) {
+        withContext(ioDispatcher) {
+            dataSource.connection.use { conn ->
+                conn.prepareStatement("SELECT pg_notify('submission_update', ?)").use { ps ->
+                    ps.setString(1, submissionId.toString())
+                    ps.execute()
+                }
             }
         }
     }
@@ -115,11 +117,13 @@ class SubmissionNotificationService(
      * Prefer [no.nav.sosialhjelp.upload.upload.UploadNotifications.notifyChange] for
      * notifications that must be atomic with a write transaction.
      */
-    fun notifyDeleted(submissionId: UUID) {
-        dataSource.connection.use { conn ->
-            conn.prepareStatement("SELECT pg_notify('submission_delete', ?)").use { ps ->
-                ps.setString(1, submissionId.toString())
-                ps.execute()
+    suspend fun notifyDeleted(submissionId: UUID) {
+        withContext(ioDispatcher) {
+            dataSource.connection.use { conn ->
+                conn.prepareStatement("SELECT pg_notify('submission_delete', ?)").use { ps ->
+                    ps.setString(1, submissionId.toString())
+                    ps.execute()
+                }
             }
         }
     }

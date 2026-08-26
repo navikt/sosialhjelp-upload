@@ -12,6 +12,7 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -38,6 +39,7 @@ class EttersendelseService(
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -80,13 +82,15 @@ class EttersendelseService(
         personIdent: String,
     ) {
         val ettersendelsePdf =
-            EttersendelsePdfGenerator.generate(
-                PdfMetadata(
-                    metadata.type,
-                    uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } },
-                ),
-                personIdent,
-            )
+            withContext(cpuDispatcher) {
+                EttersendelsePdfGenerator.generate(
+                    PdfMetadata(
+                        metadata.type,
+                        uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } },
+                    ),
+                    personIdent,
+                )
+            }
         mellomlagringClient.replaceFile(
             navEksternRefId,
             "ettersendelse.pdf",

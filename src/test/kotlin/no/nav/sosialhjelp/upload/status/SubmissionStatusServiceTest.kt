@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.status
 
+import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -44,15 +45,16 @@ class SubmissionStatusServiceTest {
      * with an empty uploads map.
      */
     @Test
-    fun `getSubmissionStatus returns empty state when no uploads exist`() {
-        val submissionId = createMockSubmission(dsl)
-        val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
+    fun `getSubmissionStatus returns empty state when no uploads exist`() =
+        runTest {
+            val submissionId = createMockSubmission(dsl)
+            val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
 
-        val result: SubmissionState = service.getSubmissionStatus(submissionId)
+            val result: SubmissionState = service.getSubmissionStatus(submissionId)
 
-        assertEquals(submissionId.toString(), result.submissionId)
-        assertTrue(result.uploads.isEmpty())
-    }
+            assertEquals(submissionId.toString(), result.submissionId)
+            assertTrue(result.uploads.isEmpty())
+        }
 
     private fun createUpload(
         submissionId: UUID,
@@ -76,26 +78,27 @@ class SubmissionStatusServiceTest {
      * correctly returned in the SubmissionState.
      */
     @Test
-    fun `getSubmissionStatus returns multiple uploads each with their corresponding pages`() {
-        val submissionId = createMockSubmission(dsl)
+    fun `getSubmissionStatus returns multiple uploads each with their corresponding pages`() =
+        runTest {
+            val submissionId = createMockSubmission(dsl)
 
-        val uploadId1 =
-            createUpload(submissionId, "first.pdf")
-        val uploadId2 =
-            createUpload(submissionId, "second.pdf")
+            val uploadId1 =
+                createUpload(submissionId, "first.pdf")
+            val uploadId2 =
+                createUpload(submissionId, "second.pdf")
 
-        val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
+            val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
 
-        val result: SubmissionState = service.getSubmissionStatus(submissionId)
+            val result: SubmissionState = service.getSubmissionStatus(submissionId)
 
-        assertEquals(result.status, SubmissionState.Status.ACTIVE)
-        assertEquals(submissionId.toString(), result.submissionId)
-        assertEquals(2, result.uploads.size)
-        val firstUpload: UploadDto? = result.uploads.find { it.id == uploadId1 }
-        val secondUpload: UploadDto? = result.uploads.find { it.id == uploadId2 }
-        assertNotNull(firstUpload)
-        assertNotNull(secondUpload)
-        assertEquals("first.pdf", firstUpload.originalFilename)
-        assertEquals("second.pdf", secondUpload.originalFilename)
-    }
+            assertEquals(result.status, SubmissionState.Status.ACTIVE)
+            assertEquals(submissionId.toString(), result.submissionId)
+            assertEquals(2, result.uploads.size)
+            val firstUpload: UploadDto? = result.uploads.find { it.id == uploadId1 }
+            val secondUpload: UploadDto? = result.uploads.find { it.id == uploadId2 }
+            assertNotNull(firstUpload)
+            assertNotNull(secondUpload)
+            assertEquals("first.pdf", firstUpload.originalFilename)
+            assertEquals("second.pdf", secondUpload.originalFilename)
+        }
 }

@@ -23,6 +23,7 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
@@ -54,6 +55,11 @@ fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain
         .main(args)
 }
+
+private const val IO_PARALLELISM = 64
+private const val MIN_CPU_PARALLELISM = 2
+
+private fun cpuParallelism() = maxOf(MIN_CPU_PARALLELISM, Runtime.getRuntime().availableProcessors())
 
 private fun getDataSource(config: ApplicationConfig): DataSource {
     val user = config.property("database.user").getString()
@@ -102,7 +108,7 @@ fun Application.module() {
     val isLocalOrTest = runtimeEnv == "local" || isTest
     val isMock = runtimeEnv == "mock" || isLocalOrTest
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     val chunkStorage: ChunkStorage =
         if (isLocalOrTest) {
@@ -150,7 +156,10 @@ private fun Application.configureDependencies(
             }
         }
         provide<ChunkStorage> { chunkStorage }
-        provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(Int.MAX_VALUE) }
+        // Wrapped to keep DI from closing the shared Dispatchers.IO on shutdown.
+        provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(IO_PARALLELISM, "app-io") }
+        // Deliberately bounded: PDF parsing and CMS encryption must not be able to saturate the host.
+        provide { CpuDispatcher(Dispatchers.Default.limitedParallelism(cpuParallelism(), "app-cpu")) }
         provide<CoroutineScope> { processingScope }
         provide<SubmissionNotificationService> { SubmissionNotificationService(dataSource, notificationScope) }
         provide(TexasClient::class)
@@ -184,7 +193,7 @@ private fun Application.configureDependencies(
 
 private fun Application.startBackgroundJobs(): List<CoroutineScope> {
     val recoveryService: UploadRecoveryService by dependencies
-    val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     recoveryScope.launch {
         while (true) {
             delay(1.minutes)
@@ -194,7 +203,7 @@ private fun Application.startBackgroundJobs(): List<CoroutineScope> {
     }
 
     val cleanupService: StaleSubmissionCleanupService by dependencies
-    val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     cleanupScope.launch {
         while (true) {
             delay(1.minutes)

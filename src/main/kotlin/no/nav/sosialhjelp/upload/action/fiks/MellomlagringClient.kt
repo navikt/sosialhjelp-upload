@@ -30,10 +30,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.upload.texas.TexasClient
@@ -49,7 +46,6 @@ class MellomlagringClient(
     @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
     private val meterRegistry: MeterRegistry,
     private val texasClient: TexasClient,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -130,78 +126,75 @@ class MellomlagringClient(
         contentType: String,
         data: ByteArray,
     ): UUID =
-        withContext(ioDispatcher) {
-            measureTimedValue {
-                val metadataPart =
-                    FormPart(
-                        key = "metadata",
-                        value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
-                        headers =
-                            Headers.build {
-                                append(
-                                    HttpHeaders.ContentType,
-                                    ContentType.Application.Json.toString(),
-                                )
-                            },
-                    )
-                val filePart =
-                    FormPart(
-                        key = "files",
-                        value = ChannelProvider { ByteReadChannel(data) },
-                        headers =
-                            Headers.build {
-                                append(HttpHeaders.ContentType, contentType)
-                                append(HttpHeaders.ContentDisposition, """filename="$filename"""")
-                            },
-                    )
-                val formData =
-                    formData {
-                        append(metadataPart)
-                        append(filePart)
-                    }
-                val response =
-                    client.submitFormWithBinaryData(mellomlagringUrl(navEksternRefId), formData) {
-                        headers {
-                            integrasjonsid?.let { append("IntegrasjonId", it) }
-                            integrasjonspassord?.let { append("IntegrasjonPassord", it) }
-                        }
-                        contentType(ContentType.MultiPart.FormData)
-                        bearerAuth(texasClient.getMaskinportenToken())
-                    }
-
-                check(response.status.isSuccess()) {
-                    "Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}"
+        measureTimedValue {
+            val metadataPart =
+                FormPart(
+                    key = "metadata",
+                    value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),
+                    headers =
+                        Headers.build {
+                            append(
+                                HttpHeaders.ContentType,
+                                ContentType.Application.Json.toString(),
+                            )
+                        },
+                )
+            val filePart =
+                FormPart(
+                    key = "files",
+                    value = ChannelProvider { ByteReadChannel(data) },
+                    headers =
+                        Headers.build {
+                            append(HttpHeaders.ContentType, contentType)
+                            append(HttpHeaders.ContentDisposition, """filename="$filename"""")
+                        },
+                )
+            val formData =
+                formData {
+                    append(metadataPart)
+                    append(filePart)
                 }
-
-                val mellomlagring = response.body<MellomlagringResponse>()
-                mellomlagring.mellomlagringMetadataList
-                    .firstOrNull()
-                    ?.filId
-                    ?.let { UUID.fromString(it) }
-                    ?: error("No filId returned from mellomlagring for upload to $navEksternRefId")
-            }.also {
-                meterRegistry.timer("mellomlagring.upload").record(it.duration.toJavaDuration())
-            }.value
-        }
-
-    suspend fun listFiles(navEksternRefId: String): List<MellomlagringFilInfo> =
-        withContext(ioDispatcher) {
             val response =
-                client.get(mellomlagringUrl(navEksternRefId)) {
+                client.submitFormWithBinaryData(mellomlagringUrl(navEksternRefId), formData) {
                     headers {
                         integrasjonsid?.let { append("IntegrasjonId", it) }
                         integrasjonspassord?.let { append("IntegrasjonPassord", it) }
                     }
-                    accept(ContentType.Application.Json)
+                    contentType(ContentType.MultiPart.FormData)
                     bearerAuth(texasClient.getMaskinportenToken())
                 }
-            if (response.status == HttpStatusCode.NotFound) return@withContext emptyList()
+
             check(response.status.isSuccess()) {
-                "Mellomlagring listFiles failed for $navEksternRefId: ${response.status}. " +
-                    "Body: ${response.bodyAsText()}"
+                "Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}"
             }
-            response.body<MellomlagringResponse>().mellomlagringMetadataList
+
+            val mellomlagring = response.body<MellomlagringResponse>()
+            mellomlagring.mellomlagringMetadataList
+                .firstOrNull()
+                ?.filId
+                ?.let { UUID.fromString(it) }
+                ?: error("No filId returned from mellomlagring for upload to $navEksternRefId")
+        }.also {
+            meterRegistry.timer("mellomlagring.upload").record(it.duration.toJavaDuration())
+        }.value
+
+    suspend fun listFiles(navEksternRefId: String): List<MellomlagringFilInfo> {
+        val response =
+            client.get(mellomlagringUrl(navEksternRefId)) {
+                headers {
+                    integrasjonsid?.let { append("IntegrasjonId", it) }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+                }
+                accept(ContentType.Application.Json)
+                bearerAuth(texasClient.getMaskinportenToken())
+            }
+        if (response.status == HttpStatusCode.NotFound) return emptyList()
+        check(response.status.isSuccess()) {
+            "Mellomlagring listFiles failed for $navEksternRefId: ${response.status}. " +
+                "Body: ${response.bodyAsText()}"
         }
+        return response.body<MellomlagringResponse>().mellomlagringMetadataList
+    }
 
     suspend fun replaceFile(
         navEksternRefId: String,
@@ -220,35 +213,31 @@ class MellomlagringClient(
         filId: UUID,
         throwOnError: Boolean = false,
     ) {
-        withContext(ioDispatcher) {
-            val response =
-                client.delete("${mellomlagringUrl(navEksternRefId)}/$filId") {
-                    headers {
-                        integrasjonsid?.let { append("IntegrasjonId", it) }
-                        integrasjonspassord?.let { append("IntegrasjonPassord", it) }
-                    }
-                    bearerAuth(texasClient.getMaskinportenToken())
+        val response =
+            client.delete("${mellomlagringUrl(navEksternRefId)}/$filId") {
+                headers {
+                    integrasjonsid?.let { append("IntegrasjonId", it) }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", it) }
                 }
-            if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
-                val message = "Failed to delete file $filId from mellomlagring: ${response.status}"
-                if (throwOnError) error(message) else logger.warn(message)
+                bearerAuth(texasClient.getMaskinportenToken())
             }
+        if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
+            val message = "Failed to delete file $filId from mellomlagring: ${response.status}"
+            if (throwOnError) error(message) else logger.warn(message)
         }
     }
 
     suspend fun deleteMellomlagring(navEksternRefId: String) {
-        withContext(ioDispatcher) {
-            val response =
-                client.delete(mellomlagringUrl(navEksternRefId)) {
-                    headers {
-                        integrasjonsid?.let { append("IntegrasjonId", it) }
-                        integrasjonspassord?.let { append("IntegrasjonPassord", it) }
-                    }
-                    bearerAuth(texasClient.getMaskinportenToken())
+        val response =
+            client.delete(mellomlagringUrl(navEksternRefId)) {
+                headers {
+                    integrasjonsid?.let { append("IntegrasjonId", it) }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", it) }
                 }
-            if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
-                logger.warn("Failed to delete mellomlagring for $navEksternRefId: ${response.status}")
+                bearerAuth(texasClient.getMaskinportenToken())
             }
+        if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
+            logger.warn("Failed to delete mellomlagring for $navEksternRefId: ${response.status}")
         }
     }
 }
