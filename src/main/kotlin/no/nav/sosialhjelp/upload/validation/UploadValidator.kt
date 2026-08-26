@@ -3,11 +3,10 @@
 package no.nav.sosialhjelp.upload.validation
 
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.io.RandomAccessReadBuffer
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -244,7 +243,7 @@ val SUPPORTED_MIME_TYPES =
 class UploadValidator(
     val virusScanner: VirusScanner,
     private val meterRegistry: MeterRegistry,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val tika = Tika()
@@ -264,7 +263,7 @@ class UploadValidator(
         fileSize: Long,
     ): List<Validation> =
         coroutineScope {
-            val virusScanValidation = async(ioDispatcher) { runVirusScan(data) }
+            val virusScanValidation = async { runVirusScan(data) }
             val (mimeType, fileTypeValidation) = validateFileType(data, filename)
             meterRegistry.counter("upload.tika_mime_type", "mime_type", mimeType).increment()
             listOfNotNull(
@@ -276,7 +275,7 @@ class UploadValidator(
         }
 
     private suspend fun validatePdf(data: ByteArray): Validation? =
-        withContext(ioDispatcher) {
+        withContext(cpuDispatcher) {
             try {
                 val randomAccessRead = RandomAccessReadBuffer(data.inputStream())
                 Loader
@@ -304,7 +303,7 @@ class UploadValidator(
         data: ByteArray,
         filename: String,
     ): Pair<String, Validation?> =
-        withContext(ioDispatcher) {
+        withContext(cpuDispatcher) {
             val tikaIS = TikaInputStream.get(data.inputStream())
             val tikaMetadata = Metadata()
             tikaMetadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)

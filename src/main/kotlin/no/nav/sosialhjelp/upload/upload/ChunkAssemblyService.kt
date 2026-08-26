@@ -1,8 +1,5 @@
 package no.nav.sosialhjelp.upload.upload
 
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -13,7 +10,6 @@ import java.util.UUID
  */
 class ChunkAssemblyService(
     private val chunkStorage: ChunkStorage,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -25,22 +21,21 @@ class ChunkAssemblyService(
     suspend fun assembleChunks(
         uploadId: UUID,
         gcsKey: String,
-    ): Pair<ByteArray, String> =
-        withContext(ioDispatcher) {
-            val chunkPrefix = "uploads/$uploadId-chunk-"
-            val chunkKeys =
-                chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
-                    key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
-                }
-            if (chunkKeys.isEmpty()) {
-                error("No chunk objects found for upload $uploadId at prefix $chunkPrefix")
+    ): Pair<ByteArray, String> {
+        val chunkPrefix = "uploads/$uploadId-chunk-"
+        val chunkKeys =
+            chunkStorage.listKeys(chunkPrefix).sortedBy { key ->
+                key.removePrefix(chunkPrefix).toLongOrNull() ?: 0L
             }
-            // Use a unique key per attempt so we never try to overwrite an existing GCS object,
-            // which would be rejected with 403 if a previous composed object is still present.
-            val composedKey = "$gcsKey-${UUID.randomUUID()}"
-            chunkStorage.composeChunks(chunkKeys, composedKey)
-            chunkStorage.readObject(composedKey) to composedKey
+        if (chunkKeys.isEmpty()) {
+            error("No chunk objects found for upload $uploadId at prefix $chunkPrefix")
         }
+        // Use a unique key per attempt so we never try to overwrite an existing GCS object,
+        // which would be rejected with 403 if a previous composed object is still present.
+        val composedKey = "$gcsKey-${UUID.randomUUID()}"
+        chunkStorage.composeChunks(chunkKeys, composedKey)
+        return chunkStorage.readObject(composedKey) to composedKey
+    }
 
     /**
      * Deletes all chunk objects for [uploadId] and the composed object (if any).

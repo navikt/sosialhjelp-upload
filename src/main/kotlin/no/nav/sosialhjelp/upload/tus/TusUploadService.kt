@@ -114,9 +114,11 @@ class TusUploadService(
         }
     }
 
-    fun getUploadInfo(uploadId: UUID): Pair<Long, Long> =
-        dsl.transactionResult { tx ->
-            tusUploadQueries.getUploadInfo(tx, uploadId)
+    suspend fun getUploadInfo(uploadId: UUID): Pair<Long, Long> =
+        withContext(ioDispatcher) {
+            dsl.transactionResult { tx ->
+                tusUploadQueries.getUploadInfo(tx, uploadId)
+            }
         }
 
     suspend fun appendChunk(
@@ -125,7 +127,7 @@ class TusUploadService(
         data: ByteArray,
     ): Long {
         val chunkKey = "uploads/$uploadId-chunk-$expectedOffset"
-        withContext(ioDispatcher) { chunkStorage.writeChunk(chunkKey, data) }
+        chunkStorage.writeChunk(chunkKey, data)
 
         val (totalSize, newOffset) =
             withContext(ioDispatcher) {

@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.validation.FileTypeValidation
@@ -29,6 +30,7 @@ class UploadProcessingService(
     private val mellomlagringStorageService: MellomlagringStorageService,
     private val meterRegistry: MeterRegistry,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -157,6 +159,7 @@ class UploadProcessingService(
         composedKey: String,
         startTime: Long,
     ) {
+        val sha512 = withContext(cpuDispatcher) { getSha512(finalData) }
         withContext(ioDispatcher) {
             dsl.transaction { tx ->
                 uploadProcessingQueries.setFilId(
@@ -165,7 +168,7 @@ class UploadProcessingService(
                     storageResult.filId,
                     storageResult.mellomlagringFilnavn,
                     storageResult.storedSize,
-                    getSha512(finalData),
+                    sha512,
                 )
                 UploadNotifications.notifyChange(tx, uploadId)
             }

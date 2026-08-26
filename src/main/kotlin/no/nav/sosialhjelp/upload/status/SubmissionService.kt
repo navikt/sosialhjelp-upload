@@ -35,7 +35,10 @@ class SubmissionService(
         }
     }
 
-    fun getSubmissionStatus(submissionId: UUID): SubmissionState =
+    suspend fun getSubmissionStatus(submissionId: UUID): SubmissionState =
+        withContext(ioDispatcher) { readSubmissionStatus(submissionId) }
+
+    private fun readSubmissionStatus(submissionId: UUID): SubmissionState =
         dsl.transactionResult { tx ->
             val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)
             val uploads =

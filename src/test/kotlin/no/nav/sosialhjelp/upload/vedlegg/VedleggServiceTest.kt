@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
 import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
@@ -79,73 +80,77 @@ class VedleggServiceTest {
     }
 
     @Test
-    fun `getVedleggByNavEksternRefId returns empty list when no uploads exist`() {
-        val navEksternRefId = UUID.randomUUID().toString()
-        createMockSubmission(dsl, navEksternRefId = navEksternRefId)
+    fun `getVedleggByNavEksternRefId returns empty list when no uploads exist`() =
+        runTest {
+            val navEksternRefId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, navEksternRefId = navEksternRefId)
 
-        val result = service.getVedleggByNavEksternRefId(navEksternRefId)
+            val result = service.getVedleggByNavEksternRefId(navEksternRefId)
 
-        assertTrue(result.vedlegg.isEmpty())
-    }
-
-    @Test
-    fun `getVedleggByNavEksternRefId groups uploads with same kategori`() {
-        val navEksternRefId = UUID.randomUUID().toString()
-        val submissionId = createMockSubmissionWithKategori(navEksternRefId, kategori = "lonnslipp")
-        insertCompleteUpload(submissionId, "a.pdf", "mella.pdf")
-        insertCompleteUpload(submissionId, "b.pdf", "mellb.pdf")
-
-        val result = service.getVedleggByNavEksternRefId(navEksternRefId)
-
-        assertEquals(1, result.vedlegg.size)
-        val vedlegg = result.vedlegg.single()
-        assertEquals("lonnslipp", vedlegg.kategori)
-        assertEquals(2, vedlegg.filer.size)
-    }
-
-    @Test
-    fun `getVedleggByNavEksternRefId splits uploads with different kategori into separate vedlegg`() {
-        val navEksternRefId = UUID.randomUUID().toString()
-        val submissionA = createMockSubmissionWithKategori(navEksternRefId + "-a", kategori = "lonnslipp")
-        val submissionB = createMockSubmissionWithKategori(navEksternRefId + "-b", kategori = "annet")
-
-        dsl.transaction { config ->
-            config
-                .dsl()
-                .update(SUBMISSION)
-                .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
-                .where(SUBMISSION.ID.`in`(submissionA, submissionB))
-                .execute()
+            assertTrue(result.vedlegg.isEmpty())
         }
 
-        insertCompleteUpload(submissionA, "a.pdf", "mella.pdf")
-        insertCompleteUpload(submissionB, "c.pdf", "mellc.pdf")
-
-        val result = service.getVedleggByNavEksternRefId(navEksternRefId)
-
-        assertEquals(2, result.vedlegg.size)
-        assertNotNull(result.vedlegg.find { it.kategori == "lonnslipp" })
-        assertNotNull(result.vedlegg.find { it.kategori == "annet" })
-    }
-
     @Test
-    fun `non-COMPLETE uploads are excluded from results`() {
-        val navEksternRefId = UUID.randomUUID().toString()
-        val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
+    fun `getVedleggByNavEksternRefId groups uploads with same kategori`() =
+        runTest {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val submissionId = createMockSubmissionWithKategori(navEksternRefId, kategori = "lonnslipp")
+            insertCompleteUpload(submissionId, "a.pdf", "mella.pdf")
+            insertCompleteUpload(submissionId, "b.pdf", "mellb.pdf")
 
-        val uploadId = UUID.randomUUID()
-        dsl.transaction { config ->
-            config
-                .dsl()
-                .insertInto(UPLOAD)
-                .set(UPLOAD.ID, uploadId)
-                .set(UPLOAD.SUBMISSION_ID, submissionId)
-                .set(UPLOAD.ORIGINAL_FILENAME, "pending.pdf")
-                .set(UPLOAD.PROCESSING_STATUS, "PENDING")
-                .execute()
+            val result = service.getVedleggByNavEksternRefId(navEksternRefId)
+
+            assertEquals(1, result.vedlegg.size)
+            val vedlegg = result.vedlegg.single()
+            assertEquals("lonnslipp", vedlegg.kategori)
+            assertEquals(2, vedlegg.filer.size)
         }
 
-        val result = service.getVedleggByNavEksternRefId(navEksternRefId)
-        assertTrue(result.vedlegg.isEmpty())
-    }
+    @Test
+    fun `getVedleggByNavEksternRefId splits uploads with different kategori into separate vedlegg`() =
+        runTest {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val submissionA = createMockSubmissionWithKategori(navEksternRefId + "-a", kategori = "lonnslipp")
+            val submissionB = createMockSubmissionWithKategori(navEksternRefId + "-b", kategori = "annet")
+
+            dsl.transaction { config ->
+                config
+                    .dsl()
+                    .update(SUBMISSION)
+                    .set(SUBMISSION.NAV_EKSTERN_REF_ID, navEksternRefId)
+                    .where(SUBMISSION.ID.`in`(submissionA, submissionB))
+                    .execute()
+            }
+
+            insertCompleteUpload(submissionA, "a.pdf", "mella.pdf")
+            insertCompleteUpload(submissionB, "c.pdf", "mellc.pdf")
+
+            val result = service.getVedleggByNavEksternRefId(navEksternRefId)
+
+            assertEquals(2, result.vedlegg.size)
+            assertNotNull(result.vedlegg.find { it.kategori == "lonnslipp" })
+            assertNotNull(result.vedlegg.find { it.kategori == "annet" })
+        }
+
+    @Test
+    fun `non-COMPLETE uploads are excluded from results`() =
+        runTest {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val submissionId = createMockSubmission(dsl, navEksternRefId = navEksternRefId)
+
+            val uploadId = UUID.randomUUID()
+            dsl.transaction { config ->
+                config
+                    .dsl()
+                    .insertInto(UPLOAD)
+                    .set(UPLOAD.ID, uploadId)
+                    .set(UPLOAD.SUBMISSION_ID, submissionId)
+                    .set(UPLOAD.ORIGINAL_FILENAME, "pending.pdf")
+                    .set(UPLOAD.PROCESSING_STATUS, "PENDING")
+                    .execute()
+            }
+
+            val result = service.getVedleggByNavEksternRefId(navEksternRefId)
+            assertTrue(result.vedlegg.isEmpty())
+        }
 }

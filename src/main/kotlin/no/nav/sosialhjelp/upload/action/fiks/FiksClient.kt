@@ -16,9 +16,6 @@ import io.ktor.http.*
 import io.ktor.serialization.jackson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.di.annotations.*
-import io.ktor.utils.io.jvm.javaio.toInputStream
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -26,6 +23,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
@@ -38,7 +36,7 @@ class FiksClient(
     @Property("fiks.integrasjonsid") private val integrasjonsid: String?,
     @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
     private val texasClient: TexasClient,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java.name)
 
@@ -106,30 +104,28 @@ class FiksClient(
     }
 
     private suspend fun fetchPublicKeyFromNetwork(): X509Certificate {
-        val publicKey =
-            withContext(ioDispatcher) {
-                client
-                    .get("$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key") {
-                        headers {
-                            integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
-                            integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
-                        }
-                        bearerAuth(texasClient.getMaskinportenToken())
-                    }.apply {
-                        if (!status.isSuccess()) {
-                            logger.error("Feil ved henting av public key fra dokumentlager: $status")
-                            throw FiksException("Feil ved henting av public key fra dokumentlager: $status")
-                        }
-                    }.bodyAsChannel()
-                    .also {
-                        logger.info("Hentet public key fra dokumentlager")
+        val publicKeyBytes =
+            client
+                .get("$fiksBaseUrl/digisos/api/v1/dokumentlager-public-key") {
+                    headers {
+                        integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
+                        integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
                     }
+                    bearerAuth(texasClient.getMaskinportenToken())
+                }.apply {
+                    if (!status.isSuccess()) {
+                        logger.error("Feil ved henting av public key fra dokumentlager: $status")
+                        throw FiksException("Feil ved henting av public key fra dokumentlager: $status")
+                    }
+                }.bodyAsBytes()
+                .also { logger.info("Hentet public key fra dokumentlager") }
+        return withContext(cpuDispatcher) {
+            try {
+                val certificateFactory = CertificateFactory.getInstance("X.509")
+                certificateFactory.generateCertificate(publicKeyBytes.inputStream()) as X509Certificate
+            } catch (e: CertificateException) {
+                throw IllegalStateException(e)
             }
-        return try {
-            val certificateFactory = CertificateFactory.getInstance("X.509")
-            (certificateFactory.generateCertificate(publicKey.toInputStream())) as X509Certificate
-        } catch (e: CertificateException) {
-            throw IllegalStateException(e)
         }
     }
 
@@ -140,79 +136,76 @@ class FiksClient(
         metadata: Metadata,
         token: String,
         filer: List<Fil>,
-    ): HttpResponse =
-        withContext(ioDispatcher) {
-            val vedleggJson =
-                VedleggSpesifikasjon(
-                    vedlegg =
-                        listOf(
-                            Vedlegg(
-                                type = metadata.type,
-                                tilleggsinfo = metadata.tilleggsinfo,
-                                hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },
-                                hendelseReferanse = metadata.hendelsereferanse,
-                                status = Vedlegg.Status.LastetOpp,
-                                filer = filer,
-                                klageId = null,
-                            ),
+    ): HttpResponse {
+        val vedleggJson =
+            VedleggSpesifikasjon(
+                vedlegg =
+                    listOf(
+                        Vedlegg(
+                            type = metadata.type,
+                            tilleggsinfo = metadata.tilleggsinfo,
+                            hendelseType = metadata.hendelsetype?.let { Vedlegg.HendelseType.fromValue(it) },
+                            hendelseReferanse = metadata.hendelsereferanse,
+                            status = Vedlegg.Status.LastetOpp,
+                            filer = filer,
+                            klageId = null,
                         ),
+                    ),
+            )
+        val formData =
+            formData {
+                append(
+                    "vedlegg.json",
+                    Json.encodeToString(vedleggJson),
+                    Headers.build {
+                        append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    },
                 )
-            val formData =
-                formData {
-                    append(
-                        "vedlegg.json",
-                        Json.encodeToString(vedleggJson),
-                        Headers.build {
-                            append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        },
-                    )
-                }
-            try {
-                client
-                    .submitFormWithBinaryData(
-                        ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
-                        formData,
-                    ) {
-                        headers {
-                            integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
-                            integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
-                        }
-                        bearerAuth(token)
-                        contentType(ContentType.MultiPart.FormData)
-                    }.also {
-                        if (!it.status.isSuccess()) {
-                            val body = it.bodyAsText()
-                            if (it.status == HttpStatusCode.BadRequest && body.contains("finnes all")) {
-                                throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
-                            }
-                            logger.error("Feil ved opplasting til fiks: ${it.status}: $body")
-                        } else {
-                            logger.info("Opplasting til fiks vellykket: ${it.status}")
-                        }
-                    }
-            } catch (e: Exception) {
-                logger.error("Feil ved opplasting til fiks: ${e.message}", e)
-                throw e
             }
+        try {
+            return client
+                .submitFormWithBinaryData(
+                    ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
+                    formData,
+                ) {
+                    headers {
+                        integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
+                        integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+                    }
+                    bearerAuth(token)
+                    contentType(ContentType.MultiPart.FormData)
+                }.also {
+                    if (!it.status.isSuccess()) {
+                        val body = it.bodyAsText()
+                        if (it.status == HttpStatusCode.BadRequest && body.contains("finnes all")) {
+                            throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
+                        }
+                        logger.error("Feil ved opplasting til fiks: ${it.status}: $body")
+                    } else {
+                        logger.info("Opplasting til fiks vellykket: ${it.status}")
+                    }
+                }
+        } catch (e: Exception) {
+            logger.error("Feil ved opplasting til fiks: ${e.message}", e)
+            throw e
         }
+    }
 
     suspend fun getSak(
         id: String,
         token: String,
     ): DigisosSak =
-        withContext(ioDispatcher) {
-            jacksonClient
-                .get(digisosSakUrl(id)) {
-                    headers {
-                        integrasjonsid?.let {
-                            append("IntegrasjonId", integrasjonsid)
-                        }
-                        integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+        jacksonClient
+            .get(digisosSakUrl(id)) {
+                headers {
+                    integrasjonsid?.let {
+                        append("IntegrasjonId", integrasjonsid)
                     }
-                    accept(ContentType.Application.Json)
-                    bearerAuth(token)
-                }.body()
-        }
+                    integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
+                }
+                accept(ContentType.Application.Json)
+                bearerAuth(token)
+            }.body()
 
     suspend fun getNewNavEksternRefId(
         fiksDigisosId: String,
