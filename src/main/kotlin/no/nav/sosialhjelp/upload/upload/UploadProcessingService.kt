@@ -5,14 +5,13 @@ package no.nav.sosialhjelp.upload.upload
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.validation.FileTypeValidation
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import java.io.File
 import java.time.Duration
 import java.util.UUID
@@ -41,36 +40,32 @@ class UploadProcessingService(
             }
         val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { "none" }
 
-        upload.fiksDigisosId?.let { MDC.put("fiksDigisosId", it) }
-        MDC.put("navEksternRefId", upload.navEksternRefId)
-        try {
-            withContext(MDCContext()) {
-                val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)
+        withMdc(
+            "fiksDigisosId" to upload.fiksDigisosId,
+            "navEksternRefId" to upload.navEksternRefId,
+        ) {
+            val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)
 
-                if (!validateUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)) {
-                    return@withContext
-                }
-
-                val (finalFilename, finalData) =
-                    convertUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)
-                        ?: return@withContext
-
-                val storageResult =
-                    storeUpload(
-                        uploadId,
-                        fileExtension,
-                        upload.navEksternRefId,
-                        finalFilename,
-                        finalData,
-                        composedKey,
-                        startTime,
-                    ) ?: return@withContext
-
-                finalizeUpload(uploadId, fileExtension, finalData, storageResult, composedKey, startTime)
+            if (!validateUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)) {
+                return@withMdc
             }
-        } finally {
-            MDC.remove("fiksDigisosId")
-            MDC.remove("navEksternRefId")
+
+            val (finalFilename, finalData) =
+                convertUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)
+                    ?: return@withMdc
+
+            val storageResult =
+                storeUpload(
+                    uploadId,
+                    fileExtension,
+                    upload.navEksternRefId,
+                    finalFilename,
+                    finalData,
+                    composedKey,
+                    startTime,
+                ) ?: return@withMdc
+
+            finalizeUpload(uploadId, fileExtension, finalData, storageResult, composedKey, startTime)
         }
     }
 

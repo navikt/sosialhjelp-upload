@@ -12,6 +12,7 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
+import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
@@ -55,20 +56,21 @@ class EttersendelseService(
                     ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
                 }
             }
+        return withMdc("navEksternRefId" to navEksternRefId) {
+            val uploads =
+                withContext(ioDispatcher) {
+                    dsl.transactionResult { tx -> uploadRepository.getUploads(tx, submissionId) }
+                }
 
-        val uploads =
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.getUploads(tx, submissionId) }
-            }
+            val violations = validateSubmissionUploads(uploads)
+            if (violations.isNotEmpty()) throw SubmissionValidationException(violations)
 
-        val violations = validateSubmissionUploads(uploads)
-        if (violations.isNotEmpty()) throw SubmissionValidationException(violations)
+            generateAndUploadPdf(metadata, uploads, navEksternRefId, personIdent)
 
-        generateAndUploadPdf(metadata, uploads, navEksternRefId, personIdent)
+            val filer = buildFilerList(uploads)
 
-        val filer = buildFilerList(uploads)
-
-        return submitToFiks(metadata, fiksDigisosId, kommunenummer, navEksternRefId, token, filer, submissionId)
+            submitToFiks(metadata, fiksDigisosId, kommunenummer, navEksternRefId, token, filer, submissionId)
+        }
     }
 
     private suspend fun generateAndUploadPdf(
@@ -135,6 +137,7 @@ class EttersendelseService(
 
         if (response.status.isSuccess()) {
             cleanupSubmission(submissionId)
+            logger.info("Successfully submitted ettersendelse for $fiksDigisosId to Fiks")
             return true
         }
         return false
