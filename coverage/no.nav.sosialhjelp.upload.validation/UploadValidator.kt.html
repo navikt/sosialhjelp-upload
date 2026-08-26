@@ -269,7 +269,7 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 <span class="fc" id="L269">            listOfNotNull(</span>
 <span class="fc" id="L270">                validateFileSize(fileSize),</span>
 <span class="fc" id="L271">                fileTypeValidation,</span>
-<span class="pc bpc" id="L272" title="1 of 4 branches missed.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
+<span class="fc bfc" id="L272" title="All 4 branches covered.">                if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
 <span class="pc bpc" id="L273" title="1 of 2 branches missed.">                virusScanValidation.await(),</span>
 <span class="fc" id="L274">            )</span>
 <span class="fc" id="L275">        }</span>
