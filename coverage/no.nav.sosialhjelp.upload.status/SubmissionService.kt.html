@@ -35,48 +35,51 @@ import java.util.*
         }
     }
 
-    fun getSubmissionStatus(submissionId: UUID): SubmissionState =
-<span class="fc" id="L39">        dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L40">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
-<span class="fc" id="L41">            val uploads =</span>
-<span class="fc" id="L42">                filenamesByUpload.mapNotNull { upload -&gt;</span>
-<span class="fc" id="L43">                    upload.id</span>
-<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                        ?.let {</span>
-<span class="fc" id="L45">                            UploadDto(</span>
-<span class="fc" id="L46">                                upload.id,</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                                upload.originalFilename ?: &quot;Ukjent fil&quot;,</span>
-<span class="fc" id="L48">                                upload.errors,</span>
-<span class="fc" id="L49">                                upload.filId,</span>
-<span class="fc bfc" id="L50" title="All 2 branches covered.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
+    suspend fun getSubmissionStatus(submissionId: UUID): SubmissionState =
+<span class="fc" id="L39">        withContext(ioDispatcher) { readSubmissionStatus(submissionId) }</span>
+
+    private fun readSubmissionStatus(submissionId: UUID): SubmissionState =
+<span class="fc" id="L42">        dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L43">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
+<span class="fc" id="L44">            val uploads =</span>
+<span class="fc" id="L45">                filenamesByUpload.mapNotNull { upload -&gt;</span>
+<span class="fc" id="L46">                    upload.id</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                        ?.let {</span>
+<span class="fc" id="L48">                            UploadDto(</span>
+<span class="fc" id="L49">                                upload.id,</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                                upload.originalFilename ?: &quot;Ukjent fil&quot;,</span>
+<span class="fc" id="L51">                                upload.errors,</span>
+<span class="fc" id="L52">                                upload.filId,</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                                url = upload.filId?.let { &quot;/upload/${upload.id}&quot; },</span>
                                 finalFilename =
-<span class="fc bfc" id="L52" title="All 2 branches covered.">                                    upload.mellomlagringFilnavn?.let { mellomlagringFilnavn -&gt;</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                                    upload.mellomlagringFilnavn?.let { mellomlagringFilnavn -&gt;</span>
                                         // Derive the user-facing name from the original filename, using the
                                         // mellomlagring extension (which may differ if the file was converted to PDF).
                                         // This hides the UUID suffix added for mellomlagring uniqueness.
-<span class="fc" id="L56">                                        val ext = File(mellomlagringFilnavn).extension</span>
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                                        val originalBase = File(upload.originalFilename ?: &quot;&quot;).nameWithoutExtension</span>
-<span class="pc bpc" id="L58" title="2 of 4 branches missed.">                                        if (ext.isNotEmpty()) &quot;$originalBase.$ext&quot; else originalBase</span>
+<span class="fc" id="L59">                                        val ext = File(mellomlagringFilnavn).extension</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                                        val originalBase = File(upload.originalFilename ?: &quot;&quot;).nameWithoutExtension</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">                                        if (ext.isNotEmpty()) &quot;$originalBase.$ext&quot; else originalBase</span>
                                     },
-<span class="fc" id="L60">                                status = UploadDto.Status.valueOf(upload.status.name),</span>
-<span class="fc" id="L61">                                upload.fileSize,</span>
-<span class="fc" id="L62">                                upload.kategori,</span>
-<span class="fc" id="L63">                                upload.correlationId,</span>
-<span class="fc" id="L64">                            )</span>
-<span class="fc" id="L65">                        }</span>
+<span class="fc" id="L63">                                status = UploadDto.Status.valueOf(upload.status.name),</span>
+<span class="fc" id="L64">                                upload.fileSize,</span>
+<span class="fc" id="L65">                                upload.kategori,</span>
+<span class="fc" id="L66">                                upload.correlationId,</span>
+<span class="fc" id="L67">                            )</span>
+<span class="fc" id="L68">                        }</span>
                 }
 
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            val tooManyFiles = uploads.size &gt; 30</span>
-<span class="pc bpc" id="L69" title="1 of 6 branches missed.">            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } &gt; 150 * 1024 * 1024</span>
-<span class="fc" id="L70">            SubmissionState(</span>
-<span class="fc" id="L71">                submissionId.toString(),</span>
-<span class="fc" id="L72">                uploads.toList(),</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            val tooManyFiles = uploads.size &gt; 30</span>
+<span class="pc bpc" id="L72" title="1 of 6 branches missed.">            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } &gt; 150 * 1024 * 1024</span>
+<span class="fc" id="L73">            SubmissionState(</span>
+<span class="fc" id="L74">                submissionId.toString(),</span>
+<span class="fc" id="L75">                uploads.toList(),</span>
                 validations =
-<span class="fc" id="L74">                    listOfNotNull(</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                        if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
-<span class="pc bpc" id="L76" title="1 of 2 branches missed.">                        if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,</span>
+<span class="fc" id="L77">                    listOfNotNull(</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                        if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                        if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,</span>
                     ),
-<span class="fc" id="L78">                status = SubmissionState.Status.ACTIVE,</span>
-<span class="fc" id="L79">            )</span>
-<span class="fc" id="L80">        }</span>
+<span class="fc" id="L81">                status = SubmissionState.Status.ACTIVE,</span>
+<span class="fc" id="L82">            )</span>
+<span class="fc" id="L83">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

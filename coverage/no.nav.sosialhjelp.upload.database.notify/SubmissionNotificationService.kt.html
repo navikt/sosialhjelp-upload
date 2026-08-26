@@ -96,14 +96,16 @@ import kotlin.time.Duration.Companion.seconds
      * Prefer [no.nav.sosialhjelp.upload.upload.UploadNotifications.notifyChange] for
      * notifications that must be atomic with a write transaction.
      */
-    fun notifyUpdate(submissionId: UUID) {
-<span class="nc" id="L100">        dataSource.connection.use { conn -&gt;</span>
-<span class="nc" id="L101">            conn.prepareStatement(&quot;SELECT pg_notify('submission_update', ?)&quot;).use { ps -&gt;</span>
-<span class="nc" id="L102">                ps.setString(1, submissionId.toString())</span>
-<span class="nc" id="L103">                ps.execute()</span>
-<span class="nc" id="L104">            }</span>
+    suspend fun notifyUpdate(submissionId: UUID) {
+<span class="nc" id="L100">        withContext(ioDispatcher) {</span>
+<span class="nc" id="L101">            dataSource.connection.use { conn -&gt;</span>
+<span class="nc" id="L102">                conn.prepareStatement(&quot;SELECT pg_notify('submission_update', ?)&quot;).use { ps -&gt;</span>
+<span class="nc" id="L103">                    ps.setString(1, submissionId.toString())</span>
+<span class="nc" id="L104">                    ps.execute()</span>
+<span class="nc" id="L105">                }</span>
+<span class="nc" id="L106">            }</span>
         }
-<span class="nc" id="L106">    }</span>
+<span class="nc" id="L108">    }</span>
 
     /**
      * Fires a pg_notify immediately on a new autocommit connection.
@@ -115,18 +117,20 @@ import kotlin.time.Duration.Companion.seconds
      * Prefer [no.nav.sosialhjelp.upload.upload.UploadNotifications.notifyChange] for
      * notifications that must be atomic with a write transaction.
      */
-    fun notifyDeleted(submissionId: UUID) {
-<span class="pc" id="L119">        dataSource.connection.use { conn -&gt;</span>
-<span class="pc" id="L120">            conn.prepareStatement(&quot;SELECT pg_notify('submission_delete', ?)&quot;).use { ps -&gt;</span>
-<span class="fc" id="L121">                ps.setString(1, submissionId.toString())</span>
-<span class="fc" id="L122">                ps.execute()</span>
-<span class="fc" id="L123">            }</span>
+    suspend fun notifyDeleted(submissionId: UUID) {
+<span class="fc" id="L121">        withContext(ioDispatcher) {</span>
+<span class="pc" id="L122">            dataSource.connection.use { conn -&gt;</span>
+<span class="pc" id="L123">                conn.prepareStatement(&quot;SELECT pg_notify('submission_delete', ?)&quot;).use { ps -&gt;</span>
+<span class="fc" id="L124">                    ps.setString(1, submissionId.toString())</span>
+<span class="fc" id="L125">                    ps.execute()</span>
+<span class="fc" id="L126">                }</span>
+<span class="fc" id="L127">            }</span>
         }
-<span class="fc" id="L125">    }</span>
+<span class="fc" id="L129">    }</span>
 
     fun getSubmissionFlow(submissionId: UUID): Flow&lt;SubmissionUpdateNotification.UpdateType&gt; =
-<span class="fc" id="L128">        _updates</span>
-<span class="fc" id="L129">            .filter { it.submissionId == submissionId }</span>
-<span class="fc" id="L130">            .map { it.type }</span>
+<span class="fc" id="L132">        _updates</span>
+<span class="fc" id="L133">            .filter { it.submissionId == submissionId }</span>
+<span class="fc" id="L134">            .map { it.type }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

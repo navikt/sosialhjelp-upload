@@ -23,9 +23,9 @@ fun Route.configureVedleggRoutes() {
 <span class="fc" id="L23">                verifyNavEksternRefIdOwnershipByPid()</span>
 
                 // GET /vedlegg/{navEksternRefId} — return JsonVedleggSpesifikasjon for the given soknadId.
-<span class="pc bnc" id="L26" title="All 3 branches missed.">                get {</span>
+<span class="pc bnc" id="L26" title="All 4 branches missed.">                get {</span>
 <span class="nc" id="L27">                    val navEksternRefId = call.parameters[&quot;navEksternRefId&quot;]!!</span>
-<span class="nc" id="L28">                    val vedlegg = vedleggService.getVedleggByNavEksternRefId(navEksternRefId)</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">                    val vedlegg = vedleggService.getVedleggByNavEksternRefId(navEksternRefId)</span>
 <span class="nc" id="L29">                    call.respond(vedlegg)</span>
 <span class="nc" id="L30">                }</span>
 

@@ -117,17 +117,15 @@ import java.time.temporal.ChronoUnit
         }
 <span class="nc" id="L118">    }</span>
 
-    private suspend fun cleanupGcsObjects(gcsKey: String) {
-<span class="nc bnc" id="L121" title="All 4 branches missed.">        withContext(ioDispatcher) {</span>
-<span class="nc" id="L122">            val chunkPrefix = &quot;$gcsKey-chunk-&quot;</span>
-<span class="nc" id="L123">            runCatching {</span>
-<span class="nc bnc" id="L124" title="All 2 branches missed.">                val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
-<span class="nc" id="L125">                (chunkKeys + listOf(gcsKey)).forEach { key -&gt;</span>
-<span class="nc bnc" id="L126" title="All 2 branches missed.">                    runCatching { chunkStorage.deleteObject(key) }</span>
-<span class="nc bnc" id="L127" title="All 2 branches missed.">                        .onFailure { log.warn(&quot;Failed to delete GCS object $key during recovery&quot;, it) }</span>
-<span class="nc" id="L128">                }</span>
-<span class="nc bnc" id="L129" title="All 2 branches missed.">            }.onFailure { log.warn(&quot;Failed to list/delete GCS objects for $gcsKey during recovery&quot;, it) }</span>
-        }
-<span class="nc" id="L131">    }</span>
+<span class="nc" id="L120">    private suspend fun cleanupGcsObjects(gcsKey: String) {</span>
+<span class="nc" id="L121">        val chunkPrefix = &quot;$gcsKey-chunk-&quot;</span>
+<span class="nc" id="L122">        runCatching {</span>
+<span class="nc" id="L123">            val chunkKeys = chunkStorage.listKeys(chunkPrefix)</span>
+<span class="nc" id="L124">            (chunkKeys + listOf(gcsKey)).forEach { key -&gt;</span>
+<span class="nc" id="L125">                runCatching { chunkStorage.deleteObject(key) }</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                    .onFailure { log.warn(&quot;Failed to delete GCS object $key during recovery&quot;, it) }</span>
+<span class="nc" id="L127">            }</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        }.onFailure { log.warn(&quot;Failed to list/delete GCS objects for $gcsKey during recovery&quot;, it) }</span>
+<span class="nc" id="L129">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
