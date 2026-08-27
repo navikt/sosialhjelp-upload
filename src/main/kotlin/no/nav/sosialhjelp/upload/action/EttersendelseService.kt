@@ -86,7 +86,7 @@ class EttersendelseService(
                 EttersendelsePdfGenerator.generate(
                     PdfMetadata(
                         metadata.type,
-                        uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn) } },
+                        uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn.replace(Regex("[\r\n\t]"), " ").trim()) } },
                     ),
                     personIdent,
                 )
