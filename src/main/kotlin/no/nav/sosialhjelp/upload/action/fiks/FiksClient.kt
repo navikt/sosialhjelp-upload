@@ -5,6 +5,7 @@ package no.nav.sosialhjelp.upload.action.fiks
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
@@ -67,6 +68,26 @@ class FiksClient(
     private val client by lazy {
         HttpClient(CIO) {
             expectSuccess = false
+            install(ContentNegotiation) {
+                json()
+            }
+            install(Logging) {
+                logger =
+                    object : Logger {
+                        override fun log(message: String) = this@FiksClient.logger.info(message)
+                    }
+                level = LogLevel.INFO
+            }
+        }
+    }
+
+    private val uploadClient by lazy {
+        HttpClient(CIO) {
+            expectSuccess = false
+            install(HttpTimeout) {
+                requestTimeoutMillis = 5 * 60_000L
+                connectTimeoutMillis = 10_000L
+            }
             install(ContentNegotiation) {
                 json()
             }
@@ -163,7 +184,7 @@ class FiksClient(
                 )
             }
         try {
-            return client
+            return uploadClient
                 .submitFormWithBinaryData(
                     ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
                     formData,
