@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
@@ -167,18 +168,19 @@ class TusUploadService(
                 }
             }
 
-        if (filId != null && navEksternRefId != null) {
-            runCatching {
-                mellomlagringClient.deleteFile(navEksternRefId, filId)
-            }.onFailure {
-                logger.warn(
-                    "Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned",
-                    it,
-                )
+        withMdc("navEksternRefId" to navEksternRefId) {
+            if (filId != null && navEksternRefId != null) {
+                runCatching {
+                    mellomlagringClient.deleteFile(navEksternRefId, filId)
+                }.onFailure {
+                    logger.warn(
+                        "Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned",
+                        it,
+                    )
+                }
             }
+            chunkAssemblyService.deleteGcsObjects(uploadId)
         }
-
-        chunkAssemblyService.deleteGcsObjects(uploadId)
     }
 
     class UploadForbiddenException(

@@ -96,18 +96,6 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         coVerify { mellomlagringClient.deleteFile(navEksternRefId, filId, any()) }
     }
 
-    @Test
-    fun `retention never deletes the whole mellomlagring for a navEksternRefId`() {
-        val navEksternRefId = UUID.randomUUID().toString()
-        val submissionId =
-            createMockSubmission(dsl, navEksternRefId = navEksternRefId, automaticCleanup = true)
-        insertUpload(submissionId, filId = UUID.randomUUID())
-
-        runBlocking { cleanupService().runCleanup() }
-
-        coVerify(exactly = 0) { mellomlagringClient.deleteMellomlagring(any()) }
-    }
-
     /**
      * Regression test for the production incident: a søknad has one submission per kategori, all
      * sharing a navEksternRefId. Cleaning up one of them must not touch the files belonging to a
@@ -143,7 +131,6 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         assertNull(submissionExists(staleSubmission), "Stale submission should be deleted")
         assertNotNull(submissionExists(liveSubmission), "Sibling submission should survive")
 
-        coVerify(exactly = 0) { mellomlagringClient.deleteMellomlagring(any()) }
         coVerify(exactly = 1) { mellomlagringClient.deleteFile(navEksternRefId, staleFilId, any()) }
         coVerify(exactly = 0) { mellomlagringClient.deleteFile(navEksternRefId, liveFilId, any()) }
     }
@@ -167,7 +154,6 @@ class StaleSubmissionCleanupServiceIntegrationTest {
             "Søknadsvedlegg must never be removed by retention — soknad-api owns that lifecycle",
         )
         coVerify(exactly = 0) { mellomlagringClient.deleteFile(any(), any(), any()) }
-        coVerify(exactly = 0) { mellomlagringClient.deleteMellomlagring(any()) }
     }
 
     /**

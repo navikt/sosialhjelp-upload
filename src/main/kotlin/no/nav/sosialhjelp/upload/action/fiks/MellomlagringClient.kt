@@ -221,23 +221,19 @@ class MellomlagringClient(
                 }
                 bearerAuth(texasClient.getMaskinportenToken())
             }
-        if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
-            val message = "Failed to delete file $filId from mellomlagring: ${response.status}"
-            if (throwOnError) error(message) else logger.warn(message)
-        }
-    }
-
-    suspend fun deleteMellomlagring(navEksternRefId: String) {
-        val response =
-            client.delete(mellomlagringUrl(navEksternRefId)) {
-                headers {
-                    integrasjonsid?.let { append("IntegrasjonId", it) }
-                    integrasjonspassord?.let { append("IntegrasjonPassord", it) }
-                }
-                bearerAuth(texasClient.getMaskinportenToken())
+        when (response.status) {
+            HttpStatusCode.NotFound -> {
+                logger.info(
+                    "File $filId not found in mellomlagring, ignoring. It has probably already been deleted",
+                )
             }
-        if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {
-            logger.warn("Failed to delete mellomlagring for $navEksternRefId: ${response.status}")
+            HttpStatusCode.OK, HttpStatusCode.NoContent -> {
+                // File deleted successfully, nothing to do
+            }
+            else -> {
+                val message = "Failed to delete file $filId from mellomlagring: ${response.status}"
+                if (throwOnError) error(message) else logger.warn(message)
+            }
         }
     }
 }

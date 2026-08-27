@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
@@ -32,20 +33,25 @@ class SubmissionDeletionService(
                 dsl.transactionResult { tx -> uploadRepository.getSubmissionResources(tx, submissionId) }
             } ?: return false
 
-        withContext(ioDispatcher) {
-            dsl.transaction { tx -> submissionQueries.cleanup(tx, submissionId) }
+        withMdc("navEksternRefId" to resources.navEksternRefId) {
+            logger.info(
+                "Deleting submission $submissionId (navEksternRefId=${resources.navEksternRefId}, " +
+                    "kategori=${resources.kategori}, filer=${resources.filIds.size})",
+            )
+            withContext(ioDispatcher) {
+                dsl.transaction { tx -> submissionQueries.cleanup(tx, submissionId) }
+            }
+
+            runCatching { notificationService.notifyDeleted(submissionId) }
+                .onFailure { logger.warn("Failed to notify deletion of submission $submissionId", it) }
+
+            deleteMellomlagringFiles(resources)
+            deleteGcsObjects(resources)
+
+            logger.info(
+                "Deleted submission $submissionId (kategori=${resources.kategori}, filer=${resources.filIds.size})",
+            )
         }
-
-        runCatching { notificationService.notifyDeleted(submissionId) }
-            .onFailure { logger.warn("Failed to notify deletion of submission $submissionId", it) }
-
-        deleteMellomlagringFiles(resources)
-        deleteGcsObjects(resources)
-
-        logger.info(
-            "Deleted submission $submissionId (navEksternRefId=${resources.navEksternRefId}, " +
-                "kategori=${resources.kategori}, filer=${resources.filIds.size})",
-        )
         return true
     }
 
@@ -67,7 +73,7 @@ class SubmissionDeletionService(
                 mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
             } catch (e: Exception) {
                 meterRegistry.counter("mellomlagring.orphaned_file").increment()
-                logger.warn("Failed to delete file $filId from mellomlagring for $navEksternRefId", e)
+                logger.warn("Failed to delete file $filId from mellomlagring", e)
             }
         }
     }

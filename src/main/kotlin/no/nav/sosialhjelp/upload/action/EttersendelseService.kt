@@ -86,7 +86,12 @@ class EttersendelseService(
                 EttersendelsePdfGenerator.generate(
                     PdfMetadata(
                         metadata.type,
-                        uploads.mapNotNull { it.mellomlagringFilnavn?.let { filnavn -> PdfFil(filnavn.replace(Regex("[\r\n\t]"), " ").trim()) } },
+                        uploads.mapNotNull {
+                            it.mellomlagringFilnavn?.let { filnavn ->
+                                // Fjern linjeskift og tabulatorer fra filnavnene, da disse kan forårsake problemer i PDF-genereringen.
+                                PdfFil(filnavn.replace(Regex("[\r\n\t]"), " ").trim())
+                            }
+                        },
                     ),
                     personIdent,
                 )
