@@ -59,8 +59,8 @@ spec:
     limits:
       memory: 2Gi
     requests:
-      cpu: 50m
-      memory: 512Mi
+      cpu: 200m
+      memory: 1088Mi
   tokenx:
     enabled: true
   maskinporten:
