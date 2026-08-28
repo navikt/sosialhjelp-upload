@@ -18,6 +18,7 @@ import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
 import no.nav.sosialhjelp.upload.pdf.PdfFil
+import no.nav.sosialhjelp.upload.pdf.PdfGenerationException
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
@@ -83,18 +84,26 @@ class EttersendelseService(
     ) {
         val ettersendelsePdf =
             withContext(cpuDispatcher) {
-                EttersendelsePdfGenerator.generate(
+                val pdfMetadata =
                     PdfMetadata(
                         metadata.type,
                         uploads.mapNotNull {
                             it.mellomlagringFilnavn?.let { filnavn ->
-                                // Fjern linjeskift og tabulatorer fra filnavnene, da disse kan forårsake problemer i PDF-genereringen.
                                 PdfFil(filnavn.replace(Regex("[\r\n\t]"), " ").trim())
                             }
                         },
-                    ),
-                    personIdent,
-                )
+                    )
+                try {
+                    EttersendelsePdfGenerator.generate(pdfMetadata, personIdent)
+                } catch (e: PdfGenerationException) {
+                    logger.error("PDF generation failed, retrying with degraded filenames", e)
+                    meterRegistry.counter("pdf.degraded_fallback").increment()
+                    val degraded =
+                        pdfMetadata.copy(
+                            filer = pdfMetadata.filer.mapIndexed { idx, _ -> PdfFil("Vedlegg ${idx + 1}") },
+                        )
+                    EttersendelsePdfGenerator.generate(degraded, personIdent)
+                }
             }
         mellomlagringClient.replaceFile(
             navEksternRefId,

@@ -46,6 +46,8 @@ class PdfGenerator internal constructor(
     private var fontStream4: InputStream? = this::class.java.getResourceAsStream("/pdf/NotoNaskhArabic-Regular.ttf")
     private val fontArabicPlain: PDFont = PDType0Font.load(document, fontStream4)
 
+    private val glyphCache = HashMap<Pair<PDFont, Int>, Boolean>()
+
     private fun calculateStartY(): Float = MEDIA_BOX.upperRightY - MARGIN
 
     fun finish(): ByteArray {
@@ -117,7 +119,7 @@ class PdfGenerator internal constructor(
 
         lines.forEach { line ->
             var xOffset = 0f
-            splitIntoFontRuns(line).forEach { (run, isArabic) ->
+            splitIntoFontRuns(line, font, arabicFont).forEach { (run, isArabic) ->
                 val activeFont = if (isArabic) arabicFont else font
                 currentStream.setFont(activeFont, fontSize)
                 currentStream.setCharacterSpacing(0F)
@@ -158,7 +160,7 @@ class PdfGenerator internal constructor(
                 currentStream.newLineAtOffset(startX - prevX, -leadingPercentage * fontSize)
             }
             prevX = startX
-            splitIntoFontRuns(lines[i]).forEach { (run, isArabic) ->
+            splitIntoFontRuns(lines[i], font, arabicFont).forEach { (run, isArabic) ->
                 currentStream.setFont(if (isArabic) arabicFont else font, fontSize)
                 currentStream.showText(run)
             }
@@ -167,53 +169,64 @@ class PdfGenerator internal constructor(
         y -= lines.size * fontSize
     }
 
-    /** Measures the total rendered width of a line, accounting for font switching. */
     private fun measureLineWidth(
         line: String,
         font: PDFont,
         arabicFont: PDFont,
         fontSize: Float,
     ): Float =
-        splitIntoFontRuns(line)
+        splitIntoFontRuns(line, font, arabicFont)
             .sumOf { (run, isArabic) ->
                 ((if (isArabic) arabicFont else font).getStringWidth(run) / 1000 * fontSize).toDouble()
             }.toFloat()
 
-    /**
-     * Splits a string into runs of consecutive characters that share the same script family:
-     * Arabic (U+0600–U+06FF, U+0750–U+077F, U+FB50–U+FDFF, U+FE70–U+FEFF, U+1EE00–U+1EEFF)
-     * versus everything else (Latin, Norwegian, digits, punctuation…).
-     *
-     * Returns a list of (text, isArabic) pairs in logical order.
-     */
-    private fun splitIntoFontRuns(text: String): List<Pair<String, Boolean>> {
+    private fun splitIntoFontRuns(
+        text: String,
+        font: PDFont,
+        arabicFont: PDFont,
+    ): List<Pair<String, Boolean>> {
         if (text.isEmpty()) return emptyList()
         val runs = mutableListOf<Pair<String, Boolean>>()
         val sb = StringBuilder()
-        var currentIsArabic = text[0].isArabicScript()
-        for (ch in text) {
-            val arabic = ch.isArabicScript()
+        var currentIsArabic = isArabicCodePoint(text.codePointAt(0))
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            val charCount = Character.charCount(cp)
+            val arabic = isArabicCodePoint(cp)
             if (arabic != currentIsArabic) {
                 runs.add(sb.toString() to currentIsArabic)
                 sb.clear()
                 currentIsArabic = arabic
             }
-            sb.append(ch)
+            val activeFont = if (arabic) arabicFont else font
+            val cpStr = String(Character.toChars(cp))
+            val supported =
+                glyphCache.getOrPut(activeFont to cp) {
+                    try {
+                        activeFont.getStringWidth(cpStr)
+                        true
+                    } catch (_: IllegalArgumentException) {
+                        false
+                    }
+                }
+            if (supported) {
+                sb.append(cpStr)
+            } else {
+                logger.debug("No glyph for U+{} in font, replacing with '?'", cp.toString(16).uppercase())
+                if (sb.isEmpty() || sb.last() != '?') sb.append('?')
+            }
+            i += charCount
         }
         if (sb.isNotEmpty()) runs.add(sb.toString() to currentIsArabic)
         return runs
     }
 
-    private fun Char.isArabicScript(): Boolean {
-        val cp = this.code
-        return cp in 0x0600..0x06FF ||
-            // Arabic
+    private fun isArabicCodePoint(cp: Int): Boolean =
+        cp in 0x0600..0x06FF ||
             cp in 0x0750..0x077F ||
-            // Arabic Supplement
             cp in 0xFB50..0xFDFF ||
-            // Arabic Presentation Forms-A
-            cp in 0xFE70..0xFEFF // Arabic Presentation Forms-B
-    }
+            cp in 0xFE70..0xFEFF
 
     private fun continueOnNewPage() {
         document.addPage(currentPage)
