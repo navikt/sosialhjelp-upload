@@ -221,45 +221,41 @@ import kotlin.time.toJavaDuration
 <span class="nc" id="L221">                }</span>
 <span class="nc" id="L222">                bearerAuth(texasClient.getMaskinportenToken())</span>
 <span class="nc" id="L223">            }</span>
-<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {</span>
-<span class="nc" id="L225">            val message = &quot;Failed to delete file $filId from mellomlagring: ${response.status}&quot;</span>
-<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (throwOnError) error(message) else logger.warn(message)</span>
+<span class="nc" id="L224">        when (response.status) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            HttpStatusCode.NotFound -&gt; {</span>
+<span class="nc" id="L226">                logger.info(</span>
+<span class="nc" id="L227">                    &quot;File $filId not found in mellomlagring, ignoring. It has probably already been deleted&quot;,</span>
+                )
+            }
+<span class="nc bnc" id="L230" title="All 4 branches missed.">            HttpStatusCode.OK, HttpStatusCode.NoContent -&gt; {</span>
+                // File deleted successfully, nothing to do
+            }
+            else -&gt; {
+<span class="nc" id="L234">                val message = &quot;Failed to delete file $filId from mellomlagring: ${response.status}&quot;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                if (throwOnError) error(message) else logger.warn(message)</span>
+            }
         }
-<span class="nc" id="L228">    }</span>
-
-    suspend fun deleteMellomlagring(navEksternRefId: String) {
-<span class="nc" id="L231">        val response =</span>
-<span class="nc" id="L232">            client.delete(mellomlagringUrl(navEksternRefId)) {</span>
-<span class="nc" id="L233">                headers {</span>
-<span class="nc bnc" id="L234" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) }</span>
-<span class="nc bnc" id="L235" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) }</span>
-<span class="nc" id="L236">                }</span>
-<span class="nc" id="L237">                bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L238">            }</span>
-<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (response.status !in listOf(HttpStatusCode.OK, HttpStatusCode.NoContent)) {</span>
-<span class="nc" id="L240">            logger.warn(&quot;Failed to delete mellomlagring for $navEksternRefId: ${response.status}&quot;)</span>
-        }
-<span class="nc" id="L242">    }</span>
+<span class="nc" id="L238">    }</span>
 }
 
-<span class="nc bnc" id="L245" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L246">private data class MellomlagringMetadata(</span>
-<span class="nc" id="L247">    val filnavn: String,</span>
-<span class="nc" id="L248">    val storrelse: Long,</span>
-<span class="nc" id="L249">    val mimetype: String,</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L242">private data class MellomlagringMetadata(</span>
+<span class="nc" id="L243">    val filnavn: String,</span>
+<span class="nc" id="L244">    val storrelse: Long,</span>
+<span class="nc" id="L245">    val mimetype: String,</span>
 )
 
-<span class="nc bnc" id="L252" title="All 10 branches missed.">@Serializable</span>
-<span class="nc" id="L253">private data class MellomlagringResponse(</span>
-<span class="nc" id="L254">    val navEksternRefId: String,</span>
-<span class="nc" id="L255">    val mellomlagringMetadataList: List&lt;MellomlagringFilInfo&gt; = emptyList(),</span>
-<span class="nc" id="L256">)</span>
+<span class="nc bnc" id="L248" title="All 10 branches missed.">@Serializable</span>
+<span class="nc" id="L249">private data class MellomlagringResponse(</span>
+<span class="nc" id="L250">    val navEksternRefId: String,</span>
+<span class="nc" id="L251">    val mellomlagringMetadataList: List&lt;MellomlagringFilInfo&gt; = emptyList(),</span>
+<span class="nc" id="L252">)</span>
 
-<span class="nc bnc" id="L258" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L259">data class MellomlagringFilInfo(</span>
-<span class="nc" id="L260">    val filnavn: String,</span>
-<span class="nc" id="L261">    val filId: String,</span>
-<span class="nc" id="L262">    val storrelse: Long,</span>
-<span class="nc" id="L263">    val mimetype: String,</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L255">data class MellomlagringFilInfo(</span>
+<span class="nc" id="L256">    val filnavn: String,</span>
+<span class="nc" id="L257">    val filId: String,</span>
+<span class="nc" id="L258">    val storrelse: Long,</span>
+<span class="nc" id="L259">    val mimetype: String,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
