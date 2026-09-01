@@ -63,10 +63,9 @@ val SUPPORTED_MIME_TYPES =
         // .sxw, .stw, .sgl (StarOffice Writer)
         "application/vnd.sun.xml.writer",
         "application/vnd.sun.xml.writer.template",
-        "application/vnd.sun.xml.writer.global",
         // .vor (StarOffice template)
         "application/vnd.stardivision.writer",
-        // .uof (Uniform Office Format)
+        // .uof/.uos/.uop (Uniform Office Format)
         "application/vnd.uoml+xml",
         // .xml (generic XML)
         "application/xml",
@@ -109,8 +108,6 @@ val SUPPORTED_MIME_TYPES =
         // .sxc, .stc (StarOffice Calc)
         "application/vnd.sun.xml.calc",
         "application/vnd.sun.xml.calc.template",
-        // .uos (Uniform Office Spreadsheet)
-        "application/vnd.uoml+xml",
         // .pxl (Pocket Excel)
         "application/x-pocket-excel",
         // .sdc (StarOffice Calc legacy)
@@ -137,8 +134,6 @@ val SUPPORTED_MIME_TYPES =
         // .sxi, .sti (StarOffice Impress)
         "application/vnd.sun.xml.impress",
         "application/vnd.sun.xml.impress.template",
-        // .uop
-        "application/vnd.uoml+xml",
         // .sdd, .sdp (StarOffice Impress legacy)
         "application/vnd.stardivision.impress",
         // Graphics & Drawing
@@ -304,10 +299,10 @@ class UploadValidator(
         filename: String,
     ): Pair<String, Validation?> =
         withContext(cpuDispatcher) {
-            val tikaIS = TikaInputStream.get(data.inputStream())
-            val tikaMetadata = Metadata()
-            tikaMetadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)
-            val mimeType = tikaIS.use { tika.detect(tikaIS, tikaMetadata) }
+            val tikaMetadata = Metadata().apply {
+                set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)
+            }
+            val mimeType = TikaInputStream.get(data, tikaMetadata).use { tika.detect(it, tikaMetadata) }
             if (mimeType !in SUPPORTED_MIME_TYPES) {
                 return@withContext mimeType to FileTypeValidation(actual = mimeType)
             }
