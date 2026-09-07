@@ -182,6 +182,43 @@ class TusUploadQueries {
                 )
             }
 
+    fun prepareDeletion(
+        tx: Configuration,
+        uploadId: UUID,
+    ): Upload {
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.ID.eq(uploadId))
+            .forUpdate()
+            .fetchSingle()
+        val upload = getUpload(tx, uploadId)
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.PROCESSING_STATUS, Status.DELETING.name)
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
+            .where(UPLOAD.ID.eq(uploadId))
+            .execute()
+        return upload
+    }
+
+    fun cancelDeletion(
+        tx: Configuration,
+        uploadId: UUID,
+        previousStatus: Status,
+    ) {
+        tx
+            .dsl()
+            .update(UPLOAD)
+            .set(UPLOAD.PROCESSING_STATUS, previousStatus.name)
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
+            .where(UPLOAD.ID.eq(uploadId))
+            .and(UPLOAD.PROCESSING_STATUS.eq(Status.DELETING.name))
+            .execute()
+    }
+
     fun deleteUpload(
         tx: Configuration,
         uploadId: UUID,

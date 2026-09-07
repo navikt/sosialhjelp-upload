@@ -35,6 +35,7 @@ import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.tus.storage.GcsBucketStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
+import no.nav.sosialhjelp.upload.upload.MellomlagringReconciliationService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
 import no.nav.sosialhjelp.upload.upload.StaleSubmissionCleanupService
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
@@ -179,6 +180,7 @@ private fun Application.configureDependencies(
         provide(ChunkAssemblyService::class)
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
+        provide(MellomlagringReconciliationService::class)
         provide(UploadProcessingService::class)
         provide(TusUploadService::class)
         provide(SubmissionService::class)

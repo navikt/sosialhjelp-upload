@@ -89,6 +89,7 @@ class TusUploadServiceIntegrationTest {
                 validator = validator,
                 fileConversionService = fileConversionService,
                 mellomlagringStorageService = mellomlagringStorageService,
+                mellomlagringClient = mellomlagringClient,
                 meterRegistry = meterRegistry,
             )
 

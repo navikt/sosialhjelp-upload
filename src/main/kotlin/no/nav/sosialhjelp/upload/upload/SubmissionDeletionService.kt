@@ -38,6 +38,7 @@ class SubmissionDeletionService(
                 "Deleting submission $submissionId (navEksternRefId=${resources.navEksternRefId}, " +
                     "kategori=${resources.kategori}, filer=${resources.filIds.size})",
             )
+            deleteMellomlagringFiles(resources)
             withContext(ioDispatcher) {
                 dsl.transaction { tx -> submissionQueries.cleanup(tx, submissionId) }
             }
@@ -45,7 +46,6 @@ class SubmissionDeletionService(
             runCatching { notificationService.notifyDeleted(submissionId) }
                 .onFailure { logger.warn("Failed to notify deletion of submission $submissionId", it) }
 
-            deleteMellomlagringFiles(resources)
             deleteGcsObjects(resources)
 
             logger.info(
@@ -70,10 +70,11 @@ class SubmissionDeletionService(
         val navEksternRefId = resources.navEksternRefId ?: return
         resources.filIds.forEach { filId ->
             try {
-                mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
+                mellomlagringClient.deleteFile(navEksternRefId, filId)
             } catch (e: Exception) {
                 meterRegistry.counter("mellomlagring.orphaned_file").increment()
                 logger.warn("Failed to delete file $filId from mellomlagring", e)
+                throw e
             }
         }
     }

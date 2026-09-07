@@ -24,6 +24,7 @@ data class Upload(
 )
 
 enum class Status {
+    DELETING,
     PROCESSING,
     FAILED,
     PENDING,
@@ -194,4 +195,19 @@ class UploadRepository {
                     sha512 = it.get(UPLOAD.SHA512),
                 )
             }
+
+    fun getFilIdsByNavEksternRefId(
+        tx: Configuration,
+        navEksternRefId: String,
+    ): Set<String> =
+        tx
+            .dsl()
+            .select(UPLOAD.FIL_ID)
+            .from(UPLOAD)
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .and(UPLOAD.FIL_ID.isNotNull)
+            .fetchSet(UPLOAD.FIL_ID)
+            .mapTo(mutableSetOf()) { it.toString() }
 }

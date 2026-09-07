@@ -3,6 +3,7 @@ package no.nav.sosialhjelp.upload.vedlegg
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.upload.MellomlagringReconciliationService
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
@@ -11,6 +12,7 @@ class VedleggService(
     private val dsl: DSLContext,
     private val uploadRepository: UploadRepository,
     private val submissionDeletionService: SubmissionDeletionService,
+    private val reconciliationService: MellomlagringReconciliationService,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
@@ -31,6 +33,7 @@ class VedleggService(
     ): Int = submissionDeletionService.deleteByNavEksternRefId(navEksternRefId, kategori)
 
     suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
+        reconciliationService.reconcile(navEksternRefId)
         val uploads =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->

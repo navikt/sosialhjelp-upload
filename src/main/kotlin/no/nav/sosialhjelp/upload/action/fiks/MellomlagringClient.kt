@@ -204,14 +204,39 @@ class MellomlagringClient(
     ): UUID {
         listFiles(navEksternRefId)
             .filter { it.filnavn == filename }
-            .forEach { deleteFile(navEksternRefId, UUID.fromString(it.filId), throwOnError = true) }
+            .forEach { deleteFile(navEksternRefId, UUID.fromString(it.filId)) }
         return uploadFile(navEksternRefId, filename, contentType, data)
     }
 
     suspend fun deleteFile(
         navEksternRefId: String,
         filId: UUID,
-        throwOnError: Boolean = false,
+    ) {
+        var lastException: Exception? = null
+        for (attempt in 1..MAX_ATTEMPTS) {
+            try {
+                deleteFileAttempt(navEksternRefId, filId)
+                return
+            } catch (e: Exception) {
+                lastException = e
+                if (attempt < MAX_ATTEMPTS) {
+                    val delayMs = RETRY_DELAYS_MS[attempt - 1]
+                    logger.warn(
+                        "Mellomlagring delete attempt $attempt/$MAX_ATTEMPTS failed for " +
+                            "$navEksternRefId/$filId, retrying in ${delayMs}ms",
+                        e,
+                    )
+                    meterRegistry.counter("mellomlagring.delete.retry").increment()
+                    delay(delayMs.milliseconds)
+                }
+            }
+        }
+        throw lastException!!
+    }
+
+    private suspend fun deleteFileAttempt(
+        navEksternRefId: String,
+        filId: UUID,
     ) {
         val response =
             client.delete("${mellomlagringUrl(navEksternRefId)}/$filId") {
@@ -232,7 +257,7 @@ class MellomlagringClient(
             }
             else -> {
                 val message = "Failed to delete file $filId from mellomlagring: ${response.status}"
-                if (throwOnError) error(message) else logger.warn(message)
+                error(message)
             }
         }
     }

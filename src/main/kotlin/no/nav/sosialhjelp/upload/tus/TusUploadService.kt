@@ -1,4 +1,4 @@
-@file:Suppress("LongParameterList")
+@file:Suppress("LongParameterList", "TooGenericExceptionCaught")
 
 package no.nav.sosialhjelp.upload.tus
 
@@ -159,25 +159,26 @@ class TusUploadService(
     }
 
     suspend fun delete(uploadId: UUID) {
-        val (filId, navEksternRefId) =
+        val upload =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
-                    val upload = tusUploadQueries.getUpload(tx, uploadId)
-                    tusUploadQueries.deleteUpload(tx, uploadId)
-                    upload.filId to upload.navEksternRefId
+                    tusUploadQueries.prepareDeletion(tx, uploadId)
                 }
             }
 
-        withMdc("navEksternRefId" to navEksternRefId) {
-            if (filId != null && navEksternRefId != null) {
-                runCatching {
-                    mellomlagringClient.deleteFile(navEksternRefId, filId)
-                }.onFailure {
-                    logger.warn(
-                        "Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned",
-                        it,
-                    )
+        withMdc("navEksternRefId" to upload.navEksternRefId) {
+            try {
+                if (upload.filId != null && upload.navEksternRefId != null) {
+                    mellomlagringClient.deleteFile(upload.navEksternRefId, upload.filId)
                 }
+                withContext(ioDispatcher) {
+                    dsl.transaction { tx -> tusUploadQueries.deleteUpload(tx, uploadId) }
+                }
+            } catch (e: Exception) {
+                withContext(ioDispatcher) {
+                    dsl.transaction { tx -> tusUploadQueries.cancelDeletion(tx, uploadId, upload.status) }
+                }
+                throw e
             }
             chunkAssemblyService.deleteGcsObjects(uploadId)
         }

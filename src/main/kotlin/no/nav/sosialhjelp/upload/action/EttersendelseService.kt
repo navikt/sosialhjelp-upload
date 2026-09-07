@@ -20,6 +20,7 @@ import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfGenerationException
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
+import no.nav.sosialhjelp.upload.upload.MellomlagringReconciliationService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
@@ -39,6 +40,7 @@ class EttersendelseService(
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
+    private val reconciliationService: MellomlagringReconciliationService,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
@@ -68,6 +70,7 @@ class EttersendelseService(
             val violations = validateSubmissionUploads(uploads)
             if (violations.isNotEmpty()) throw SubmissionValidationException(violations)
 
+            reconciliationService.reconcile(navEksternRefId)
             generateAndUploadPdf(metadata, uploads, navEksternRefId, personIdent)
 
             val filer = buildFilerList(uploads)

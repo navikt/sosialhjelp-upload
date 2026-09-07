@@ -1,4 +1,4 @@
-@file:Suppress("TooGenericExceptionCaught", "NestedBlockDepth")
+@file:Suppress("TooGenericExceptionCaught", "NestedBlockDepth", "LongParameterList")
 
 package no.nav.sosialhjelp.upload.upload
 
@@ -8,6 +8,7 @@ import io.opentelemetry.api.trace.StatusCode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import org.jooq.DSLContext
@@ -19,6 +20,7 @@ class UploadRecoveryService(
     private val dsl: DSLContext,
     private val uploadRecoveryQueries: UploadRecoveryQueries,
     private val notificationService: SubmissionNotificationService,
+    private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
     private val meterRegistry: MeterRegistry,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -70,6 +72,7 @@ class UploadRecoveryService(
                 staleUploads.forEach { info ->
                     notificationService.notifyUpdate(info.submissionId)
                     info.gcsKey?.let { cleanupGcsObjects(it) }
+                    cleanupMellomlagringFiles(info)
                 }
             }
         } catch (e: Exception) {
@@ -126,5 +129,19 @@ class UploadRecoveryService(
                     .onFailure { log.warn("Failed to delete GCS object $key during recovery", it) }
             }
         }.onFailure { log.warn("Failed to list/delete GCS objects for $gcsKey during recovery", it) }
+    }
+
+    private suspend fun cleanupMellomlagringFiles(info: UploadRecoveryQueries.StaleUploadInfo) {
+        val navEksternRefId = info.navEksternRefId ?: return
+        val suffix = "-${info.uploadId.toString().substringBefore('-')}"
+        runCatching {
+            mellomlagringClient
+                .listFiles(navEksternRefId)
+                .filter { it.filnavn.substringBeforeLast('.').endsWith(suffix) }
+                .forEach { file ->
+                    mellomlagringClient.deleteFile(navEksternRefId, java.util.UUID.fromString(file.filId))
+                    meterRegistry.counter("mellomlagring.orphan_detected", "source", "recovery").increment()
+                }
+        }.onFailure { log.error("Failed to remove mellomlagring files for stale upload ${info.uploadId}", it) }
     }
 }

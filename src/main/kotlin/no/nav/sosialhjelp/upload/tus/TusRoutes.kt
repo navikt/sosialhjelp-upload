@@ -160,11 +160,16 @@ private suspend fun RoutingContext.validateRequest(): RequestMetadata? {
     return RequestMetadata(personident, token, uploadLength)
 }
 
+@Suppress("TooGenericExceptionCaught")
 private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService) {
     val uploadId = call.attributes[VerifiedUploadId]
 
-    runCatching { tusUploadService.delete(uploadId) }.getOrElse {
-        return call.respond(HttpStatusCode.Forbidden)
+    try {
+        tusUploadService.delete(uploadId)
+    } catch (e: Exception) {
+        call.application.environment.log
+            .error("Failed to delete upload $uploadId", e)
+        return call.respond(HttpStatusCode.ServiceUnavailable)
     }
 
     call.response.header("Tus-Resumable", TUS_RESUMABLE)

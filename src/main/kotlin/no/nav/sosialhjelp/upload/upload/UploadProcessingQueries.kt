@@ -50,7 +50,7 @@ class UploadProcessingQueries {
         mellomlagringFilnavn: String,
         mellomlagringStorrelse: Long,
         sha512: String,
-    ) {
+    ): Boolean =
         tx
             .dsl()
             .update(UPLOAD)
@@ -62,8 +62,8 @@ class UploadProcessingQueries {
             .setNull(UPLOAD.GCS_KEY)
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
             .where(UPLOAD.ID.eq(uploadId))
-            .execute()
-    }
+            .and(UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name))
+            .execute() > 0
 
     fun markFailed(
         tx: Configuration,

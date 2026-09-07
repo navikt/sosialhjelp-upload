@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
@@ -28,6 +29,7 @@ class UploadProcessingService(
     private val validator: UploadValidator,
     private val fileConversionService: FileConversionService,
     private val mellomlagringStorageService: MellomlagringStorageService,
+    private val mellomlagringClient: MellomlagringClient,
     private val meterRegistry: MeterRegistry,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
@@ -67,7 +69,15 @@ class UploadProcessingService(
                     startTime,
                 ) ?: return@withMdc
 
-            finalizeUpload(uploadId, fileExtension, finalData, storageResult, composedKey, startTime)
+            finalizeUpload(
+                uploadId,
+                fileExtension,
+                finalData,
+                storageResult,
+                upload.navEksternRefId,
+                composedKey,
+                startTime,
+            )
         }
     }
 
@@ -156,23 +166,38 @@ class UploadProcessingService(
         fileExtension: String,
         finalData: ByteArray,
         storageResult: MellomlagringStorageService.StorageResult,
+        navEksternRefId: String,
         composedKey: String,
         startTime: Long,
     ) {
         val sha512 = withContext(cpuDispatcher) { getSha512(finalData) }
-        withContext(ioDispatcher) {
-            dsl.transaction { tx ->
-                uploadProcessingQueries.setFilId(
-                    tx,
-                    uploadId,
-                    storageResult.filId,
-                    storageResult.mellomlagringFilnavn,
-                    storageResult.storedSize,
-                    sha512,
-                )
-                UploadNotifications.notifyChange(tx, uploadId)
+        val finalized =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    uploadProcessingQueries.setFilId(
+                        tx,
+                        uploadId,
+                        storageResult.filId,
+                        storageResult.mellomlagringFilnavn,
+                        storageResult.storedSize,
+                        sha512,
+                    )
+                }
             }
+        if (!finalized) {
+            logger.warn("Upload $uploadId was deleted while processing; removing its mellomlagring file")
+            runCatching {
+                mellomlagringClient.deleteFile(
+                    navEksternRefId,
+                    storageResult.filId,
+                )
+            }.onFailure {
+                meterRegistry.counter("mellomlagring.orphaned_file", "source", "processing_race").increment()
+                logger.error("Failed to remove file for deleted upload $uploadId", it)
+            }
+            return
         }
+        withContext(ioDispatcher) { dsl.transaction { tx -> UploadNotifications.notifyChange(tx, uploadId) } }
         chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
         recordTimer(fileExtension, "success", startTime)
     }

@@ -14,7 +14,6 @@ import org.apache.tika.Tika
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
-import org.checkerframework.checker.regex.qual.Regex
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.text.Normalizer
@@ -299,9 +298,10 @@ class UploadValidator(
         filename: String,
     ): Pair<String, Validation?> =
         withContext(cpuDispatcher) {
-            val tikaMetadata = Metadata().apply {
-                set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)
-            }
+            val tikaMetadata =
+                Metadata().apply {
+                    set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)
+                }
             val mimeType = TikaInputStream.get(data, tikaMetadata).use { tika.detect(it, tikaMetadata) }
             if (mimeType !in SUPPORTED_MIME_TYPES) {
                 return@withContext mimeType to FileTypeValidation(actual = mimeType)

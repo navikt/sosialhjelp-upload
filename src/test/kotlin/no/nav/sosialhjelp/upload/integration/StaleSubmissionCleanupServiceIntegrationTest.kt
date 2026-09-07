@@ -93,7 +93,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         runBlocking { cleanupService().runCleanup() }
 
         assertNull(submissionExists(submissionId), "Submission should be deleted after retention run")
-        coVerify { mellomlagringClient.deleteFile(navEksternRefId, filId, any()) }
+        coVerify { mellomlagringClient.deleteFile(navEksternRefId, filId) }
     }
 
     /**
@@ -131,8 +131,8 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         assertNull(submissionExists(staleSubmission), "Stale submission should be deleted")
         assertNotNull(submissionExists(liveSubmission), "Sibling submission should survive")
 
-        coVerify(exactly = 1) { mellomlagringClient.deleteFile(navEksternRefId, staleFilId, any()) }
-        coVerify(exactly = 0) { mellomlagringClient.deleteFile(navEksternRefId, liveFilId, any()) }
+        coVerify(exactly = 1) { mellomlagringClient.deleteFile(navEksternRefId, staleFilId) }
+        coVerify(exactly = 0) { mellomlagringClient.deleteFile(navEksternRefId, liveFilId) }
     }
 
     @Test
@@ -153,7 +153,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
             submissionExists(submissionId),
             "Søknadsvedlegg must never be removed by retention — soknad-api owns that lifecycle",
         )
-        coVerify(exactly = 0) { mellomlagringClient.deleteFile(any(), any(), any()) }
+        coVerify(exactly = 0) { mellomlagringClient.deleteFile(any(), any()) }
     }
 
     /**
@@ -168,7 +168,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         runBlocking { cleanupService().runCleanup() }
 
         assertNotNull(submissionExists(submissionId), "An undecided submission must never be swept")
-        coVerify(exactly = 0) { mellomlagringClient.deleteFile(any(), any(), any()) }
+        coVerify(exactly = 0) { mellomlagringClient.deleteFile(any(), any()) }
     }
 
     @Test
@@ -217,8 +217,8 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         assertEquals(2, deleted)
         assertNull(submissionExists(a))
         assertNull(submissionExists(b))
-        coVerify { mellomlagringClient.deleteFile(navEksternRefId, filA, any()) }
-        coVerify { mellomlagringClient.deleteFile(navEksternRefId, filB, any()) }
+        coVerify { mellomlagringClient.deleteFile(navEksternRefId, filA) }
+        coVerify { mellomlagringClient.deleteFile(navEksternRefId, filB) }
     }
 
     @Test
@@ -247,7 +247,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
         assertEquals(1, deleted)
         assertNull(submissionExists(husleie))
         assertNotNull(submissionExists(konto), "Files for other kategorier must survive")
-        coVerify(exactly = 1) { mellomlagringClient.deleteFile(navEksternRefId, husleieFil, any()) }
-        coVerify(exactly = 0) { mellomlagringClient.deleteFile(navEksternRefId, kontoFil, any()) }
+        coVerify(exactly = 1) { mellomlagringClient.deleteFile(navEksternRefId, husleieFil) }
+        coVerify(exactly = 0) { mellomlagringClient.deleteFile(navEksternRefId, kontoFil) }
     }
 }
