@@ -332,7 +332,7 @@ class UploadFlowIntegrationTest {
                     .fetchOne()
             assertNull(row, "Upload row should be removed from DB after deletion")
 
-            coVerify { mellomlagringClient.deleteFile(any(), filId) }
+            coVerify { mellomlagringClient.deleteFile(any(), filId, any()) }
         }
 
     @Test
