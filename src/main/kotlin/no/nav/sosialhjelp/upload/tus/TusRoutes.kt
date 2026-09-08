@@ -167,7 +167,8 @@ private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService)
     runCatching { tusUploadService.delete(uploadId) }.getOrElse { e ->
         return when (e) {
             is MellomlagringDeleteException -> {
-                call.application.environment.log.error("Failed deleting upload $uploadId", e)
+                call.application.environment.log
+                    .error("Failed deleting upload $uploadId", e)
                 call.respond(HttpStatusCode.BadGateway)
             }
             else -> call.respond(HttpStatusCode.Forbidden)
