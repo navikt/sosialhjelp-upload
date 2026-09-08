@@ -12,6 +12,7 @@ import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
+import no.nav.sosialhjelp.upload.tus.TusUploadService.MellomlagringDeleteException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
 
 private const val TUS_RESUMABLE = "1.0.0"
@@ -163,8 +164,14 @@ private suspend fun RoutingContext.validateRequest(): RequestMetadata? {
 private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService) {
     val uploadId = call.attributes[VerifiedUploadId]
 
-    runCatching { tusUploadService.delete(uploadId) }.getOrElse {
-        return call.respond(HttpStatusCode.Forbidden)
+    runCatching { tusUploadService.delete(uploadId) }.getOrElse { e ->
+        return when (e) {
+            is MellomlagringDeleteException -> {
+                call.application.environment.log.error("Failed deleting upload $uploadId", e)
+                call.respond(HttpStatusCode.BadGateway)
+            }
+            else -> call.respond(HttpStatusCode.Forbidden)
+        }
     }
 
     call.response.header("Tus-Resumable", TUS_RESUMABLE)

@@ -458,6 +458,39 @@ class TusUploadServiceIntegrationTest {
         }
 
     @Test
+    fun `delete does not remove upload from database when mellomlagring delete fails`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            val content = "hello mellomlagring".toByteArray()
+            val filId = UUID.randomUUID()
+            coEvery {
+                mellomlagringClient.uploadFile(any(), any(), any(), any())
+            } returns filId
+            coEvery {
+                mellomlagringClient.deleteFile(any(), eq(filId), any())
+            } throws RuntimeException("mellomlagring is down")
+
+            createMockSubmission(dsl, externalId)
+            val uploadId =
+                tusUploadService.create(
+                    TusMetadata("delete-fails.pdf", externalId, correlationId, null, "id", null),
+                    content.size.toLong(),
+                    personident,
+                    "test-token",
+                )
+            tusUploadService.appendChunk(uploadId, 0L, content)
+            awaitUploadTerminal(dsl, uploadId)
+
+            assertFailsWith<TusUploadService.MellomlagringDeleteException> {
+                tusUploadService.delete(uploadId)
+            }
+
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            assertNotNull(row, "Upload should not be deleted from database when mellomlagring delete fails")
+        }
+
+    @Test
     fun `concurrent uploads on different contextIds with same fiksDigisosId get different navEksternRefIds`() =
         runTest {
             val fiksDigisosId = UUID.randomUUID().toString()
