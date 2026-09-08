@@ -159,25 +159,27 @@ class TusUploadService(
     }
 
     suspend fun delete(uploadId: UUID) {
-        val (filId, navEksternRefId) =
+        val upload =
             withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    val upload = tusUploadQueries.getUpload(tx, uploadId)
-                    tusUploadQueries.deleteUpload(tx, uploadId)
-                    upload.filId to upload.navEksternRefId
-                }
+                dsl.transactionResult { tx -> tusUploadQueries.getUpload(tx, uploadId) }
             }
+        val filId = upload.filId
+        val navEksternRefId = upload.navEksternRefId
 
         withMdc("navEksternRefId" to navEksternRefId) {
             if (filId != null && navEksternRefId != null) {
                 runCatching {
-                    mellomlagringClient.deleteFile(navEksternRefId, filId)
-                }.onFailure {
-                    logger.warn(
-                        "Failed to delete file $filId from mellomlagring after upload deletion; it may be orphaned",
-                        it,
+                    mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
+                }.onFailure { e ->
+                    throw MellomlagringDeleteException(
+                        "Mellomlagring delete failed",
+                        e,
                     )
                 }
+            }
+
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> tusUploadQueries.deleteUpload(tx, uploadId) }
             }
             chunkAssemblyService.deleteGcsObjects(uploadId)
         }
@@ -186,4 +188,9 @@ class TusUploadService(
     class UploadForbiddenException(
         message: String,
     ) : RuntimeException(message)
+
+    class MellomlagringDeleteException(
+        message: String,
+        cause: Throwable,
+    ) : RuntimeException(message, cause)
 }
