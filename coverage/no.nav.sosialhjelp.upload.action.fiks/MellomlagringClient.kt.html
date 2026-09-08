@@ -208,10 +208,10 @@ import kotlin.time.toJavaDuration
 <span class="nc" id="L208">        return uploadFile(navEksternRefId, filename, contentType, data)</span>
     }
 
-<span class="fc" id="L211">    suspend fun deleteFile(</span>
+<span class="nc" id="L211">    suspend fun deleteFile(</span>
         navEksternRefId: String,
         filId: UUID,
-<span class="fc" id="L214">        throwOnError: Boolean = false,</span>
+<span class="nc" id="L214">        throwOnError: Boolean = false,</span>
     ) {
 <span class="nc" id="L216">        val response =</span>
 <span class="nc" id="L217">            client.delete(&quot;${mellomlagringUrl(navEksternRefId)}/$filId&quot;) {</span>

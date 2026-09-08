@@ -12,6 +12,7 @@ import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
+import no.nav.sosialhjelp.upload.tus.TusUploadService.MellomlagringDeleteException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
 
 private const val TUS_RESUMABLE = &quot;1.0.0&quot;
@@ -23,181 +24,188 @@ private const val PROXY_PATH_INNSYN = &quot;/sosialhjelp/innsyn/api/upload-api&q
 private const val PROXY_PATH_SOKNAD = &quot;/sosialhjelp/soknad/api/upload-api&quot;
 
 fun Route.configureTusRoutes(basePath: String) {
-<span class="fc" id="L26">    val tusUploadService: TusUploadService by application.dependencies</span>
+<span class="fc" id="L27">    val tusUploadService: TusUploadService by application.dependencies</span>
 
-<span class="pc bnc" id="L28" title="All 5 branches missed.">    options { tusOptions() }</span>
-<span class="pc bpc" id="L29" title="3 of 5 branches missed.">    post { tusPost(tusUploadService, basePath) }</span>
+<span class="pc bnc" id="L29" title="All 5 branches missed.">    options { tusOptions() }</span>
+<span class="pc bpc" id="L30" title="3 of 5 branches missed.">    post { tusPost(tusUploadService, basePath) }</span>
 
-<span class="fc" id="L31">    route(&quot;/{id}&quot;) {</span>
-<span class="fc" id="L32">        verifyUploadOwnership()</span>
-<span class="pc bnc" id="L33" title="All 5 branches missed.">        head { tusHead(tusUploadService) }</span>
-<span class="pc bpc" id="L34" title="1 of 5 branches missed.">        patch { tusPatch(tusUploadService) }</span>
-<span class="pc bpc" id="L35" title="1 of 5 branches missed.">        delete { tusDelete(tusUploadService) }</span>
-<span class="fc" id="L36">    }</span>
-<span class="fc" id="L37">}</span>
+<span class="fc" id="L32">    route(&quot;/{id}&quot;) {</span>
+<span class="fc" id="L33">        verifyUploadOwnership()</span>
+<span class="pc bnc" id="L34" title="All 5 branches missed.">        head { tusHead(tusUploadService) }</span>
+<span class="pc bpc" id="L35" title="1 of 5 branches missed.">        patch { tusPatch(tusUploadService) }</span>
+<span class="pc bpc" id="L36" title="1 of 5 branches missed.">        delete { tusDelete(tusUploadService) }</span>
+<span class="fc" id="L37">    }</span>
+<span class="fc" id="L38">}</span>
 
 private suspend fun RoutingContext.tusOptions() {
-<span class="nc" id="L40">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
-<span class="nc" id="L41">    call.response.header(&quot;Tus-Version&quot;, TUS_VERSION)</span>
-<span class="nc" id="L42">    call.response.header(&quot;Tus-Extension&quot;, TUS_EXTENSION)</span>
-<span class="nc" id="L43">    call.response.header(&quot;Tus-Max-Size&quot;, MAX_CHUNK_SIZE.toString())</span>
-<span class="nc" id="L44">    call.respond(HttpStatusCode.NoContent)</span>
-<span class="nc" id="L45">}</span>
+<span class="nc" id="L41">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
+<span class="nc" id="L42">    call.response.header(&quot;Tus-Version&quot;, TUS_VERSION)</span>
+<span class="nc" id="L43">    call.response.header(&quot;Tus-Extension&quot;, TUS_EXTENSION)</span>
+<span class="nc" id="L44">    call.response.header(&quot;Tus-Max-Size&quot;, MAX_CHUNK_SIZE.toString())</span>
+<span class="nc" id="L45">    call.respond(HttpStatusCode.NoContent)</span>
+<span class="nc" id="L46">}</span>
 
 @Suppress(&quot;ReturnCount&quot;)
 private suspend fun RoutingContext.tusPost(
     tusUploadService: TusUploadService,
     basePath: String,
 ) {
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">    val requestMetadata = validateRequest() ?: return</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">    val metadata = parseAndValidateTusMetadata() ?: return</span>
-<span class="fc" id="L54">    val fiksDigisosId = metadata.fiksDigisosId</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">    val requestMetadata = validateRequest() ?: return</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">    val metadata = parseAndValidateTusMetadata() ?: return</span>
+<span class="fc" id="L55">    val fiksDigisosId = metadata.fiksDigisosId</span>
 
-<span class="fc" id="L56">    val uploadId =</span>
-<span class="fc" id="L57">        try {</span>
-<span class="fc" id="L58">            tusUploadService.create(</span>
-<span class="fc" id="L59">                metadata,</span>
-<span class="fc" id="L60">                requestMetadata.uploadLength,</span>
-<span class="fc" id="L61">                requestMetadata.personIdent,</span>
-<span class="fc" id="L62">                requestMetadata.token,</span>
+<span class="fc" id="L57">    val uploadId =</span>
+<span class="fc" id="L58">        try {</span>
+<span class="fc" id="L59">            tusUploadService.create(</span>
+<span class="fc" id="L60">                metadata,</span>
+<span class="fc" id="L61">                requestMetadata.uploadLength,</span>
+<span class="fc" id="L62">                requestMetadata.personIdent,</span>
+<span class="fc" id="L63">                requestMetadata.token,</span>
             )
-<span class="fc" id="L64">        } catch (_: UploadForbiddenException) {</span>
-<span class="fc" id="L65">            return call.respond(HttpStatusCode.Forbidden)</span>
+<span class="fc" id="L65">        } catch (_: UploadForbiddenException) {</span>
+<span class="fc" id="L66">            return call.respond(HttpStatusCode.Forbidden)</span>
         }
 
-<span class="fc" id="L68">    val forwardedPrefix = call.request.header(&quot;x-forwarded-prefix&quot;)</span>
-<span class="fc" id="L69">    val proxyPath =</span>
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        forwardedPrefix ?: when {</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            fiksDigisosId != null -&gt; PROXY_PATH_INNSYN</span>
-<span class="nc" id="L72">            else -&gt; PROXY_PATH_SOKNAD</span>
+<span class="fc" id="L69">    val forwardedPrefix = call.request.header(&quot;x-forwarded-prefix&quot;)</span>
+<span class="fc" id="L70">    val proxyPath =</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        forwardedPrefix ?: when {</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            fiksDigisosId != null -&gt; PROXY_PATH_INNSYN</span>
+<span class="nc" id="L73">            else -&gt; PROXY_PATH_SOKNAD</span>
         }
 
-<span class="fc" id="L75">    call.response.header(&quot;Location&quot;, &quot;$proxyPath$basePath/$uploadId&quot;)</span>
-<span class="fc" id="L76">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
-<span class="fc" id="L77">    call.respond(HttpStatusCode.Created)</span>
-<span class="fc" id="L78">}</span>
+<span class="fc" id="L76">    call.response.header(&quot;Location&quot;, &quot;$proxyPath$basePath/$uploadId&quot;)</span>
+<span class="fc" id="L77">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
+<span class="fc" id="L78">    call.respond(HttpStatusCode.Created)</span>
+<span class="fc" id="L79">}</span>
 
 private suspend fun RoutingContext.tusHead(tusUploadService: TusUploadService) {
-<span class="nc" id="L81">    val uploadId = call.attributes[VerifiedUploadId]</span>
+<span class="nc" id="L82">    val uploadId = call.attributes[VerifiedUploadId]</span>
 
-<span class="nc" id="L83">    val (offset, size) =</span>
-<span class="nc bnc" id="L84" title="All 2 branches missed.">        runCatching { tusUploadService.getUploadInfo(uploadId) }.getOrElse {</span>
-<span class="nc" id="L85">            return call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L84">    val (offset, size) =</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        runCatching { tusUploadService.getUploadInfo(uploadId) }.getOrElse {</span>
+<span class="nc" id="L86">            return call.respond(HttpStatusCode.NotFound)</span>
         }
 
-<span class="nc" id="L88">    call.response.header(&quot;Upload-Offset&quot;, offset.toString())</span>
-<span class="nc" id="L89">    call.response.header(&quot;Upload-Length&quot;, size.toString())</span>
-<span class="nc" id="L90">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
-<span class="nc" id="L91">    call.response.header(&quot;Cache-Control&quot;, &quot;no-store&quot;)</span>
-<span class="nc" id="L92">    call.respond(HttpStatusCode.OK)</span>
-<span class="nc" id="L93">}</span>
+<span class="nc" id="L89">    call.response.header(&quot;Upload-Offset&quot;, offset.toString())</span>
+<span class="nc" id="L90">    call.response.header(&quot;Upload-Length&quot;, size.toString())</span>
+<span class="nc" id="L91">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
+<span class="nc" id="L92">    call.response.header(&quot;Cache-Control&quot;, &quot;no-store&quot;)</span>
+<span class="nc" id="L93">    call.respond(HttpStatusCode.OK)</span>
+<span class="nc" id="L94">}</span>
 
 @Suppress(&quot;ReturnCount&quot;)
 private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) {
-<span class="fc" id="L97">    val uploadId = call.attributes[VerifiedUploadId]</span>
+<span class="fc" id="L98">    val uploadId = call.attributes[VerifiedUploadId]</span>
 
-<span class="fc" id="L99">    val contentType = call.request.header(&quot;Content-Type&quot;)</span>
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">    if (contentType != &quot;application/offset+octet-stream&quot;) {</span>
-<span class="nc" id="L101">        return call.respond(HttpStatusCode.UnsupportedMediaType)</span>
+<span class="fc" id="L100">    val contentType = call.request.header(&quot;Content-Type&quot;)</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">    if (contentType != &quot;application/offset+octet-stream&quot;) {</span>
+<span class="nc" id="L102">        return call.respond(HttpStatusCode.UnsupportedMediaType)</span>
     }
-<span class="fc" id="L103">    val uploadOffset =</span>
-<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        call.request.header(&quot;Upload-Offset&quot;)?.toLongOrNull()</span>
-<span class="nc" id="L105">            ?: return call.respond(HttpStatusCode.BadRequest)</span>
+<span class="fc" id="L104">    val uploadOffset =</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">        call.request.header(&quot;Upload-Offset&quot;)?.toLongOrNull()</span>
+<span class="nc" id="L106">            ?: return call.respond(HttpStatusCode.BadRequest)</span>
 
-<span class="fc" id="L107">    val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()</span>
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">    if (data.size &gt; MAX_CHUNK_SIZE) {</span>
-<span class="nc" id="L109">        return call.respond(HttpStatusCode.PayloadTooLarge)</span>
+<span class="fc" id="L108">    val data = call.receiveChannel().readRemaining(MAX_CHUNK_SIZE.toLong() + 1).readByteArray()</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">    if (data.size &gt; MAX_CHUNK_SIZE) {</span>
+<span class="nc" id="L110">        return call.respond(HttpStatusCode.PayloadTooLarge)</span>
     }
 
-<span class="fc" id="L112">    val newOffset =</span>
-<span class="pc" id="L113">        runCatching {</span>
-<span class="fc" id="L114">            tusUploadService.appendChunk(uploadId, uploadOffset, data)</span>
-<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        }.getOrElse { e -&gt;</span>
-<span class="nc" id="L116">            when (e) {</span>
-<span class="nc bnc" id="L117" title="All 2 branches missed.">                is OffsetMismatchException -&gt; return call.respond(HttpStatusCode.Conflict)</span>
+<span class="fc" id="L113">    val newOffset =</span>
+<span class="pc" id="L114">        runCatching {</span>
+<span class="fc" id="L115">            tusUploadService.appendChunk(uploadId, uploadOffset, data)</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        }.getOrElse { e -&gt;</span>
+<span class="nc" id="L117">            when (e) {</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                is OffsetMismatchException -&gt; return call.respond(HttpStatusCode.Conflict)</span>
                 else -&gt; {
-<span class="nc" id="L119">                    call.application.environment.log</span>
-<span class="nc" id="L120">                        .error(&quot;Error appending chunk to upload $uploadId&quot;, e)</span>
-<span class="nc" id="L121">                    return call.respond(HttpStatusCode.InternalServerError)</span>
+<span class="nc" id="L120">                    call.application.environment.log</span>
+<span class="nc" id="L121">                        .error(&quot;Error appending chunk to upload $uploadId&quot;, e)</span>
+<span class="nc" id="L122">                    return call.respond(HttpStatusCode.InternalServerError)</span>
                 }
             }
         }
 
-<span class="fc" id="L126">    call.response.header(&quot;Upload-Offset&quot;, newOffset.toString())</span>
-<span class="fc" id="L127">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
-<span class="fc" id="L128">    call.respond(HttpStatusCode.NoContent)</span>
-<span class="fc" id="L129">}</span>
+<span class="fc" id="L127">    call.response.header(&quot;Upload-Offset&quot;, newOffset.toString())</span>
+<span class="fc" id="L128">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
+<span class="fc" id="L129">    call.respond(HttpStatusCode.NoContent)</span>
+<span class="fc" id="L130">}</span>
 
 @Suppress(&quot;ReturnCount&quot;)
 private suspend fun RoutingContext.validateRequest(): RequestMetadata? {
-<span class="fc" id="L133">    val personident =</span>
-<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        call.principal&lt;JWTPrincipal&gt;()?.subject</span>
-<span class="nc" id="L135">            ?: run {</span>
-<span class="nc" id="L136">                call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L137">                return null</span>
+<span class="fc" id="L134">    val personident =</span>
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">        call.principal&lt;JWTPrincipal&gt;()?.subject</span>
+<span class="nc" id="L136">            ?: run {</span>
+<span class="nc" id="L137">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L138">                return null</span>
             }
-<span class="fc" id="L139">    val token =</span>
-<span class="pc bpc" id="L140" title="2 of 4 branches missed.">        call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;)</span>
-<span class="nc" id="L141">            ?: run {</span>
-<span class="nc" id="L142">                call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L143">                return null</span>
+<span class="fc" id="L140">    val token =</span>
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">        call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;)</span>
+<span class="nc" id="L142">            ?: run {</span>
+<span class="nc" id="L143">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L144">                return null</span>
             }
 
-<span class="fc" id="L146">    val tusResumable = call.request.header(&quot;Tus-Resumable&quot;)</span>
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">    if (tusResumable != TUS_RESUMABLE) {</span>
-<span class="nc" id="L148">        call.response.header(&quot;Tus-Version&quot;, TUS_VERSION)</span>
-<span class="nc" id="L149">        call.respond(HttpStatusCode.PreconditionFailed)</span>
-<span class="nc" id="L150">        return null</span>
+<span class="fc" id="L147">    val tusResumable = call.request.header(&quot;Tus-Resumable&quot;)</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">    if (tusResumable != TUS_RESUMABLE) {</span>
+<span class="nc" id="L149">        call.response.header(&quot;Tus-Version&quot;, TUS_VERSION)</span>
+<span class="nc" id="L150">        call.respond(HttpStatusCode.PreconditionFailed)</span>
+<span class="nc" id="L151">        return null</span>
     }
 
-<span class="fc" id="L153">    val uploadLength =</span>
-<span class="pc bpc" id="L154" title="2 of 4 branches missed.">        call.request.header(&quot;Upload-Length&quot;)?.toLongOrNull()</span>
-<span class="nc" id="L155">            ?: run {</span>
-<span class="nc" id="L156">                call.respond(HttpStatusCode.BadRequest)</span>
-<span class="nc" id="L157">                return null</span>
+<span class="fc" id="L154">    val uploadLength =</span>
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">        call.request.header(&quot;Upload-Length&quot;)?.toLongOrNull()</span>
+<span class="nc" id="L156">            ?: run {</span>
+<span class="nc" id="L157">                call.respond(HttpStatusCode.BadRequest)</span>
+<span class="nc" id="L158">                return null</span>
             }
 
-<span class="fc" id="L160">    return RequestMetadata(personident, token, uploadLength)</span>
+<span class="fc" id="L161">    return RequestMetadata(personident, token, uploadLength)</span>
 }
 
 private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService) {
-<span class="fc" id="L164">    val uploadId = call.attributes[VerifiedUploadId]</span>
+<span class="fc" id="L165">    val uploadId = call.attributes[VerifiedUploadId]</span>
 
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">    runCatching { tusUploadService.delete(uploadId) }.getOrElse {</span>
-<span class="nc" id="L167">        return call.respond(HttpStatusCode.Forbidden)</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">    runCatching { tusUploadService.delete(uploadId) }.getOrElse { e -&gt;</span>
+<span class="nc" id="L168">        return when (e) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            is MellomlagringDeleteException -&gt; {</span>
+<span class="nc" id="L170">                call.application.environment.log</span>
+<span class="nc" id="L171">                    .error(&quot;Failed deleting upload $uploadId&quot;, e)</span>
+<span class="nc" id="L172">                call.respond(HttpStatusCode.BadGateway)</span>
+            }
+<span class="nc" id="L174">            else -&gt; call.respond(HttpStatusCode.Forbidden)</span>
+        }
     }
 
-<span class="fc" id="L170">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
-<span class="fc" id="L171">    call.respond(HttpStatusCode.NoContent)</span>
-<span class="fc" id="L172">}</span>
+<span class="fc" id="L178">    call.response.header(&quot;Tus-Resumable&quot;, TUS_RESUMABLE)</span>
+<span class="fc" id="L179">    call.respond(HttpStatusCode.NoContent)</span>
+<span class="fc" id="L180">}</span>
 
 @Suppress(&quot;ReturnCount&quot;)
 private suspend fun RoutingContext.parseAndValidateTusMetadata(): TusMetadata? {
-<span class="fc" id="L176">    val metadata =</span>
-<span class="fc" id="L177">        parseMetadata(call.request.header(&quot;Upload-Metadata&quot;))</span>
-<span class="fc" id="L178">            .toTusMetadata()</span>
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            .getOrElse {</span>
-<span class="nc bnc" id="L180" title="All 2 branches missed.">                call.respond(HttpStatusCode.BadRequest, it.message ?: &quot;&quot;)</span>
-<span class="nc" id="L181">                return null</span>
+<span class="fc" id="L184">    val metadata =</span>
+<span class="fc" id="L185">        parseMetadata(call.request.header(&quot;Upload-Metadata&quot;))</span>
+<span class="fc" id="L186">            .toTusMetadata()</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            .getOrElse {</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                call.respond(HttpStatusCode.BadRequest, it.message ?: &quot;&quot;)</span>
+<span class="nc" id="L189">                return null</span>
             }
-<span class="pc bpc" id="L183" title="3 of 4 branches missed.">    if (metadata.fiksDigisosId == null &amp;&amp; metadata.navEksternRefId == null) {</span>
-<span class="nc" id="L184">        call.respond(HttpStatusCode.BadRequest, &quot;Mangler fiksDigisosId eller navEksternRefId&quot;)</span>
-<span class="nc" id="L185">        return null</span>
-    }
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">    if (metadata.contextId.length &gt; 2048) {</span>
-<span class="nc" id="L188">        call.respond(HttpStatusCode.BadRequest, &quot;contextId for lang&quot;)</span>
-<span class="nc" id="L189">        return null</span>
-    }
-<span class="pc bpc" id="L191" title="2 of 4 branches missed.">    if (metadata.fiksDigisosId != null &amp;&amp; metadata.fiksDigisosId.length &gt; 255) {</span>
-<span class="nc" id="L192">        call.respond(HttpStatusCode.BadRequest, &quot;fiksDigisosId for lang&quot;)</span>
+<span class="pc bpc" id="L191" title="3 of 4 branches missed.">    if (metadata.fiksDigisosId == null &amp;&amp; metadata.navEksternRefId == null) {</span>
+<span class="nc" id="L192">        call.respond(HttpStatusCode.BadRequest, &quot;Mangler fiksDigisosId eller navEksternRefId&quot;)</span>
 <span class="nc" id="L193">        return null</span>
     }
-<span class="fc" id="L195">    return metadata</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">    if (metadata.contextId.length &gt; 2048) {</span>
+<span class="nc" id="L196">        call.respond(HttpStatusCode.BadRequest, &quot;contextId for lang&quot;)</span>
+<span class="nc" id="L197">        return null</span>
+    }
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">    if (metadata.fiksDigisosId != null &amp;&amp; metadata.fiksDigisosId.length &gt; 255) {</span>
+<span class="nc" id="L200">        call.respond(HttpStatusCode.BadRequest, &quot;fiksDigisosId for lang&quot;)</span>
+<span class="nc" id="L201">        return null</span>
+    }
+<span class="fc" id="L203">    return metadata</span>
 }
 
-<span class="fc" id="L198">private data class RequestMetadata(</span>
-<span class="fc" id="L199">    val personIdent: String,</span>
-<span class="fc" id="L200">    val token: String,</span>
-<span class="fc" id="L201">    val uploadLength: Long,</span>
+<span class="fc" id="L206">private data class RequestMetadata(</span>
+<span class="fc" id="L207">    val personIdent: String,</span>
+<span class="fc" id="L208">    val token: String,</span>
+<span class="fc" id="L209">    val uploadLength: Long,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
