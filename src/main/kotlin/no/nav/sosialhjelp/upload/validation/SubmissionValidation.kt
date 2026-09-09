@@ -9,6 +9,7 @@ const val MAX_TOTAL_SIZE_BYTES = 150L * 1024 * 1024
 
 @Serializable
 enum class SubmissionValidationCode {
+    NO_FILES,
     TOO_MANY_FILES,
     TOTAL_SIZE_TOO_LARGE,
 }
@@ -25,6 +26,9 @@ class SubmissionValidationException(
 fun validateSubmissionUploads(uploads: List<Upload>): List<SubmissionValidationCode> {
     val completeUploads = uploads.filter { it.status == Status.COMPLETE }
     val violations = mutableListOf<SubmissionValidationCode>()
+    if (completeUploads.isEmpty()) {
+        violations += SubmissionValidationCode.NO_FILES
+    }
     if (completeUploads.size > MAX_FILES_PER_SUBMISSION) {
         violations += SubmissionValidationCode.TOO_MANY_FILES
     }
