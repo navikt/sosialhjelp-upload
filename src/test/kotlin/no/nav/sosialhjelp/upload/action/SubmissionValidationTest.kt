@@ -34,6 +34,12 @@ class SubmissionValidationTest {
     }
 
     @Test
+    fun `returns NO_FILES when no complete uploads exist`() {
+        val violations = validateSubmissionUploads(emptyList())
+        assertContains(violations, SubmissionValidationCode.NO_FILES)
+    }
+
+    @Test
     fun `returns no violations when exactly 30 complete uploads exist`() {
         val uploads = (1..MAX_FILES_PER_SUBMISSION).map { makeCompleteUpload() }
         val violations = validateSubmissionUploads(uploads)
