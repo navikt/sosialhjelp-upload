@@ -238,6 +238,8 @@ class TusUploadServiceIntegrationTest {
             assertNotNull(row)
             assertEquals(filId, row[UPLOAD.FIL_ID])
             assertNull(row[UPLOAD.GCS_KEY], "gcs_key should be cleared after mellomlagring upload")
+            assertEquals(false, row[UPLOAD.CONVERTED])
+            assertEquals("application/pdf", row[UPLOAD.CONTENT_TYPE])
         }
 
     @Test
@@ -331,6 +333,8 @@ class TusUploadServiceIntegrationTest {
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertEquals(filId, row!![UPLOAD.FIL_ID])
+            assertEquals(true, row[UPLOAD.CONVERTED])
+            assertEquals("application/pdf", row[UPLOAD.CONTENT_TYPE])
         }
 
     @Test

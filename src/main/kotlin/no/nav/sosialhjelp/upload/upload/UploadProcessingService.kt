@@ -65,7 +65,7 @@ class UploadProcessingService(
                     startTime,
                 ) ?: return@withMdc
 
-            finalizeUpload(uploadId, fileExtension, convertedFile.data, storageResult, composedKey, startTime)
+            finalizeUpload(uploadId, fileExtension, convertedFile, storageResult, composedKey, startTime)
         }
     }
 
@@ -158,12 +158,12 @@ class UploadProcessingService(
     private suspend fun finalizeUpload(
         uploadId: UUID,
         fileExtension: String,
-        finalData: ByteArray,
+        convertedFile: FileConversionService.ConversionResult.Success,
         storageResult: MellomlagringStorageService.StorageResult,
         composedKey: String,
         startTime: Long,
     ) {
-        val sha512 = withContext(cpuDispatcher) { getSha512(finalData) }
+        val sha512 = withContext(cpuDispatcher) { getSha512(convertedFile.data) }
         withContext(ioDispatcher) {
             dsl.transaction { tx ->
                 uploadProcessingQueries.setFilId(
@@ -173,6 +173,8 @@ class UploadProcessingService(
                     storageResult.mellomlagringFilnavn,
                     storageResult.storedSize,
                     sha512,
+                    convertedFile.converted,
+                    convertedFile.contentType,
                 )
                 UploadNotifications.notifyChange(tx, uploadId)
             }

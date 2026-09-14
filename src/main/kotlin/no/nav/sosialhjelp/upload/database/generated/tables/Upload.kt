@@ -135,6 +135,16 @@ open class Upload(
      */
     val CORRELATION_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("correlation_id"), SQLDataType.UUID, this, "")
 
+    /**
+     * The column <code>public.upload.converted</code>.
+     */
+    val CONVERTED: TableField<UploadRecord, Boolean?> = createField(DSL.name("converted"), SQLDataType.BOOLEAN.nullable(false).defaultValue(DSL.field(DSL.raw("false"), SQLDataType.BOOLEAN)), this, "")
+
+    /**
+     * The column <code>public.upload.content_type</code>.
+     */
+    val CONTENT_TYPE: TableField<UploadRecord, String?> = createField(DSL.name("content_type"), SQLDataType.CLOB, this, "")
+
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, where: Condition?): this(alias, null, null, null, aliased, null, where)

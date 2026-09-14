@@ -19,6 +19,7 @@ class FileConversionService(
             val filename: String,
             val data: ByteArray,
             val contentType: String,
+            val converted: Boolean,
         ) : ConversionResult()
 
         data class UnsupportedFiletype(
@@ -39,12 +40,16 @@ class FileConversionService(
         val canonicalFilename =
             if (extension.isEmpty()) file.name else "${file.nameWithoutExtension}.$extension"
         if (mimeType in PASSTHROUGH_MIME_TYPES) {
-            return ConversionResult.Success(canonicalFilename, data, mimeType)
+            return ConversionResult.Success(canonicalFilename, data, mimeType, converted = false)
         }
-        val converted = gotenbergService.convertToPdf(data, extension)
-        return when (converted) {
+        return when (val converted = gotenbergService.convertToPdf(data, extension)) {
             is GotenbergConversionResult.Success ->
-                ConversionResult.Success("${file.nameWithoutExtension}.pdf", converted.bytes, "application/pdf")
+                ConversionResult.Success(
+                    "${file.nameWithoutExtension}.pdf",
+                    converted.bytes,
+                    "application/pdf",
+                    converted = true,
+                )
             is GotenbergConversionResult.UnsupportedFiletype -> ConversionResult.UnsupportedFiletype(extension)
         }
     }

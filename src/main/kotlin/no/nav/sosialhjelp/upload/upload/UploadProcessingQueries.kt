@@ -50,6 +50,8 @@ class UploadProcessingQueries {
         mellomlagringFilnavn: String,
         mellomlagringStorrelse: Long,
         sha512: String,
+        converted: Boolean,
+        contentType: String,
     ) {
         tx
             .dsl()
@@ -58,6 +60,8 @@ class UploadProcessingQueries {
             .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)
             .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)
             .set(UPLOAD.SHA512, sha512)
+            .set(UPLOAD.CONVERTED, converted)
+            .set(UPLOAD.CONTENT_TYPE, contentType)
             .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)
             .setNull(UPLOAD.GCS_KEY)
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length

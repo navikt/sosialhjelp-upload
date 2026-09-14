@@ -159,6 +159,7 @@ class TusUploadQueries {
                 UPLOAD.SIZE,
                 UPLOAD.MELLOMLAGRING_STORRELSE,
                 UPLOAD.PROCESSING_STATUS,
+                UPLOAD.CONTENT_TYPE,
             ).from(UPLOAD)
             .join(SUBMISSION)
             .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
@@ -179,6 +180,7 @@ class TusUploadQueries {
                             .get(UPLOAD.PROCESSING_STATUS)
                             ?.let { s -> Status.valueOf(s) }
                             ?: error("No processing status. Was it not selected?"),
+                    contentType = it.get(UPLOAD.CONTENT_TYPE),
                 )
             }
 

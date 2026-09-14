@@ -21,6 +21,8 @@ data class Upload(
     val sha512: String? = null,
     val kategori: String? = null,
     val correlationId: UUID? = null,
+    val converted: Boolean = false,
+    val contentType: String? = null,
 )
 
 enum class Status {
@@ -128,6 +130,8 @@ class UploadRepository {
                 UPLOAD.SHA512,
                 SUBMISSION.KATEGORI,
                 UPLOAD.CORRELATION_ID,
+                UPLOAD.CONVERTED,
+                UPLOAD.CONTENT_TYPE,
             ).from(UPLOAD)
             .leftJoin(ERROR)
             .on(ERROR.UPLOAD.eq(UPLOAD.ID))
@@ -155,6 +159,8 @@ class UploadRepository {
                     sha512 = records.first().get(UPLOAD.SHA512),
                     kategori = records.first().get(SUBMISSION.KATEGORI),
                     correlationId = records.first().get(UPLOAD.CORRELATION_ID),
+                    converted = records.first().get(UPLOAD.CONVERTED) ?: false,
+                    contentType = records.first().get(UPLOAD.CONTENT_TYPE),
                 )
             }
 
