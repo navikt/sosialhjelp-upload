@@ -1,11 +1,8 @@
 package no.nav.sosialhjelp.upload.upload
 
-import io.ktor.http.ContentType
-import io.ktor.http.defaultForFile
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.util.UUID
 
 /**
@@ -26,19 +23,18 @@ class MellomlagringStorageService(
     )
 
     /**
-     * Encrypts [data], derives the content type from [filename], generates a unique
+     * Encrypts [data], uses the detected [contentType], generates a unique
      * mellomlagring filename, uploads the encrypted bytes, and returns the result.
      */
     suspend fun store(
         navEksternRefId: String,
         filename: String,
+        contentType: String,
         uploadId: UUID,
         data: ByteArray,
     ): StorageResult {
         val mellomlagringFilnavn = makeUniqueMellomlagringFilename(filename, uploadId)
         val encrypted = encryptionService.encryptBytes(data)
-        val contentType = ContentType.defaultForFile(File(filename)).toString()
-
         logger.info("Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId")
         val filId =
             mellomlagringClient.uploadFile(

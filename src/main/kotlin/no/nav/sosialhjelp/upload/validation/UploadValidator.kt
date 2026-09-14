@@ -243,6 +243,11 @@ class UploadValidator(
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val tika = Tika()
 
+    data class FileValidationResult(
+        val mimeType: String,
+        val errors: List<Validation>,
+    )
+
     fun validate(
         filename: String,
         fileSize: Long,
@@ -256,16 +261,20 @@ class UploadValidator(
         filename: String,
         data: ByteArray,
         fileSize: Long,
-    ): List<Validation> =
+    ): FileValidationResult =
         coroutineScope {
             val virusScanValidation = async { runVirusScan(data) }
             val (mimeType, fileTypeValidation) = validateFileType(data, filename)
             meterRegistry.counter("upload.tika_mime_type", "mime_type", mimeType).increment()
-            listOfNotNull(
-                validateFileSize(fileSize),
-                fileTypeValidation,
-                if (mimeType == "application/pdf") validatePdf(data) else null,
-                virusScanValidation.await(),
+            FileValidationResult(
+                mimeType = mimeType,
+                errors =
+                    listOfNotNull(
+                        validateFileSize(fileSize),
+                        fileTypeValidation,
+                        if (mimeType == "application/pdf") validatePdf(data) else null,
+                        virusScanValidation.await(),
+                    ),
             )
         }
 
