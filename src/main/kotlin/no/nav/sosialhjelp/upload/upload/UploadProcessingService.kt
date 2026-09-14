@@ -105,15 +105,16 @@ class UploadProcessingService(
             return when (val result = fileConversionService.convertIfNeeded(filename, mimeType, rawData)) {
                 is FileConversionService.ConversionResult.UnsupportedFiletype -> {
                     logger.info(
-                        "Upload $uploadId (*$fileExtension) rejected by Gotenberg: format not supported for conversion",
+                        "Upload $uploadId (*${result.extension}) rejected by Gotenberg: " +
+                            "format not supported for conversion",
                     )
-                    val validation = FileTypeValidation(fileExtension)
+                    val validation = FileTypeValidation(result.extension)
                     withContext(ioDispatcher) {
                         dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, listOf(validation)) }
                     }
                     chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
-                    meterRegistry.counter("upload.gotenberg_unsupported", "extension", fileExtension).increment()
-                    recordTimer(fileExtension, "validation_failure", startTime)
+                    meterRegistry.counter("upload.gotenberg_unsupported", "extension", result.extension).increment()
+                    recordTimer(result.extension, "validation_failure", startTime)
                     null
                 }
                 is FileConversionService.ConversionResult.Success -> {
