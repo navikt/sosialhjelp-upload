@@ -14,6 +14,10 @@ class GotenbergService(
     private val gotenbergClient =
         HttpClient(CIO) {
             expectSuccess = false
+            install(HttpTimeout) {
+                requestTimeoutMillis = 25_000L
+                connectTimeoutMillis = 10_000L
+            }
             defaultRequest { url(gotenbergUrl) }
         }
 
