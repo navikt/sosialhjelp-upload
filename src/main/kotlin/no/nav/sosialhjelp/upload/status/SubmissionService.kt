@@ -64,6 +64,7 @@ class SubmissionService(
                                 upload.fileSize,
                                 upload.kategori,
                                 upload.correlationId,
+                                upload.converted,
                             )
                         }
                 }

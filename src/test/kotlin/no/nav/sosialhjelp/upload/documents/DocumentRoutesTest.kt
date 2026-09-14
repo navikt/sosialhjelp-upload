@@ -2,6 +2,7 @@ package no.nav.sosialhjelp.upload.documents
 
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.plugins.di.dependencies
@@ -115,6 +116,7 @@ class DocumentRoutesTest {
                 .set(UPLOAD.MELLOMLAGRING_FILNAVN, "test.pdf")
                 .set(UPLOAD.MELLOMLAGRING_STORRELSE, 100L)
                 .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
+                .set(UPLOAD.CONTENT_TYPE, "application/pdf")
                 .execute()
         }
         return uploadId
@@ -163,6 +165,8 @@ class DocumentRoutesTest {
                     header("Authorization", "Bearer $token")
                 }.apply {
                     assertEquals(HttpStatusCode.OK, status)
+                    assertEquals("application/pdf", headers[HttpHeaders.ContentType])
+                    assertEquals("nosniff", headers["X-Content-Type-Options"])
                 }
         }
 }

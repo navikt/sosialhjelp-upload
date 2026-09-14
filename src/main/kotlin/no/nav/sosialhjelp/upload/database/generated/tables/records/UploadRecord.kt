@@ -70,10 +70,18 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(12, value)
         get(): UUID? = get(12) as UUID?
 
+    open var converted: Boolean?
+        set(value): Unit = set(13, value)
+        get(): Boolean? = get(13) as Boolean?
+
+    open var contentType: String?
+        set(value): Unit = set(14, value)
+        get(): String? = get(14) as String?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null, correlationId: UUID? = null): this() {
+    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null, correlationId: UUID? = null, converted: Boolean? = null, contentType: String? = null): this() {
         this.id = id
         this.submissionId = submissionId
         this.originalFilename = originalFilename
@@ -87,6 +95,8 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         this.updatedAt = updatedAt
         this.gcsKey = gcsKey
         this.correlationId = correlationId
+        this.converted = converted
+        this.contentType = contentType
         resetTouchedOnNotNull()
     }
 }

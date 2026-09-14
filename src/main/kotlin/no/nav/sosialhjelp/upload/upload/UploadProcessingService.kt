@@ -8,7 +8,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.withMdc
-import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.validation.FileTypeValidation
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
@@ -48,12 +47,12 @@ class UploadProcessingService(
         ) {
             val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)
 
-            if (!validateUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)) {
-                return@withMdc
-            }
+            val mimeType =
+                validateUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)
+                    ?: return@withMdc
 
-            val (finalFilename, finalData) =
-                convertUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)
+            val convertedFile =
+                convertUpload(uploadId, upload.filename, mimeType, fileExtension, rawData, composedKey, startTime)
                     ?: return@withMdc
 
             val storageResult =
@@ -61,13 +60,12 @@ class UploadProcessingService(
                     uploadId,
                     fileExtension,
                     upload.navEksternRefId,
-                    finalFilename,
-                    finalData,
+                    convertedFile,
                     composedKey,
                     startTime,
                 ) ?: return@withMdc
 
-            finalizeUpload(uploadId, fileExtension, finalData, storageResult, composedKey, startTime)
+            finalizeUpload(uploadId, fileExtension, convertedFile, storageResult, composedKey, startTime)
         }
     }
 
@@ -78,50 +76,51 @@ class UploadProcessingService(
         rawData: ByteArray,
         composedKey: String,
         startTime: Long,
-    ): Boolean {
-        val errors = validator.validate(filename, rawData, rawData.size.toLong())
-        if (errors.isEmpty()) return true
+    ): String? {
+        val validationResult = validator.validate(filename, rawData, rawData.size.toLong())
+        if (validationResult.errors.isEmpty()) return validationResult.mimeType
 
         logger.info(
             "Upload $uploadId (*$fileExtension) failed validation: " +
-                "${errors.map { "${it.code}: ${it.message}" }}",
+                "${validationResult.errors.map { "${it.code}: ${it.message}" }}",
         )
         withContext(ioDispatcher) {
-            dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, errors) }
+            dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, validationResult.errors) }
         }
         chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
         recordTimer(fileExtension, "validation_failure", startTime)
-        return false
+        return null
     }
 
     private suspend fun convertUpload(
         uploadId: UUID,
         filename: String,
+        mimeType: String,
         fileExtension: String,
         rawData: ByteArray,
         composedKey: String,
         startTime: Long,
-    ): Pair<String, ByteArray>? =
+    ): FileConversionService.ConversionResult.Success? =
         try {
-            val (extension, result) = fileConversionService.convertIfNeeded(filename, rawData)
-            return when (result) {
-                is GotenbergConversionResult.UnsupportedFiletype -> {
+            return when (val result = fileConversionService.convertIfNeeded(filename, mimeType, rawData)) {
+                is FileConversionService.ConversionResult.UnsupportedFiletype -> {
                     logger.info(
-                        "Upload $uploadId (*$fileExtension) rejected by Gotenberg: format not supported for conversion",
+                        "Upload $uploadId (*${result.extension}) rejected by Gotenberg: " +
+                            "format not supported for conversion",
                     )
-                    val validation = FileTypeValidation(fileExtension)
+                    val validation = FileTypeValidation(result.extension)
                     withContext(ioDispatcher) {
                         dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, listOf(validation)) }
                     }
                     chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
-                    meterRegistry.counter("upload.gotenberg_unsupported", "extension", fileExtension).increment()
-                    recordTimer(fileExtension, "validation_failure", startTime)
+                    meterRegistry.counter("upload.gotenberg_unsupported", "extension", result.extension).increment()
+                    recordTimer(result.extension, "validation_failure", startTime)
                     null
                 }
-                is GotenbergConversionResult.Success -> {
-                    val finalExtension = File(extension).extension.lowercase().ifEmpty { "none" }
+                is FileConversionService.ConversionResult.Success -> {
+                    val finalExtension = File(result.filename).extension.lowercase().ifEmpty { "none" }
                     meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
-                    extension to result.bytes
+                    result
                 }
             }
         } catch (e: Exception) {
@@ -135,13 +134,19 @@ class UploadProcessingService(
         uploadId: UUID,
         fileExtension: String,
         navEksternRefId: String,
-        finalFilename: String,
-        finalData: ByteArray,
+        convertedFile: FileConversionService.ConversionResult.Success,
         composedKey: String,
         startTime: Long,
     ): MellomlagringStorageService.StorageResult? =
         try {
-            val result = mellomlagringStorageService.store(navEksternRefId, finalFilename, uploadId, finalData)
+            val result =
+                mellomlagringStorageService.store(
+                    navEksternRefId,
+                    convertedFile.filename,
+                    convertedFile.contentType,
+                    uploadId,
+                    convertedFile.data,
+                )
             logger.info("Upload $uploadId stored in mellomlagring as ${result.filId}")
             result
         } catch (e: Exception) {
@@ -154,12 +159,12 @@ class UploadProcessingService(
     private suspend fun finalizeUpload(
         uploadId: UUID,
         fileExtension: String,
-        finalData: ByteArray,
+        convertedFile: FileConversionService.ConversionResult.Success,
         storageResult: MellomlagringStorageService.StorageResult,
         composedKey: String,
         startTime: Long,
     ) {
-        val sha512 = withContext(cpuDispatcher) { getSha512(finalData) }
+        val sha512 = withContext(cpuDispatcher) { getSha512(convertedFile.data) }
         withContext(ioDispatcher) {
             dsl.transaction { tx ->
                 uploadProcessingQueries.setFilId(
@@ -169,6 +174,8 @@ class UploadProcessingService(
                     storageResult.mellomlagringFilnavn,
                     storageResult.storedSize,
                     sha512,
+                    convertedFile.converted,
+                    convertedFile.contentType,
                 )
                 UploadNotifications.notifyChange(tx, uploadId)
             }

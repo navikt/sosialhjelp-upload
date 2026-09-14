@@ -20,6 +20,7 @@ data class UploadDto(
     val kategori: String?,
     @property:Serializable(with = UUIDSerializer::class)
     val correlationId: UUID?,
+    val converted: Boolean = false,
 ) {
     enum class Status {
         COMPLETE,

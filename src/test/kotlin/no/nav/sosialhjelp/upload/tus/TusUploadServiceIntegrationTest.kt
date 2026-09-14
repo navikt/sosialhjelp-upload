@@ -28,11 +28,14 @@ import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
 import no.nav.sosialhjelp.upload.validation.Result
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.VirusScanner
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.pdmodel.PDPage
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -216,7 +219,7 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
-            val content = "hello mellomlagring".toByteArray()
+            val content = minimalPdf()
             val filId = UUID.randomUUID()
             coEvery {
                 mellomlagringClient.uploadFile(any(), any(), any(), any())
@@ -238,6 +241,8 @@ class TusUploadServiceIntegrationTest {
             assertNotNull(row)
             assertEquals(filId, row[UPLOAD.FIL_ID])
             assertNull(row[UPLOAD.GCS_KEY], "gcs_key should be cleared after mellomlagring upload")
+            assertEquals(false, row[UPLOAD.CONVERTED])
+            assertEquals("application/pdf", row[UPLOAD.CONTENT_TYPE])
         }
 
     @Test
@@ -331,6 +336,8 @@ class TusUploadServiceIntegrationTest {
 
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertEquals(filId, row!![UPLOAD.FIL_ID])
+            assertEquals(true, row[UPLOAD.CONVERTED])
+            assertEquals("application/pdf", row[UPLOAD.CONTENT_TYPE])
         }
 
     @Test
@@ -435,6 +442,17 @@ class TusUploadServiceIntegrationTest {
 
     // endregion
 
+    /** Creates a minimal valid PDF so Tika detects the pass-through MIME type from its bytes. */
+    private fun minimalPdf(): ByteArray {
+        PDDocument().use { document ->
+            document.addPage(PDPage())
+            return ByteArrayOutputStream().use { output ->
+                document.save(output)
+                output.toByteArray()
+            }
+        }
+    }
+
     // region delete
 
     @Test
@@ -462,7 +480,7 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
-            val content = "hello mellomlagring".toByteArray()
+            val content = minimalPdf()
             val filId = UUID.randomUUID()
             coEvery {
                 mellomlagringClient.uploadFile(any(), any(), any(), any())
