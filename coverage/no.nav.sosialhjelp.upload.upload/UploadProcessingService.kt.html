@@ -104,8 +104,8 @@ import java.util.UUID
     ): Pair&lt;String, ByteArray&gt;? =
 <span class="fc" id="L105">        try {</span>
 <span class="fc" id="L106">            val (extension, result) = fileConversionService.convertIfNeeded(filename, rawData)</span>
-<span class="fc" id="L107">            return when (result) {</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">                is GotenbergConversionResult.UnsupportedFiletype -&gt; {</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            return when (result) {</span>
+                is GotenbergConversionResult.UnsupportedFiletype -&gt; {
 <span class="fc" id="L109">                    logger.info(</span>
 <span class="fc" id="L110">                        &quot;Upload $uploadId (*$fileExtension) rejected by Gotenberg: format not supported for conversion&quot;,</span>
                     )
@@ -118,7 +118,7 @@ import java.util.UUID
 <span class="fc" id="L118">                    recordTimer(fileExtension, &quot;validation_failure&quot;, startTime)</span>
 <span class="fc" id="L119">                    null</span>
                 }
-<span class="fc" id="L121">                is GotenbergConversionResult.Success -&gt; {</span>
+                is GotenbergConversionResult.Success -&gt; {
 <span class="pc bpc" id="L122" title="2 of 4 branches missed.">                    val finalExtension = File(extension).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
 <span class="fc" id="L123">                    meterRegistry.counter(&quot;upload.converted_file_extension&quot;, &quot;extension&quot;, finalExtension).increment()</span>
 <span class="fc" id="L124">                    extension to result.bytes</span>
