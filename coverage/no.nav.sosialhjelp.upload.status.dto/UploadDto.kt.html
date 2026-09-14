@@ -5,7 +5,7 @@ import no.nav.sosialhjelp.upload.contentnegotiation.UUIDSerializer
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import java.util.UUID
 
-<span class="pc bpc" id="L8" title="5 of 10 branches missed.">@Serializable</span>
+<span class="pc bpc" id="L8" title="9 of 18 branches missed.">@Serializable</span>
 <span class="pc" id="L9">data class UploadDto(</span>
 <span class="fc" id="L10">    @property:Serializable(with = UUIDSerializer::class)</span>
 <span class="fc" id="L11">    val id: UUID?,</span>
@@ -20,12 +20,13 @@ import java.util.UUID
 <span class="pc" id="L20">    val kategori: String?,</span>
 <span class="fc" id="L21">    @property:Serializable(with = UUIDSerializer::class)</span>
 <span class="nc" id="L22">    val correlationId: UUID?,</span>
-<span class="nc" id="L23">) {</span>
+<span class="pc" id="L23">    val converted: Boolean = false,</span>
+<span class="nc" id="L24">) {</span>
     enum class Status {
-<span class="fc" id="L25">        COMPLETE,</span>
-<span class="fc" id="L26">        PROCESSING,</span>
-<span class="fc" id="L27">        FAILED,</span>
-<span class="fc" id="L28">        PENDING,</span>
+<span class="fc" id="L26">        COMPLETE,</span>
+<span class="fc" id="L27">        PROCESSING,</span>
+<span class="fc" id="L28">        FAILED,</span>
+<span class="fc" id="L29">        PENDING,</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

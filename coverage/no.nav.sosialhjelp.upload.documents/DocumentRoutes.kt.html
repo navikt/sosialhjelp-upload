@@ -46,10 +46,12 @@ fun Route.configureDocumentRoutes() {
 <span class="pc bpc" id="L46" title="1 of 2 branches missed.">        checkNotNull(upload.mellomlagringFilnavn) { &quot;Mangler originalFilename. Er ikke fil ferdig opplastet?&quot; }</span>
 
 <span class="fc" id="L48">        call.response.header(HttpHeaders.ContentDisposition, &quot;inline; filename=\&quot;${upload.mellomlagringFilnavn}\&quot;&quot;)</span>
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        call.respondBytes(</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            mellomlagringClient.getFile(upload.navEksternRefId, upload.filId),</span>
-<span class="fc" id="L51">            ContentType.defaultForFile(File(upload.mellomlagringFilnavn)),</span>
+<span class="fc" id="L49">        call.response.header(&quot;X-Content-Type-Options&quot;, &quot;nosniff&quot;)</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        call.respondBytes(</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            mellomlagringClient.getFile(upload.navEksternRefId, upload.filId),</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">            upload.contentType?.let(ContentType::parse)</span>
+<span class="nc" id="L53">                ?: ContentType.defaultForFile(File(upload.mellomlagringFilnavn)),</span>
         )
-<span class="fc" id="L53">    }</span>
-<span class="fc" id="L54">}</span>
+<span class="fc" id="L55">    }</span>
+<span class="fc" id="L56">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

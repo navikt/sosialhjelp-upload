@@ -2,31 +2,56 @@
 
 import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
+import no.nav.sosialhjelp.upload.validation.PASSTHROUGH_MIME_TYPES
+import no.nav.sosialhjelp.upload.validation.canonicalExtension
 import java.io.File
 
 /**
  * Converts uploaded files to PDF when needed.
- * PDF, JPEG, JPG and PNG files are passed through unchanged.
+ * PDF, JPEG and PNG files are passed through unchanged.
  * All other formats are sent to Gotenberg for conversion.
  */
-<span class="fc" id="L12">class FileConversionService(</span>
-<span class="fc" id="L13">    private val gotenbergService: GotenbergService,</span>
+<span class="fc" id="L14">class FileConversionService(</span>
+<span class="fc" id="L15">    private val gotenbergService: GotenbergService,</span>
 ) {
+    sealed class ConversionResult {
+<span class="fc" id="L18">        data class Success(</span>
+<span class="fc" id="L19">            val filename: String,</span>
+<span class="fc" id="L20">            val data: ByteArray,</span>
+<span class="fc" id="L21">            val contentType: String,</span>
+<span class="fc" id="L22">            val converted: Boolean,</span>
+        ) : ConversionResult()
+
+<span class="fc" id="L25">        data class UnsupportedFiletype(</span>
+<span class="pc" id="L26">            val extension: String,</span>
+        ) : ConversionResult()
+    }
+
     /**
-     * Returns the file unchanged if it is already a supported direct-store format.
-     * Otherwise converts to PDF via Gotenberg and returns the new filename + converted bytes.
+     * Routes by detected MIME type, never the client-supplied filename extension.
      */
-<span class="fc" id="L19">    suspend fun convertIfNeeded(</span>
+    suspend fun convertIfNeeded(
         filename: String,
+        mimeType: String,
         data: ByteArray,
-    ): Pair&lt;String, GotenbergConversionResult&gt; {
-<span class="fc" id="L23">        val extension = File(filename).extension.lowercase()</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (extension in listOf(&quot;pdf&quot;, &quot;jpeg&quot;, &quot;jpg&quot;, &quot;png&quot;)) {</span>
-<span class="fc" id="L25">            return filename to GotenbergConversionResult.Success(data)</span>
+    ): ConversionResult {
+<span class="fc" id="L38">        val file = File(filename)</span>
+<span class="fc" id="L39">        val extension = canonicalExtension(mimeType, file.extension)</span>
+<span class="fc" id="L40">        val canonicalFilename =</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">            if (extension.isEmpty()) file.name else &quot;${file.nameWithoutExtension}.$extension&quot;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (mimeType in PASSTHROUGH_MIME_TYPES) {</span>
+<span class="fc" id="L43">            return ConversionResult.Success(canonicalFilename, data, mimeType, converted = false)</span>
         }
-<span class="fc" id="L27">        val converted = gotenbergService.convertToPdf(data, extension)</span>
-<span class="fc" id="L28">        val pdfName = File(filename).nameWithoutExtension + &quot;.pdf&quot;</span>
-<span class="fc" id="L29">        return pdfName to converted</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        return when (val converted = gotenbergService.convertToPdf(data, extension)) {</span>
+            is GotenbergConversionResult.Success -&gt;
+<span class="fc" id="L47">                ConversionResult.Success(</span>
+<span class="fc" id="L48">                    &quot;${file.nameWithoutExtension}.pdf&quot;,</span>
+<span class="fc" id="L49">                    converted.bytes,</span>
+<span class="fc" id="L50">                    &quot;application/pdf&quot;,</span>
+<span class="fc" id="L51">                    converted = true,</span>
+                )
+<span class="fc" id="L53">            is GotenbergConversionResult.UnsupportedFiletype -&gt; ConversionResult.UnsupportedFiletype(extension)</span>
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

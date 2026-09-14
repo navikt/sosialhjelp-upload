@@ -159,44 +159,46 @@ import java.util.UUID
 <span class="fc" id="L159">                UPLOAD.SIZE,</span>
 <span class="fc" id="L160">                UPLOAD.MELLOMLAGRING_STORRELSE,</span>
 <span class="fc" id="L161">                UPLOAD.PROCESSING_STATUS,</span>
-<span class="fc" id="L162">            ).from(UPLOAD)</span>
-<span class="fc" id="L163">            .join(SUBMISSION)</span>
-<span class="fc" id="L164">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
-<span class="fc" id="L165">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L166">            .fetchSingle()</span>
-<span class="fc" id="L167">            .let {</span>
-<span class="fc" id="L168">                Upload(</span>
-<span class="fc" id="L169">                    id = it.get(UPLOAD.ID),</span>
-<span class="fc" id="L170">                    originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),</span>
-<span class="fc" id="L171">                    errors = emptyList(),</span>
-<span class="fc" id="L172">                    filId = it.get(UPLOAD.FIL_ID),</span>
-<span class="fc" id="L173">                    navEksternRefId = it.get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
-<span class="fc" id="L174">                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
-<span class="fc" id="L175">                    fileSize = it.get(UPLOAD.SIZE),</span>
-<span class="fc" id="L176">                    mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
+<span class="fc" id="L162">                UPLOAD.CONTENT_TYPE,</span>
+<span class="fc" id="L163">            ).from(UPLOAD)</span>
+<span class="fc" id="L164">            .join(SUBMISSION)</span>
+<span class="fc" id="L165">            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L166">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L167">            .fetchSingle()</span>
+<span class="fc" id="L168">            .let {</span>
+<span class="fc" id="L169">                Upload(</span>
+<span class="fc" id="L170">                    id = it.get(UPLOAD.ID),</span>
+<span class="fc" id="L171">                    originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),</span>
+<span class="fc" id="L172">                    errors = emptyList(),</span>
+<span class="fc" id="L173">                    filId = it.get(UPLOAD.FIL_ID),</span>
+<span class="fc" id="L174">                    navEksternRefId = it.get(SUBMISSION.NAV_EKSTERN_REF_ID),</span>
+<span class="fc" id="L175">                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),</span>
+<span class="fc" id="L176">                    fileSize = it.get(UPLOAD.SIZE),</span>
+<span class="fc" id="L177">                    mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),</span>
                     status =
-<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                        it</span>
-<span class="fc" id="L179">                            .get(UPLOAD.PROCESSING_STATUS)</span>
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                            ?.let { s -&gt; Status.valueOf(s) }</span>
-<span class="nc" id="L181">                            ?: error(&quot;No processing status. Was it not selected?&quot;),</span>
-<span class="fc" id="L182">                )</span>
-<span class="fc" id="L183">            }</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                        it</span>
+<span class="fc" id="L180">                            .get(UPLOAD.PROCESSING_STATUS)</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                            ?.let { s -&gt; Status.valueOf(s) }</span>
+<span class="nc" id="L182">                            ?: error(&quot;No processing status. Was it not selected?&quot;),</span>
+<span class="fc" id="L183">                    contentType = it.get(UPLOAD.CONTENT_TYPE),</span>
+<span class="fc" id="L184">                )</span>
+<span class="fc" id="L185">            }</span>
 
     fun deleteUpload(
         tx: Configuration,
         uploadId: UUID,
     ): Int {
-<span class="fc" id="L189">        val submissionId =</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            getSubmissionIdFromUploadId(tx, uploadId)</span>
-<span class="nc" id="L191">                ?: error(&quot;No submissionId for upload&quot;)</span>
-<span class="fc" id="L192">        val deleted =</span>
-<span class="fc" id="L193">            tx</span>
-<span class="fc" id="L194">                .dsl()</span>
-<span class="fc" id="L195">                .delete(UPLOAD)</span>
-<span class="fc" id="L196">                .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L197">                .execute()</span>
-<span class="fc" id="L198">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
-<span class="fc" id="L199">        return deleted</span>
+<span class="fc" id="L191">        val submissionId =</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            getSubmissionIdFromUploadId(tx, uploadId)</span>
+<span class="nc" id="L193">                ?: error(&quot;No submissionId for upload&quot;)</span>
+<span class="fc" id="L194">        val deleted =</span>
+<span class="fc" id="L195">            tx</span>
+<span class="fc" id="L196">                .dsl()</span>
+<span class="fc" id="L197">                .delete(UPLOAD)</span>
+<span class="fc" id="L198">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L199">                .execute()</span>
+<span class="fc" id="L200">        tx.dsl().execute(&quot;SELECT pg_notify('submission_update', ?)&quot;, submissionId.toString())</span>
+<span class="fc" id="L201">        return deleted</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

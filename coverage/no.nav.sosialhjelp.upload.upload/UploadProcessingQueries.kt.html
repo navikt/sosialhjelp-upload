@@ -50,51 +50,55 @@ import java.util.UUID
         mellomlagringFilnavn: String,
         mellomlagringStorrelse: Long,
         sha512: String,
+        converted: Boolean,
+        contentType: String,
     ) {
-<span class="fc" id="L54">        tx</span>
-<span class="fc" id="L55">            .dsl()</span>
-<span class="fc" id="L56">            .update(UPLOAD)</span>
-<span class="fc" id="L57">            .set(UPLOAD.FIL_ID, filId)</span>
-<span class="fc" id="L58">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
-<span class="fc" id="L59">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
-<span class="fc" id="L60">            .set(UPLOAD.SHA512, sha512)</span>
-<span class="fc" id="L61">            .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)</span>
-<span class="fc" id="L62">            .setNull(UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L56">        tx</span>
+<span class="fc" id="L57">            .dsl()</span>
+<span class="fc" id="L58">            .update(UPLOAD)</span>
+<span class="fc" id="L59">            .set(UPLOAD.FIL_ID, filId)</span>
+<span class="fc" id="L60">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
+<span class="fc" id="L61">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
+<span class="fc" id="L62">            .set(UPLOAD.SHA512, sha512)</span>
+<span class="fc" id="L63">            .set(UPLOAD.CONVERTED, converted)</span>
+<span class="fc" id="L64">            .set(UPLOAD.CONTENT_TYPE, contentType)</span>
+<span class="fc" id="L65">            .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)</span>
+<span class="fc" id="L66">            .setNull(UPLOAD.GCS_KEY)</span>
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length
-<span class="fc" id="L64">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L65">            .execute()</span>
-<span class="fc" id="L66">    }</span>
+<span class="fc" id="L68">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L69">            .execute()</span>
+<span class="fc" id="L70">    }</span>
 
     fun markFailed(
         tx: Configuration,
         uploadId: UUID,
     ) {
-<span class="fc" id="L72">        tx</span>
-<span class="fc" id="L73">            .dsl()</span>
-<span class="fc" id="L74">            .update(UPLOAD)</span>
-<span class="fc" id="L75">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
-<span class="fc" id="L76">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L77">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L78">            .execute()</span>
-<span class="fc" id="L79">    }</span>
+<span class="fc" id="L76">        tx</span>
+<span class="fc" id="L77">            .dsl()</span>
+<span class="fc" id="L78">            .update(UPLOAD)</span>
+<span class="fc" id="L79">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
+<span class="fc" id="L80">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L81">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L82">            .execute()</span>
+<span class="fc" id="L83">    }</span>
 
     fun addErrors(
         tx: Configuration,
         uploadId: UUID,
         validations: List&lt;Validation&gt;,
     ) {
-<span class="fc" id="L86">        val errorTable = no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR</span>
-<span class="fc" id="L87">        validations.forEach {</span>
-<span class="fc" id="L88">            tx</span>
-<span class="fc" id="L89">                .dsl()</span>
-<span class="fc" id="L90">                .insertInto(errorTable)</span>
-<span class="fc" id="L91">                .set(errorTable.UPLOAD, uploadId)</span>
-<span class="fc" id="L92">                .set(errorTable.CODE, it.code.name)</span>
-<span class="fc" id="L93">                .set(errorTable.ID, UUID.randomUUID())</span>
-<span class="fc" id="L94">                .execute()</span>
-<span class="fc" id="L95">        }</span>
-<span class="fc" id="L96">        markFailed(tx, uploadId)</span>
-<span class="fc" id="L97">        UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L98">    }</span>
+<span class="fc" id="L90">        val errorTable = no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR</span>
+<span class="fc" id="L91">        validations.forEach {</span>
+<span class="fc" id="L92">            tx</span>
+<span class="fc" id="L93">                .dsl()</span>
+<span class="fc" id="L94">                .insertInto(errorTable)</span>
+<span class="fc" id="L95">                .set(errorTable.UPLOAD, uploadId)</span>
+<span class="fc" id="L96">                .set(errorTable.CODE, it.code.name)</span>
+<span class="fc" id="L97">                .set(errorTable.ID, UUID.randomUUID())</span>
+<span class="fc" id="L98">                .execute()</span>
+<span class="fc" id="L99">        }</span>
+<span class="fc" id="L100">        markFailed(tx, uploadId)</span>
+<span class="fc" id="L101">        UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L102">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

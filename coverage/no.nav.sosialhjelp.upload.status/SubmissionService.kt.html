@@ -64,22 +64,23 @@ import java.util.*
 <span class="fc" id="L64">                                upload.fileSize,</span>
 <span class="fc" id="L65">                                upload.kategori,</span>
 <span class="fc" id="L66">                                upload.correlationId,</span>
-<span class="fc" id="L67">                            )</span>
-<span class="fc" id="L68">                        }</span>
+<span class="fc" id="L67">                                upload.converted,</span>
+<span class="fc" id="L68">                            )</span>
+<span class="fc" id="L69">                        }</span>
                 }
 
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            val tooManyFiles = uploads.size &gt; 30</span>
-<span class="pc bpc" id="L72" title="1 of 6 branches missed.">            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } &gt; 150 * 1024 * 1024</span>
-<span class="fc" id="L73">            SubmissionState(</span>
-<span class="fc" id="L74">                submissionId.toString(),</span>
-<span class="fc" id="L75">                uploads.toList(),</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            val tooManyFiles = uploads.size &gt; 30</span>
+<span class="pc bpc" id="L73" title="1 of 6 branches missed.">            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } &gt; 150 * 1024 * 1024</span>
+<span class="fc" id="L74">            SubmissionState(</span>
+<span class="fc" id="L75">                submissionId.toString(),</span>
+<span class="fc" id="L76">                uploads.toList(),</span>
                 validations =
-<span class="fc" id="L77">                    listOfNotNull(</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                        if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                        if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,</span>
+<span class="fc" id="L78">                    listOfNotNull(</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                        if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                        if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,</span>
                     ),
-<span class="fc" id="L81">                status = SubmissionState.Status.ACTIVE,</span>
-<span class="fc" id="L82">            )</span>
-<span class="fc" id="L83">        }</span>
+<span class="fc" id="L82">                status = SubmissionState.Status.ACTIVE,</span>
+<span class="fc" id="L83">            )</span>
+<span class="fc" id="L84">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
