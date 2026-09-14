@@ -480,7 +480,7 @@ class TusUploadServiceIntegrationTest {
         runTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
-            val content = "hello mellomlagring".toByteArray()
+            val content = minimalPdf()
             val filId = UUID.randomUUID()
             coEvery {
                 mellomlagringClient.uploadFile(any(), any(), any(), any())
