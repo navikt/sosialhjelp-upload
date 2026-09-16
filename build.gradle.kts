@@ -6,10 +6,10 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
-    id("nl.littlerobots.version-catalog-update") version "1.0.0"
+    id("nl.littlerobots.version-catalog-update") version "1.1.1"
     id("org.jooq.jooq-codegen-gradle") version libs.versions.jooq
     id("jacoco")
-    id("org.sonarqube") version "7.2.3.7755"
+    id("org.sonarqube") version "7.5.0.8588"
 }
 
 group = "no.nav.sosialhjelp"
