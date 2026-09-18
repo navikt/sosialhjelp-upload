@@ -43,6 +43,7 @@ spec:
         - application: sosialhjelp-innsyn
         - application: sosialhjelp-soknad-api
         - application: sosialhjelp-soknad
+        - application: sosialhjelp-innsyn-api
   gcp:
     sqlInstances:
       - type: POSTGRES_17

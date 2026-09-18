@@ -41,6 +41,7 @@ spec:
         - application: sosialhjelp-innsyn-mock
         - application: sosialhjelp-soknad-mock
         - application: sosialhjelp-soknad-api-mock
+        - application: sosialhjelp-innsyn-api-mock
   gcp:
     sqlInstances:
       - type: POSTGRES_17
