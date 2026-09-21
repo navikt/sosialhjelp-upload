@@ -22,11 +22,14 @@ class TeamLogger(
         message: String,
         throwable: Throwable? = null,
         vararg fields: Pair<String, Any?>,
-    ) = logger.atError().withFields(fields).setCause(throwable).log(message)
+    ) = logger
+        .atError()
+        .withFields(fields)
+        .setCause(throwable)
+        .log(message)
 }
 
-fun teamLogger(forClass: KClass<*>): TeamLogger =
-    TeamLogger(LoggerFactory.getLogger("teamlogs.${forClass.java.name}"))
+fun teamLogger(forClass: KClass<*>): TeamLogger = TeamLogger(LoggerFactory.getLogger("teamlogs.${forClass.java.name}"))
 
 inline fun <reified T : Any> teamLogger(): TeamLogger = teamLogger(T::class)
 

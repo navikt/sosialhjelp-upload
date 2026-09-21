@@ -3,9 +3,9 @@ package no.nav.sosialhjelp.upload.common
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.read.ListAppender
+import org.slf4j.LoggerFactory
 import kotlin.test.Test
 import kotlin.test.assertFalse
-import org.slf4j.LoggerFactory
 
 class TeamLoggerTest {
     @Test
