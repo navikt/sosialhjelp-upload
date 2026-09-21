@@ -8,8 +8,8 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import kotlinx.serialization.SerialName
@@ -51,56 +51,41 @@ import java.time.Instant
 <span class="fc" id="L51">                    setBody(maskinportenParams)</span>
 <span class="fc" id="L52">                }</span>
 
-        @Suppress(&quot;TooGenericExceptionCaught&quot;, &quot;SwallowedException&quot;)
-<span class="fc" id="L55">        val body =</span>
-<span class="fc" id="L56">            try {</span>
-<span class="fc" id="L57">                response.body&lt;TokenResponse.Success&gt;()</span>
-<span class="fc" id="L58">            } catch (e: Exception) {</span>
-<span class="fc" id="L59">                response.body&lt;TokenResponse.Error&gt;()</span>
-            }
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (body is TokenResponse.Success) {</span>
-<span class="fc" id="L62">            cachedToken = body.accessToken</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (response.status.isSuccess()) {</span>
+<span class="fc" id="L55">            val body = response.body&lt;TokenSuccessResponse&gt;()</span>
+<span class="fc" id="L56">            cachedToken = body.accessToken</span>
             // Subtract 30s buffer to avoid using a token that expires in transit
-<span class="fc" id="L64">            tokenExpiresAt = Instant.now().plusSeconds(body.expiresInSeconds.toLong() - 30)</span>
-<span class="fc" id="L65">            return body.accessToken</span>
-        } else {
-<span class="nc" id="L67">            logger.error(</span>
-<span class="nc" id="L68">                &quot;Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}&quot;,</span>
-            )
-<span class="nc" id="L70">            throw TexasTokenException(&quot;Failed to get token from Texas&quot;)</span>
+<span class="fc" id="L58">            tokenExpiresAt = Instant.now().plusSeconds(body.expiresInSeconds.toLong() - 30)</span>
+<span class="fc" id="L59">            return body.accessToken</span>
         }
+
+<span class="fc" id="L62">        val body = response.body&lt;TokenErrorResponse&gt;()</span>
+<span class="fc" id="L63">        logger.error(&quot;Failed to get token from Texas: $body, status: ${response.status}&quot;)</span>
+<span class="fc" id="L64">        throw TexasTokenException(&quot;Failed to get token from Texas&quot;)</span>
     }
 }
 
-<span class="nc" id="L75">class TexasTokenException(</span>
+<span class="fc" id="L68">class TexasTokenException(</span>
     message: String,
-<span class="nc" id="L77">) : RuntimeException(message)</span>
+<span class="fc" id="L70">) : RuntimeException(message)</span>
 
 private val maskinportenParams: Map&lt;String, String&gt; =
-<span class="fc" id="L80">    mapOf(&quot;identity_provider&quot; to &quot;maskinporten&quot;, &quot;target&quot; to &quot;ks:fiks&quot;)</span>
+<span class="fc" id="L73">    mapOf(&quot;identity_provider&quot; to &quot;maskinporten&quot;, &quot;target&quot; to &quot;ks:fiks&quot;)</span>
 
-<span class="pc" id="L82">@Serializable</span>
-sealed class TokenResponse {
-<span class="pc bpc" id="L84" title="1 of 2 branches missed.">    @Serializable</span>
-<span class="nc" id="L85">    data class Success(</span>
-<span class="nc" id="L86">        @SerialName(&quot;access_token&quot;)</span>
-<span class="fc" id="L87">        val accessToken: String,</span>
-<span class="nc" id="L88">        @SerialName(&quot;expires_in&quot;)</span>
-<span class="fc" id="L89">        val expiresInSeconds: Int,</span>
-<span class="nc" id="L90">        @SerialName(&quot;token_type&quot;)</span>
-<span class="nc" id="L91">        val tokenType: String,</span>
-    ) : TokenResponse()
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">@Serializable</span>
+<span class="nc" id="L76">data class TokenSuccessResponse(</span>
+<span class="nc" id="L77">    @SerialName(&quot;access_token&quot;)</span>
+<span class="fc" id="L78">    val accessToken: String,</span>
+<span class="nc" id="L79">    @SerialName(&quot;expires_in&quot;)</span>
+<span class="fc" id="L80">    val expiresInSeconds: Int,</span>
+<span class="nc" id="L81">    @SerialName(&quot;token_type&quot;)</span>
+<span class="nc" id="L82">    val tokenType: String,</span>
+)
 
-<span class="nc" id="L94">    data class Error(</span>
-<span class="nc" id="L95">        val error: TokenErrorResponse,</span>
-<span class="nc" id="L96">        val status: HttpStatusCode,</span>
-    ) : TokenResponse()
-<span class="fc" id="L98">}</span>
-
-<span class="nc bnc" id="L100" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L101">data class TokenErrorResponse(</span>
-<span class="nc" id="L102">    val error: String,</span>
-<span class="nc" id="L103">    @SerialName(&quot;error_description&quot;)</span>
-<span class="nc" id="L104">    val errorDescription: String,</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">@Serializable</span>
+<span class="nc" id="L86">data class TokenErrorResponse(</span>
+<span class="nc" id="L87">    val error: String,</span>
+<span class="nc" id="L88">    @SerialName(&quot;error_description&quot;)</span>
+<span class="nc" id="L89">    val errorDescription: String,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
