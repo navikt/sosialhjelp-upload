@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TeamLogger.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.common</a> &gt; <span class="el_source">TeamLogger.kt</span></div><h1>TeamLogger.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.common
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import org.slf4j.spi.LoggingEventBuilder
+import kotlin.reflect.KClass
+
+<span class="fc" id="L8">class TeamLogger(</span>
+<span class="fc" id="L9">    private val logger: Logger,</span>
+) {
+    fun info(
+        message: String,
+        vararg fields: Pair&lt;String, Any?&gt;,
+<span class="fc" id="L14">    ) = logger.atInfo().withFields(fields).log(message)</span>
+
+    fun warn(
+        message: String,
+        vararg fields: Pair&lt;String, Any?&gt;,
+<span class="nc" id="L19">    ) = logger.atWarn().withFields(fields).log(message)</span>
+
+<span class="nc" id="L21">    fun error(</span>
+        message: String,
+<span class="nc" id="L23">        throwable: Throwable? = null,</span>
+        vararg fields: Pair&lt;String, Any?&gt;,
+<span class="nc" id="L25">    ) = logger</span>
+<span class="nc" id="L26">        .atError()</span>
+<span class="nc" id="L27">        .withFields(fields)</span>
+<span class="nc" id="L28">        .setCause(throwable)</span>
+<span class="nc" id="L29">        .log(message)</span>
+}
+
+<span class="fc" id="L32">fun teamLogger(forClass: KClass&lt;*&gt;): TeamLogger = TeamLogger(LoggerFactory.getLogger(&quot;teamlogs.${forClass.java.name}&quot;))</span>
+
+<span class="nc" id="L34">inline fun &lt;reified T : Any&gt; teamLogger(): TeamLogger = teamLogger(T::class)</span>
+
+private fun LoggingEventBuilder.withFields(fields: Array&lt;out Pair&lt;String, Any?&gt;&gt;): LoggingEventBuilder {
+<span class="fc" id="L37">    fields.forEach { (key, value) -&gt; addKeyValue(key, value) }</span>
+<span class="fc" id="L38">    return this</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
