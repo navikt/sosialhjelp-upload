@@ -8,8 +8,8 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import kotlinx.serialization.SerialName
@@ -49,26 +49,19 @@ class TexasClient(
                     accept(ContentType.Application.Json)
                     contentType(ContentType.Application.Json)
                     setBody(maskinportenParams)
-                }
+        }
 
-        @Suppress("TooGenericExceptionCaught", "SwallowedException")
-        val body =
-            try {
-                response.body<TokenResponse.Success>()
-            } catch (e: Exception) {
-                response.body<TokenResponse.Error>()
-            }
-        if (body is TokenResponse.Success) {
+        if (response.status.isSuccess()) {
+            val body = response.body<TokenSuccessResponse>()
             cachedToken = body.accessToken
             // Subtract 30s buffer to avoid using a token that expires in transit
             tokenExpiresAt = Instant.now().plusSeconds(body.expiresInSeconds.toLong() - 30)
             return body.accessToken
-        } else {
-            logger.error(
-                "Failed to get token from Texas: ${(body as TokenResponse.Error).error}, status: ${body.status}",
-            )
-            throw TexasTokenException("Failed to get token from Texas")
         }
+
+        val body = response.body<TokenErrorResponse>()
+        logger.error("Failed to get token from Texas: $body, status: ${response.status}")
+        throw TexasTokenException("Failed to get token from Texas")
     }
 }
 
@@ -80,22 +73,14 @@ private val maskinportenParams: Map<String, String> =
     mapOf("identity_provider" to "maskinporten", "target" to "ks:fiks")
 
 @Serializable
-sealed class TokenResponse {
-    @Serializable
-    data class Success(
-        @SerialName("access_token")
-        val accessToken: String,
-        @SerialName("expires_in")
-        val expiresInSeconds: Int,
-        @SerialName("token_type")
-        val tokenType: String,
-    ) : TokenResponse()
-
-    data class Error(
-        val error: TokenErrorResponse,
-        val status: HttpStatusCode,
-    ) : TokenResponse()
-}
+data class TokenSuccessResponse(
+    @SerialName("access_token")
+    val accessToken: String,
+    @SerialName("expires_in")
+    val expiresInSeconds: Int,
+    @SerialName("token_type")
+    val tokenType: String,
+)
 
 @Serializable
 data class TokenErrorResponse(

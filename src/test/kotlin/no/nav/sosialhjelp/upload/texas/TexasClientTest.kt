@@ -81,11 +81,10 @@ class TexasClientTest {
                     .code(500)
                     .addHeader("Content-Type", "application/json")
                     .body(
-                        """{"error":{"error":"server_error","error_description":"Something went wrong"},""" +
-                            """"status":500}""",
+                        """{"error":"server_error","error_description":"Something went wrong"}""",
                     ).build(),
             )
-            assertFailsWith<RuntimeException> {
+            assertFailsWith<TexasTokenException> {
                 client.getMaskinportenToken()
             }
         }
