@@ -2,6 +2,7 @@
 
 package no.nav.sosialhjelp.upload.action.fiks
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -10,12 +11,12 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.jackson.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.serialization.jackson.jackson
 import io.ktor.server.plugins.di.annotations.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,6 +24,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
+import no.nav.sosialhjelp.api.fiks.ErrorMessage
 import no.nav.sosialhjelp.upload.action.Metadata
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
@@ -31,6 +33,11 @@ import org.slf4j.LoggerFactory
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+
+private const val DEFAULT_REQUEST_TIMEOUT_MS = 30_000L
+private const val CONNECT_TIMEOUT_MS = 10_000L
+private const val UPLOAD_REQUEST_TIMEOUT_MS = 5 * 60_000L
+private const val COUNTER_SUFFIX_LENGTH = 4
 
 class FiksClient(
     @Property("fiks.baseUrl") private val fiksBaseUrl: String,
@@ -49,47 +56,17 @@ class FiksClient(
 
     private fun digisosSakUrl(fiksDigisosId: String) = "$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId"
 
-    private val jacksonClient by lazy {
-        HttpClient(CIO) {
-            expectSuccess = false
-            install(ContentNegotiation) {
-                jackson()
-            }
-            install(Logging) {
-                logger =
-                    object : Logger {
-                        override fun log(message: String) = this@FiksClient.logger.info(message)
-                    }
-                level = LogLevel.INFO
-            }
-        }
-    }
-
     private val client by lazy {
         HttpClient(CIO) {
             expectSuccess = false
-            install(ContentNegotiation) {
-                json()
-            }
-            install(Logging) {
-                logger =
-                    object : Logger {
-                        override fun log(message: String) = this@FiksClient.logger.info(message)
-                    }
-                level = LogLevel.INFO
-            }
-        }
-    }
-
-    private val uploadClient by lazy {
-        HttpClient(CIO) {
-            expectSuccess = false
             install(HttpTimeout) {
-                requestTimeoutMillis = 5 * 60_000L
-                connectTimeoutMillis = 10_000L
+                requestTimeoutMillis = DEFAULT_REQUEST_TIMEOUT_MS
+                connectTimeoutMillis = CONNECT_TIMEOUT_MS
             }
             install(ContentNegotiation) {
-                json()
+                jackson {
+                    configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                }
             }
             install(Logging) {
                 logger =
@@ -184,11 +161,12 @@ class FiksClient(
                 )
             }
         try {
-            return uploadClient
+            return client
                 .submitFormWithBinaryData(
                     ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
                     formData,
                 ) {
+                    timeout { requestTimeoutMillis = UPLOAD_REQUEST_TIMEOUT_MS }
                     headers {
                         integrasjonsid?.let { append("IntegrasjonId", integrasjonsid) }
                         integrasjonspassord?.let { append("IntegrasjonPassord", integrasjonspassord) }
@@ -197,11 +175,11 @@ class FiksClient(
                     contentType(ContentType.MultiPart.FormData)
                 }.also {
                     if (!it.status.isSuccess()) {
-                        val body = it.bodyAsText()
-                        if (it.status == HttpStatusCode.BadRequest && body.contains("finnes all")) {
+                        val body = it.body<ErrorMessage>()
+                        if (it.status == HttpStatusCode.BadRequest && body.message?.contains("finnes all") ?: false) {
                             throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
                         }
-                        logger.error("Feil ved opplasting til fiks: ${it.status}: $body")
+                        logger.error("Feil ved opplasting til fiks: ${it.status}: ${sanitizeFiksError(body)}")
                     } else {
                         logger.info("Opplasting til fiks vellykket: ${it.status}")
                     }
@@ -216,7 +194,7 @@ class FiksClient(
         id: String,
         token: String,
     ): DigisosSak =
-        jacksonClient
+        client
             .get(digisosSakUrl(id)) {
                 headers {
                     integrasjonsid?.let {
@@ -238,7 +216,18 @@ class FiksClient(
     }
 }
 
-private const val COUNTER_SUFFIX_LENGTH = 4
+internal fun sanitizeFiksError(error: ErrorMessage): String {
+    val message =
+        error.message
+            ?.lineSequence()
+            // Fiks lists filenames on indented lines. Keep the reason and counts, not filenames.
+            ?.filterNot { it.startsWith(' ') || it.startsWith('\t') }
+            ?.joinToString(" | ") { it.trim() }
+    return listOfNotNull(
+        error.errorId?.let { "errorId=$it" },
+        message?.takeIf { it.isNotBlank() }?.let { "message=$it" },
+    ).joinToString(", ")
+}
 
 internal fun lagNavEksternRefId(
     digisosSak: DigisosSak,
