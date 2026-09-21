@@ -106,4 +106,27 @@ class FiksClientTest {
         val result = lagIdSuffix("baseXXXX")
         assertEquals("0001", result)
     }
+
+    @Test
+    fun `sanitizes filenames from Fiks upload error`() {
+        val body =
+            "{\"errorId\":\"error-id\",\"message\":\"" +
+                "Opplastede filer stemmer ikke med metadata i vedlegg.json\\n" +
+                "2 vedlegg listet i vedlegg.json er ikke lastet opp:\\n" +
+                "  vedtak om godkjent flytting.pdf\\n" +
+                "1 opplastede filer er ikke listet i vedlegg.json:\\n" +
+                "  ettersendelse.pdf\"}"
+
+        assertEquals(
+            "errorId=error-id, message=Opplastede filer stemmer ikke med metadata i vedlegg.json | " +
+                "2 vedlegg listet i vedlegg.json er ikke lastet opp: | " +
+                "1 opplastede filer er ikke listet i vedlegg.json:",
+            sanitizeFiksError(body),
+        )
+    }
+
+    @Test
+    fun `does not expose invalid Fiks error response`() {
+        assertEquals("Fikk feil ved parsing av fiks-melding", sanitizeFiksError("raw response"))
+    }
 }

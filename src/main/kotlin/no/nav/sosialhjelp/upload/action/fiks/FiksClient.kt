@@ -22,6 +22,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.Metadata
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
@@ -201,7 +203,7 @@ class FiksClient(
                         if (it.status == HttpStatusCode.BadRequest && body.contains("finnes all")) {
                             throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
                         }
-                        logger.error("Feil ved opplasting til fiks: ${it.status}: $body")
+                        logger.error("Feil ved opplasting til fiks: ${it.status}: ${sanitizeFiksError(body)}")
                     } else {
                         logger.info("Opplasting til fiks vellykket: ${it.status}")
                     }
@@ -239,6 +241,24 @@ class FiksClient(
 }
 
 private const val COUNTER_SUFFIX_LENGTH = 4
+
+internal fun sanitizeFiksError(body: String): String =
+    runCatching {
+        val response = Json.parseToJsonElement(body).jsonObject
+        val errorId = response["errorId"]?.jsonPrimitive?.content
+        val message =
+            response["message"]
+                ?.jsonPrimitive
+                ?.content
+                ?.lineSequence()
+                // Fiks lists filenames on indented lines. Keep the reason and counts, not filenames.
+                ?.filterNot { it.startsWith(' ') || it.startsWith('\t') }
+                ?.joinToString(" | ") { it.trim() }
+        listOfNotNull(
+            errorId?.let { "errorId=$it" },
+            message?.takeIf { it.isNotBlank() }?.let { "message=$it" },
+        ).joinToString(", ")
+    }.getOrElse { "Fikk feil ved parsing av fiks-melding" }
 
 internal fun lagNavEksternRefId(
     digisosSak: DigisosSak,
