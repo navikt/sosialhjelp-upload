@@ -5,7 +5,6 @@ package no.nav.sosialhjelp.upload.action.fiks
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
@@ -31,67 +30,67 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
 import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTimedValue
 import kotlin.time.toJavaDuration
 
-private const val DEFAULT_REQUEST_TIMEOUT_MS = 30_000L
-private const val CONNECT_TIMEOUT_MS = 10_000L
-
-<span class="nc" id="L45">class MellomlagringClient(</span>
-<span class="nc" id="L46">    @Property(&quot;fiks.baseUrl&quot;) private val fiksBaseUrl: String,</span>
-<span class="nc" id="L47">    @Property(&quot;fiks.integrasjonsid&quot;) private val integrasjonsid: String?,</span>
-<span class="nc" id="L48">    @Property(&quot;fiks.integrasjonspassord&quot;) private val integrasjonspassord: String?,</span>
-<span class="nc" id="L49">    private val meterRegistry: MeterRegistry,</span>
-<span class="nc" id="L50">    private val texasClient: TexasClient,</span>
+<span class="nc" id="L43">class MellomlagringClient(</span>
+<span class="nc" id="L44">    @Property(&quot;fiks.baseUrl&quot;) private val fiksBaseUrl: String,</span>
+<span class="nc" id="L45">    @Property(&quot;fiks.integrasjonsid&quot;) private val integrasjonsid: String?,</span>
+<span class="nc" id="L46">    @Property(&quot;fiks.integrasjonspassord&quot;) private val integrasjonspassord: String?,</span>
+<span class="nc" id="L47">    private val meterRegistry: MeterRegistry,</span>
+<span class="nc" id="L48">    private val texasClient: TexasClient,</span>
 ) {
-<span class="nc" id="L52">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="nc" id="L50">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
 
-<span class="nc" id="L54">    private val client by lazy {</span>
-<span class="nc" id="L55">        HttpClient(CIO) {</span>
-<span class="nc" id="L56">            expectSuccess = false</span>
-<span class="nc" id="L57">            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }</span>
-<span class="nc" id="L58">            install(Logging) {</span>
-<span class="nc" id="L59">                logger =</span>
-<span class="nc" id="L60">                    object : Logger {</span>
-<span class="nc" id="L61">                        override fun log(message: String) = this@MellomlagringClient.logger.info(message)</span>
+<span class="nc" id="L52">    private val client by lazy {</span>
+<span class="nc" id="L53">        HttpClient(CIO) {</span>
+<span class="nc" id="L54">            expectSuccess = false</span>
+<span class="nc" id="L55">            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }</span>
+<span class="nc" id="L56">            install(Logging) {</span>
+<span class="nc" id="L57">                logger =</span>
+<span class="nc" id="L58">                    object : Logger {</span>
+<span class="nc" id="L59">                        override fun log(message: String) = this@MellomlagringClient.logger.info(message)</span>
                     }
-<span class="nc" id="L63">                level = LogLevel.INFO</span>
-<span class="nc" id="L64">            }</span>
-<span class="nc" id="L65">            install(HttpTimeout) {</span>
-<span class="nc" id="L66">                requestTimeoutMillis = DEFAULT_REQUEST_TIMEOUT_MS</span>
-<span class="nc" id="L67">                connectTimeoutMillis = CONNECT_TIMEOUT_MS</span>
-<span class="nc" id="L68">            }</span>
-<span class="nc" id="L69">        }</span>
+<span class="nc" id="L61">                level = LogLevel.INFO</span>
+<span class="nc" id="L62">            }</span>
+<span class="nc" id="L63">        }</span>
     }
 
-<span class="nc" id="L72">    private fun mellomlagringUrl(navEksternRefId: String) = &quot;$fiksBaseUrl/digisos/api/v1/mellomlagring/$navEksternRefId&quot;</span>
+<span class="nc" id="L66">    private fun mellomlagringUrl(navEksternRefId: String) = &quot;$fiksBaseUrl/digisos/api/v1/mellomlagring/$navEksternRefId&quot;</span>
 
     suspend fun getFile(
         navEksternRefId: String,
         id: UUID,
     ): ByteArray {
-<span class="nc" id="L78">        val response =</span>
-<span class="nc" id="L79">            client.get(mellomlagringUrl(navEksternRefId) + &quot;/$id&quot;) {</span>
-<span class="nc" id="L80">                headers {</span>
-<span class="nc bnc" id="L81" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) } ?: run {</span>
-<span class="nc" id="L82">                        logger.warn(&quot;Mangler fiks integrasjonsid&quot;)</span>
-<span class="nc" id="L83">                    }</span>
-<span class="nc bnc" id="L84" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) } ?: run {</span>
-<span class="nc" id="L85">                        logger.warn(&quot;Mangler fiks integrasjonspassord&quot;)</span>
-<span class="nc" id="L86">                    }</span>
-<span class="nc" id="L87">                }</span>
-<span class="nc" id="L88">                accept(ContentType.Any)</span>
-<span class="nc" id="L89">                bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L90">            }</span>
-<span class="nc bnc" id="L91" title="All 2 branches missed.">        check(response.status.isSuccess()) {</span>
-<span class="nc" id="L92">            &quot;Fikk feil fra Fiks på GET /mellomlagring/$navEksternRefId/$id: ${response.bodyAsText()}&quot;</span>
+<span class="nc" id="L72">        val response =</span>
+<span class="nc" id="L73">            client.get(mellomlagringUrl(navEksternRefId) + &quot;/$id&quot;) {</span>
+<span class="nc" id="L74">                headers {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) } ?: run {</span>
+<span class="nc" id="L76">                        logger.warn(&quot;Mangler fiks integrasjonsid&quot;)</span>
+<span class="nc" id="L77">                    }</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) } ?: run {</span>
+<span class="nc" id="L79">                        logger.warn(&quot;Mangler fiks integrasjonspassord&quot;)</span>
+<span class="nc" id="L80">                    }</span>
+<span class="nc" id="L81">                }</span>
+<span class="nc" id="L82">                accept(ContentType.Any)</span>
+<span class="nc" id="L83">                bearerAuth(texasClient.getMaskinportenToken())</span>
+<span class="nc" id="L84">            }</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        check(response.status.isSuccess()) {</span>
+<span class="nc" id="L86">            &quot;Fikk feil fra Fiks på GET /mellomlagring/$navEksternRefId/$id: ${response.bodyAsText()}&quot;</span>
         }
-<span class="nc" id="L94">        return response.bodyAsBytes()</span>
+<span class="nc" id="L88">        return response.bodyAsBytes()</span>
+    }
+
+    companion object {
+<span class="fc" id="L92">        private val RETRY_DELAYS_MS = listOf(500L, 2000L)</span>
+<span class="pc" id="L93">        val MAX_ATTEMPTS = RETRY_DELAYS_MS.size + 1</span>
     }
 
     suspend fun uploadFile(
@@ -99,139 +98,164 @@ private const val CONNECT_TIMEOUT_MS = 10_000L
         filename: String,
         contentType: String,
         data: ByteArray,
-    ): UUID =
-<span class="nc" id="L103">        measureTimedValue {</span>
-<span class="nc" id="L104">            val metadataPart =</span>
-<span class="nc" id="L105">                FormPart(</span>
-<span class="nc" id="L106">                    key = &quot;metadata&quot;,</span>
-<span class="nc" id="L107">                    value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),</span>
-                    headers =
-<span class="nc" id="L109">                        Headers.build {</span>
-<span class="nc" id="L110">                            append(</span>
-<span class="nc" id="L111">                                HttpHeaders.ContentType,</span>
-<span class="nc" id="L112">                                ContentType.Application.Json.toString(),</span>
-                            )
-<span class="nc" id="L114">                        },</span>
-                )
-<span class="nc" id="L116">            val filePart =</span>
-<span class="nc" id="L117">                FormPart(</span>
-<span class="nc" id="L118">                    key = &quot;files&quot;,</span>
-<span class="nc" id="L119">                    value = ChannelProvider { ByteReadChannel(data) },</span>
-                    headers =
-<span class="nc" id="L121">                        Headers.build {</span>
-<span class="nc" id="L122">                            append(HttpHeaders.ContentType, contentType)</span>
-<span class="nc" id="L123">                            append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;$filename&quot;&quot;&quot;&quot;)</span>
-<span class="nc" id="L124">                        },</span>
-                )
-<span class="nc" id="L126">            val formData =</span>
-<span class="nc" id="L127">                formData {</span>
-<span class="nc" id="L128">                    append(metadataPart)</span>
-<span class="nc" id="L129">                    append(filePart)</span>
-<span class="nc" id="L130">                }</span>
-<span class="nc" id="L131">            val response =</span>
-<span class="nc" id="L132">                client.submitFormWithBinaryData(mellomlagringUrl(navEksternRefId), formData) {</span>
-<span class="nc" id="L133">                    headers {</span>
-<span class="nc bnc" id="L134" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) }</span>
-<span class="nc bnc" id="L135" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) }</span>
-<span class="nc" id="L136">                    }</span>
-<span class="nc" id="L137">                    contentType(ContentType.MultiPart.FormData)</span>
-<span class="nc" id="L138">                    bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L139">                }</span>
-
-<span class="nc bnc" id="L141" title="All 2 branches missed.">            check(response.status.isSuccess()) {</span>
-<span class="nc" id="L142">                &quot;Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}&quot;</span>
+    ): UUID {
+<span class="nc" id="L102">        var lastException: Exception? = null</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">        for (attempt in 1..MAX_ATTEMPTS) {</span>
+<span class="nc" id="L104">            try {</span>
+<span class="nc" id="L105">                return uploadFileAttempt(navEksternRefId, filename, contentType, data)</span>
+<span class="nc" id="L106">            } catch (e: Exception) {</span>
+<span class="nc" id="L107">                lastException = e</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                if (attempt &lt; MAX_ATTEMPTS) {</span>
+<span class="nc" id="L109">                    val delayMs = RETRY_DELAYS_MS[attempt - 1]</span>
+<span class="nc" id="L110">                    logger.warn(</span>
+<span class="nc" id="L111">                        &quot;Mellomlagring upload attempt $attempt/$MAX_ATTEMPTS failed for &quot; +</span>
+<span class="nc" id="L112">                            &quot;$navEksternRefId, retrying in ${delayMs}ms&quot;,</span>
+<span class="nc" id="L113">                        e,</span>
+                    )
+<span class="nc" id="L115">                    meterRegistry.counter(&quot;mellomlagring.upload.retry&quot;).increment()</span>
+<span class="nc" id="L116">                    delay(delayMs.milliseconds)</span>
+                }
             }
-
-<span class="nc" id="L145">            val mellomlagring = response.body&lt;MellomlagringResponse&gt;()</span>
-<span class="nc bnc" id="L146" title="All 2 branches missed.">            mellomlagring.mellomlagringMetadataList</span>
-<span class="nc" id="L147">                .firstOrNull()</span>
-<span class="nc bnc" id="L148" title="All 2 branches missed.">                ?.filId</span>
-<span class="nc bnc" id="L149" title="All 2 branches missed.">                ?.let { UUID.fromString(it) }</span>
-<span class="nc" id="L150">                ?: error(&quot;No filId returned from mellomlagring for upload to $navEksternRefId&quot;)</span>
-<span class="nc" id="L151">        }.also {</span>
-<span class="nc" id="L152">            meterRegistry.timer(&quot;mellomlagring.upload&quot;).record(it.duration.toJavaDuration())</span>
-<span class="nc" id="L153">        }.value</span>
-
-    suspend fun listFiles(navEksternRefId: String): List&lt;MellomlagringFilInfo&gt; {
-<span class="nc" id="L156">        val response =</span>
-<span class="nc" id="L157">            client.get(mellomlagringUrl(navEksternRefId)) {</span>
-<span class="nc" id="L158">                headers {</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) }</span>
-<span class="nc bnc" id="L160" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) }</span>
-<span class="nc" id="L161">                }</span>
-<span class="nc" id="L162">                accept(ContentType.Application.Json)</span>
-<span class="nc" id="L163">                bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L164">            }</span>
-<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (response.status == HttpStatusCode.NotFound) return emptyList()</span>
-<span class="nc bnc" id="L166" title="All 2 branches missed.">        check(response.status.isSuccess()) {</span>
-<span class="nc" id="L167">            &quot;Mellomlagring listFiles failed for $navEksternRefId: ${response.status}. &quot; +</span>
-<span class="nc" id="L168">                &quot;Body: ${response.bodyAsText()}&quot;</span>
         }
-<span class="nc" id="L170">        return response.body&lt;MellomlagringResponse&gt;().mellomlagringMetadataList</span>
+<span class="nc" id="L120">        throw lastException!!</span>
     }
 
-<span class="nc" id="L173">    suspend fun replaceFile(</span>
+    private suspend fun uploadFileAttempt(
+        navEksternRefId: String,
+        filename: String,
+        contentType: String,
+        data: ByteArray,
+    ): UUID =
+<span class="nc" id="L129">        measureTimedValue {</span>
+<span class="nc" id="L130">            val metadataPart =</span>
+<span class="nc" id="L131">                FormPart(</span>
+<span class="nc" id="L132">                    key = &quot;metadata&quot;,</span>
+<span class="nc" id="L133">                    value = Json.encodeToString(MellomlagringMetadata(filename, data.size.toLong(), contentType)),</span>
+                    headers =
+<span class="nc" id="L135">                        Headers.build {</span>
+<span class="nc" id="L136">                            append(</span>
+<span class="nc" id="L137">                                HttpHeaders.ContentType,</span>
+<span class="nc" id="L138">                                ContentType.Application.Json.toString(),</span>
+                            )
+<span class="nc" id="L140">                        },</span>
+                )
+<span class="nc" id="L142">            val filePart =</span>
+<span class="nc" id="L143">                FormPart(</span>
+<span class="nc" id="L144">                    key = &quot;files&quot;,</span>
+<span class="nc" id="L145">                    value = ChannelProvider { ByteReadChannel(data) },</span>
+                    headers =
+<span class="nc" id="L147">                        Headers.build {</span>
+<span class="nc" id="L148">                            append(HttpHeaders.ContentType, contentType)</span>
+<span class="nc" id="L149">                            append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;$filename&quot;&quot;&quot;&quot;)</span>
+<span class="nc" id="L150">                        },</span>
+                )
+<span class="nc" id="L152">            val formData =</span>
+<span class="nc" id="L153">                formData {</span>
+<span class="nc" id="L154">                    append(metadataPart)</span>
+<span class="nc" id="L155">                    append(filePart)</span>
+<span class="nc" id="L156">                }</span>
+<span class="nc" id="L157">            val response =</span>
+<span class="nc" id="L158">                client.submitFormWithBinaryData(mellomlagringUrl(navEksternRefId), formData) {</span>
+<span class="nc" id="L159">                    headers {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                        integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) }</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                        integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) }</span>
+<span class="nc" id="L162">                    }</span>
+<span class="nc" id="L163">                    contentType(ContentType.MultiPart.FormData)</span>
+<span class="nc" id="L164">                    bearerAuth(texasClient.getMaskinportenToken())</span>
+<span class="nc" id="L165">                }</span>
+
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            check(response.status.isSuccess()) {</span>
+<span class="nc" id="L168">                &quot;Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}&quot;</span>
+            }
+
+<span class="nc" id="L171">            val mellomlagring = response.body&lt;MellomlagringResponse&gt;()</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            mellomlagring.mellomlagringMetadataList</span>
+<span class="nc" id="L173">                .firstOrNull()</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                ?.filId</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                ?.let { UUID.fromString(it) }</span>
+<span class="nc" id="L176">                ?: error(&quot;No filId returned from mellomlagring for upload to $navEksternRefId&quot;)</span>
+<span class="nc" id="L177">        }.also {</span>
+<span class="nc" id="L178">            meterRegistry.timer(&quot;mellomlagring.upload&quot;).record(it.duration.toJavaDuration())</span>
+<span class="nc" id="L179">        }.value</span>
+
+    suspend fun listFiles(navEksternRefId: String): List&lt;MellomlagringFilInfo&gt; {
+<span class="nc" id="L182">        val response =</span>
+<span class="nc" id="L183">            client.get(mellomlagringUrl(navEksternRefId)) {</span>
+<span class="nc" id="L184">                headers {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) }</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) }</span>
+<span class="nc" id="L187">                }</span>
+<span class="nc" id="L188">                accept(ContentType.Application.Json)</span>
+<span class="nc" id="L189">                bearerAuth(texasClient.getMaskinportenToken())</span>
+<span class="nc" id="L190">            }</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (response.status == HttpStatusCode.NotFound) return emptyList()</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        check(response.status.isSuccess()) {</span>
+<span class="nc" id="L193">            &quot;Mellomlagring listFiles failed for $navEksternRefId: ${response.status}. &quot; +</span>
+<span class="nc" id="L194">                &quot;Body: ${response.bodyAsText()}&quot;</span>
+        }
+<span class="nc" id="L196">        return response.body&lt;MellomlagringResponse&gt;().mellomlagringMetadataList</span>
+    }
+
+<span class="nc" id="L199">    suspend fun replaceFile(</span>
         navEksternRefId: String,
         filename: String,
         contentType: String,
         data: ByteArray,
     ): UUID {
-<span class="nc" id="L179">        listFiles(navEksternRefId)</span>
-<span class="nc" id="L180">            .filter { it.filnavn == filename }</span>
-<span class="nc" id="L181">            .forEach { deleteFile(navEksternRefId, UUID.fromString(it.filId), throwOnError = true) }</span>
-<span class="nc" id="L182">        return uploadFile(navEksternRefId, filename, contentType, data)</span>
+<span class="nc" id="L205">        listFiles(navEksternRefId)</span>
+<span class="nc" id="L206">            .filter { it.filnavn == filename }</span>
+<span class="nc" id="L207">            .forEach { deleteFile(navEksternRefId, UUID.fromString(it.filId), throwOnError = true) }</span>
+<span class="nc" id="L208">        return uploadFile(navEksternRefId, filename, contentType, data)</span>
     }
 
-<span class="nc" id="L185">    suspend fun deleteFile(</span>
+<span class="nc" id="L211">    suspend fun deleteFile(</span>
         navEksternRefId: String,
         filId: UUID,
-<span class="nc" id="L188">        throwOnError: Boolean = false,</span>
+<span class="nc" id="L214">        throwOnError: Boolean = false,</span>
     ) {
-<span class="nc" id="L190">        val response =</span>
-<span class="nc" id="L191">            client.delete(&quot;${mellomlagringUrl(navEksternRefId)}/$filId&quot;) {</span>
-<span class="nc" id="L192">                headers {</span>
-<span class="nc bnc" id="L193" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) }</span>
-<span class="nc bnc" id="L194" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) }</span>
-<span class="nc" id="L195">                }</span>
-<span class="nc" id="L196">                bearerAuth(texasClient.getMaskinportenToken())</span>
-<span class="nc" id="L197">            }</span>
-<span class="nc" id="L198">        when (response.status) {</span>
-<span class="nc bnc" id="L199" title="All 2 branches missed.">            HttpStatusCode.NotFound -&gt; {</span>
-<span class="nc" id="L200">                logger.info(</span>
-<span class="nc" id="L201">                    &quot;File $filId not found in mellomlagring, ignoring. It has probably already been deleted&quot;,</span>
+<span class="nc" id="L216">        val response =</span>
+<span class="nc" id="L217">            client.delete(&quot;${mellomlagringUrl(navEksternRefId)}/$filId&quot;) {</span>
+<span class="nc" id="L218">                headers {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                    integrasjonsid?.let { append(&quot;IntegrasjonId&quot;, it) }</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                    integrasjonspassord?.let { append(&quot;IntegrasjonPassord&quot;, it) }</span>
+<span class="nc" id="L221">                }</span>
+<span class="nc" id="L222">                bearerAuth(texasClient.getMaskinportenToken())</span>
+<span class="nc" id="L223">            }</span>
+<span class="nc" id="L224">        when (response.status) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            HttpStatusCode.NotFound -&gt; {</span>
+<span class="nc" id="L226">                logger.info(</span>
+<span class="nc" id="L227">                    &quot;File $filId not found in mellomlagring, ignoring. It has probably already been deleted&quot;,</span>
                 )
             }
-
-<span class="nc bnc" id="L205" title="All 4 branches missed.">            HttpStatusCode.OK, HttpStatusCode.NoContent -&gt; {</span>
+<span class="nc bnc" id="L230" title="All 4 branches missed.">            HttpStatusCode.OK, HttpStatusCode.NoContent -&gt; {</span>
                 // File deleted successfully, nothing to do
             }
-
             else -&gt; {
-<span class="nc" id="L210">                val message = &quot;Failed to delete file $filId from mellomlagring: ${response.status}&quot;</span>
-<span class="nc bnc" id="L211" title="All 2 branches missed.">                if (throwOnError) error(message) else logger.warn(message)</span>
+<span class="nc" id="L234">                val message = &quot;Failed to delete file $filId from mellomlagring: ${response.status}&quot;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                if (throwOnError) error(message) else logger.warn(message)</span>
             }
         }
-<span class="nc" id="L214">    }</span>
+<span class="nc" id="L238">    }</span>
 }
 
-<span class="nc bnc" id="L217" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L218">private data class MellomlagringMetadata(</span>
-<span class="nc" id="L219">    val filnavn: String,</span>
-<span class="nc" id="L220">    val storrelse: Long,</span>
-<span class="nc" id="L221">    val mimetype: String,</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L242">private data class MellomlagringMetadata(</span>
+<span class="nc" id="L243">    val filnavn: String,</span>
+<span class="nc" id="L244">    val storrelse: Long,</span>
+<span class="nc" id="L245">    val mimetype: String,</span>
 )
 
-<span class="nc bnc" id="L224" title="All 10 branches missed.">@Serializable</span>
-<span class="nc" id="L225">private data class MellomlagringResponse(</span>
-<span class="nc" id="L226">    val navEksternRefId: String,</span>
-<span class="nc" id="L227">    val mellomlagringMetadataList: List&lt;MellomlagringFilInfo&gt; = emptyList(),</span>
-<span class="nc" id="L228">)</span>
+<span class="nc bnc" id="L248" title="All 10 branches missed.">@Serializable</span>
+<span class="nc" id="L249">private data class MellomlagringResponse(</span>
+<span class="nc" id="L250">    val navEksternRefId: String,</span>
+<span class="nc" id="L251">    val mellomlagringMetadataList: List&lt;MellomlagringFilInfo&gt; = emptyList(),</span>
+<span class="nc" id="L252">)</span>
 
-<span class="nc bnc" id="L230" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L231">data class MellomlagringFilInfo(</span>
-<span class="nc" id="L232">    val filnavn: String,</span>
-<span class="nc" id="L233">    val filId: String,</span>
-<span class="nc" id="L234">    val storrelse: Long,</span>
-<span class="nc" id="L235">    val mimetype: String,</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L255">data class MellomlagringFilInfo(</span>
+<span class="nc" id="L256">    val filnavn: String,</span>
+<span class="nc" id="L257">    val filId: String,</span>
+<span class="nc" id="L258">    val storrelse: Long,</span>
+<span class="nc" id="L259">    val mimetype: String,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
