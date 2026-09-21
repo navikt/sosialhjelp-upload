@@ -158,7 +158,6 @@ class EttersendelseService(
         if (response.status.isSuccess()) {
             cleanupSubmission(submissionId)
             logger.info("Successfully submitted ettersendelse for $fiksDigisosId to Fiks")
-            teamLogger.info("Successfully submitted ettersendelse for $fiksDigisosId to Fiks, med fnr??", "fnr" to "12126912121")
             return true
         }
         return false
