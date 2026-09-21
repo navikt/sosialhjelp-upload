@@ -5,6 +5,7 @@ package no.nav.sosialhjelp.upload.action.fiks
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
@@ -30,15 +31,16 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.ktor.utils.io.ByteReadChannel
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
 import java.util.UUID
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTimedValue
 import kotlin.time.toJavaDuration
+
+private const val DEFAULT_REQUEST_TIMEOUT_MS = 30_000L
+private const val CONNECT_TIMEOUT_MS = 10_000L
 
 class MellomlagringClient(
     @Property("fiks.baseUrl") private val fiksBaseUrl: String,
@@ -59,6 +61,10 @@ class MellomlagringClient(
                         override fun log(message: String) = this@MellomlagringClient.logger.info(message)
                     }
                 level = LogLevel.INFO
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = DEFAULT_REQUEST_TIMEOUT_MS
+                connectTimeoutMillis = CONNECT_TIMEOUT_MS
             }
         }
     }
@@ -88,39 +94,7 @@ class MellomlagringClient(
         return response.bodyAsBytes()
     }
 
-    companion object {
-        private val RETRY_DELAYS_MS = listOf(500L, 2000L)
-        val MAX_ATTEMPTS = RETRY_DELAYS_MS.size + 1
-    }
-
     suspend fun uploadFile(
-        navEksternRefId: String,
-        filename: String,
-        contentType: String,
-        data: ByteArray,
-    ): UUID {
-        var lastException: Exception? = null
-        for (attempt in 1..MAX_ATTEMPTS) {
-            try {
-                return uploadFileAttempt(navEksternRefId, filename, contentType, data)
-            } catch (e: Exception) {
-                lastException = e
-                if (attempt < MAX_ATTEMPTS) {
-                    val delayMs = RETRY_DELAYS_MS[attempt - 1]
-                    logger.warn(
-                        "Mellomlagring upload attempt $attempt/$MAX_ATTEMPTS failed for " +
-                            "$navEksternRefId, retrying in ${delayMs}ms",
-                        e,
-                    )
-                    meterRegistry.counter("mellomlagring.upload.retry").increment()
-                    delay(delayMs.milliseconds)
-                }
-            }
-        }
-        throw lastException!!
-    }
-
-    private suspend fun uploadFileAttempt(
         navEksternRefId: String,
         filename: String,
         contentType: String,
@@ -227,9 +201,11 @@ class MellomlagringClient(
                     "File $filId not found in mellomlagring, ignoring. It has probably already been deleted",
                 )
             }
+
             HttpStatusCode.OK, HttpStatusCode.NoContent -> {
                 // File deleted successfully, nothing to do
             }
+
             else -> {
                 val message = "Failed to delete file $filId from mellomlagring: ${response.status}"
                 if (throwOnError) error(message) else logger.warn(message)
