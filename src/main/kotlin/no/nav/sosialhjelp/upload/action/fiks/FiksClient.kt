@@ -216,19 +216,18 @@ class FiksClient(
     }
 }
 
-internal fun sanitizeFiksError(error: ErrorMessage): String =
-    runCatching {
-        val message =
-            error.message
-                ?.lineSequence()
-                // Fiks lists filenames on indented lines. Keep the reason and counts, not filenames.
-                ?.filterNot { it.startsWith(' ') || it.startsWith('\t') }
-                ?.joinToString(" | ") { it.trim() }
-        listOfNotNull(
-            error.errorId?.let { "errorId=$it" },
-            message?.takeIf { it.isNotBlank() }?.let { "message=$it" },
-        ).joinToString(", ")
-    }.getOrElse { "Fikk feil ved parsing av fiks-melding" }
+internal fun sanitizeFiksError(error: ErrorMessage): String {
+    val message =
+        error.message
+            ?.lineSequence()
+            // Fiks lists filenames on indented lines. Keep the reason and counts, not filenames.
+            ?.filterNot { it.startsWith(' ') || it.startsWith('\t') }
+            ?.joinToString(" | ") { it.trim() }
+    return listOfNotNull(
+        error.errorId?.let { "errorId=$it" },
+        message?.takeIf { it.isNotBlank() }?.let { "message=$it" },
+    ).joinToString(", ")
+}
 
 internal fun lagNavEksternRefId(
     digisosSak: DigisosSak,

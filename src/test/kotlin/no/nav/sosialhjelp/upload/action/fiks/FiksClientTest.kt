@@ -2,6 +2,7 @@ package no.nav.sosialhjelp.upload.action.fiks
 
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.api.fiks.DokumentInfo
+import no.nav.sosialhjelp.api.fiks.ErrorMessage
 import no.nav.sosialhjelp.api.fiks.Ettersendelse
 import no.nav.sosialhjelp.api.fiks.EttersendtInfoNAV
 import no.nav.sosialhjelp.api.fiks.OriginalSoknadNAV
@@ -109,24 +110,37 @@ class FiksClientTest {
 
     @Test
     fun `sanitizes filenames from Fiks upload error`() {
-        val body =
-            "{\"errorId\":\"error-id\",\"message\":\"" +
-                "Opplastede filer stemmer ikke med metadata i vedlegg.json\\n" +
-                "2 vedlegg listet i vedlegg.json er ikke lastet opp:\\n" +
-                "  vedtak om godkjent flytting.pdf\\n" +
-                "1 opplastede filer er ikke listet i vedlegg.json:\\n" +
-                "  ettersendelse.pdf\"}"
-
+        val errorMessage =
+            createErrorMessage(
+                errorId = "error-id",
+                message =
+                    "Opplastede filer stemmer ikke med metadata i vedlegg.json\n" +
+                        "2 vedlegg listet i vedlegg.json er ikke lastet opp:\n" +
+                        "  vedtak om godkjent flytting.pdf\n" +
+                        "1 opplastede filer er ikke listet i vedlegg.json:\n" +
+                        "  ettersendelse.pdf",
+            )
         assertEquals(
             "errorId=error-id, message=Opplastede filer stemmer ikke med metadata i vedlegg.json | " +
                 "2 vedlegg listet i vedlegg.json er ikke lastet opp: | " +
                 "1 opplastede filer er ikke listet i vedlegg.json:",
-            sanitizeFiksError(body),
+            sanitizeFiksError(errorMessage),
         )
     }
-
-    @Test
-    fun `does not expose invalid Fiks error response`() {
-        assertEquals("Fikk feil ved parsing av fiks-melding", sanitizeFiksError("raw response"))
-    }
 }
+
+fun createErrorMessage(
+    errorId: String,
+    message: String,
+): ErrorMessage =
+    ErrorMessage(
+        errorId = errorId,
+        message = message,
+        error = null,
+        errorCode = null,
+        path = null,
+        originalPath = null,
+        errorJson = null,
+        status = null,
+        timestamp = null,
+    )
