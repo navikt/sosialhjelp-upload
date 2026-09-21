@@ -7,6 +7,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.Property
+import java.io.IOException
 
 class GotenbergService(
     @Property("gotenberg.url") gotenbergUrl: String,
@@ -17,6 +18,14 @@ class GotenbergService(
             install(HttpTimeout) {
                 requestTimeoutMillis = 25_000L
                 connectTimeoutMillis = 10_000L
+            }
+            install(HttpRequestRetry) {
+                maxRetries = 2
+                retryIf { _, response -> response.status.value in 500..599 }
+                retryOnExceptionIf { _, cause ->
+                    cause is IOException || cause is HttpRequestTimeoutException
+                }
+                exponentialDelay(base = 2.0, baseDelayMs = 500)
             }
             defaultRequest { url(gotenbergUrl) }
         }
