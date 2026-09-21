@@ -7,49 +7,58 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.Property
+import java.io.IOException
 
-<span class="fc" id="L11">class GotenbergService(</span>
+<span class="fc" id="L12">class GotenbergService(</span>
     @Property(&quot;gotenberg.url&quot;) gotenbergUrl: String,
 ) {
     private val gotenbergClient =
-<span class="fc" id="L15">        HttpClient(CIO) {</span>
-<span class="fc" id="L16">            expectSuccess = false</span>
-<span class="fc" id="L17">            install(HttpTimeout) {</span>
-<span class="fc" id="L18">                requestTimeoutMillis = 25_000L</span>
-<span class="fc" id="L19">                connectTimeoutMillis = 10_000L</span>
-<span class="fc" id="L20">            }</span>
-<span class="pc" id="L21">            defaultRequest { url(gotenbergUrl) }</span>
-<span class="fc" id="L22">        }</span>
+<span class="fc" id="L16">        HttpClient(CIO) {</span>
+<span class="fc" id="L17">            expectSuccess = false</span>
+<span class="fc" id="L18">            install(HttpTimeout) {</span>
+<span class="fc" id="L19">                requestTimeoutMillis = 25_000L</span>
+<span class="fc" id="L20">                connectTimeoutMillis = 10_000L</span>
+<span class="fc" id="L21">            }</span>
+<span class="fc" id="L22">            install(HttpRequestRetry) {</span>
+<span class="fc" id="L23">                maxRetries = 2</span>
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">                retryIf { _, response -&gt; response.status.value in 500..599 }</span>
+<span class="fc" id="L25">                retryOnExceptionIf { _, cause -&gt;</span>
+<span class="nc bnc" id="L26" title="All 4 branches missed.">                    cause is IOException || cause is HttpRequestTimeoutException</span>
+                }
+<span class="fc" id="L28">                exponentialDelay(base = 2.0, baseDelayMs = 500)</span>
+<span class="fc" id="L29">            }</span>
+<span class="fc" id="L30">            defaultRequest { url(gotenbergUrl) }</span>
+<span class="fc" id="L31">        }</span>
 
     private fun buildHeaders(filetype: String): Headers =
-<span class="nc" id="L25">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$filetype&quot;&quot;&quot;&quot;) }</span>
+<span class="fc" id="L34">        Headers.build { append(HttpHeaders.ContentDisposition, &quot;&quot;&quot;filename=&quot;file.$filetype&quot;&quot;&quot;&quot;) }</span>
 
     suspend fun convertToPdf(
         data: ByteArray,
         extension: String,
     ): GotenbergConversionResult {
-<span class="nc" id="L31">        val res =</span>
-<span class="nc" id="L32">            gotenbergClient</span>
-<span class="nc" id="L33">                .submitFormWithBinaryData(</span>
-<span class="nc" id="L34">                    formData { append(&quot;file&quot;, data, buildHeaders(extension)) },</span>
+<span class="fc" id="L40">        val res =</span>
+<span class="fc" id="L41">            gotenbergClient</span>
+<span class="fc" id="L42">                .submitFormWithBinaryData(</span>
+<span class="fc" id="L43">                    formData { append(&quot;file&quot;, data, buildHeaders(extension)) },</span>
                 )
 
-<span class="nc bnc" id="L37" title="All 2 branches missed.">        if (res.status == HttpStatusCode.BadRequest) {</span>
-<span class="nc" id="L38">            return GotenbergConversionResult.UnsupportedFiletype(extension)</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (res.status == HttpStatusCode.BadRequest) {</span>
+<span class="fc" id="L47">            return GotenbergConversionResult.UnsupportedFiletype(extension)</span>
         }
-<span class="nc bnc" id="L40" title="All 2 branches missed.">        check(res.status.isSuccess()) { &quot;Failed to convert file type $extension to PDF: ${res.status}&quot; }</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        check(res.status.isSuccess()) { &quot;Failed to convert file type $extension to PDF: ${res.status}&quot; }</span>
 
-<span class="nc" id="L42">        return GotenbergConversionResult.Success(res.readRawBytes())</span>
+<span class="fc" id="L51">        return GotenbergConversionResult.Success(res.readRawBytes())</span>
     }
 }
 
 sealed class GotenbergConversionResult {
-<span class="fc" id="L47">    class UnsupportedFiletype(</span>
-<span class="fc" id="L48">        val extension: String,</span>
+<span class="fc" id="L56">    class UnsupportedFiletype(</span>
+<span class="fc" id="L57">        val extension: String,</span>
     ) : GotenbergConversionResult()
 
-<span class="fc" id="L51">    class Success(</span>
-<span class="fc" id="L52">        val bytes: ByteArray,</span>
+<span class="fc" id="L60">    class Success(</span>
+<span class="fc" id="L61">        val bytes: ByteArray,</span>
     ) : GotenbergConversionResult()
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
