@@ -49,7 +49,7 @@ class TexasClient(
                     accept(ContentType.Application.Json)
                     contentType(ContentType.Application.Json)
                     setBody(maskinportenParams)
-        }
+                }
 
         if (response.status.isSuccess()) {
             val body = response.body<TokenSuccessResponse>()
