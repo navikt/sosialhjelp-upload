@@ -13,6 +13,7 @@ import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
+import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -43,6 +44,7 @@ class EttersendelseService(
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val teamLogger = teamLogger(this::class)
 
     suspend fun upload(
         metadata: Metadata,

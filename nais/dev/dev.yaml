@@ -35,6 +35,8 @@ spec:
         - host: minside.fiks.test.ks.no
         - host: test.idporten.no
       rules:
+        - application: logging
+          namespace: nais-system
         - application: clamav
           namespace: nais-system
         - application: sosialhjelp-konvertering-til-pdf

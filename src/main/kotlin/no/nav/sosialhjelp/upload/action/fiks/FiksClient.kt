@@ -27,6 +27,7 @@ import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.api.fiks.ErrorMessage
 import no.nav.sosialhjelp.upload.action.Metadata
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
+import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.slf4j.LoggerFactory
@@ -47,6 +48,7 @@ class FiksClient(
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java.name)
+    private val teamLogger = teamLogger(this::class)
 
     private fun ettersendelseUrl(
         fiksDigisosId: String,
@@ -180,6 +182,7 @@ class FiksClient(
                             throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
                         }
                         logger.error("Feil ved opplasting til fiks: ${it.status}: ${sanitizeFiksError(body)}")
+                        teamLogger.error("Feil ved opplasting til fiks: ${it.status}: $body")
                     } else {
                         logger.info("Opplasting til fiks vellykket: ${it.status}")
                     }
