@@ -196,9 +196,9 @@ class FiksClient(
     suspend fun getSak(
         id: String,
         token: String,
-    ): DigisosSak =
-        client
-            .get(digisosSakUrl(id)) {
+    ): DigisosSak {
+        val response =
+            client.get(digisosSakUrl(id)) {
                 headers {
                     integrasjonsid?.let {
                         append("IntegrasjonId", integrasjonsid)
@@ -207,7 +207,17 @@ class FiksClient(
                 }
                 accept(ContentType.Application.Json)
                 bearerAuth(token)
-            }.body()
+            }
+        if (!response.status.isSuccess()) {
+            // Error body may not be JSON (e.g. gateway errors), so don't let parsing mask the real status.
+            val error = runCatching { response.body<ErrorMessage>() }.getOrNull()
+            val sanitized = error?.let(::sanitizeFiksError).orEmpty()
+            logger.error("Feil ved henting av DigisosSak fra Fiks: ${response.status}: $sanitized")
+            teamLogger.error("Feil ved henting av DigisosSak fra Fiks: ${response.status}: $error")
+            throw FiksGetSakException(response.status, id, sanitized)
+        }
+        return response.body()
+    }
 
     suspend fun getNewNavEksternRefId(
         fiksDigisosId: String,
@@ -264,6 +274,15 @@ class EttersendelseAlreadyExistsException(
     val navEksternRefId: String,
     val fiksDigisosId: String,
 ) : RuntimeException("Ettersendelse $navEksternRefId already exists for fiksDigisosId $fiksDigisosId")
+
+class FiksGetSakException(
+    val status: HttpStatusCode,
+    val fiksDigisosId: String,
+    sanitizedError: String,
+) : RuntimeException(
+        "Henting av DigisosSak $fiksDigisosId feilet: $status" +
+            if (sanitizedError.isNotBlank()) " ($sanitizedError)" else "",
+    )
 
 @Serializable
 data class Fil(
