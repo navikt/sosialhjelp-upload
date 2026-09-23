@@ -14,11 +14,13 @@ class VedleggService(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
-     * Deletes every submission for [navEksternRefId], including the files in Fiks mellomlagring.
-     * Called by sosialhjelp-soknad-api once the søknad has been sent.
+     * Deletes every submission for [navEksternRefId], including the files in Fiks mellomlagring
+     * unless [keepMellomlagring] is true. Called by sosialhjelp-soknad-api once the søknad has been sent.
      */
-    suspend fun deleteVedlegg(navEksternRefId: String): Int =
-        submissionDeletionService.deleteByNavEksternRefId(navEksternRefId)
+    suspend fun deleteVedlegg(
+        navEksternRefId: String,
+        keepMellomlagring: Boolean,
+    ): Int = submissionDeletionService.deleteByNavEksternRefId(navEksternRefId, keepMellomlagring = keepMellomlagring)
 
     /**
      * Deletes the submission for [navEksternRefId] + [kategori], including the files in Fiks
@@ -28,7 +30,12 @@ class VedleggService(
     suspend fun deleteVedlegg(
         navEksternRefId: String,
         kategori: String,
-    ): Int = submissionDeletionService.deleteByNavEksternRefId(navEksternRefId, kategori)
+    ): Int =
+        submissionDeletionService.deleteByNavEksternRefId(
+            navEksternRefId,
+            keepMellomlagring = false,
+            kategori = kategori,
+        )
 
     suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
         val uploads =

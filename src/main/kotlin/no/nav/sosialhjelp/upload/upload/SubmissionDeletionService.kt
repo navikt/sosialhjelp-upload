@@ -27,7 +27,10 @@ class SubmissionDeletionService(
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    suspend fun deleteSubmission(submissionId: UUID): Boolean {
+    suspend fun deleteSubmission(
+        submissionId: UUID,
+        keepMellomlagring: Boolean,
+    ): Boolean {
         val resources =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx -> uploadRepository.getSubmissionResources(tx, submissionId) }
@@ -35,8 +38,8 @@ class SubmissionDeletionService(
 
         withMdc("navEksternRefId" to resources.navEksternRefId) {
             logger.info(
-                "Deleting submission $submissionId (navEksternRefId=${resources.navEksternRefId}, " +
-                    "kategori=${resources.kategori}, filer=${resources.filIds.size})",
+                "Deleting submission $submissionId " +
+                    "(kategori=${resources.kategori}, filer=${resources.filIds.size})",
             )
             withContext(ioDispatcher) {
                 dsl.transaction { tx -> submissionQueries.cleanup(tx, submissionId) }
@@ -45,7 +48,9 @@ class SubmissionDeletionService(
             runCatching { notificationService.notifyDeleted(submissionId) }
                 .onFailure { logger.warn("Failed to notify deletion of submission $submissionId", it) }
 
-            deleteMellomlagringFiles(resources)
+            if (!keepMellomlagring) {
+                deleteMellomlagringFiles(resources)
+            }
             deleteGcsObjects(resources)
 
             logger.info(
@@ -57,13 +62,14 @@ class SubmissionDeletionService(
 
     suspend fun deleteByNavEksternRefId(
         navEksternRefId: String,
+        keepMellomlagring: Boolean,
         kategori: String? = null,
     ): Int {
         val submissionIds =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx -> uploadRepository.findSubmissionIds(tx, navEksternRefId, kategori) }
             }
-        return submissionIds.count { deleteSubmission(it) }
+        return submissionIds.count { deleteSubmission(it, keepMellomlagring) }
     }
 
     private suspend fun deleteMellomlagringFiles(resources: SubmissionResources) {

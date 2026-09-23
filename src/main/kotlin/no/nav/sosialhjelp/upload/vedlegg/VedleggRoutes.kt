@@ -11,6 +11,7 @@ import io.ktor.server.routing.application
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
+import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.verifyNavEksternRefIdOwnershipByPid
 
 fun Route.configureVedleggRoutes() {
@@ -31,7 +32,8 @@ fun Route.configureVedleggRoutes() {
 
                 delete {
                     val navEksternRefId = call.parameters["navEksternRefId"]!!
-                    vedleggService.deleteVedlegg(navEksternRefId)
+                    val keepMellomlagring = call.queryParameters["keepMellomlagring"]?.toBooleanStrictOrNull() ?: false
+                    vedleggService.deleteVedlegg(navEksternRefId, keepMellomlagring)
                     call.respond(NoContent)
                 }
 
@@ -46,8 +48,9 @@ fun Route.configureVedleggRoutes() {
                             "Missing kategori (vedleggstype)",
                             status = BadRequest,
                         )
-
-                    vedleggService.deleteVedlegg(navEksternRefId, kategori)
+                    withMdc("navEksternRefId" to navEksternRefId) {
+                        vedleggService.deleteVedlegg(navEksternRefId, kategori)
+                    }
                     call.respond(NoContent)
                 }
             }

@@ -197,8 +197,9 @@ class MellomlagringClient(
             }
         when (response.status) {
             HttpStatusCode.NotFound -> {
-                logger.info(
-                    "File $filId not found in mellomlagring, ignoring. It has probably already been deleted",
+                logger.debug(
+                    "File {} not found in mellomlagring, ignoring. It has probably already been deleted",
+                    filId,
                 )
             }
 

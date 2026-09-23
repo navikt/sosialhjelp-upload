@@ -16,6 +16,7 @@ import no.nav.sosialhjelp.upload.upload.StaleSubmissionQueries
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import org.jooq.DSLContext
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -34,6 +35,11 @@ class StaleSubmissionCleanupServiceIntegrationTest {
     private val uploadRepository = UploadRepository()
     private lateinit var mellomlagringClient: MellomlagringClient
     private val chunkStorage = FileSystemStorage()
+
+    @BeforeAll
+    fun migrate() {
+        PostgresTestContainer.migrate()
+    }
 
     @BeforeEach
     fun cleanDb() {
@@ -212,13 +218,41 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                 meterRegistry = SimpleMeterRegistry(),
             )
 
-        val deleted = runBlocking { deletionService.deleteByNavEksternRefId(navEksternRefId) }
+        val deleted =
+            runBlocking { deletionService.deleteByNavEksternRefId(navEksternRefId, keepMellomlagring = false) }
 
         assertEquals(2, deleted)
         assertNull(submissionExists(a))
         assertNull(submissionExists(b))
         coVerify { mellomlagringClient.deleteFile(navEksternRefId, filA, any()) }
         coVerify { mellomlagringClient.deleteFile(navEksternRefId, filB, any()) }
+    }
+
+    @Test
+    fun `deleting by navEksternRefId with keepMellomlagring keeps files in mellomlagring`() {
+        val navEksternRefId = UUID.randomUUID().toString()
+        val a = createMockSubmission(dsl, navEksternRefId = navEksternRefId, kategori = "husleie")
+        val b = createMockSubmission(dsl, navEksternRefId = navEksternRefId, kategori = "kontoutskrift")
+        insertUpload(a, filId = UUID.randomUUID())
+        insertUpload(b, filId = UUID.randomUUID())
+
+        val deletionService =
+            SubmissionDeletionService(
+                dsl = dsl,
+                submissionQueries = submissionQueries,
+                uploadRepository = uploadRepository,
+                mellomlagringClient = mellomlagringClient,
+                chunkStorage = chunkStorage,
+                notificationService = mockk(relaxed = true),
+                meterRegistry = SimpleMeterRegistry(),
+            )
+
+        val deleted = runBlocking { deletionService.deleteByNavEksternRefId(navEksternRefId, keepMellomlagring = true) }
+
+        assertEquals(2, deleted)
+        assertNull(submissionExists(a))
+        assertNull(submissionExists(b))
+        coVerify(exactly = 0) { mellomlagringClient.deleteFile(navEksternRefId, any(), any()) }
     }
 
     @Test
@@ -242,7 +276,14 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                 meterRegistry = SimpleMeterRegistry(),
             )
 
-        val deleted = runBlocking { deletionService.deleteByNavEksternRefId(navEksternRefId, "husleie") }
+        val deleted =
+            runBlocking {
+                deletionService.deleteByNavEksternRefId(
+                    navEksternRefId,
+                    keepMellomlagring = false,
+                    kategori = "husleie",
+                )
+            }
 
         assertEquals(1, deleted)
         assertNull(submissionExists(husleie))
