@@ -14,11 +14,13 @@ import org.jooq.DSLContext
 <span class="fc" id="L14">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
 <span class="fc" id="L15">) {</span>
     /**
-     * Deletes every submission for [navEksternRefId], including the files in Fiks mellomlagring.
-     * Called by sosialhjelp-soknad-api once the søknad has been sent.
+     * Deletes every submission for [navEksternRefId], including the files in Fiks mellomlagring
+     * unless [keepMellomlagring] is true. Called by sosialhjelp-soknad-api once the søknad has been sent.
      */
-    suspend fun deleteVedlegg(navEksternRefId: String): Int =
-<span class="nc" id="L21">        submissionDeletionService.deleteByNavEksternRefId(navEksternRefId)</span>
+    suspend fun deleteVedlegg(
+        navEksternRefId: String,
+        keepMellomlagring: Boolean,
+<span class="nc" id="L23">    ): Int = submissionDeletionService.deleteByNavEksternRefId(navEksternRefId, keepMellomlagring = keepMellomlagring)</span>
 
     /**
      * Deletes the submission for [navEksternRefId] + [kategori], including the files in Fiks
@@ -28,33 +30,38 @@ import org.jooq.DSLContext
     suspend fun deleteVedlegg(
         navEksternRefId: String,
         kategori: String,
-<span class="nc" id="L31">    ): Int = submissionDeletionService.deleteByNavEksternRefId(navEksternRefId, kategori)</span>
+    ): Int =
+<span class="nc" id="L34">        submissionDeletionService.deleteByNavEksternRefId(</span>
+<span class="nc" id="L35">            navEksternRefId,</span>
+<span class="nc" id="L36">            keepMellomlagring = false,</span>
+<span class="nc" id="L37">            kategori = kategori,</span>
+<span class="nc" id="L38">        )</span>
 
-<span class="fc" id="L33">    suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {</span>
-<span class="fc" id="L34">        val uploads =</span>
-<span class="fc" id="L35">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L36">                dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L37">                    uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
-<span class="fc" id="L38">                }</span>
+<span class="fc" id="L40">    suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {</span>
+<span class="fc" id="L41">        val uploads =</span>
+<span class="fc" id="L42">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L43">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L44">                    uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)</span>
+<span class="fc" id="L45">                }</span>
             }
 
-<span class="fc" id="L41">        val grouped = uploads.groupBy { it.category }</span>
+<span class="fc" id="L48">        val grouped = uploads.groupBy { it.category }</span>
 
-<span class="fc" id="L43">        val vedleggList =</span>
-<span class="fc" id="L44">            grouped.map { (key, files) -&gt;</span>
-<span class="fc" id="L45">                Vedlegg(</span>
-<span class="fc" id="L46">                    kategori = key,</span>
+<span class="fc" id="L50">        val vedleggList =</span>
+<span class="fc" id="L51">            grouped.map { (key, files) -&gt;</span>
+<span class="fc" id="L52">                Vedlegg(</span>
+<span class="fc" id="L53">                    kategori = key,</span>
                     filer =
-<span class="fc" id="L48">                        files.map { file -&gt;</span>
-<span class="fc" id="L49">                            Fil(</span>
-<span class="fc" id="L50">                                filnavn = file.mellomlagringFilnavn,</span>
-<span class="fc" id="L51">                                sha512 = file.sha512,</span>
-<span class="fc" id="L52">                            )</span>
+<span class="fc" id="L55">                        files.map { file -&gt;</span>
+<span class="fc" id="L56">                            Fil(</span>
+<span class="fc" id="L57">                                filnavn = file.mellomlagringFilnavn,</span>
+<span class="fc" id="L58">                                sha512 = file.sha512,</span>
+<span class="fc" id="L59">                            )</span>
                         },
-<span class="fc" id="L54">                )</span>
+<span class="fc" id="L61">                )</span>
             }
 
-<span class="fc" id="L57">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
+<span class="fc" id="L64">        return VedleggSpesifikasjon(vedlegg = vedleggList)</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -197,41 +197,42 @@ private const val CONNECT_TIMEOUT_MS = 10_000L
 <span class="nc" id="L197">            }</span>
 <span class="nc" id="L198">        when (response.status) {</span>
 <span class="nc bnc" id="L199" title="All 2 branches missed.">            HttpStatusCode.NotFound -&gt; {</span>
-<span class="nc" id="L200">                logger.info(</span>
-<span class="nc" id="L201">                    &quot;File $filId not found in mellomlagring, ignoring. It has probably already been deleted&quot;,</span>
+<span class="nc" id="L200">                logger.debug(</span>
+<span class="nc" id="L201">                    &quot;File {} not found in mellomlagring, ignoring. It has probably already been deleted&quot;,</span>
+<span class="nc" id="L202">                    filId,</span>
                 )
             }
 
-<span class="nc bnc" id="L205" title="All 4 branches missed.">            HttpStatusCode.OK, HttpStatusCode.NoContent -&gt; {</span>
+<span class="nc bnc" id="L206" title="All 4 branches missed.">            HttpStatusCode.OK, HttpStatusCode.NoContent -&gt; {</span>
                 // File deleted successfully, nothing to do
             }
 
             else -&gt; {
-<span class="nc" id="L210">                val message = &quot;Failed to delete file $filId from mellomlagring: ${response.status}&quot;</span>
-<span class="nc bnc" id="L211" title="All 2 branches missed.">                if (throwOnError) error(message) else logger.warn(message)</span>
+<span class="nc" id="L211">                val message = &quot;Failed to delete file $filId from mellomlagring: ${response.status}&quot;</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                if (throwOnError) error(message) else logger.warn(message)</span>
             }
         }
-<span class="nc" id="L214">    }</span>
+<span class="nc" id="L215">    }</span>
 }
 
-<span class="nc bnc" id="L217" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L218">private data class MellomlagringMetadata(</span>
-<span class="nc" id="L219">    val filnavn: String,</span>
-<span class="nc" id="L220">    val storrelse: Long,</span>
-<span class="nc" id="L221">    val mimetype: String,</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L219">private data class MellomlagringMetadata(</span>
+<span class="nc" id="L220">    val filnavn: String,</span>
+<span class="nc" id="L221">    val storrelse: Long,</span>
+<span class="nc" id="L222">    val mimetype: String,</span>
 )
 
-<span class="nc bnc" id="L224" title="All 10 branches missed.">@Serializable</span>
-<span class="nc" id="L225">private data class MellomlagringResponse(</span>
-<span class="nc" id="L226">    val navEksternRefId: String,</span>
-<span class="nc" id="L227">    val mellomlagringMetadataList: List&lt;MellomlagringFilInfo&gt; = emptyList(),</span>
-<span class="nc" id="L228">)</span>
+<span class="nc bnc" id="L225" title="All 10 branches missed.">@Serializable</span>
+<span class="nc" id="L226">private data class MellomlagringResponse(</span>
+<span class="nc" id="L227">    val navEksternRefId: String,</span>
+<span class="nc" id="L228">    val mellomlagringMetadataList: List&lt;MellomlagringFilInfo&gt; = emptyList(),</span>
+<span class="nc" id="L229">)</span>
 
-<span class="nc bnc" id="L230" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L231">data class MellomlagringFilInfo(</span>
-<span class="nc" id="L232">    val filnavn: String,</span>
-<span class="nc" id="L233">    val filId: String,</span>
-<span class="nc" id="L234">    val storrelse: Long,</span>
-<span class="nc" id="L235">    val mimetype: String,</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L232">data class MellomlagringFilInfo(</span>
+<span class="nc" id="L233">    val filnavn: String,</span>
+<span class="nc" id="L234">    val filId: String,</span>
+<span class="nc" id="L235">    val storrelse: Long,</span>
+<span class="nc" id="L236">    val mimetype: String,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
