@@ -30,13 +30,13 @@ import java.io.File
         sourceKeys: List&lt;String&gt;,
         destKey: String,
     ) {
-<span class="pc" id="L33">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L33">        withContext(ioDispatcher) {</span>
 <span class="fc" id="L34">            val dest = file(destKey)</span>
 <span class="pc" id="L35">            dest.outputStream().use { out -&gt;</span>
 <span class="pc" id="L36">                sourceKeys.forEach { key -&gt; file(key).inputStream().use { it.copyTo(out) } }</span>
 <span class="fc" id="L37">            }</span>
 <span class="fc" id="L38">        }</span>
-<span class="nc" id="L39">    }</span>
+<span class="fc" id="L39">    }</span>
 
     override suspend fun readObject(key: String): ByteArray =
 <span class="fc" id="L42">        withContext(ioDispatcher) {</span>
