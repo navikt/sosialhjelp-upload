@@ -6,8 +6,6 @@ fiks_kryptering = "2.5.0"
 flyway = "13.10.0"
 google-cloud-storage = "2.75.0"
 hikari = "7.1.0"
-jackson2 = "2.22.4"
-jackson3 = "3.2.4"
 jdbc = "42.7.13"
 jooq = "3.21.9"
 junit = "6.1.3"
@@ -35,8 +33,6 @@ flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "google-cloud-storage" }
 hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
-jackson2-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jackson2" }
-jackson3-bom = { module = "tools.jackson:jackson-bom", version.ref = "jackson3" }
 jdbc-postgresql = { module = "org.postgresql:postgresql", version.ref = "jdbc" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
 jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }

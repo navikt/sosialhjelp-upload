@@ -67,9 +67,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.slf4j)
     implementation(libs.ktor.server.netty)
     implementation(libs.logback.classic)
-    // Overstyr transitive Jackson-versjoner (CVE-er i 2.22.2 og 3.0.1)
-    implementation(platform(libs.jackson2.bom))
-    implementation(platform(libs.jackson3.bom))
     implementation(libs.logstash.logback.encoder)
     implementation(libs.ktor.server.config.yaml)
 
