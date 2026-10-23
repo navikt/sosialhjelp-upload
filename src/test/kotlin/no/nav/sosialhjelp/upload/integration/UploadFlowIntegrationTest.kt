@@ -53,6 +53,7 @@ import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.EttersendelseAlreadyExistsException
+import no.nav.sosialhjelp.upload.action.fiks.EttersendelseMottaker
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
@@ -372,6 +373,66 @@ class UploadFlowIntegrationTest {
                     .where(SUBMISSION.ID.eq(submissionId))
                     .fetchOne()
             assertNull(sub, "Submission should be deleted after successful submit")
+        }
+
+    @Test
+    fun `submit with klageId sends to klage mottaker without fetching sak`() =
+        appTest {
+            val contextId = UUID.randomUUID().toString()
+            val token = JwtTestUtils.issueToken()
+            val fiksDigisosId = UUID.randomUUID().toString()
+            val klageId = UUID.randomUUID()
+
+            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns UUID.randomUUID()
+            coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } returns
+                mockk<HttpResponse> { every { status } returns HttpStatusCode.OK }
+
+            val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+            val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+            awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+
+            val submitResp =
+                client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"fiksDigisosId":"$fiksDigisosId","klageId":"$klageId",""" +
+                            """"metadata":{"type":"dok","tilleggsinfo":"info"}}""",
+                    )
+                }
+            assertEquals(HttpStatusCode.Created, submitResp.status)
+
+            coVerify(exactly = 0) { fiksClient.getSak(any(), any()) }
+            coVerify {
+                fiksClient.uploadEttersendelse(
+                    fiksDigisosId,
+                    any(),
+                    EttersendelseMottaker.Klage(klageId),
+                    any(),
+                    any(),
+                    any(),
+                )
+            }
+        }
+
+    @Test
+    fun `submit with invalid klageId returns 400`() =
+        appTest {
+            val contextId = UUID.randomUUID().toString()
+            val token = JwtTestUtils.issueToken()
+            val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+
+            val submitResp =
+                client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"fiksDigisosId":"abc","klageId":"not-a-uuid",""" +
+                            """"metadata":{"type":"dok","tilleggsinfo":"info"}}""",
+                    )
+                }
+            assertEquals(HttpStatusCode.BadRequest, submitResp.status)
+            coVerify(exactly = 0) { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) }
         }
 
     @Test

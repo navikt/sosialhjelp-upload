@@ -84,6 +84,26 @@ class FiksClientTest {
     }
 
     @Test
+    fun `ignores klage refs in Fiks ettersendelser when incrementing`() {
+        val sak =
+            digisosSak(
+                originalSoknadRefId = "ref0000",
+                ettersendelser = listOf("ref0002", "3f2a1b4c-0000-4000-8000-000000009999"),
+            )
+        assertEquals("ref0003", lagNavEksternRefId(sak))
+    }
+
+    @Test
+    fun `isSoknadEttersendelseRef accepts counter refs and rejects other formats`() {
+        assertTrue(isSoknadEttersendelseRef("fiks-id-0001"))
+        assertTrue(isSoknadEttersendelseRef("ref0042"))
+        kotlin.test.assertFalse(isSoknadEttersendelseRef("3f2a1b4c-0000-4000-8000-000000009999"))
+        kotlin.test.assertFalse(isSoknadEttersendelseRef("3f2a1b4c-0000-4000-8000-00000000abcd"))
+        kotlin.test.assertFalse(isSoknadEttersendelseRef("refABCD"))
+        kotlin.test.assertFalse(isSoknadEttersendelseRef("0001"))
+    }
+
+    @Test
     fun `handles malformed suffix gracefully without throwing`() {
         // suffix is "ABCD" — not numeric, should use 0L as fallback
         val sak = digisosSak(ettersendelser = listOf("refABCD"))

@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.util.UUID
 
 private const val DEFAULT_REQUEST_TIMEOUT_MS = 30_000L
 private const val CONNECT_TIMEOUT_MS = 10_000L
@@ -52,9 +53,14 @@ class FiksClient(
 
     private fun ettersendelseUrl(
         fiksDigisosId: String,
-        kommunenummer: String,
         navEksternRefId: String,
-    ) = "$fiksBaseUrl/digisos/api/v2/soknader/$kommunenummer/$fiksDigisosId/$navEksternRefId"
+        mottaker: EttersendelseMottaker,
+    ) = when (mottaker) {
+        is EttersendelseMottaker.Soknad ->
+            "$fiksBaseUrl/digisos/api/v2/soknader/${mottaker.kommunenummer}/$fiksDigisosId/$navEksternRefId"
+        is EttersendelseMottaker.Klage ->
+            "$fiksBaseUrl/digisos/klage/api/v1/$fiksDigisosId/$navEksternRefId/${mottaker.klageId}/vedlegg"
+    }
 
     private fun digisosSakUrl(fiksDigisosId: String) = "$fiksBaseUrl/digisos/api/v1/soknader/$fiksDigisosId"
 
@@ -131,8 +137,8 @@ class FiksClient(
 
     suspend fun uploadEttersendelse(
         fiksDigisosId: String,
-        kommunenummer: String,
         navEksternRefId: String,
+        mottaker: EttersendelseMottaker,
         metadata: Metadata,
         token: String,
         filer: List<Fil>,
@@ -148,7 +154,7 @@ class FiksClient(
                             hendelseReferanse = metadata.hendelsereferanse,
                             status = Vedlegg.Status.LastetOpp,
                             filer = filer,
-                            klageId = null,
+                            klageId = (mottaker as? EttersendelseMottaker.Klage)?.klageId?.toString(),
                         ),
                     ),
             )
@@ -165,7 +171,7 @@ class FiksClient(
         try {
             return client
                 .submitFormWithBinaryData(
-                    ettersendelseUrl(fiksDigisosId, kommunenummer, navEksternRefId),
+                    ettersendelseUrl(fiksDigisosId, navEksternRefId, mottaker),
                     formData,
                 ) {
                     timeout { requestTimeoutMillis = UPLOAD_REQUEST_TIMEOUT_MS }
@@ -242,6 +248,30 @@ internal fun sanitizeFiksError(error: ErrorMessage): String {
     ).joinToString(", ")
 }
 
+/**
+ * Destination for an ettersendelse in Fiks. Søknad and klage use different endpoints
+ * and need different data, so the choice is modelled as a type rather than a nullable flag.
+ */
+sealed interface EttersendelseMottaker {
+    data class Soknad(
+        val kommunenummer: String,
+    ) : EttersendelseMottaker
+
+    data class Klage(
+        val klageId: UUID,
+    ) : EttersendelseMottaker
+}
+
+/**
+ * True if [navEksternRefId] has the søknad ettersendelse format: a prefix followed by a
+ * 4-digit counter. Refs in other formats (e.g. UUIDs used for klage) must not affect the
+ * counter used by [lagNavEksternRefId]. A UUID can end in four digits, so it is excluded explicitly.
+ */
+internal fun isSoknadEttersendelseRef(navEksternRefId: String): Boolean =
+    navEksternRefId.length > COUNTER_SUFFIX_LENGTH &&
+        navEksternRefId.takeLast(COUNTER_SUFFIX_LENGTH).all { it.isDigit() } &&
+        runCatching { UUID.fromString(navEksternRefId) }.isFailure
+
 internal fun lagNavEksternRefId(
     digisosSak: DigisosSak,
     localMax: String? = null,
@@ -250,6 +280,7 @@ internal fun lagNavEksternRefId(
         digisosSak.ettersendtInfoNAV
             ?.ettersendelser
             ?.map { it.navEksternRefId }
+            ?.filter { isSoknadEttersendelseRef(it) }
             ?.maxByOrNull { it.takeLast(COUNTER_SUFFIX_LENGTH).toLongOrNull() ?: 0L }
 
     // Take the highest counter across remote Fiks state and local in-flight submissions.
