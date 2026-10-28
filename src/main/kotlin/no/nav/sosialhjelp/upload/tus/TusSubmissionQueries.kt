@@ -188,7 +188,8 @@ class TusSubmissionQueries {
 
     /**
      * Returns the highest [navEksternRefId] among all local submissions for [fiksDigisosId],
-     * comparing the last 4 characters numerically. Only søknad-format refs are considered. Returns null if no submissions exist yet.
+     * comparing the last 4 characters numerically. Only søknad-format refs are considered.
+     * Returns null if no submissions exist yet.
      *
      * Used to seed the counter when generating a new navEksternRefId so that in-flight
      * submissions that haven't been submitted to Fiks yet are accounted for.
