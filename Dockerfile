@@ -3,4 +3,4 @@ ENV TZ="Europe/Oslo"
 
 COPY /build/libs/upload-all.jar app.jar
 
-ENTRYPOINT ["-jar", "app.jar"]
+CMD ["-jar", "app.jar"]
