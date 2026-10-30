@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.EttersendelseAlreadyExistsException
+import no.nav.sosialhjelp.upload.action.fiks.EttersendelseMottaker
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
@@ -52,9 +53,12 @@ class EttersendelseService(
         token: String,
         submissionId: UUID,
         personIdent: String,
+        klageId: UUID? = null,
     ): Boolean {
-        val sak = fiksClient.getSak(fiksDigisosId, token)
-        val kommunenummer = sak.kommunenummer
+        // Klage-endepunktet trenger ikke kommunenummer, så vi henter bare saken for søknad.
+        val mottaker =
+            klageId?.let { EttersendelseMottaker.Klage(it) }
+                ?: EttersendelseMottaker.Soknad(fiksClient.getSak(fiksDigisosId, token).kommunenummer)
         val navEksternRefId =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
@@ -74,7 +78,15 @@ class EttersendelseService(
 
             val filer = buildFilerList(uploads)
 
-            submitToFiks(metadata, fiksDigisosId, kommunenummer, navEksternRefId, token, filer, submissionId)
+            submitToFiks(
+                metadata,
+                fiksDigisosId,
+                navEksternRefId,
+                mottaker,
+                token,
+                filer,
+                submissionId,
+            )
         }
     }
 
@@ -124,8 +136,8 @@ class EttersendelseService(
     private suspend fun submitToFiks(
         metadata: Metadata,
         fiksDigisosId: String,
-        kommunenummer: String,
         navEksternRefId: String,
+        mottaker: EttersendelseMottaker,
         token: String,
         filer: List<Fil>,
         submissionId: UUID,
@@ -135,8 +147,8 @@ class EttersendelseService(
                 measureTimedValue {
                     fiksClient.uploadEttersendelse(
                         fiksDigisosId,
-                        kommunenummer,
                         navEksternRefId,
+                        mottaker,
                         metadata,
                         token,
                         filer,

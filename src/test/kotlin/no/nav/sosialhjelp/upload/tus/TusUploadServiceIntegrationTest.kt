@@ -546,5 +546,45 @@ class TusUploadServiceIntegrationTest {
             )
         }
 
+    @Test
+    fun `klage upload with client UUID ref does not affect søknad counter`() =
+        runTest {
+            val fiksDigisosId = UUID.randomUUID().toString()
+            val personident = "12345678910"
+            val klageRef = "3f2a1b4c-0000-4000-8000-000000009999"
+
+            tusUploadService.create(
+                TusMetadata(
+                    filename = "klage.pdf",
+                    contextId = UUID.randomUUID().toString(),
+                    correlationId = correlationId,
+                    fiksDigisosId = fiksDigisosId,
+                    navEksternRefId = klageRef,
+                    kategori = null,
+                ),
+                100L,
+                personident,
+                "token",
+            )
+
+            assertEquals(
+                null,
+                tusSubmissionQueries.getMaxNavEksternRefIdForFiksDigisosId(dsl.configuration(), fiksDigisosId),
+            )
+
+            coEvery { fiksClient.getNewNavEksternRefId(fiksDigisosId, any(), null) } returns "$fiksDigisosId-0001"
+            val soknadContext = UUID.randomUUID().toString()
+            tusUploadService.create(
+                TusMetadata("soknad.pdf", soknadContext, correlationId, fiksDigisosId, null, null),
+                100L,
+                personident,
+                "token",
+            )
+            assertEquals(
+                "$fiksDigisosId-0001",
+                tusSubmissionQueries.getNavEksternRefIdByContextId(dsl.configuration(), soknadContext),
+            )
+        }
+
     // endregion
 }

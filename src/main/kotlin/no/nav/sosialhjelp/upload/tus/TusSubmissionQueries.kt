@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.tus
 
+import no.nav.sosialhjelp.upload.action.fiks.isSoknadEttersendelseRef
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import org.jooq.Configuration
 import org.jooq.impl.DSL.param
@@ -187,7 +188,8 @@ class TusSubmissionQueries {
 
     /**
      * Returns the highest [navEksternRefId] among all local submissions for [fiksDigisosId],
-     * comparing the last 4 characters numerically. Returns null if no submissions exist yet.
+     * comparing the last 4 characters numerically. Only søknad-format refs are considered.
+     * Returns null if no submissions exist yet.
      *
      * Used to seed the counter when generating a new navEksternRefId so that in-flight
      * submissions that haven't been submitted to Fiks yet are accounted for.
@@ -206,6 +208,8 @@ class TusSubmissionQueries {
                     .and(SUBMISSION.NAV_EKSTERN_REF_ID.isNotNull),
             ).fetch()
             .map { it[SUBMISSION.NAV_EKSTERN_REF_ID]!! }
+            // Ignore refs in other formats (e.g. klage), which would break the counter.
+            .filter { isSoknadEttersendelseRef(it) }
             .maxByOrNull { it.takeLast(4).toLong() }
 
     private fun isOwnedByAnotherUser(

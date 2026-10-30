@@ -11,6 +11,7 @@ import no.nav.sosialhjelp.upload.VerifiedPersonident
 import no.nav.sosialhjelp.upload.VerifiedSubmissionId
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.verifySubmissionOwnership
+import java.util.UUID
 
 @Serializable
 data class Metadata(
@@ -24,6 +25,7 @@ data class Metadata(
 @Serializable
 data class SubmitInput(
     val fiksDigisosId: String? = null,
+    val klageId: String? = null,
     val metadata: Metadata,
 )
 
@@ -39,6 +41,11 @@ fun Route.configureActionRoutes() {
             val fiksDigisosId =
                 input.fiksDigisosId
                     ?: return@post call.respondText("fiksDigisosId is required", status = HttpStatusCode.BadRequest)
+            val klageId =
+                input.klageId?.let {
+                    runCatching { UUID.fromString(it) }.getOrNull()
+                        ?: return@post call.respondText("klageId must be a UUID", status = HttpStatusCode.BadRequest)
+                }
             val token =
                 call.request.header("Authorization")?.removePrefix("Bearer ")
                     ?: return@post call.respond(HttpStatusCode.Unauthorized)
@@ -50,6 +57,7 @@ fun Route.configureActionRoutes() {
                         token,
                         submissionId,
                         personIdent = call.attributes[VerifiedPersonident],
+                        klageId = klageId,
                     )
                 }
             if (result) {
