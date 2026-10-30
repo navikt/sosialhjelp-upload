@@ -376,6 +376,45 @@ class UploadFlowIntegrationTest {
         }
 
     @Test
+    fun `DELETE submission removes submission and its mellomlagring files`() =
+        appTest {
+            val contextId = UUID.randomUUID().toString()
+            val token = JwtTestUtils.issueToken()
+            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns UUID.randomUUID()
+            coEvery { mellomlagringClient.deleteFile(any(), any(), any()) } returns Unit
+
+            val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+            val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+            awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+
+            val resp =
+                client.delete("/sosialhjelp/upload/submission/$submissionId") {
+                    header("Authorization", "Bearer $token")
+                }
+            assertEquals(HttpStatusCode.NoContent, resp.status)
+
+            val sub =
+                PostgresTestContainer.dsl
+                    .selectFrom(SUBMISSION)
+                    .where(SUBMISSION.ID.eq(submissionId))
+                    .fetchOne()
+            assertNull(sub, "Submission should be deleted")
+        }
+
+    @Test
+    fun `DELETE submission owned by another user returns NotFound`() =
+        appTest {
+            val submissionId = createMockSubmission(PostgresTestContainer.dsl, UUID.randomUUID().toString())
+            val otherToken = JwtTestUtils.issueToken(subject = "99999999999")
+
+            val resp =
+                client.delete("/sosialhjelp/upload/submission/$submissionId") {
+                    header("Authorization", "Bearer $otherToken")
+                }
+            assertEquals(HttpStatusCode.NotFound, resp.status)
+        }
+
+    @Test
     fun `submit with klageId sends to klage mottaker without fetching sak`() =
         appTest {
             val contextId = UUID.randomUUID().toString()
