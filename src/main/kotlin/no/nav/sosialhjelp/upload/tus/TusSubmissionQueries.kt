@@ -2,6 +2,7 @@ package no.nav.sosialhjelp.upload.tus
 
 import no.nav.sosialhjelp.upload.action.fiks.isSoknadEttersendelseRef
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
+import no.nav.sosialhjelp.upload.database.submitLockActive
 import org.jooq.Configuration
 import org.jooq.impl.DSL.param
 import java.util.UUID
@@ -12,6 +13,15 @@ import java.util.UUID
  */
 class TusSubmissionQueries {
     class SubmissionOwnedByAnotherUserException : RuntimeException()
+
+    /** True while a non-expired submit lock is held on the submission. */
+    fun isSubmitLocked(
+        tx: Configuration,
+        submissionId: UUID,
+    ): Boolean =
+        tx
+            .dsl()
+            .fetchExists(SUBMISSION, SUBMISSION.ID.eq(submissionId).and(submitLockActive()))
 
     /**
      * Finds an existing submission for [contextId] owned by [personIdent].

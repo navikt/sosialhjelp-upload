@@ -8,6 +8,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
 import io.ktor.utils.io.ClosedWriteChannelException
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
@@ -24,6 +25,10 @@ fun Application.configureStatusPages() {
         }
         exception<SubmissionValidationException> { call, cause ->
             call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))
+        }
+        exception<SubmitInProgressException> { call, cause ->
+            this@configureStatusPages.environment.log.warn("Conflict on ${call.request.uri}: ${cause.message}")
+            call.respondText(text = "Submit already in progress", status = HttpStatusCode.Conflict)
         }
         exception<TusSubmissionQueries.SubmissionOwnedByAnotherUserException> { call, _ ->
             this@configureStatusPages.environment.log.warn("Submission owned by another user: ${call.request.uri}")

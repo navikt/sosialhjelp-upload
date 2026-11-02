@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
@@ -94,6 +95,12 @@ class TusUploadService(
                         }
                         ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
 
+                if (tusSubmissionQueries.isSubmitLocked(tx, submissionId)) {
+                    throw SubmitInProgressException(
+                        "Cannot add uploads while submission $submissionId is being submitted",
+                    )
+                }
+
                 tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)
                 val uploadId =
                     tusUploadQueries
@@ -165,6 +172,19 @@ class TusUploadService(
             }
         val filId = upload.filId
         val navEksternRefId = upload.navEksternRefId
+
+        // Check before touching mellomlagring: deleting the file first would leave a submit
+        // in flight referencing a file that no longer exists.
+        withContext(ioDispatcher) {
+            dsl.transaction { tx ->
+                val submissionId = tusUploadQueries.getSubmissionIdFromUploadId(tx, uploadId)
+                if (submissionId != null && tusSubmissionQueries.isSubmitLocked(tx, submissionId)) {
+                    throw SubmitInProgressException(
+                        "Cannot delete upload while submission $submissionId is being submitted",
+                    )
+                }
+            }
+        }
 
         withMdc("navEksternRefId" to navEksternRefId) {
             if (filId != null && navEksternRefId != null) {

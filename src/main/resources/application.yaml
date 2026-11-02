@@ -5,6 +5,8 @@ ktor:
       - no.nav.sosialhjelp.upload.ApplicationKt.module
   deployment:
     port: 3007
+    shutdownGracePeriod: 15000
+    shutdownTimeout: 20000
 jwt:
   audience: "$IDPORTEN_CLIENT_ID:default"
   issuer: "$IDPORTEN_ISSUER:http://localhost:8888/default"

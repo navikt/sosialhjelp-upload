@@ -27,6 +27,7 @@ import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.api.fiks.ErrorMessage
 import no.nav.sosialhjelp.upload.action.Metadata
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
 import no.nav.sosialhjelp.upload.texas.TexasClient
@@ -184,9 +185,7 @@ class FiksClient(
                 }.also {
                     if (!it.status.isSuccess()) {
                         val body = it.body<ErrorMessage>()
-                        if (it.status == HttpStatusCode.BadRequest && body.message?.contains("finnes all") ?: false) {
-                            throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
-                        }
+                        throwIfConflict(it.status, body, navEksternRefId, fiksDigisosId)
                         logger.error("Feil ved opplasting til fiks: ${it.status}: ${sanitizeFiksError(body)}")
                         teamLogger.error("Feil ved opplasting til fiks: ${it.status}: $body")
                     } else {
@@ -196,6 +195,22 @@ class FiksClient(
         } catch (e: Exception) {
             logger.error("Feil ved opplasting til fiks: ${e.message}", e)
             throw e
+        }
+    }
+
+    private fun throwIfConflict(
+        status: HttpStatusCode,
+        body: ErrorMessage,
+        navEksternRefId: String,
+        fiksDigisosId: String,
+    ) {
+        if (status != HttpStatusCode.BadRequest) return
+        val message = body.message ?: return
+        when {
+            message.contains("finnes all") ->
+                throw EttersendelseAlreadyExistsException(navEksternRefId, fiksDigisosId)
+            message.contains("allerede påbegynt") ->
+                throw SubmitInProgressException("Fiks has already started receiving $navEksternRefId")
         }
     }
 
