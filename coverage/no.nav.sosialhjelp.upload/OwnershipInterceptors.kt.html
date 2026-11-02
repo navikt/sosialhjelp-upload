@@ -49,9 +49,9 @@ import java.util.UUID
 <span class="fc bfc" id="L49" title="All 2 branches covered.">                withContext(ioDispatcher) {</span>
 <span class="fc" id="L50">                    submissionQueries.isOwnedByUser(submissionId, personident)</span>
                 }
-<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (!owned) {</span>
-<span class="fc" id="L53">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="fc" id="L54">                return@on</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (!owned) {</span>
+<span class="nc" id="L53">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L54">                return@on</span>
             }
 
 <span class="fc" id="L57">            call.attributes.put(VerifiedSubmissionId, submissionId)</span>

@@ -2,6 +2,7 @@
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.database.submitLockInactive
 import org.jooq.Configuration
 import org.jooq.impl.DSL
 import java.time.OffsetDateTime
@@ -10,11 +11,11 @@ import java.util.UUID
 /**
  * DB queries for the submission cleanup job: finding stale submissions to clean up.
  */
-<span class="fc" id="L13">class StaleSubmissionQueries {</span>
-<span class="fc" id="L14">    data class StaleSubmission(</span>
-<span class="fc" id="L15">        val id: UUID,</span>
-<span class="fc" id="L16">        val navEksternRefId: String,</span>
-<span class="fc" id="L17">        val kategori: String?,</span>
+<span class="fc" id="L14">class StaleSubmissionQueries {</span>
+<span class="fc" id="L15">    data class StaleSubmission(</span>
+<span class="fc" id="L16">        val id: UUID,</span>
+<span class="fc" id="L17">        val navEksternRefId: String,</span>
+<span class="fc" id="L18">        val kategori: String?,</span>
     )
 
     /**
@@ -29,32 +30,33 @@ import java.util.UUID
         tx: Configuration,
         cutoff: OffsetDateTime,
     ): List&lt;StaleSubmission&gt; =
-<span class="fc" id="L32">        tx</span>
-<span class="fc" id="L33">            .dsl()</span>
-<span class="fc" id="L34">            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.KATEGORI)</span>
-<span class="fc" id="L35">            .from(SUBMISSION)</span>
-<span class="fc" id="L36">            .join(UPLOAD)</span>
-<span class="fc" id="L37">            .on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))</span>
-<span class="fc" id="L38">            .where(SUBMISSION.AUTOMATIC_CLEANUP.isTrue)</span>
-<span class="fc" id="L39">            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.KATEGORI)</span>
-<span class="fc" id="L40">            .having(</span>
+<span class="fc" id="L33">        tx</span>
+<span class="fc" id="L34">            .dsl()</span>
+<span class="fc" id="L35">            .select(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.KATEGORI)</span>
+<span class="fc" id="L36">            .from(SUBMISSION)</span>
+<span class="fc" id="L37">            .join(UPLOAD)</span>
+<span class="fc" id="L38">            .on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))</span>
+<span class="fc" id="L39">            .where(SUBMISSION.AUTOMATIC_CLEANUP.isTrue)</span>
+<span class="fc" id="L40">            .and(submitLockInactive())</span>
+<span class="fc" id="L41">            .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.KATEGORI)</span>
+<span class="fc" id="L42">            .having(</span>
                 DSL
-<span class="fc" id="L42">                    .max(UPLOAD.UPDATED_AT)</span>
-<span class="fc" id="L43">                    .lt(cutoff)</span>
-<span class="fc" id="L44">                    .and(</span>
+<span class="fc" id="L44">                    .max(UPLOAD.UPDATED_AT)</span>
+<span class="fc" id="L45">                    .lt(cutoff)</span>
+<span class="fc" id="L46">                    .and(</span>
                         DSL
-<span class="fc" id="L46">                            .count()</span>
-<span class="fc" id="L47">                            .filterWhere(</span>
-<span class="fc" id="L48">                                UPLOAD.PROCESSING_STATUS.`in`(&quot;PENDING&quot;, &quot;PROCESSING&quot;),</span>
-<span class="fc" id="L49">                            ).eq(0),</span>
+<span class="fc" id="L48">                            .count()</span>
+<span class="fc" id="L49">                            .filterWhere(</span>
+<span class="fc" id="L50">                                UPLOAD.PROCESSING_STATUS.`in`(&quot;PENDING&quot;, &quot;PROCESSING&quot;),</span>
+<span class="fc" id="L51">                            ).eq(0),</span>
                     ),
-<span class="fc" id="L51">            ).fetch()</span>
-<span class="fc" id="L52">            .map {</span>
-<span class="fc" id="L53">                StaleSubmission(</span>
-<span class="fc" id="L54">                    it[SUBMISSION.ID]!!,</span>
-<span class="fc" id="L55">                    it[SUBMISSION.NAV_EKSTERN_REF_ID]!!,</span>
-<span class="fc" id="L56">                    it[SUBMISSION.KATEGORI],</span>
-<span class="fc" id="L57">                )</span>
-<span class="fc" id="L58">            }</span>
+<span class="fc" id="L53">            ).fetch()</span>
+<span class="fc" id="L54">            .map {</span>
+<span class="fc" id="L55">                StaleSubmission(</span>
+<span class="fc" id="L56">                    it[SUBMISSION.ID]!!,</span>
+<span class="fc" id="L57">                    it[SUBMISSION.NAV_EKSTERN_REF_ID]!!,</span>
+<span class="fc" id="L58">                    it[SUBMISSION.KATEGORI],</span>
+<span class="fc" id="L59">                )</span>
+<span class="fc" id="L60">            }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
