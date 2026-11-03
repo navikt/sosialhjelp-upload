@@ -13,19 +13,19 @@ import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
+import kotlin.time.toJavaDuration
 
-<span class="nc" id="L17">class UploadRecoveryService(</span>
-<span class="nc" id="L18">    private val dsl: DSLContext,</span>
-<span class="nc" id="L19">    private val uploadRecoveryQueries: UploadRecoveryQueries,</span>
-<span class="nc" id="L20">    private val notificationService: SubmissionNotificationService,</span>
-<span class="nc" id="L21">    private val chunkStorage: ChunkStorage,</span>
-<span class="nc" id="L22">    private val meterRegistry: MeterRegistry,</span>
+<span class="nc" id="L18">class UploadRecoveryService(</span>
+<span class="nc" id="L19">    private val dsl: DSLContext,</span>
+<span class="nc" id="L20">    private val uploadRecoveryQueries: UploadRecoveryQueries,</span>
+<span class="nc" id="L21">    private val notificationService: SubmissionNotificationService,</span>
+<span class="nc" id="L22">    private val chunkStorage: ChunkStorage,</span>
+<span class="nc" id="L23">    private val meterRegistry: MeterRegistry,</span>
 ) {
-<span class="nc" id="L24">    private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)</span>
-<span class="nc" id="L25">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
+<span class="nc" id="L25">    private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)</span>
+<span class="nc" id="L26">    private val tracer = GlobalOpenTelemetry.getTracer(&quot;sosialhjelp-upload&quot;)</span>
 
     companion object {
-        const val PROCESSING_TIMEOUT_MINUTES = 3L
         const val PENDING_TIMEOUT_MINUTES = 3L
     }
 
@@ -49,7 +49,7 @@ import java.time.temporal.ChronoUnit
 <span class="nc" id="L49">        val span = tracer.spanBuilder(&quot;upload.recovery.stuck_processing&quot;).startSpan()</span>
 <span class="nc" id="L50">        val scope = span.makeCurrent()</span>
 <span class="nc" id="L51">        try {</span>
-<span class="nc" id="L52">            val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)</span>
+<span class="nc" id="L52">            val cutoff = OffsetDateTime.now().minus(PROCESSING_LEASE.toJavaDuration())</span>
 <span class="nc" id="L53">            val staleUploads =</span>
 <span class="nc" id="L54">                withContext(Dispatchers.IO) {</span>
 <span class="nc" id="L55">                    dsl.transactionResult { tx -&gt;</span>
@@ -60,7 +60,7 @@ import java.time.temporal.ChronoUnit
 <span class="nc bnc" id="L60" title="All 4 branches missed.">            if (staleUploads.isNotEmpty()) {</span>
 <span class="nc" id="L61">                log.warn(</span>
 <span class="nc" id="L62">                    &quot;Recovered ${staleUploads.size} upload(s) stuck in PROCESSING &quot; +</span>
-                        &quot;(older than ${PROCESSING_TIMEOUT_MINUTES}m)&quot;,
+<span class="nc" id="L63">                        &quot;(older than $PROCESSING_LEASE)&quot;,</span>
                 )
 <span class="nc" id="L65">                meterRegistry</span>
 <span class="nc" id="L66">                    .counter(&quot;upload.recovery&quot;, &quot;reason&quot;, &quot;stuck_processing&quot;)</span>

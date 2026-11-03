@@ -58,7 +58,7 @@ fun Route.configureStatusRoutes() {
 <span class="nc" id="L58">                }</span>
 <span class="fc" id="L59">            try {</span>
 <span class="pc bpc" id="L60" title="1 of 2 branches missed.">                send(submissionService.getSubmissionStatus(submissionId))</span>
-<span class="pc bpc" id="L61" title="2 of 4 branches missed.">                for (type in events) {</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">                for (type in events) {</span>
 <span class="fc bfc" id="L62" title="All 2 branches covered.">                    if (type == SubmissionUpdateNotification.UpdateType.DELETE) break</span>
 <span class="pc bpc" id="L63" title="1 of 2 branches missed.">                    send(submissionService.getSubmissionStatus(submissionId))</span>
                 }
