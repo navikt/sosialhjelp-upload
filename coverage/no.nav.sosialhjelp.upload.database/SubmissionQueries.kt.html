@@ -100,7 +100,7 @@ fun lockSubmission(
 <span class="fc" id="L100">            .set(SUBMISSION.SUBMIT_ATTEMPT_ID, attemptId)</span>
 <span class="fc" id="L101">            .set(SUBMISSION.SUBMIT_STARTED_AT, now)</span>
 <span class="fc" id="L102">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L103">            .and(SUBMISSION_SUBMITTED_AT.isNull)</span>
+<span class="fc" id="L103">            .and(SUBMISSION.SUBMITTED_AT.isNull)</span>
 <span class="fc" id="L104">            .and(submitLockInactive(now))</span>
 <span class="fc" id="L105">            .execute() == 1</span>
     }
@@ -150,7 +150,7 @@ fun lockSubmission(
 <span class="fc" id="L150">            tx</span>
 <span class="fc" id="L151">                .dsl()</span>
 <span class="fc" id="L152">                .update(SUBMISSION)</span>
-<span class="fc" id="L153">                .set(SUBMISSION_SUBMITTED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L153">                .set(SUBMISSION.SUBMITTED_AT, OffsetDateTime.now())</span>
 <span class="fc" id="L154">                .set(SUBMISSION.CONTEXT_ID, DSL.concat(SUBMISSION.CONTEXT_ID, DSL.inline(&quot;:submitted:$submissionId&quot;)))</span>
 <span class="fc" id="L155">                .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)</span>
 <span class="fc" id="L156">                .setNull(SUBMISSION.SUBMIT_STARTED_AT)</span>
@@ -175,7 +175,7 @@ fun lockSubmission(
 <span class="fc" id="L175">        tx</span>
 <span class="fc" id="L176">            .dsl()</span>
 <span class="fc" id="L177">            .deleteFrom(SUBMISSION)</span>
-<span class="fc" id="L178">            .where(SUBMISSION_SUBMITTED_AT.lt(cutoff))</span>
+<span class="fc" id="L178">            .where(SUBMISSION.SUBMITTED_AT.lt(cutoff))</span>
 <span class="fc" id="L179">            .execute()</span>
 
     /** Deletes the submission unless a submit holds a live lock. Atomic with claimSubmit. */
