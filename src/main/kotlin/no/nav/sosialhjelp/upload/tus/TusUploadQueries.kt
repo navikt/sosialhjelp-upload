@@ -2,10 +2,12 @@ package no.nav.sosialhjelp.upload.tus
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.database.submitLockActive
 import no.nav.sosialhjelp.upload.upload.Status
 import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadNotifications
 import org.jooq.Configuration
+import org.jooq.impl.DSL
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -142,7 +144,17 @@ class TusUploadQueries {
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.ID.eq(uploadId))
             .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
-            .execute() > 0
+            // Do not start processing while the submission is being submitted: the file would reach
+            // mellomlagring without being listed in vedlegg.json.
+            .and(
+                DSL.notExists(
+                    DSL
+                        .selectOne()
+                        .from(SUBMISSION)
+                        .where(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+                        .and(submitLockActive()),
+                ),
+            ).execute() > 0
 
     fun getUpload(
         tx: Configuration,

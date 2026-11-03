@@ -12,7 +12,10 @@ import kotlin.test.assertContains
 import kotlin.test.assertTrue
 
 class SubmissionValidationTest {
-    private fun makeCompleteUpload(mellomlagringStorrelse: Long = 1024L): Upload =
+    private fun makeCompleteUpload(
+        mellomlagringStorrelse: Long = 1024L,
+        status: Status = Status.COMPLETE,
+    ): Upload =
         Upload(
             id = UUID.randomUUID(),
             originalFilename = "file.pdf",
@@ -22,9 +25,15 @@ class SubmissionValidationTest {
             mellomlagringFilnavn = "file.pdf",
             fileSize = mellomlagringStorrelse,
             mellomlagringStorrelse = mellomlagringStorrelse,
-            status = Status.COMPLETE,
+            status = status,
             sha512 = "abc",
         )
+
+    @Test
+    fun `returns UPLOADS_PROCESSING when an upload is still processing`() {
+        val uploads = listOf(makeCompleteUpload(), makeCompleteUpload(status = Status.PROCESSING))
+        assertContains(validateSubmissionUploads(uploads), SubmissionValidationCode.UPLOADS_PROCESSING)
+    }
 
     @Test
     fun `returns TOO_MANY_FILES when more than 30 complete uploads exist`() {

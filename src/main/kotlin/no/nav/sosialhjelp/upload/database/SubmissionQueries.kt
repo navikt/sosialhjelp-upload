@@ -1,9 +1,26 @@
 package no.nav.sosialhjelp.upload.database
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
+import org.jooq.Condition
 import org.jooq.Configuration
 import org.jooq.DSLContext
+import java.time.OffsetDateTime
 import java.util.UUID
+
+/** How long a submit lock is honoured. Must exceed the worst-case submit duration (Fiks upload timeout is 5 min). */
+const val SUBMIT_LOCK_MINUTES = 15L
+
+/** True when a submit lock is held and has not expired. */
+fun submitLockActive(now: OffsetDateTime = OffsetDateTime.now()): Condition =
+    SUBMISSION.SUBMIT_ATTEMPT_ID
+        .isNotNull
+        .and(SUBMISSION.SUBMIT_STARTED_AT.gt(now.minusMinutes(SUBMIT_LOCK_MINUTES)))
+
+/** True when no submit lock is held, or the held lock has expired. */
+fun submitLockInactive(now: OffsetDateTime = OffsetDateTime.now()): Condition =
+    SUBMISSION.SUBMIT_ATTEMPT_ID
+        .isNull
+        .or(SUBMISSION.SUBMIT_STARTED_AT.le(now.minusMinutes(SUBMIT_LOCK_MINUTES)))
 
 /**
  * Shared submission DB queries used across multiple features:
@@ -46,6 +63,67 @@ class SubmissionQueries(
                     .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),
             ).fetchSingle()
             .value1() > 0
+
+    /**
+     * Takes the submit lock for [attemptId]. A single conditional UPDATE, so Postgres' row lock
+     * makes concurrent claims safe: exactly one caller sees `true`. An expired lock can be taken over.
+     */
+    fun claimSubmit(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Boolean {
+        val now = OffsetDateTime.now()
+        return tx
+            .dsl()
+            .update(SUBMISSION)
+            .set(SUBMISSION.SUBMIT_ATTEMPT_ID, attemptId)
+            .set(SUBMISSION.SUBMIT_STARTED_AT, now)
+            .where(SUBMISSION.ID.eq(submissionId))
+            .and(submitLockInactive(now))
+            .execute() == 1
+    }
+
+    /** Fencing check: true only if [attemptId] still holds the lock. */
+    fun isCurrentAttempt(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Boolean =
+        tx
+            .dsl()
+            .fetchExists(
+                SUBMISSION,
+                SUBMISSION.ID.eq(submissionId).and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId)),
+            )
+
+    /** Releases the lock, but only if [attemptId] still holds it. */
+    fun releaseSubmit(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Boolean =
+        tx
+            .dsl()
+            .update(SUBMISSION)
+            .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)
+            .setNull(SUBMISSION.SUBMIT_STARTED_AT)
+            .where(SUBMISSION.ID.eq(submissionId))
+            .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))
+            .execute() == 1
+
+    /** Deletes the submission only if [attemptId] still holds the submit lock. */
+    fun deleteAfterSubmit(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Int =
+        tx
+            .dsl()
+            .deleteFrom(SUBMISSION)
+            .where(SUBMISSION.ID.eq(submissionId))
+            .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))
+            .execute()
 
     fun cleanup(
         tx: Configuration,
