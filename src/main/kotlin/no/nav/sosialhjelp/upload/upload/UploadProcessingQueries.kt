@@ -62,7 +62,9 @@ class UploadProcessingQueries {
             .or(
                 UPLOAD.PROCESSING_STATUS
                     .eq(Status.PROCESSING.name)
-                    .and(UPLOAD.PROCESSING_STARTED_AT.lt(leaseCutoff))
+                    // Rows claimed by pre-V1.18 code (e.g. an old pod during rollout) have no
+                    // processing_started_at; fall back to updated_at so they are not stuck forever.
+                    .and(DSL.coalesce(UPLOAD.PROCESSING_STARTED_AT, UPLOAD.UPDATED_AT).lt(leaseCutoff))
                     .and(UPLOAD.PROCESSING_ATTEMPTS.lt(MAX_PROCESSING_ATTEMPTS)),
             )
 

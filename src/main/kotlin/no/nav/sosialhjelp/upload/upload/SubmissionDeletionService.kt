@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -79,8 +80,21 @@ class SubmissionDeletionService(
             withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx -> uploadRepository.findSubmissionIds(tx, navEksternRefId, kategori) }
             }
-        return submissionIds.count { deleteSubmission(it, keepMellomlagring) }
+        // Never delete under a running submit: the files would vanish from mellomlagring after
+        // vedlegg.json was built. 409 lets the caller retry once the submit has finished.
+        return submissionIds.count { submissionId ->
+            val deleted = deleteSubmission(submissionId, keepMellomlagring, skipIfSubmitting = true)
+            if (!deleted && submissionExists(submissionId)) {
+                throw SubmitInProgressException("Submit in progress for submission $submissionId")
+            }
+            deleted
+        }
     }
+
+    private suspend fun submissionExists(submissionId: UUID): Boolean =
+        withContext(Dispatchers.IO) {
+            dsl.transactionResult { tx -> uploadRepository.getSubmissionResources(tx, submissionId) != null }
+        }
 
     private suspend fun deleteMellomlagringFiles(resources: SubmissionResources) {
         val navEksternRefId = resources.navEksternRefId ?: return

@@ -13,6 +13,7 @@ import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
+import kotlin.time.toJavaDuration
 
 class UploadRecoveryService(
     private val dsl: DSLContext,
@@ -25,7 +26,6 @@ class UploadRecoveryService(
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
 
     companion object {
-        const val PROCESSING_TIMEOUT_MINUTES = 3L
         const val PENDING_TIMEOUT_MINUTES = 3L
     }
 
@@ -49,7 +49,7 @@ class UploadRecoveryService(
         val span = tracer.spanBuilder("upload.recovery.stuck_processing").startSpan()
         val scope = span.makeCurrent()
         try {
-            val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
+            val cutoff = OffsetDateTime.now().minus(PROCESSING_LEASE.toJavaDuration())
             val staleUploads =
                 withContext(Dispatchers.IO) {
                     dsl.transactionResult { tx ->
@@ -60,7 +60,7 @@ class UploadRecoveryService(
             if (staleUploads.isNotEmpty()) {
                 log.warn(
                     "Recovered ${staleUploads.size} upload(s) stuck in PROCESSING " +
-                        "(older than ${PROCESSING_TIMEOUT_MINUTES}m)",
+                        "(older than $PROCESSING_LEASE)",
                 )
                 meterRegistry
                     .counter("upload.recovery", "reason", "stuck_processing")
