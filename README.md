@@ -146,12 +146,12 @@ I CI settes de som `ORG_GRADLE_PROJECT_githubUser` og `ORG_GRADLE_PROJECT_github
 
 Tjenesten kjører periodiske oppryddingsjobber:
 
-Deployment bruker `Recreate`: alle gamle pods stopper før nye starter. Dette hindrer at eldre kode uten lease behandler de samme filene som nye workers under migreringen. Strategien gir nedetid ved deployment. Ikke rull tilbake til eldre kode etter migrering av databasen uten å håndtere `READY`-opplastinger og nye processing leases først.
+Deployment bruker `Recreate` fordi eldre kode ikke kjenner statusen `READY`. Strategien gir nedetid ved deployment. Før rollback må `READY`-opplastinger håndteres.
 
 | Jobb | Timeout | Handling |
 |------|---------|----------|
-| **Behandling** | 3 minutter per forsøk | Ferdig opplastede filer får status `READY` og behandles av en worker. Stopper en pod midt i behandlingen, prøver en annen pod igjen når forsøket har gått ut på tid. Etter 3 forsøk markeres filen `FAILED`. |
-| **Stuck uploads** | 3 minutter | Opplastinger som står i `PENDING` i mer enn 3 minutter markeres som `FAILED`. Brukeren kan deretter forkaste dem selv via UI. |
+| **Behandling** | 150 sekunder | Ferdig opplastede filer får status `READY` og behandles én gang av en worker. Ved feil kan brukeren laste opp filen på nytt. |
+| **Stuck uploads** | 3 minutter | Opplastinger som står i `PENDING` eller `PROCESSING` i mer enn 3 minutter markeres som `FAILED`. Brukeren kan deretter forkaste dem selv via UI. |
 | **Innsendte submissions** | 7 dager | Raden beholdes uten filer etter innsending, slik at neste `navEksternRefId` på saken ikke gjenbruker referansen. |
 | **Stale submissions** | 1 time | Submissions som ikke har blitt sendt inn og ikke har hatt aktivitet på 1 time slettes automatisk, inkludert tilhørende filer i GCS og mellomlagring. |
 

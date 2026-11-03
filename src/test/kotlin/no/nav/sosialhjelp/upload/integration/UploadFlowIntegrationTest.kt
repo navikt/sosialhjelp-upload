@@ -365,6 +365,15 @@ class UploadFlowIntegrationTest {
 
             // The row is kept (for the navEksternRefId counter) but marked submitted, without uploads.
             assertSubmitted(submissionId)
+
+            val retry =
+                client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"fiksDigisosId":"$fiksDigisosId","metadata":{"type":"dok","tilleggsinfo":"info"}}""")
+                }
+            assertEquals(HttpStatusCode.Created, retry.status)
+            coVerify(exactly = 1) { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) }
         }
 
     private fun assertSubmitted(submissionId: UUID) {

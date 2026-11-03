@@ -3,10 +3,10 @@
 package no.nav.sosialhjelp.upload.validation
 
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.io.RandomAccessReadBuffer
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -238,6 +238,7 @@ val SUPPORTED_MIME_TYPES =
 class UploadValidator(
     val virusScanner: VirusScanner,
     private val meterRegistry: MeterRegistry,
+    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val tika = Tika()
@@ -278,7 +279,7 @@ class UploadValidator(
         }
 
     private suspend fun validatePdf(data: ByteArray): Validation? =
-        withContext(Dispatchers.Default) {
+        withContext(cpuDispatcher) {
             try {
                 val randomAccessRead = RandomAccessReadBuffer(data.inputStream())
                 Loader
@@ -306,7 +307,7 @@ class UploadValidator(
         data: ByteArray,
         filename: String,
     ): Pair<String, Validation?> =
-        withContext(Dispatchers.Default) {
+        withContext(cpuDispatcher) {
             val tikaMetadata =
                 Metadata().apply {
                     set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)

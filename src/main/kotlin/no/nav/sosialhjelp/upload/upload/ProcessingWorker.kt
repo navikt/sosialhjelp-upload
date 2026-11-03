@@ -15,18 +15,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
-import java.time.OffsetDateTime
+import java.util.UUID
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
 
-/** How long an attempt owns an upload. Must exceed the worst-case pipeline (Gotenberg retries ~80 s). */
-val PROCESSING_LEASE = 3.minutes
 val PROCESSING_TIMEOUT = 150.seconds
 
 /**
- * Pulls READY uploads (and uploads whose lease expired) from the database and processes them.
+ * Pulls READY uploads from the database and processes each once.
  *
  * The database is the queue, so work survives pod restarts and is shared between pods.
  * A fixed number of workers per pod bounds memory: each attempt holds the file in memory a few times.
@@ -55,8 +51,7 @@ class ProcessingWorker(
             try {
                 val claim =
                     withContext(Dispatchers.IO) {
-                        val cutoff = OffsetDateTime.now().minus(PROCESSING_LEASE.toJavaDuration())
-                        dsl.transactionResult { tx -> queries.claimNext(tx, cutoff) }
+                        dsl.transactionResult { tx -> queries.claimNext(tx) }
                     }
                 if (claim == null) {
                     withTimeoutOrNull(POLL_INTERVAL) { wakeups.receive() }
@@ -75,14 +70,15 @@ class ProcessingWorker(
         }
     }
 
-    private suspend fun processClaim(claim: UploadProcessingQueries.Claim) {
+    private suspend fun processClaim(uploadId: UUID) {
         val finished =
             withTimeoutOrNull(processingTimeout) {
-                processingService.process(claim)
+                processingService.process(uploadId)
                 true
             } ?: false
         if (!finished) {
-            log.warn("Upload ${claim.uploadId} processing timed out; retrying after lease expiry")
+            log.warn("Upload $uploadId processing timed out")
+            processingService.markTimedOut(uploadId)
         }
     }
 

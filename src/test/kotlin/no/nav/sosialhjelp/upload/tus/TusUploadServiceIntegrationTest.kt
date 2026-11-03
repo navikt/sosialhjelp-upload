@@ -47,9 +47,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayOutputStream
-import java.time.OffsetDateTime
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -67,7 +65,6 @@ class TusUploadServiceIntegrationTest {
     private lateinit var virusScanner: VirusScanner
     private lateinit var gotenbergService: GotenbergService
     private lateinit var fiksClient: FiksClient
-    private lateinit var processingWorker: ProcessingWorker
     private val processingScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val correlationId: UUID = UUID.randomUUID()
 
@@ -112,7 +109,6 @@ class TusUploadServiceIntegrationTest {
 
         val processingWorker = ProcessingWorker(dsl, uploadProcessingQueries, uploadProcessingService)
         processingWorker.start(processingScope)
-        this.processingWorker = processingWorker
 
         tusUploadService =
             TusUploadService(
@@ -644,17 +640,15 @@ class TusUploadServiceIntegrationTest {
     private suspend fun settle() = withContext(Dispatchers.Default) { delay(1_500) }
 
     @Test
-    fun `delete waits for a concurrent storage commit and deletes the committed file`() =
+    fun `delete during storage removes the upload and cleans up the late file`() =
         runBlocking {
             val filId = UUID.randomUUID()
             val release = CompletableDeferred<Unit>()
             val uploadId = startBlockedUpload(filId, release)
 
             val deletion = async(Dispatchers.IO) { tusUploadService.delete(uploadId) }
-            delay(200)
-            assertTrue(!deletion.isCompleted, "Delete must wait for the storage transaction")
-            release.complete(Unit)
             withTimeout(10_000) { deletion.await() }
+            release.complete(Unit)
 
             coVerify(timeout = 3_000) { mellomlagringClient.deleteFile(any(), eq(filId), any()) }
             assertNull(dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne())
@@ -666,6 +660,9 @@ class TusUploadServiceIntegrationTest {
             clearMocks(mellomlagringClient)
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
+            val filId = UUID.randomUUID()
+            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            coEvery { mellomlagringClient.deleteFile(any(), any(), any()) } returns Unit
             coEvery { virusScanner.scan(any()) } coAnswers {
                 entered.complete(Unit)
                 release.await()
@@ -695,59 +692,7 @@ class TusUploadServiceIntegrationTest {
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertEquals("FAILED", row!![UPLOAD.PROCESSING_STATUS])
             assertNull(row[UPLOAD.FIL_ID])
-        }
-
-    @Test
-    fun `expired attempt cannot replace the file committed by a newer attempt`() =
-        runBlocking {
-            clearMocks(mellomlagringClient)
-            val entered = CompletableDeferred<Unit>()
-            val release = CompletableDeferred<Unit>()
-            val scans = AtomicInteger()
-            val winningFileId = UUID.randomUUID()
-            coEvery { virusScanner.scan(any()) } coAnswers {
-                if (scans.incrementAndGet() == 1) {
-                    entered.complete(Unit)
-                    release.await()
-                }
-                Result.OK
-            }
-            coEvery { mellomlagringClient.replaceFile(any(), any(), any(), any()) } returns winningFileId
-            val content = minimalPdf()
-            val contextId = UUID.randomUUID().toString()
-            createMockSubmission(dsl, contextId)
-            val uploadId =
-                tusUploadService.create(
-                    TusMetadata("race.pdf", contextId, correlationId, null, "id", null),
-                    content.size.toLong(),
-                    "12345678910",
-                    "token",
-                )
-            tusUploadService.appendChunk(uploadId, 0L, content)
-            withTimeout(10_000) { entered.await() }
-            dsl
-                .update(UPLOAD)
-                .set(UPLOAD.PROCESSING_STARTED_AT, OffsetDateTime.now().minusMinutes(10))
-                .where(UPLOAD.ID.eq(uploadId))
-                .execute()
-            processingWorker.wake()
-            withTimeout(10_000) {
-                while (dsl
-                        .select(UPLOAD.PROCESSING_STATUS)
-                        .from(UPLOAD)
-                        .where(UPLOAD.ID.eq(uploadId))
-                        .fetchOne()
-                        ?.value1() != "COMPLETE"
-                ) {
-                    delay(50)
-                }
-            }
-            release.complete(Unit)
-            settle()
-            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()!!
-            assertEquals(winningFileId, row[UPLOAD.FIL_ID])
-            coVerify(exactly = 1) { mellomlagringClient.replaceFile(any(), any(), any(), any()) }
-            coVerify(exactly = 0) { mellomlagringClient.uploadFile(any(), any(), any(), any()) }
+            coVerify { mellomlagringClient.deleteFile(any(), filId, any()) }
         }
 
     @Test

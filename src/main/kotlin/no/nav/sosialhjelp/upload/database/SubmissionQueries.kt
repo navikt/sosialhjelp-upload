@@ -105,6 +105,11 @@ class SubmissionQueries(
             .execute() == 1
     }
 
+    fun isSubmitted(
+        tx: Configuration,
+        submissionId: UUID,
+    ): Boolean = tx.dsl().fetchExists(SUBMISSION, SUBMISSION.ID.eq(submissionId).and(SUBMISSION.SUBMITTED_AT.isNotNull))
+
     /** Fencing check: true only if [attemptId] still holds the lock. */
     fun isCurrentAttempt(
         tx: Configuration,

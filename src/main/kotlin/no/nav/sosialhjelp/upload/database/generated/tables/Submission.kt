@@ -137,7 +137,7 @@ open class Submission(
     /**
      * Create an aliased <code>public.submission</code> table reference
      */
-    constructor(alias: Name): this(alias, SUBMISSION)
+    constructor(alias: Name): this(alias, null)
 
     /**
      * Create a <code>public.submission</code> table reference

@@ -13,6 +13,7 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.common.withMdc
@@ -41,6 +42,7 @@ class EttersendelseService(
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
+    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val teamLogger = teamLogger(this::class)
@@ -59,6 +61,11 @@ class EttersendelseService(
                 dsl.transactionResult { tx -> submissionQueries.claimSubmit(tx, submissionId, attemptId) }
             }
         if (!claimed) {
+            val alreadySubmitted =
+                withContext(Dispatchers.IO) {
+                    dsl.transactionResult { tx -> submissionQueries.isSubmitted(tx, submissionId) }
+                }
+            if (alreadySubmitted) return true
             logger.warn("Submit rejected, another submit holds the lock for submission $submissionId")
             meterRegistry.counter("fiks.submission.rejected_in_progress").increment()
             throw SubmitInProgressException("Submit already in progress for submission $submissionId")
@@ -154,7 +161,7 @@ class EttersendelseService(
         personIdent: String,
     ) {
         val ettersendelsePdf =
-            withContext(Dispatchers.Default) {
+            withContext(cpuDispatcher) {
                 val pdfMetadata =
                     PdfMetadata(
                         metadata.type,
@@ -244,7 +251,8 @@ class EttersendelseService(
                 dsl.transactionResult { tx -> submissionQueries.markSubmitted(tx, submissionId, attemptId) }
             }
         if (deleted > 0) {
-            notificationService.notifyDeleted(submissionId)
+            runCatching { notificationService.notifyDeleted(submissionId) }
+                .onFailure { logger.warn("Failed to notify submitted submission $submissionId", it) }
         } else {
             logger.warn(
                 "Submission $submissionId was not marked submitted, attempt $attemptId no longer holds the lock",

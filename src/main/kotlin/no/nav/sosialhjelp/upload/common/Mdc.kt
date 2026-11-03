@@ -9,7 +9,7 @@ import org.slf4j.MDC
  *
  * MDC is thread-local; coroutines move between threads. [MDCContext] snapshots the
  * MDC map at construction time and reinstalls it on every continuation resume, so
- * the values survive `withContext(Dispatchers.IO)` and friends inside [block].
+ * the values survive `withContext(ioDispatcher)` and friends inside [block].
  *
  * Previous values are restored (not just removed) so nested calls compose correctly.
  * Pairs with a null value are skipped.

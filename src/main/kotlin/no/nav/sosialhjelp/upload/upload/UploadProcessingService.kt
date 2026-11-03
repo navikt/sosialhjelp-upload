@@ -6,22 +6,20 @@ import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.withMdc
-import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries.Claim
 import no.nav.sosialhjelp.upload.validation.FileTypeValidation
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.Validation
 import org.jooq.DSLContext
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.Duration
+import java.util.UUID
 
 /**
  * Runs one processing attempt: assemble → validate → convert → store → finalize.
- *
- * Every DB write is fenced on the claim's attempt id. The upload row is locked while storing
- * and committing the file ID, so a newer attempt or deletion cannot race the remote replacement.
+ * Completion is conditional on the upload still being in PROCESSING.
  */
 class UploadProcessingService(
     private val dsl: DSLContext,
@@ -31,42 +29,33 @@ class UploadProcessingService(
     private val fileConversionService: FileConversionService,
     private val mellomlagringStorageService: MellomlagringStorageService,
     private val meterRegistry: MeterRegistry,
+    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    private class StorageAttemptException(
-        cause: Throwable,
-    ) : RuntimeException(cause)
-
     private class Attempt(
-        val claim: Claim,
+        val uploadId: UUID,
         val upload: UploadForProcessing,
         val startTime: Long = System.nanoTime(),
     ) {
-        val uploadId get() = claim.uploadId
         val extension = File(upload.filename).extension.lowercase().ifEmpty { "none" }
         var composedKey: String? = null
     }
 
-    suspend fun process(claim: Claim) {
+    suspend fun process(uploadId: UUID) {
         val upload =
             withContext(Dispatchers.IO) {
-                dsl.transactionResult { tx -> uploadProcessingQueries.getUploadForProcessing(tx, claim.uploadId) }
+                dsl.transactionResult { tx -> uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }
             }
-        val attempt = Attempt(claim, upload)
+        val attempt = Attempt(uploadId, upload)
         withMdc("fiksDigisosId" to upload.fiksDigisosId, "navEksternRefId" to upload.navEksternRefId) {
             try {
                 run(attempt)
             } catch (e: CancellationException) {
-                // Pod shutdown: leave the upload PROCESSING. The lease expires and another pod retries.
+                // Shutdown leaves the upload PROCESSING for the recovery sweep.
                 throw e
-            } catch (e: StorageAttemptException) {
-                // The remote write or database commit may have succeeded. Retry with replaceFile
-                // rather than marking FAILED and leaving an untracked remote file behind.
-                logger.warn("Upload ${attempt.uploadId} storage attempt failed; retrying after lease expiry", e)
-                cleanupOwnObject(attempt)
             } catch (e: Exception) {
-                logger.error("Upload ${attempt.uploadId} failed during processing (attempt ${claim.attempt})", e)
+                logger.error("Upload ${attempt.uploadId} failed during processing", e)
                 fail(attempt, "processing_failure", emptyList())
             }
         }
@@ -101,49 +90,39 @@ class UploadProcessingService(
         val finalExtension = File(converted.filename).extension.lowercase().ifEmpty { "none" }
         meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
 
-        val sha512 = withContext(Dispatchers.Default) { getSha512(converted.data) }
+        val sha512 = withContext(cpuDispatcher) { getSha512(converted.data) }
+        val stored =
+            mellomlagringStorageService.store(
+                attempt.upload.navEksternRefId,
+                converted.filename,
+                converted.contentType,
+                attempt.uploadId,
+                converted.data,
+            )
+        logger.info("Upload ${attempt.uploadId} stored in mellomlagring as ${stored.filId}")
+        // On an uncertain commit outcome the remote file must not be deleted: the DB may refer to it.
         val completed =
-            try {
-                withContext(Dispatchers.IO) {
-                    dsl.transactionCoroutine { tx ->
-                        // Keep ownership stable across remote replacement and the DB update.
-                        if (!uploadProcessingQueries.lockOwnedAttempt(tx, attempt.uploadId, attempt.claim.attemptId)) {
-                            return@transactionCoroutine false
-                        }
-                        val stored =
-                            mellomlagringStorageService.store(
-                                attempt.upload.navEksternRefId,
-                                converted.filename,
-                                converted.contentType,
-                                attempt.uploadId,
-                                converted.data,
-                                replaceExisting = attempt.claim.attempt > 1,
-                            )
-                        logger.info("Upload ${attempt.uploadId} stored in mellomlagring as ${stored.filId}")
-                        check(
-                            uploadProcessingQueries.setFilId(
-                                tx,
-                                attempt.uploadId,
-                                attempt.claim.attemptId,
-                                stored.filId,
-                                stored.mellomlagringFilnavn,
-                                stored.storedSize,
-                                sha512,
-                                converted.converted,
-                                converted.contentType,
-                            ),
-                        ) { "Processing attempt lost its locked upload ${attempt.uploadId}" }
-                        UploadNotifications.notifyChange(tx, attempt.uploadId)
-                        true
-                    }
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    val updated =
+                        uploadProcessingQueries.setFilId(
+                            tx,
+                            attempt.uploadId,
+                            stored.filId,
+                            stored.mellomlagringFilnavn,
+                            stored.storedSize,
+                            sha512,
+                            converted.converted,
+                            converted.contentType,
+                        )
+                    if (updated) UploadNotifications.notifyChange(tx, attempt.uploadId)
+                    updated
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                throw StorageAttemptException(e)
             }
         if (!completed) {
-            logger.warn("Upload ${attempt.uploadId}: attempt was fenced out before storing")
+            logger.warn("Upload ${attempt.uploadId} was deleted or failed before storage completed")
+            runCatching { mellomlagringStorageService.delete(attempt.upload.navEksternRefId, stored.filId) }
+                .onFailure { logger.warn("Failed to delete untracked file ${stored.filId}", it) }
             cleanupOwnObject(attempt)
             return
         }
@@ -151,7 +130,7 @@ class UploadProcessingService(
         recordTimer(attempt.extension, "success", attempt.startTime)
     }
 
-    /** Marks the upload FAILED (with [errors]) if this attempt still owns it. */
+    /** Marks the upload FAILED (with [errors]) if it is still processing. */
     private suspend fun fail(
         attempt: Attempt,
         result: String,
@@ -162,10 +141,10 @@ class UploadProcessingService(
                 dsl.transactionResult { tx ->
                     if (errors.isEmpty()) {
                         uploadProcessingQueries
-                            .markFailed(tx, attempt.uploadId, attempt.claim.attemptId)
+                            .markFailed(tx, attempt.uploadId, onlyProcessing = true)
                             .also { if (it) UploadNotifications.notifyChange(tx, attempt.uploadId) }
                     } else {
-                        uploadProcessingQueries.addErrors(tx, attempt.uploadId, errors, attempt.claim.attemptId)
+                        uploadProcessingQueries.addErrors(tx, attempt.uploadId, errors, onlyProcessing = true)
                     }
                 }
             }
@@ -179,6 +158,20 @@ class UploadProcessingService(
 
     private suspend fun cleanupOwnObject(attempt: Attempt) {
         attempt.composedKey?.let { chunkAssemblyService.deleteObject(it) }
+    }
+
+    suspend fun markTimedOut(uploadId: UUID) {
+        val failed =
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    val updated = uploadProcessingQueries.markFailed(tx, uploadId, onlyProcessing = true)
+                    if (updated) UploadNotifications.notifyChange(tx, uploadId)
+                    updated
+                }
+            }
+        if (failed) {
+            chunkAssemblyService.deleteGcsObjects(uploadId)
+        }
     }
 
     private fun recordTimer(

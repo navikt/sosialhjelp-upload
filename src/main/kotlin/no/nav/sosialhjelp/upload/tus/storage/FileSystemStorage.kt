@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.tus.storage
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -10,6 +11,7 @@ import java.io.File
  */
 class FileSystemStorage(
     baseDir: File = File(System.getProperty("java.io.tmpdir"), "sosialhjelp-upload"),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ChunkStorage {
     private val root = baseDir.also { it.mkdirs() }
 
@@ -19,7 +21,7 @@ class FileSystemStorage(
         key: String,
         data: ByteArray,
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             file(key).writeBytes(data)
         }
     }
@@ -28,7 +30,7 @@ class FileSystemStorage(
         sourceKeys: List<String>,
         destKey: String,
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val dest = file(destKey)
             dest.outputStream().use { out ->
                 sourceKeys.forEach { key -> file(key).inputStream().use { it.copyTo(out) } }
@@ -37,23 +39,23 @@ class FileSystemStorage(
     }
 
     override suspend fun readObject(key: String): ByteArray =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             file(key).readBytes()
         }
 
     override suspend fun deleteObject(key: String) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             file(key).delete()
         }
     }
 
     override suspend fun exists(key: String): Boolean =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             file(key).exists()
         }
 
     override suspend fun listKeys(prefix: String): List<String> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val prefixFile = File(root, prefix)
             val dir = prefixFile.parentFile ?: root
             val namePrefix = prefixFile.name

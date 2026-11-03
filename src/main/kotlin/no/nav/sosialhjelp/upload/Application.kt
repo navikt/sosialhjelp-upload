@@ -9,6 +9,7 @@ import io.ktor.server.plugins.di.*
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,6 +23,7 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
@@ -54,6 +56,11 @@ fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain
         .main(args)
 }
+
+private const val IO_PARALLELISM = 64
+private const val MIN_CPU_PARALLELISM = 2
+
+private fun cpuParallelism() = maxOf(MIN_CPU_PARALLELISM, Runtime.getRuntime().availableProcessors())
 
 private fun getDataSource(config: ApplicationConfig): DataSource {
     val user = config.property("database.user").getString()
@@ -166,6 +173,8 @@ private fun Application.configureDependencies(
             }
         }
         provide<ChunkStorage> { chunkStorage }
+        provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(IO_PARALLELISM, "app-io") }
+        provide { CpuDispatcher(Dispatchers.Default.limitedParallelism(cpuParallelism(), "app-cpu")) }
         provide<SubmissionNotificationService> { SubmissionNotificationService(dataSource, notificationScope) }
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
