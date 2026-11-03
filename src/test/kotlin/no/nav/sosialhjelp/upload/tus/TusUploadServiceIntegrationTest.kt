@@ -1,6 +1,7 @@
 package no.nav.sosialhjelp.upload.tus
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -8,8 +9,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -44,7 +47,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayOutputStream
+import java.time.OffsetDateTime
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -52,6 +57,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Suppress("LargeClass")
 class TusUploadServiceIntegrationTest {
     private lateinit var dsl: DSLContext
     private lateinit var tusSubmissionQueries: TusSubmissionQueries
@@ -606,7 +612,7 @@ class TusUploadServiceIntegrationTest {
 
     // endregion
 
-    // region races (expected to FAIL until phase 1 of the concurrency plan is implemented)
+    // region races
 
     /** Starts an upload whose mellomlagring call blocks until [release] completes. */
     private suspend fun startBlockedUpload(
@@ -638,25 +644,45 @@ class TusUploadServiceIntegrationTest {
     private suspend fun settle() = withContext(Dispatchers.Default) { delay(1_500) }
 
     @Test
-    fun `deleting an upload while it is processing does not orphan the mellomlagring file`() =
-        runTest {
+    fun `delete waits for a concurrent storage commit and deletes the committed file`() =
+        runBlocking {
             val filId = UUID.randomUUID()
             val release = CompletableDeferred<Unit>()
             val uploadId = startBlockedUpload(filId, release)
 
-            tusUploadService.delete(uploadId)
+            val deletion = async(Dispatchers.IO) { tusUploadService.delete(uploadId) }
+            delay(200)
+            assertTrue(!deletion.isCompleted, "Delete must wait for the storage transaction")
             release.complete(Unit)
-            settle()
+            withTimeout(10_000) { deletion.await() }
 
-            // The processing job lost its row, so it must clean up the file it just uploaded.
             coVerify(timeout = 3_000) { mellomlagringClient.deleteFile(any(), eq(filId), any()) }
+            assertNull(dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne())
         }
 
     @Test
     fun `late processing result does not overwrite an upload that recovery marked FAILED`() =
-        runTest {
+        runBlocking {
+            clearMocks(mellomlagringClient)
+            val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
-            val uploadId = startBlockedUpload(UUID.randomUUID(), release)
+            coEvery { virusScanner.scan(any()) } coAnswers {
+                entered.complete(Unit)
+                release.await()
+                Result.OK
+            }
+            val content = minimalPdf()
+            val contextId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, contextId)
+            val uploadId =
+                tusUploadService.create(
+                    TusMetadata("late.pdf", contextId, correlationId, null, "id", null),
+                    content.size.toLong(),
+                    "12345678910",
+                    "token",
+                )
+            tusUploadService.appendChunk(uploadId, 0L, content)
+            withTimeout(10_000) { entered.await() }
 
             dsl
                 .update(UPLOAD)
@@ -669,6 +695,59 @@ class TusUploadServiceIntegrationTest {
             val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
             assertEquals("FAILED", row!![UPLOAD.PROCESSING_STATUS])
             assertNull(row[UPLOAD.FIL_ID])
+        }
+
+    @Test
+    fun `expired attempt cannot replace the file committed by a newer attempt`() =
+        runBlocking {
+            clearMocks(mellomlagringClient)
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val scans = AtomicInteger()
+            val winningFileId = UUID.randomUUID()
+            coEvery { virusScanner.scan(any()) } coAnswers {
+                if (scans.incrementAndGet() == 1) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+                Result.OK
+            }
+            coEvery { mellomlagringClient.replaceFile(any(), any(), any(), any()) } returns winningFileId
+            val content = minimalPdf()
+            val contextId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, contextId)
+            val uploadId =
+                tusUploadService.create(
+                    TusMetadata("race.pdf", contextId, correlationId, null, "id", null),
+                    content.size.toLong(),
+                    "12345678910",
+                    "token",
+                )
+            tusUploadService.appendChunk(uploadId, 0L, content)
+            withTimeout(10_000) { entered.await() }
+            dsl
+                .update(UPLOAD)
+                .set(UPLOAD.PROCESSING_STARTED_AT, OffsetDateTime.now().minusMinutes(10))
+                .where(UPLOAD.ID.eq(uploadId))
+                .execute()
+            processingWorker.wake()
+            withTimeout(10_000) {
+                while (dsl
+                        .select(UPLOAD.PROCESSING_STATUS)
+                        .from(UPLOAD)
+                        .where(UPLOAD.ID.eq(uploadId))
+                        .fetchOne()
+                        ?.value1() != "COMPLETE"
+                ) {
+                    delay(50)
+                }
+            }
+            release.complete(Unit)
+            settle()
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()!!
+            assertEquals(winningFileId, row[UPLOAD.FIL_ID])
+            coVerify(exactly = 1) { mellomlagringClient.replaceFile(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { mellomlagringClient.uploadFile(any(), any(), any(), any()) }
         }
 
     @Test

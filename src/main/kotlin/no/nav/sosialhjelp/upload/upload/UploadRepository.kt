@@ -60,6 +60,21 @@ data class SubmissionResources(
 )
 
 class UploadRepository {
+    /** Lock upload rows after locking the submission, before collecting remote resource IDs. */
+    fun lockUploads(
+        tx: Configuration,
+        submissionId: UUID,
+    ) {
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
+            .orderBy(UPLOAD.ID)
+            .forUpdate()
+            .fetch()
+    }
+
     /**
      * Returns the ids of all submissions for [navEksternRefId], optionally narrowed to [kategori].
      *

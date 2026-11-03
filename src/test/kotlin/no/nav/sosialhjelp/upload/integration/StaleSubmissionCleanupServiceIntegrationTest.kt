@@ -3,7 +3,12 @@ package no.nav.sosialhjelp.upload.integration
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
@@ -88,6 +93,57 @@ class StaleSubmissionCleanupServiceIntegrationTest {
 
     private fun submissionExists(submissionId: UUID) =
         dsl.selectFrom(SUBMISSION).where(SUBMISSION.ID.eq(submissionId)).fetchOne()
+
+    @Test
+    fun `submission deletion waits for concurrent completion before collecting file IDs`() =
+        runBlocking {
+            val ref = UUID.randomUUID().toString()
+            val submissionId = createMockSubmission(dsl, navEksternRefId = ref)
+            val uploadId = insertUpload(submissionId, status = "PROCESSING")
+            val filId = UUID.randomUUID()
+            val locked = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val completion =
+                async(Dispatchers.IO) {
+                    dsl.transaction { tx ->
+                        tx
+                            .dsl()
+                            .select(UPLOAD.ID)
+                            .from(UPLOAD)
+                            .where(UPLOAD.ID.eq(uploadId))
+                            .forUpdate()
+                            .fetchOne()
+                        locked.complete(Unit)
+                        runBlocking { release.await() }
+                        tx
+                            .dsl()
+                            .update(UPLOAD)
+                            .set(UPLOAD.FIL_ID, filId)
+                            .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
+                            .where(UPLOAD.ID.eq(uploadId))
+                            .execute()
+                    }
+                }
+            withTimeout(10_000) { locked.await() }
+            val deletionService =
+                SubmissionDeletionService(
+                    dsl,
+                    submissionQueries,
+                    uploadRepository,
+                    mellomlagringClient,
+                    chunkStorage,
+                    mockk(relaxed = true),
+                    SimpleMeterRegistry(),
+                )
+            val deletion = async(Dispatchers.IO) { deletionService.deleteSubmission(submissionId, false) }
+            delay(200)
+            release.complete(Unit)
+            withTimeout(10_000) {
+                completion.await()
+                deletion.await()
+            }
+            coVerify { mellomlagringClient.deleteFile(ref, filId, any()) }
+        }
 
     @Test
     fun `stale submissions are deleted after retention period`() {

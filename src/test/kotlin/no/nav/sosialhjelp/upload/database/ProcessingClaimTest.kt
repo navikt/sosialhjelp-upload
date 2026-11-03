@@ -1,17 +1,27 @@
 package no.nav.sosialhjelp.upload.database
 
+import io.mockk.coEvery
+import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries
 import no.nav.sosialhjelp.upload.upload.MAX_PROCESSING_ATTEMPTS
+import no.nav.sosialhjelp.upload.upload.ProcessingWorker
 import no.nav.sosialhjelp.upload.upload.Status
 import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
+import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -19,11 +29,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.time.OffsetDateTime
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ProcessingClaimTest {
@@ -141,4 +153,46 @@ class ProcessingClaimTest {
         assertTrue(dsl.transactionResult { tx -> submissionQueries.claimSubmit(tx, submissionId, UUID.randomUUID()) })
         assertNull(claim())
     }
+
+    @Test
+    fun `legacy processing is not reclaimed even after its old timestamp expires`() {
+        val (_, legacyUpload) = readyUpload()
+        dsl
+            .update(UPLOAD)
+            .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now().minusHours(1))
+            .where(UPLOAD.ID.eq(legacyUpload))
+            .execute()
+        assertNull(claim())
+        val (_, queuedUpload) = readyUpload()
+        assertEquals(queuedUpload, claim()?.uploadId)
+    }
+
+    @Test
+    fun `timed out processing frees worker for another upload`() =
+        runBlocking {
+            val service = mockk<UploadProcessingService>()
+            val entered = CompletableDeferred<Unit>()
+            val nextProcessed = CompletableDeferred<UUID>()
+            val calls = AtomicInteger()
+            coEvery { service.process(any()) } coAnswers {
+                if (calls.incrementAndGet() == 1) {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                }
+                nextProcessed.complete(firstArg<UploadProcessingQueries.Claim>().uploadId)
+            }
+            val worker = ProcessingWorker(dsl, queries, service, 300.milliseconds)
+            val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+            try {
+                readyUpload()
+                worker.start(scope, workers = 1)
+                withTimeout(10_000) { entered.await() }
+                val (_, secondUpload) = readyUpload()
+                worker.wake()
+                assertEquals(secondUpload, withTimeout(10_000) { nextProcessed.await() })
+            } finally {
+                scope.cancel()
+            }
+        }
 }

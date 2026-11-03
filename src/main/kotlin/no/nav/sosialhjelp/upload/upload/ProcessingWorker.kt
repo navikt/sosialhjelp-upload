@@ -16,12 +16,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
 /** How long an attempt owns an upload. Must exceed the worst-case pipeline (Gotenberg retries ~80 s). */
 val PROCESSING_LEASE = 3.minutes
+val PROCESSING_TIMEOUT = 150.seconds
 
 /**
  * Pulls READY uploads (and uploads whose lease expired) from the database and processes them.
@@ -33,6 +35,7 @@ class ProcessingWorker(
     private val dsl: DSLContext,
     private val queries: UploadProcessingQueries,
     private val processingService: UploadProcessingService,
+    private val processingTimeout: Duration = PROCESSING_TIMEOUT,
 ) {
     private val log = LoggerFactory.getLogger(ProcessingWorker::class.java)
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
@@ -58,7 +61,7 @@ class ProcessingWorker(
                 if (claim == null) {
                     withTimeoutOrNull(POLL_INTERVAL) { wakeups.receive() }
                 } else {
-                    processingService.process(claim)
+                    processClaim(claim)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -69,6 +72,17 @@ class ProcessingWorker(
                 log.error("Processing worker iteration failed", e)
                 delay(POLL_INTERVAL)
             }
+        }
+    }
+
+    private suspend fun processClaim(claim: UploadProcessingQueries.Claim) {
+        val finished =
+            withTimeoutOrNull(processingTimeout) {
+                processingService.process(claim)
+                true
+            } ?: false
+        if (!finished) {
+            log.warn("Upload ${claim.uploadId} processing timed out; retrying after lease expiry")
         }
     }
 

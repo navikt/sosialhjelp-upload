@@ -12,6 +12,7 @@ import no.nav.sosialhjelp.upload.validation.FileTypeValidation
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import no.nav.sosialhjelp.upload.validation.Validation
 import org.jooq.DSLContext
+import org.jooq.kotlin.coroutines.transactionCoroutine
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.Duration
@@ -19,9 +20,8 @@ import java.time.Duration
 /**
  * Runs one processing attempt: assemble → validate → convert → store → finalize.
  *
- * Every DB write is fenced on the claim's attempt id. If a write is fenced out, the upload was
- * deleted, failed by recovery or taken over by a newer attempt. This attempt then stops, removes
- * the mellomlagring file it stored and leaves the GCS chunks alone (a newer attempt may need them).
+ * Every DB write is fenced on the claim's attempt id. The upload row is locked while storing
+ * and committing the file ID, so a newer attempt or deletion cannot race the remote replacement.
  */
 class UploadProcessingService(
     private val dsl: DSLContext,
@@ -33,6 +33,10 @@ class UploadProcessingService(
     private val meterRegistry: MeterRegistry,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
+
+    private class StorageAttemptException(
+        cause: Throwable,
+    ) : RuntimeException(cause)
 
     private class Attempt(
         val claim: Claim,
@@ -56,6 +60,11 @@ class UploadProcessingService(
             } catch (e: CancellationException) {
                 // Pod shutdown: leave the upload PROCESSING. The lease expires and another pod retries.
                 throw e
+            } catch (e: StorageAttemptException) {
+                // The remote write or database commit may have succeeded. Retry with replaceFile
+                // rather than marking FAILED and leaving an untracked remote file behind.
+                logger.warn("Upload ${attempt.uploadId} storage attempt failed; retrying after lease expiry", e)
+                cleanupOwnObject(attempt)
             } catch (e: Exception) {
                 logger.error("Upload ${attempt.uploadId} failed during processing (attempt ${claim.attempt})", e)
                 fail(attempt, "processing_failure", emptyList())
@@ -92,40 +101,49 @@ class UploadProcessingService(
         val finalExtension = File(converted.filename).extension.lowercase().ifEmpty { "none" }
         meterRegistry.counter("upload.converted_file_extension", "extension", finalExtension).increment()
 
-        val stored =
-            mellomlagringStorageService.store(
-                attempt.upload.navEksternRefId,
-                converted.filename,
-                converted.contentType,
-                attempt.uploadId,
-                converted.data,
-                // A retry may follow an attempt that stored the file and then died.
-                replaceExisting = attempt.claim.attempt > 1,
-            )
-        logger.info("Upload ${attempt.uploadId} stored in mellomlagring as ${stored.filId}")
-
         val sha512 = withContext(Dispatchers.Default) { getSha512(converted.data) }
         val completed =
-            withContext(Dispatchers.IO) {
-                dsl.transactionResult { tx ->
-                    uploadProcessingQueries
-                        .setFilId(
-                            tx,
-                            attempt.uploadId,
-                            attempt.claim.attemptId,
-                            stored.filId,
-                            stored.mellomlagringFilnavn,
-                            stored.storedSize,
-                            sha512,
-                            converted.converted,
-                            converted.contentType,
-                        ).also { if (it) UploadNotifications.notifyChange(tx, attempt.uploadId) }
+            try {
+                withContext(Dispatchers.IO) {
+                    dsl.transactionCoroutine { tx ->
+                        // Keep ownership stable across remote replacement and the DB update.
+                        if (!uploadProcessingQueries.lockOwnedAttempt(tx, attempt.uploadId, attempt.claim.attemptId)) {
+                            return@transactionCoroutine false
+                        }
+                        val stored =
+                            mellomlagringStorageService.store(
+                                attempt.upload.navEksternRefId,
+                                converted.filename,
+                                converted.contentType,
+                                attempt.uploadId,
+                                converted.data,
+                                replaceExisting = attempt.claim.attempt > 1,
+                            )
+                        logger.info("Upload ${attempt.uploadId} stored in mellomlagring as ${stored.filId}")
+                        check(
+                            uploadProcessingQueries.setFilId(
+                                tx,
+                                attempt.uploadId,
+                                attempt.claim.attemptId,
+                                stored.filId,
+                                stored.mellomlagringFilnavn,
+                                stored.storedSize,
+                                sha512,
+                                converted.converted,
+                                converted.contentType,
+                            ),
+                        ) { "Processing attempt lost its locked upload ${attempt.uploadId}" }
+                        UploadNotifications.notifyChange(tx, attempt.uploadId)
+                        true
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw StorageAttemptException(e)
             }
         if (!completed) {
-            logger.warn("Upload ${attempt.uploadId}: attempt was fenced out, removing file ${stored.filId}")
-            runCatching { mellomlagringStorageService.delete(attempt.upload.navEksternRefId, stored.filId) }
-                .onFailure { logger.error("Failed to remove orphaned mellomlagring file ${stored.filId}", it) }
+            logger.warn("Upload ${attempt.uploadId}: attempt was fenced out before storing")
             cleanupOwnObject(attempt)
             return
         }

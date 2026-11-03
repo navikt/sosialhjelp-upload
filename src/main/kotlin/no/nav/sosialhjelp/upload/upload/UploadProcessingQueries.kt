@@ -62,9 +62,9 @@ class UploadProcessingQueries {
             .or(
                 UPLOAD.PROCESSING_STATUS
                     .eq(Status.PROCESSING.name)
-                    // Rows claimed by pre-V1.18 code (e.g. an old pod during rollout) have no
-                    // processing_started_at; fall back to updated_at so they are not stuck forever.
-                    .and(DSL.coalesce(UPLOAD.PROCESSING_STARTED_AT, UPLOAD.UPDATED_AT).lt(leaseCutoff))
+                    // Legacy processors do not fence writes. Never reclaim them until all old pods stopped.
+                    .and(UPLOAD.PROCESSING_ATTEMPT_ID.isNotNull)
+                    .and(UPLOAD.PROCESSING_STARTED_AT.lt(leaseCutoff))
                     .and(UPLOAD.PROCESSING_ATTEMPTS.lt(MAX_PROCESSING_ATTEMPTS)),
             )
 
@@ -139,6 +139,21 @@ class UploadProcessingQueries {
                 .eq(Status.PROCESSING.name)
                 .and(UPLOAD.PROCESSING_ATTEMPT_ID.eq(attemptId))
         }
+
+    /** Keep ownership stable while replacing the remote file and committing its ID. */
+    fun lockOwnedAttempt(
+        tx: Configuration,
+        uploadId: UUID,
+        attemptId: UUID,
+    ): Boolean =
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.ID.eq(uploadId))
+            .and(ownedBy(attemptId))
+            .forUpdate()
+            .fetchOne() != null
 
     @Suppress("LongParameterList")
     fun setFilId(

@@ -188,6 +188,18 @@ class TusUploadQueries {
                 )
             }
 
+    fun lockUpload(
+        tx: Configuration,
+        uploadId: UUID,
+    ): Boolean =
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.ID.eq(uploadId))
+            .forUpdate()
+            .fetchOne() != null
+
     fun deleteUpload(
         tx: Configuration,
         uploadId: UUID,

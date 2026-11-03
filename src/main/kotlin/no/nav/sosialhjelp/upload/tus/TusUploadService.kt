@@ -165,6 +165,7 @@ class TusUploadService(
                     "Cannot delete upload while submission $submissionId is being submitted",
                 )
             }
+            check(tusUploadQueries.lockUpload(tx, uploadId)) { "Upload $uploadId not found" }
             val upload = tusUploadQueries.getUpload(tx, uploadId)
             val filId = upload.filId
             val navEksternRefId = upload.navEksternRefId

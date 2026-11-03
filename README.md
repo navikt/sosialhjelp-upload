@@ -146,6 +146,8 @@ I CI settes de som `ORG_GRADLE_PROJECT_githubUser` og `ORG_GRADLE_PROJECT_github
 
 Tjenesten kjører periodiske oppryddingsjobber:
 
+Deployment bruker `Recreate`: alle gamle pods stopper før nye starter. Dette hindrer at eldre kode uten lease behandler de samme filene som nye workers under migreringen. Strategien gir nedetid ved deployment. Ikke rull tilbake til eldre kode etter migrering av databasen uten å håndtere `READY`-opplastinger og nye processing leases først.
+
 | Jobb | Timeout | Handling |
 |------|---------|----------|
 | **Behandling** | 3 minutter per forsøk | Ferdig opplastede filer får status `READY` og behandles av en worker. Stopper en pod midt i behandlingen, prøver en annen pod igjen når forsøket har gått ut på tid. Etter 3 forsøk markeres filen `FAILED`. |

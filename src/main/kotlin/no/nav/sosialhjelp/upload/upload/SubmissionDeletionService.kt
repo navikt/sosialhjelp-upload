@@ -9,6 +9,7 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
+import no.nav.sosialhjelp.upload.database.lockSubmission
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import org.jooq.DSLContext
@@ -33,7 +34,19 @@ class SubmissionDeletionService(
     ): Boolean {
         val resources =
             withContext(Dispatchers.IO) {
-                dsl.transactionResult { tx -> uploadRepository.getSubmissionResources(tx, submissionId) }
+                dsl.transactionResult { tx ->
+                    lockSubmission(tx, submissionId)
+                    uploadRepository.lockUploads(tx, submissionId)
+                    val current =
+                        uploadRepository.getSubmissionResources(tx, submissionId) ?: return@transactionResult null
+                    val deleted =
+                        if (skipIfSubmitting) {
+                            submissionQueries.cleanupIfNotSubmitting(tx, submissionId)
+                        } else {
+                            submissionQueries.cleanup(tx, submissionId)
+                        }
+                    if (deleted == 1) current else null
+                }
             } ?: return false
 
         return withMdc("navEksternRefId" to resources.navEksternRefId) {
@@ -41,21 +54,6 @@ class SubmissionDeletionService(
                 "Deleting submission $submissionId " +
                     "(kategori=${resources.kategori}, filer=${resources.filIds.size})",
             )
-            val deleted =
-                withContext(Dispatchers.IO) {
-                    dsl.transactionResult { tx ->
-                        if (skipIfSubmitting) {
-                            submissionQueries.cleanupIfNotSubmitting(tx, submissionId)
-                        } else {
-                            submissionQueries.cleanup(tx, submissionId)
-                        }
-                    }
-                }
-            if (deleted == 0 && skipIfSubmitting) {
-                logger.info("Skipping deletion of submission $submissionId, submit in progress")
-                return@withMdc false
-            }
-
             runCatching { notificationService.notifyDeleted(submissionId) }
                 .onFailure { logger.warn("Failed to notify deletion of submission $submissionId", it) }
 
