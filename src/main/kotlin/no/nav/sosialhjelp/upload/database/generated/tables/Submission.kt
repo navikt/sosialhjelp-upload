@@ -120,6 +120,11 @@ open class Submission(
      */
     val SUBMIT_STARTED_AT: TableField<SubmissionRecord, OffsetDateTime?> = createField(DSL.name("submit_started_at"), SQLDataType.TIMESTAMPWITHTIMEZONE(6), this, "")
 
+    /**
+     * The column <code>public.submission.submitted_at</code>.
+     */
+    val SUBMITTED_AT: TableField<SubmissionRecord, OffsetDateTime?> = createField(DSL.name("submitted_at"), SQLDataType.TIMESTAMPWITHTIMEZONE(6), this, "")
+
     private constructor(alias: Name, aliased: Table<SubmissionRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<SubmissionRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)
     private constructor(alias: Name, aliased: Table<SubmissionRecord>?, where: Condition?): this(alias, null, null, null, aliased, null, where)
@@ -132,7 +137,7 @@ open class Submission(
     /**
      * Create an aliased <code>public.submission</code> table reference
      */
-    constructor(alias: Name): this(alias, null)
+    constructor(alias: Name): this(alias, SUBMISSION)
 
     /**
      * Create a <code>public.submission</code> table reference

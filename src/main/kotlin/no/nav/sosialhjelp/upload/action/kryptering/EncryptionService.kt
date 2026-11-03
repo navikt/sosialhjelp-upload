@@ -1,9 +1,9 @@
 package no.nav.sosialhjelp.upload.action.kryptering
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.ks.kryptering.CMSKrypteringImpl
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
-import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import org.slf4j.LoggerFactory
 import java.security.Security
 
@@ -14,14 +14,13 @@ interface EncryptionService {
 class EncryptionServiceImpl(
     private val fiksClient: FiksClient,
     private val kryptering: CMSKrypteringImpl,
-    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) : EncryptionService {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     override suspend fun encryptBytes(data: ByteArray): ByteArray {
         val cert = fiksClient.fetchPublicKey()
         logger.debug("Krypterer ${data.size} bytes")
-        return withContext(cpuDispatcher) {
+        return withContext(Dispatchers.Default) {
             kryptering.krypterData(data, cert, Security.getProvider("BC"))
         }
     }

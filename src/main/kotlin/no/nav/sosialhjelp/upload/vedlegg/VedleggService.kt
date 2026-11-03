@@ -1,6 +1,5 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
@@ -11,7 +10,6 @@ class VedleggService(
     private val dsl: DSLContext,
     private val uploadRepository: UploadRepository,
     private val submissionDeletionService: SubmissionDeletionService,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
      * Deletes every submission for [navEksternRefId], including the files in Fiks mellomlagring
@@ -39,7 +37,7 @@ class VedleggService(
 
     suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
         val uploads =
-            withContext(ioDispatcher) {
+            withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
                     uploadRepository.getCompletedUploadsByNavEksternRefId(tx, navEksternRefId)
                 }

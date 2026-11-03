@@ -28,7 +28,7 @@ fun validateSubmissionUploads(uploads: List<Upload>): List<SubmissionValidationC
     val completeUploads = uploads.filter { it.status == Status.COMPLETE }
     val violations = mutableListOf<SubmissionValidationCode>()
     // A file still being processed may reach mellomlagring after vedlegg.json is built.
-    if (uploads.any { it.status == Status.PROCESSING }) {
+    if (uploads.any { it.status == Status.PROCESSING || it.status == Status.READY }) {
         violations += SubmissionValidationCode.UPLOADS_PROCESSING
     }
     if (completeUploads.isEmpty()) {

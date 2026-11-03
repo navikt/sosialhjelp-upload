@@ -37,6 +37,12 @@ class ChunkAssemblyService(
         return chunkStorage.readObject(composedKey) to composedKey
     }
 
+    /** Deletes a single object. Errors are logged, not rethrown. */
+    suspend fun deleteObject(key: String) {
+        runCatching { chunkStorage.deleteObject(key) }
+            .onFailure { logger.warn("Failed to delete GCS object $key", it) }
+    }
+
     /**
      * Deletes all chunk objects for [uploadId] and the composed object (if any).
      * Errors are logged but not rethrown so cleanup never blocks the caller.
@@ -45,11 +51,10 @@ class ChunkAssemblyService(
         uploadId: UUID,
         composedKey: String? = null,
     ) {
-        val chunkPrefix = "uploads/$uploadId-chunk-"
-        val keysToDelete = listOf(composedKey ?: "uploads/$uploadId")
+        // One prefix covers chunks, the base object and any composed object.
         runCatching {
-            val chunkKeys = chunkStorage.listKeys(chunkPrefix)
-            (chunkKeys + keysToDelete).distinct().forEach { key ->
+            val keys = chunkStorage.listKeys("uploads/$uploadId")
+            (keys + listOfNotNull(composedKey)).distinct().forEach { key ->
                 runCatching { chunkStorage.deleteObject(key) }
                     .onFailure { logger.warn("Failed to delete GCS object $key", it) }
             }

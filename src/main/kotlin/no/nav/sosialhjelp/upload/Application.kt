@@ -9,7 +9,6 @@ import io.ktor.server.plugins.di.*
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,7 +22,6 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
-import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
@@ -36,6 +34,7 @@ import no.nav.sosialhjelp.upload.tus.storage.GcsBucketStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
+import no.nav.sosialhjelp.upload.upload.ProcessingWorker
 import no.nav.sosialhjelp.upload.upload.StaleSubmissionCleanupService
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
@@ -55,11 +54,6 @@ fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain
         .main(args)
 }
-
-private const val IO_PARALLELISM = 64
-private const val MIN_CPU_PARALLELISM = 2
-
-private fun cpuParallelism() = maxOf(MIN_CPU_PARALLELISM, Runtime.getRuntime().availableProcessors())
 
 private fun getDataSource(config: ApplicationConfig): DataSource {
     val user = config.property("database.user").getString()
@@ -109,20 +103,37 @@ fun Application.module() {
     val isMock = runtimeEnv == "mock" || isLocalOrTest
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val chunkStorageDirectory =
+        // A fresh directory per test run: a shared /tmp path breaks when another user owns it.
+        if (isTest) {
+            java.nio.file.Files
+                .createTempDirectory("sosialhjelp-upload")
+                .toFile()
+        } else {
+            null
+        }
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     val chunkStorage: ChunkStorage =
         if (isLocalOrTest) {
-            FileSystemStorage()
+            chunkStorageDirectory?.let { FileSystemStorage(it) } ?: FileSystemStorage()
         } else {
             val bucketName = environment.config.property("gcs.bucketName").getString()
             GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
         }
-    configureDependencies(dataSource, notificationScope, processingScope, appMicrometerRegistry, chunkStorage, isMock)
+    configureDependencies(dataSource, notificationScope, appMicrometerRegistry, chunkStorage, isMock)
     configureSecurity()
     configureHTTP()
     configureMonitoring(appMicrometerRegistry)
     configureStatusPages()
     configureRouting()
+
+    // Processing runs in every mode (tests included): it is part of the upload flow, not a sweep.
+    // Resolve after startup, not during module(): dependency overrides registered after module()
+    // (as the integration tests do) must be in place before the worker builds its object graph.
+    monitor.subscribe(ApplicationStarted) {
+        val processingWorker: ProcessingWorker by dependencies
+        processingWorker.start(processingScope)
+    }
 
     val scopes =
         if (!isTest) startBackgroundJobs() else emptyList()
@@ -138,7 +149,6 @@ fun Application.module() {
 private fun Application.configureDependencies(
     dataSource: DataSource,
     notificationScope: CoroutineScope,
-    processingScope: CoroutineScope,
     appMicrometerRegistry: PrometheusMeterRegistry,
     chunkStorage: ChunkStorage,
     isMock: Boolean,
@@ -156,11 +166,6 @@ private fun Application.configureDependencies(
             }
         }
         provide<ChunkStorage> { chunkStorage }
-        // Wrapped to keep DI from closing the shared Dispatchers.IO on shutdown.
-        provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(IO_PARALLELISM, "app-io") }
-        // Deliberately bounded: PDF parsing and CMS encryption must not be able to saturate the host.
-        provide { CpuDispatcher(Dispatchers.Default.limitedParallelism(cpuParallelism(), "app-cpu")) }
-        provide<CoroutineScope> { processingScope }
         provide<SubmissionNotificationService> { SubmissionNotificationService(dataSource, notificationScope) }
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
@@ -180,6 +185,7 @@ private fun Application.configureDependencies(
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
         provide(UploadProcessingService::class)
+        provide(ProcessingWorker::class)
         provide(TusUploadService::class)
         provide(SubmissionService::class)
         provide(GotenbergService::class)

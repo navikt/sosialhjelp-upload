@@ -5,7 +5,6 @@ package no.nav.sosialhjelp.upload.upload
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.StatusCode
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -21,7 +20,6 @@ class UploadRecoveryService(
     private val notificationService: SubmissionNotificationService,
     private val chunkStorage: ChunkStorage,
     private val meterRegistry: MeterRegistry,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val log = LoggerFactory.getLogger(UploadRecoveryService::class.java)
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
@@ -53,7 +51,7 @@ class UploadRecoveryService(
         try {
             val cutoff = OffsetDateTime.now().minus(PROCESSING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
             val staleUploads =
-                withContext(ioDispatcher) {
+                withContext(Dispatchers.IO) {
                     dsl.transactionResult { tx ->
                         uploadRecoveryQueries.markStaleProcessingAsFailed(tx, cutoff)
                     }
@@ -88,7 +86,7 @@ class UploadRecoveryService(
         try {
             val cutoff = OffsetDateTime.now().minus(PENDING_TIMEOUT_MINUTES, ChronoUnit.MINUTES)
             val staleUploads =
-                withContext(ioDispatcher) {
+                withContext(Dispatchers.IO) {
                     dsl.transactionResult { tx ->
                         uploadRecoveryQueries.markHaltedPendingAsFailed(tx, cutoff)
                     }
@@ -118,9 +116,8 @@ class UploadRecoveryService(
     }
 
     private suspend fun cleanupGcsObjects(gcsKey: String) {
-        val chunkPrefix = "$gcsKey-chunk-"
         runCatching {
-            val chunkKeys = chunkStorage.listKeys(chunkPrefix)
+            val chunkKeys = chunkStorage.listKeys(gcsKey)
             (chunkKeys + listOf(gcsKey)).forEach { key ->
                 runCatching { chunkStorage.deleteObject(key) }
                     .onFailure { log.warn("Failed to delete GCS object $key during recovery", it) }

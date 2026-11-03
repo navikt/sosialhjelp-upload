@@ -80,7 +80,7 @@ class SubmitLockTest {
             assertFalse(queries.isCurrentAttempt(tx, id, old))
             assertTrue(queries.isCurrentAttempt(tx, id, new))
             assertFalse(queries.releaseSubmit(tx, id, old))
-            assertEquals(0, queries.deleteAfterSubmit(tx, id, old))
+            assertEquals(0, queries.markSubmitted(tx, id, old))
         }
         assertEquals(1, dsl.fetchCount(SUBMISSION, SUBMISSION.ID.eq(id)))
     }
@@ -95,12 +95,36 @@ class SubmitLockTest {
     }
 
     @Test
-    fun `deleteAfterSubmit deletes only for the current attempt`() {
-        val id = createMockSubmission(dsl)
+    fun `markSubmitted keeps the row, frees the context id and blocks a new submit`() {
+        val contextId = UUID.randomUUID().toString()
+        val id = createMockSubmission(dsl, contextId)
         val attempt = UUID.randomUUID()
         assertTrue(claim(id, attempt))
-        assertEquals(1, dsl.transactionResult { tx -> queries.deleteAfterSubmit(tx, id, attempt) })
-        assertEquals(0, dsl.fetchCount(SUBMISSION, SUBMISSION.ID.eq(id)))
+        assertEquals(1, dsl.transactionResult { tx -> queries.markSubmitted(tx, id, attempt) })
+
+        // Kept so the ref still counts when the next navEksternRefId is derived.
+        assertEquals(1, dsl.fetchCount(SUBMISSION, SUBMISSION.ID.eq(id)))
+        assertEquals(0, dsl.fetchCount(SUBMISSION, SUBMISSION.CONTEXT_ID.eq(contextId)))
+        assertFalse(claim(id, UUID.randomUUID()))
+    }
+
+    @Test
+    fun `next navEksternRefId counts a submitted submission`() {
+        val fiksDigisosId = UUID.randomUUID().toString()
+        val id = createMockSubmission(dsl, navEksternRefId = "${fiksDigisosId}0007")
+        dsl
+            .update(SUBMISSION)
+            .set(SUBMISSION.FIKS_DIGISOS_ID, fiksDigisosId)
+            .where(SUBMISSION.ID.eq(id))
+            .execute()
+        val attempt = UUID.randomUUID()
+        assertTrue(claim(id, attempt))
+        dsl.transaction { tx -> queries.markSubmitted(tx, id, attempt) }
+
+        assertEquals(
+            "${fiksDigisosId}0007",
+            dsl.transactionResult { tx -> tusQueries.getMaxNavEksternRefIdForFiksDigisosId(tx, fiksDigisosId) },
+        )
     }
 
     @Test

@@ -1,9 +1,11 @@
 package no.nav.sosialhjelp.upload.database
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
+import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import org.jooq.Condition
 import org.jooq.Configuration
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -21,6 +23,24 @@ fun submitLockInactive(now: OffsetDateTime = OffsetDateTime.now()): Condition =
     SUBMISSION.SUBMIT_ATTEMPT_ID
         .isNull
         .or(SUBMISSION.SUBMIT_STARTED_AT.le(now.minusMinutes(SUBMIT_LOCK_MINUTES)))
+
+/**
+ * Locks the submission row for the rest of the transaction. Always take this before any upload
+ * row lock. claimSubmit updates the same row, so a lease check made after this call stays valid
+ * until commit.
+ */
+fun lockSubmission(
+    tx: Configuration,
+    submissionId: UUID,
+) {
+    tx
+        .dsl()
+        .select(SUBMISSION.ID)
+        .from(SUBMISSION)
+        .where(SUBMISSION.ID.eq(submissionId))
+        .forUpdate()
+        .fetch()
+}
 
 /**
  * Shared submission DB queries used across multiple features:
@@ -80,6 +100,7 @@ class SubmissionQueries(
             .set(SUBMISSION.SUBMIT_ATTEMPT_ID, attemptId)
             .set(SUBMISSION.SUBMIT_STARTED_AT, now)
             .where(SUBMISSION.ID.eq(submissionId))
+            .and(SUBMISSION.SUBMITTED_AT.isNull)
             .and(submitLockInactive(now))
             .execute() == 1
     }
@@ -112,17 +133,61 @@ class SubmissionQueries(
             .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))
             .execute() == 1
 
-    /** Deletes the submission only if [attemptId] still holds the submit lock. */
-    fun deleteAfterSubmit(
+    /**
+     * Marks the submission as sent, only if [attemptId] still holds the submit lock.
+     *
+     * The row is kept (its uploads are deleted) so its navEksternRefId still counts when the next
+     * ref for the same fiksDigisosId is derived. Fiks may not list the new ettersendelse yet.
+     * The context id is released so the frontend can start a new submission with it.
+     */
+    fun markSubmitted(
         tx: Configuration,
         submissionId: UUID,
         attemptId: UUID,
+    ): Int {
+        lockSubmission(tx, submissionId)
+        val updated =
+            tx
+                .dsl()
+                .update(SUBMISSION)
+                .set(SUBMISSION.SUBMITTED_AT, OffsetDateTime.now())
+                .set(SUBMISSION.CONTEXT_ID, DSL.concat(SUBMISSION.CONTEXT_ID, DSL.inline(":submitted:$submissionId")))
+                .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)
+                .setNull(SUBMISSION.SUBMIT_STARTED_AT)
+                .where(SUBMISSION.ID.eq(submissionId))
+                .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))
+                .execute()
+        if (updated == 1) {
+            tx
+                .dsl()
+                .deleteFrom(UPLOAD)
+                .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
+                .execute()
+        }
+        return updated
+    }
+
+    /** Deletes sent submissions older than [cutoff]. They only hold a ref and a fødselsnummer. */
+    fun deleteSubmittedBefore(
+        tx: Configuration,
+        cutoff: OffsetDateTime,
+    ): Int =
+        tx
+            .dsl()
+            .deleteFrom(SUBMISSION)
+            .where(SUBMISSION.SUBMITTED_AT.lt(cutoff))
+            .execute()
+
+    /** Deletes the submission unless a submit holds a live lock. Atomic with claimSubmit. */
+    fun cleanupIfNotSubmitting(
+        tx: Configuration,
+        submissionId: UUID,
     ): Int =
         tx
             .dsl()
             .deleteFrom(SUBMISSION)
             .where(SUBMISSION.ID.eq(submissionId))
-            .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))
+            .and(submitLockInactive())
             .execute()
 
     fun cleanup(

@@ -3,10 +3,10 @@
 package no.nav.sosialhjelp.upload.database.notify
 
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -40,12 +40,15 @@ data class SubmissionUpdateNotification(
 class SubmissionNotificationService(
     private val dataSource: DataSource,
     listenerScope: CoroutineScope = CoroutineScope(SupervisorJob()),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val log = LoggerFactory.getLogger(SubmissionNotificationService::class.java)
 
     @Suppress("PropertyName")
-    private val _updates = MutableSharedFlow<SubmissionUpdateNotification>(extraBufferCapacity = 64)
+    private val _updates =
+        MutableSharedFlow<SubmissionUpdateNotification>(
+            extraBufferCapacity = 64,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
 
     /** All submission update/delete notifications, unfiltered. */
     val allUpdates: Flow<SubmissionUpdateNotification> = _updates.asSharedFlow()
@@ -54,7 +57,7 @@ class SubmissionNotificationService(
         listenerScope.launch {
             while (true) {
                 try {
-                    withContext(ioDispatcher) {
+                    withContext(Dispatchers.IO) {
                         dataSource.connection.use { conn ->
                             val pgConn = conn.unwrap(PGConnection::class.java)
                             conn.createStatement().execute("LISTEN submission_update")
@@ -97,7 +100,7 @@ class SubmissionNotificationService(
      * notifications that must be atomic with a write transaction.
      */
     suspend fun notifyUpdate(submissionId: UUID) {
-        withContext(ioDispatcher) {
+        withContext(Dispatchers.IO) {
             dataSource.connection.use { conn ->
                 conn.prepareStatement("SELECT pg_notify('submission_update', ?)").use { ps ->
                     ps.setString(1, submissionId.toString())
@@ -118,7 +121,7 @@ class SubmissionNotificationService(
      * notifications that must be atomic with a write transaction.
      */
     suspend fun notifyDeleted(submissionId: UUID) {
-        withContext(ioDispatcher) {
+        withContext(Dispatchers.IO) {
             dataSource.connection.use { conn ->
                 conn.prepareStatement("SELECT pg_notify('submission_delete', ?)").use { ps ->
                     ps.setString(1, submissionId.toString())

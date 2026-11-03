@@ -15,7 +15,8 @@ class UploadRecoveryQueries {
     )
 
     /**
-     * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
+     * Fails uploads whose last allowed attempt has an expired lease. Uploads with attempts left
+     * are retried by [ProcessingWorker] instead.
      * Returns info needed for SSE notification and GCS cleanup.
      */
     fun markStaleProcessingAsFailed(
@@ -28,7 +29,8 @@ class UploadRecoveryQueries {
             .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name))
-            .and(UPLOAD.UPDATED_AT.lt(cutoff))
+            .and(UPLOAD.PROCESSING_STARTED_AT.lt(cutoff))
+            .and(UPLOAD.PROCESSING_ATTEMPTS.ge(MAX_PROCESSING_ATTEMPTS))
             .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)
             .fetch()
             .mapNotNull { record ->

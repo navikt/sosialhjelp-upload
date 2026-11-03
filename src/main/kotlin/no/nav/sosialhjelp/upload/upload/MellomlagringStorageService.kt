@@ -22,27 +22,40 @@ class MellomlagringStorageService(
         val storedSize: Long,
     )
 
+    suspend fun delete(
+        navEksternRefId: String,
+        filId: UUID,
+    ) = mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
+
     /**
      * Encrypts [data], uses the detected [contentType], generates a unique
      * mellomlagring filename, uploads the encrypted bytes, and returns the result.
      */
+    @Suppress("LongParameterList")
     suspend fun store(
         navEksternRefId: String,
         filename: String,
         contentType: String,
         uploadId: UUID,
         data: ByteArray,
+        replaceExisting: Boolean = false,
     ): StorageResult {
         val mellomlagringFilnavn = makeUniqueMellomlagringFilename(filename, uploadId)
         val encrypted = encryptionService.encryptBytes(data)
         logger.info("Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId")
+        // The filename is derived from the upload id, so replacing by name removes a copy left
+        // behind by an earlier attempt that died after storing.
         val filId =
-            mellomlagringClient.uploadFile(
-                navEksternRefId = navEksternRefId,
-                filename = mellomlagringFilnavn,
-                contentType = contentType,
-                data = encrypted,
-            )
+            if (replaceExisting) {
+                mellomlagringClient.replaceFile(navEksternRefId, mellomlagringFilnavn, contentType, encrypted)
+            } else {
+                mellomlagringClient.uploadFile(
+                    navEksternRefId = navEksternRefId,
+                    filename = mellomlagringFilnavn,
+                    contentType = contentType,
+                    data = encrypted,
+                )
+            }
         return StorageResult(
             filId = filId,
             mellomlagringFilnavn = mellomlagringFilnavn,

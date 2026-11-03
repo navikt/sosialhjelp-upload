@@ -1,11 +1,11 @@
 package no.nav.sosialhjelp.upload.status
 
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
+import no.nav.sosialhjelp.upload.upload.Status
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.DSLContext
@@ -16,13 +16,12 @@ class SubmissionService(
     private val uploadRepository: UploadRepository,
     private val tusSubmissionQueries: TusSubmissionQueries,
     private val dsl: DSLContext,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun getOrCreate(
         contextId: String,
         personIdent: String,
     ): UUID {
-        return withContext(ioDispatcher) {
+        return withContext(Dispatchers.IO) {
             val existing =
                 dsl.transactionResult { tx ->
                     tusSubmissionQueries.findSubmission(tx, contextId, personIdent)
@@ -36,7 +35,7 @@ class SubmissionService(
     }
 
     suspend fun getSubmissionStatus(submissionId: UUID): SubmissionState =
-        withContext(ioDispatcher) { readSubmissionStatus(submissionId) }
+        withContext(Dispatchers.IO) { readSubmissionStatus(submissionId) }
 
     private fun readSubmissionStatus(submissionId: UUID): SubmissionState =
         dsl.transactionResult { tx ->
@@ -60,7 +59,12 @@ class SubmissionService(
                                         val originalBase = File(upload.originalFilename ?: "").nameWithoutExtension
                                         if (ext.isNotEmpty()) "$originalBase.$ext" else originalBase
                                     },
-                                status = UploadDto.Status.valueOf(upload.status.name),
+                                status =
+                                    when (upload.status) {
+                                        // READY is internal (queued); clients only know PROCESSING.
+                                        Status.READY -> UploadDto.Status.PROCESSING
+                                        else -> UploadDto.Status.valueOf(upload.status.name)
+                                    },
                                 upload.fileSize,
                                 upload.kategori,
                                 upload.correlationId,

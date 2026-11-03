@@ -18,6 +18,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.jackson.jackson
 import io.ktor.server.plugins.di.annotations.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -26,7 +27,6 @@ import kotlinx.serialization.json.Json
 import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.api.fiks.ErrorMessage
 import no.nav.sosialhjelp.upload.action.Metadata
-import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.contentnegotiation.HendelseTypeSerializer
@@ -47,7 +47,6 @@ class FiksClient(
     @Property("fiks.integrasjonsid") private val integrasjonsid: String?,
     @Property("fiks.integrasjonspassord") private val integrasjonspassord: String?,
     private val texasClient: TexasClient,
-    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java.name)
     private val teamLogger = teamLogger(this::class)
@@ -126,7 +125,7 @@ class FiksClient(
                     }
                 }.bodyAsBytes()
                 .also { logger.info("Hentet public key fra dokumentlager") }
-        return withContext(cpuDispatcher) {
+        return withContext(Dispatchers.Default) {
             try {
                 val certificateFactory = CertificateFactory.getInstance("X.509")
                 certificateFactory.generateCertificate(publicKeyBytes.inputStream()) as X509Certificate

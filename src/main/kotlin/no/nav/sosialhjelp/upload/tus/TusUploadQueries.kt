@@ -2,12 +2,10 @@ package no.nav.sosialhjelp.upload.tus
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
-import no.nav.sosialhjelp.upload.database.submitLockActive
 import no.nav.sosialhjelp.upload.upload.Status
 import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadNotifications
 import org.jooq.Configuration
-import org.jooq.impl.DSL
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -17,6 +15,11 @@ import java.util.UUID
  */
 class TusUploadQueries {
     class OffsetMismatchException(
+        message: String,
+    ) : RuntimeException(message)
+
+    /** The upload has left PENDING (rejected, failed or processing) and takes no more chunks. */
+    class UploadNotAcceptingChunksException(
         message: String,
     ) : RuntimeException(message)
 
@@ -97,14 +100,19 @@ class TusUploadQueries {
         chunkSize: Int,
     ): Pair<Long, Long> {
         // Lock the row to serialize concurrent chunk uploads to the same upload ID.
-        tx
-            .dsl()
-            .select(UPLOAD.ID)
-            .from(UPLOAD)
-            .where(UPLOAD.ID.eq(uploadId))
-            .forUpdate()
-            .fetchOne()
-            ?: throw OffsetMismatchException("Upload $uploadId not found")
+        val status =
+            tx
+                .dsl()
+                .select(UPLOAD.PROCESSING_STATUS)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .forUpdate()
+                .fetchOne()
+                ?.value1()
+                ?: throw OffsetMismatchException("Upload $uploadId not found")
+        if (status != Status.PENDING.name) {
+            throw UploadNotAcceptingChunksException("Upload $uploadId is $status, not accepting chunks")
+        }
         val newOffset = expectedOffset + chunkSize
         val affected =
             tx
@@ -114,6 +122,7 @@ class TusUploadQueries {
                 .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
                 .where(UPLOAD.ID.eq(uploadId))
                 .and(UPLOAD.UPLOAD_OFFSET.eq(expectedOffset))
+                .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
                 .execute()
         if (affected == 0) {
             throw OffsetMismatchException("Upload $uploadId offset mismatch: expected $expectedOffset")
@@ -126,35 +135,18 @@ class TusUploadQueries {
                 .where(UPLOAD.ID.eq(uploadId))
                 .fetchSingle()
                 .get(UPLOAD.SIZE)!!
+        if (newOffset == totalSize) {
+            // Hand over to the processing workers in the same transaction as the last chunk.
+            tx
+                .dsl()
+                .update(UPLOAD)
+                .set(UPLOAD.PROCESSING_STATUS, Status.READY.name)
+                .where(UPLOAD.ID.eq(uploadId))
+                .execute()
+            UploadNotifications.notifyChange(tx, uploadId)
+        }
         return totalSize to newOffset
     }
-
-    /**
-     * Atomically claims an upload for processing by transitioning PENDING → PROCESSING.
-     * Returns true if this caller claimed it, false if already claimed or processed.
-     */
-    fun claimForProcessing(
-        tx: Configuration,
-        uploadId: UUID,
-    ): Boolean =
-        tx
-            .dsl()
-            .update(UPLOAD)
-            .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)
-            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
-            .where(UPLOAD.ID.eq(uploadId))
-            .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
-            // Do not start processing while the submission is being submitted: the file would reach
-            // mellomlagring without being listed in vedlegg.json.
-            .and(
-                DSL.notExists(
-                    DSL
-                        .selectOne()
-                        .from(SUBMISSION)
-                        .where(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
-                        .and(submitLockActive()),
-                ),
-            ).execute() > 0
 
     fun getUpload(
         tx: Configuration,

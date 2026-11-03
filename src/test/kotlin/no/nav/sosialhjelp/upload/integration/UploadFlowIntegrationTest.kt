@@ -32,7 +32,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -143,7 +142,6 @@ class UploadFlowIntegrationTest {
                 // Overrides must be registered before the module is loaded
                 dependencies.provide<MellomlagringClient> { mellomlagringClient }
                 dependencies.provide<FiksClient> { fiksClient }
-                dependencies.provide<CoroutineDispatcher> { Dispatchers.Unconfined }
                 module()
             }
             startApplication()
@@ -173,8 +171,6 @@ class UploadFlowIntegrationTest {
                 module()
                 dependencies.provide<MellomlagringClient> { mellomlagringClient }
                 dependencies.provide<FiksClient> { fiksClient }
-                // Wrap to avoid DI trying to close Dispatchers.IO on shutdown
-                dependencies.provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(Int.MAX_VALUE) }
             }
         server.start()
         val port =
@@ -367,13 +363,22 @@ class UploadFlowIntegrationTest {
                 }
             assertEquals(HttpStatusCode.Created, submitResp.status)
 
-            val sub =
-                PostgresTestContainer.dsl
-                    .selectFrom(SUBMISSION)
-                    .where(SUBMISSION.ID.eq(submissionId))
-                    .fetchOne()
-            assertNull(sub, "Submission should be deleted after successful submit")
+            // The row is kept (for the navEksternRefId counter) but marked submitted, without uploads.
+            assertSubmitted(submissionId)
         }
+
+    private fun assertSubmitted(submissionId: UUID) {
+        val dsl = PostgresTestContainer.dsl
+        val submittedAt =
+            dsl
+                .select(SUBMISSION.SUBMITTED_AT)
+                .from(SUBMISSION)
+                .where(SUBMISSION.ID.eq(submissionId))
+                .fetchOne()
+                ?.value1()
+        assertNotNull(submittedAt, "Submission should be marked submitted")
+        assertEquals(0, dsl.fetchCount(UPLOAD, UPLOAD.SUBMISSION_ID.eq(submissionId)), "Uploads should be deleted")
+    }
 
     @Test
     fun `submit with klageId sends to klage mottaker without fetching sak`() =
@@ -463,12 +468,8 @@ class UploadFlowIntegrationTest {
                 }
             assertEquals(HttpStatusCode.Created, submitResp.status)
 
-            val sub =
-                PostgresTestContainer.dsl
-                    .selectFrom(SUBMISSION)
-                    .where(SUBMISSION.ID.eq(submissionId))
-                    .fetchOne()
-            assertNull(sub, "Submission should be cleaned up even when Fiks reports already exists")
+            // The row is kept (for the navEksternRefId counter) but marked submitted, without uploads.
+            assertSubmitted(submissionId)
         }
 
     @Test

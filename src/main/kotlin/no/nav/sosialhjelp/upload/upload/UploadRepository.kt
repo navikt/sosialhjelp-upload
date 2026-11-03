@@ -26,6 +26,8 @@ data class Upload(
 )
 
 enum class Status {
+    /** All bytes received; waiting for a processing worker. */
+    READY,
     PROCESSING,
     FAILED,
     PENDING,

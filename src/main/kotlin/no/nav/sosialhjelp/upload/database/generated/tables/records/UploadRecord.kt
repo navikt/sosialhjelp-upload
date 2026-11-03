@@ -78,10 +78,22 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         set(value): Unit = set(14, value)
         get(): String? = get(14) as String?
 
+    open var processingAttemptId: UUID?
+        set(value): Unit = set(15, value)
+        get(): UUID? = get(15) as UUID?
+
+    open var processingStartedAt: OffsetDateTime?
+        set(value): Unit = set(16, value)
+        get(): OffsetDateTime? = get(16) as OffsetDateTime?
+
+    open var processingAttempts: Int?
+        set(value): Unit = set(17, value)
+        get(): Int? = get(17) as Int?
+
     /**
      * Create a detached, initialised UploadRecord
      */
-    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null, correlationId: UUID? = null, converted: Boolean? = null, contentType: String? = null): this() {
+    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null, correlationId: UUID? = null, converted: Boolean? = null, contentType: String? = null, processingAttemptId: UUID? = null, processingStartedAt: OffsetDateTime? = null, processingAttempts: Int? = null): this() {
         this.id = id
         this.submissionId = submissionId
         this.originalFilename = originalFilename
@@ -97,6 +109,9 @@ open class UploadRecord() : TableRecordImpl<UploadRecord>(Upload.UPLOAD) {
         this.correlationId = correlationId
         this.converted = converted
         this.contentType = contentType
+        this.processingAttemptId = processingAttemptId
+        this.processingStartedAt = processingStartedAt
+        this.processingAttempts = processingAttempts
         resetTouchedOnNotNull()
     }
 }

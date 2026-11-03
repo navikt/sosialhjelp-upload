@@ -4,7 +4,6 @@ package no.nav.sosialhjelp.upload.action
 
 import io.ktor.http.*
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -14,7 +13,6 @@ import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
-import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.common.withMdc
@@ -43,8 +41,6 @@ class EttersendelseService(
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val teamLogger = teamLogger(this::class)
@@ -59,7 +55,7 @@ class EttersendelseService(
     ): Boolean {
         val attemptId = UUID.randomUUID()
         val claimed =
-            withContext(ioDispatcher) {
+            withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx -> submissionQueries.claimSubmit(tx, submissionId, attemptId) }
             }
         if (!claimed) {
@@ -92,14 +88,14 @@ class EttersendelseService(
             klageId?.let { EttersendelseMottaker.Klage(it) }
                 ?: EttersendelseMottaker.Soknad(fiksClient.getSak(fiksDigisosId, token).kommunenummer)
         val navEksternRefId =
-            withContext(ioDispatcher) {
+            withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
                     ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
                 }
             }
         return withMdc("navEksternRefId" to navEksternRefId) {
             val uploads =
-                withContext(ioDispatcher) {
+                withContext(Dispatchers.IO) {
                     dsl.transactionResult { tx -> uploadRepository.getUploads(tx, submissionId) }
                 }
 
@@ -131,7 +127,7 @@ class EttersendelseService(
         attemptId: UUID,
     ) {
         val current =
-            withContext(ioDispatcher) {
+            withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx -> submissionQueries.isCurrentAttempt(tx, submissionId, attemptId) }
             }
         if (!current) {
@@ -145,7 +141,7 @@ class EttersendelseService(
         attemptId: UUID,
     ) {
         runCatching {
-            withContext(NonCancellable + ioDispatcher) {
+            withContext(NonCancellable + Dispatchers.IO) {
                 dsl.transactionResult { tx -> submissionQueries.releaseSubmit(tx, submissionId, attemptId) }
             }
         }.onFailure { logger.error("Failed to release submit lock for submission $submissionId", it) }
@@ -158,7 +154,7 @@ class EttersendelseService(
         personIdent: String,
     ) {
         val ettersendelsePdf =
-            withContext(cpuDispatcher) {
+            withContext(Dispatchers.Default) {
                 val pdfMetadata =
                     PdfMetadata(
                         metadata.type,
@@ -244,14 +240,14 @@ class EttersendelseService(
         attemptId: UUID,
     ) {
         val deleted =
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> submissionQueries.deleteAfterSubmit(tx, submissionId, attemptId) }
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx -> submissionQueries.markSubmitted(tx, submissionId, attemptId) }
             }
         if (deleted > 0) {
             notificationService.notifyDeleted(submissionId)
         } else {
             logger.warn(
-                "Submission $submissionId was not deleted after submit, attempt $attemptId no longer holds the lock",
+                "Submission $submissionId was not marked submitted, attempt $attemptId no longer holds the lock",
             )
         }
     }

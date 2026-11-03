@@ -5,9 +5,9 @@ package no.nav.sosialhjelp.upload.upload
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.StatusCode
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -25,15 +25,18 @@ class StaleSubmissionCleanupService(
     private val dsl: DSLContext,
     private val submissionRetentionQueries: StaleSubmissionQueries,
     private val submissionDeletionService: SubmissionDeletionService,
+    private val submissionQueries: SubmissionQueries,
     private val meterRegistry: MeterRegistry,
     private val idleTimeout: Duration = Duration.ofHours(IDLE_TIMEOUT_HOURS),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val log = LoggerFactory.getLogger(StaleSubmissionCleanupService::class.java)
     private val tracer = GlobalOpenTelemetry.getTracer("sosialhjelp-upload")
 
     companion object {
         const val IDLE_TIMEOUT_HOURS = 1L
+
+        /** Long enough for Fiks to list the ettersendelse in ettersendtInfoNAV. */
+        const val SUBMITTED_RETENTION_DAYS = 7L
     }
 
     suspend fun runCleanup() {
@@ -42,7 +45,7 @@ class StaleSubmissionCleanupService(
         try {
             val cutoff = OffsetDateTime.now().minus(idleTimeout)
             val staleSubmissions =
-                withContext(ioDispatcher) {
+                withContext(Dispatchers.IO) {
                     dsl.transactionResult { tx ->
                         submissionRetentionQueries.getStaleSubmissions(tx, cutoff)
                     }
@@ -57,6 +60,12 @@ class StaleSubmissionCleanupService(
             for (submission in staleSubmissions) {
                 deleteStaleSubmission(submission)
             }
+            val submittedCutoff = OffsetDateTime.now().minusDays(SUBMITTED_RETENTION_DAYS)
+            val purged =
+                withContext(Dispatchers.IO) {
+                    dsl.transactionResult { tx -> submissionQueries.deleteSubmittedBefore(tx, submittedCutoff) }
+                }
+            if (purged > 0) log.info("Deleted $purged submitted submission(s) older than ${SUBMITTED_RETENTION_DAYS}d")
         } catch (e: Exception) {
             span.recordException(e)
             span.setStatus(StatusCode.ERROR, e.message ?: "Retention failed")
@@ -73,7 +82,11 @@ class StaleSubmissionCleanupService(
                 "Retention deleting submission ${submission.id} " +
                     "(navEksternRefId=${submission.navEksternRefId}, kategori=${submission.kategori})",
             )
-            submissionDeletionService.deleteSubmission(submission.id, keepMellomlagring = false)
+            submissionDeletionService.deleteSubmission(
+                submission.id,
+                keepMellomlagring = false,
+                skipIfSubmitting = true,
+            )
             meterRegistry.counter("submission.retention", "result", "success").increment()
         } catch (e: Exception) {
             log.warn("Failed to delete stale submission ${submission.id}", e)

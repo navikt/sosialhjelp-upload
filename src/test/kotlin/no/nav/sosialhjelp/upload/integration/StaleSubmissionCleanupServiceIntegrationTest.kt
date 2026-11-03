@@ -62,6 +62,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                     notificationService = mockk(relaxed = true),
                     meterRegistry = SimpleMeterRegistry(),
                 ),
+            submissionQueries = submissionQueries,
             meterRegistry = SimpleMeterRegistry(),
             idleTimeout = timeout,
         )

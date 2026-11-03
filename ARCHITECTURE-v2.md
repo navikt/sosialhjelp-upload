@@ -321,8 +321,9 @@ Two background coroutines run continuously on application start:
 
 | Service | Interval | Purpose |
 |---|---|---|
-| `UploadRecoveryService` | 1 minute | Re-processes uploads stuck in `PROCESSING` state by re-reading bytes from GCS (falls back to marking failed if GCS object is missing) |
-| `RetentionService` | 1 minute | Deletes stale submissions (uploads and GCS objects) that were never submitted |
+| `ProcessingWorker` | Continuous (4 per pod) | Claims `READY` uploads, and `PROCESSING` uploads whose 3-minute lease expired, and processes them. Every write is fenced on `processing_attempt_id` |
+| `UploadRecoveryService` | 1 minute | Fails `PENDING` uploads idle for 3 minutes, and `PROCESSING` uploads that used all 3 attempts |
+| `StaleSubmissionCleanupService` | 1 minute | Deletes idle unsubmitted submissions (`automatic_cleanup = true`), and submitted submissions after 7 days |
 
 ---
 

@@ -145,6 +145,21 @@ open class Upload(
      */
     val CONTENT_TYPE: TableField<UploadRecord, String?> = createField(DSL.name("content_type"), SQLDataType.CLOB, this, "")
 
+    /**
+     * The column <code>public.upload.processing_attempt_id</code>.
+     */
+    val PROCESSING_ATTEMPT_ID: TableField<UploadRecord, UUID?> = createField(DSL.name("processing_attempt_id"), SQLDataType.UUID, this, "")
+
+    /**
+     * The column <code>public.upload.processing_started_at</code>.
+     */
+    val PROCESSING_STARTED_AT: TableField<UploadRecord, OffsetDateTime?> = createField(DSL.name("processing_started_at"), SQLDataType.TIMESTAMPWITHTIMEZONE(6), this, "")
+
+    /**
+     * The column <code>public.upload.processing_attempts</code>.
+     */
+    val PROCESSING_ATTEMPTS: TableField<UploadRecord, Int?> = createField(DSL.name("processing_attempts"), SQLDataType.INTEGER.nullable(false).defaultValue(DSL.field(DSL.raw("0"), SQLDataType.INTEGER)), this, "")
+
     private constructor(alias: Name, aliased: Table<UploadRecord>?): this(alias, null, null, null, aliased, null, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, parameters: Array<Field<*>?>?): this(alias, null, null, null, aliased, parameters, null)
     private constructor(alias: Name, aliased: Table<UploadRecord>?, where: Condition?): this(alias, null, null, null, aliased, null, where)
@@ -157,7 +172,7 @@ open class Upload(
     /**
      * Create an aliased <code>public.upload</code> table reference
      */
-    constructor(alias: Name): this(alias, null)
+    constructor(alias: Name): this(alias, UPLOAD)
 
     /**
      * Create a <code>public.upload</code> table reference
