@@ -15,66 +15,76 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
-import java.time.OffsetDateTime
-import kotlin.time.Duration.Companion.minutes
+import java.util.UUID
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
 
-/** How long an attempt owns an upload. Must exceed the worst-case pipeline (Gotenberg retries ~80 s). */
-<span class="fc" id="L24">val PROCESSING_LEASE = 3.minutes</span>
+<span class="fc" id="L22">val PROCESSING_TIMEOUT = 150.seconds</span>
 
 /**
- * Pulls READY uploads (and uploads whose lease expired) from the database and processes them.
+ * Pulls READY uploads from the database and processes each once.
  *
  * The database is the queue, so work survives pod restarts and is shared between pods.
  * A fixed number of workers per pod bounds memory: each attempt holds the file in memory a few times.
  */
-<span class="fc" id="L32">class ProcessingWorker(</span>
-<span class="fc" id="L33">    private val dsl: DSLContext,</span>
-<span class="fc" id="L34">    private val queries: UploadProcessingQueries,</span>
-<span class="fc" id="L35">    private val processingService: UploadProcessingService,</span>
-) {
-<span class="fc" id="L37">    private val log = LoggerFactory.getLogger(ProcessingWorker::class.java)</span>
-<span class="fc" id="L38">    private val wakeups = Channel&lt;Unit&gt;(Channel.CONFLATED)</span>
+<span class="fc" id="L30">class ProcessingWorker(</span>
+<span class="fc" id="L31">    private val dsl: DSLContext,</span>
+<span class="fc" id="L32">    private val queries: UploadProcessingQueries,</span>
+<span class="fc" id="L33">    private val processingService: UploadProcessingService,</span>
+<span class="fc" id="L34">    private val processingTimeout: Duration = PROCESSING_TIMEOUT,</span>
+<span class="fc" id="L35">) {</span>
+<span class="fc" id="L36">    private val log = LoggerFactory.getLogger(ProcessingWorker::class.java)</span>
+<span class="fc" id="L37">    private val wakeups = Channel&lt;Unit&gt;(Channel.CONFLATED)</span>
 
     /** Called after a final chunk so a local worker starts at once instead of at the next poll. */
     fun wake() {
-<span class="fc" id="L42">        wakeups.trySend(Unit)</span>
-<span class="fc" id="L43">    }</span>
+<span class="fc" id="L41">        wakeups.trySend(Unit)</span>
+<span class="fc" id="L42">    }</span>
 
-<span class="fc" id="L45">    fun start(</span>
+<span class="fc" id="L44">    fun start(</span>
         scope: CoroutineScope,
-<span class="fc" id="L47">        workers: Int = WORKERS,</span>
-<span class="pc bfc" id="L48" title="All 2 branches covered.">    ): List&lt;Job&gt; = List(workers) { scope.launch { loop() } }</span>
+<span class="fc" id="L46">        workers: Int = WORKERS,</span>
+<span class="pc bfc" id="L47" title="All 2 branches covered.">    ): List&lt;Job&gt; = List(workers) { scope.launch { loop() } }</span>
 
-<span class="fc" id="L50">    private suspend fun loop() {</span>
-<span class="fc" id="L51">        while (true) {</span>
-<span class="fc" id="L52">            try {</span>
-<span class="fc" id="L53">                val claim =</span>
-<span class="fc" id="L54">                    withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L55">                        val cutoff = OffsetDateTime.now().minus(PROCESSING_LEASE.toJavaDuration())</span>
-<span class="fc" id="L56">                        dsl.transactionResult { tx -&gt; queries.claimNext(tx, cutoff) }</span>
+<span class="fc" id="L49">    private suspend fun loop() {</span>
+<span class="fc" id="L50">        while (true) {</span>
+<span class="fc" id="L51">            try {</span>
+<span class="fc" id="L52">                val claim =</span>
+<span class="fc" id="L53">                    withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L54">                        dsl.transactionResult { tx -&gt; queries.claimNext(tx) }</span>
                     }
-<span class="fc bfc" id="L58" title="All 2 branches covered.">                if (claim == null) {</span>
-<span class="fc" id="L59">                    withTimeoutOrNull(POLL_INTERVAL) { wakeups.receive() }</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                if (claim == null) {</span>
+<span class="fc" id="L57">                    withTimeoutOrNull(POLL_INTERVAL) { wakeups.receive() }</span>
                 } else {
-<span class="fc" id="L61">                    processingService.process(claim)</span>
+<span class="fc" id="L59">                    processClaim(claim)</span>
                 }
-<span class="fc" id="L63">            } catch (e: CancellationException) {</span>
-<span class="fc" id="L64">                throw e</span>
-<span class="nc" id="L65">            } catch (e: Exception) {</span>
+<span class="fc" id="L61">            } catch (e: CancellationException) {</span>
+<span class="fc" id="L62">                throw e</span>
+<span class="nc" id="L63">            } catch (e: Exception) {</span>
                 // A blocking JDBC call is not interrupted by cancellation. If the worker was
                 // cancelled (shutdown) while it ran, its failure is noise: stop quietly.
-<span class="nc" id="L68">                currentCoroutineContext().ensureActive()</span>
-<span class="nc" id="L69">                log.error(&quot;Processing worker iteration failed&quot;, e)</span>
-<span class="nc" id="L70">                delay(POLL_INTERVAL)</span>
+<span class="nc" id="L66">                currentCoroutineContext().ensureActive()</span>
+<span class="nc" id="L67">                log.error(&quot;Processing worker iteration failed&quot;, e)</span>
+<span class="nc" id="L68">                delay(POLL_INTERVAL)</span>
             }
         }
     }
 
+    private suspend fun processClaim(uploadId: UUID) {
+<span class="fc" id="L74">        val finished =</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            withTimeoutOrNull(processingTimeout) {</span>
+<span class="fc" id="L76">                processingService.process(uploadId)</span>
+<span class="fc" id="L77">                true</span>
+<span class="nc" id="L78">            } ?: false</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (!finished) {</span>
+<span class="nc" id="L80">            log.warn(&quot;Upload $uploadId processing timed out&quot;)</span>
+<span class="nc" id="L81">            processingService.markTimedOut(uploadId)</span>
+        }
+<span class="pc" id="L83">    }</span>
+
     companion object {
         const val WORKERS = 4
-<span class="pc" id="L77">        val POLL_INTERVAL = 1.seconds</span>
+<span class="pc" id="L87">        val POLL_INTERVAL = 1.seconds</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

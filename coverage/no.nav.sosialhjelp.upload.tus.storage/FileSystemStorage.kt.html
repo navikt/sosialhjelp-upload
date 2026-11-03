@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileSystemStorage.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.tus.storage</a> &gt; <span class="el_source">FileSystemStorage.kt</span></div><h1>FileSystemStorage.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.tus.storage
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -8,59 +9,60 @@ import java.io.File
  * Filesystem-backed chunk storage for local development.
  * Chunks are written to `{baseDir}/{key}`.
  */
-<span class="fc" id="L11">class FileSystemStorage(</span>
-<span class="fc" id="L12">    baseDir: File = File(System.getProperty(&quot;java.io.tmpdir&quot;), &quot;sosialhjelp-upload&quot;),</span>
-<span class="fc" id="L13">) : ChunkStorage {</span>
-<span class="fc" id="L14">    private val root = baseDir.also { it.mkdirs() }</span>
+<span class="fc" id="L12">class FileSystemStorage(</span>
+<span class="fc" id="L13">    baseDir: File = File(System.getProperty(&quot;java.io.tmpdir&quot;), &quot;sosialhjelp-upload&quot;),</span>
+<span class="fc" id="L14">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L15">) : ChunkStorage {</span>
+<span class="fc" id="L16">    private val root = baseDir.also { it.mkdirs() }</span>
 
-<span class="fc" id="L16">    private fun file(key: String) = File(root, key).also { it.parentFile.mkdirs() }</span>
+<span class="fc" id="L18">    private fun file(key: String) = File(root, key).also { it.parentFile.mkdirs() }</span>
 
     override suspend fun writeChunk(
         key: String,
         data: ByteArray,
     ) {
-<span class="fc" id="L22">        withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L23">            file(key).writeBytes(data)</span>
-<span class="fc" id="L24">        }</span>
-<span class="fc" id="L25">    }</span>
+<span class="fc" id="L24">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L25">            file(key).writeBytes(data)</span>
+<span class="fc" id="L26">        }</span>
+<span class="fc" id="L27">    }</span>
 
     override suspend fun composeChunks(
         sourceKeys: List&lt;String&gt;,
         destKey: String,
     ) {
-<span class="pc" id="L31">        withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L32">            val dest = file(destKey)</span>
-<span class="pc" id="L33">            dest.outputStream().use { out -&gt;</span>
-<span class="pc" id="L34">                sourceKeys.forEach { key -&gt; file(key).inputStream().use { it.copyTo(out) } }</span>
-<span class="fc" id="L35">            }</span>
-<span class="fc" id="L36">        }</span>
-<span class="nc" id="L37">    }</span>
+<span class="fc" id="L33">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L34">            val dest = file(destKey)</span>
+<span class="pc" id="L35">            dest.outputStream().use { out -&gt;</span>
+<span class="pc" id="L36">                sourceKeys.forEach { key -&gt; file(key).inputStream().use { it.copyTo(out) } }</span>
+<span class="fc" id="L37">            }</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">    }</span>
 
     override suspend fun readObject(key: String): ByteArray =
-<span class="fc" id="L40">        withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L41">            file(key).readBytes()</span>
-<span class="fc" id="L42">        }</span>
+<span class="fc" id="L42">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L43">            file(key).readBytes()</span>
+<span class="fc" id="L44">        }</span>
 
     override suspend fun deleteObject(key: String) {
-<span class="fc" id="L45">        withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L46">            file(key).delete()</span>
+<span class="fc" id="L47">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L48">            file(key).delete()</span>
         }
-<span class="fc" id="L48">    }</span>
+<span class="fc" id="L50">    }</span>
 
     override suspend fun exists(key: String): Boolean =
-<span class="nc" id="L51">        withContext(Dispatchers.IO) {</span>
-<span class="nc" id="L52">            file(key).exists()</span>
-<span class="nc" id="L53">        }</span>
+<span class="nc" id="L53">        withContext(ioDispatcher) {</span>
+<span class="nc" id="L54">            file(key).exists()</span>
+<span class="nc" id="L55">        }</span>
 
     override suspend fun listKeys(prefix: String): List&lt;String&gt; =
-<span class="fc" id="L56">        withContext(Dispatchers.IO) {</span>
-<span class="fc" id="L57">            val prefixFile = File(root, prefix)</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            val dir = prefixFile.parentFile ?: root</span>
-<span class="fc" id="L59">            val namePrefix = prefixFile.name</span>
-<span class="fc" id="L60">            dir</span>
-<span class="fc" id="L61">                .listFiles { f -&gt; f.name.startsWith(namePrefix) }</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                ?.map { root.toURI().relativize(it.toURI()).path }</span>
-<span class="pc" id="L63">                ?: emptyList()</span>
-<span class="fc" id="L64">        }</span>
+<span class="fc" id="L58">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L59">            val prefixFile = File(root, prefix)</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            val dir = prefixFile.parentFile ?: root</span>
+<span class="fc" id="L61">            val namePrefix = prefixFile.name</span>
+<span class="fc" id="L62">            dir</span>
+<span class="fc" id="L63">                .listFiles { f -&gt; f.name.startsWith(namePrefix) }</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                ?.map { root.toURI().relativize(it.toURI()).path }</span>
+<span class="pc" id="L65">                ?: emptyList()</span>
+<span class="fc" id="L66">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

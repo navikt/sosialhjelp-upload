@@ -78,41 +78,26 @@ import org.jooq.impl.TableRecordImpl
 <span class="nc" id="L78">        set(value): Unit = set(14, value)</span>
 <span class="nc" id="L79">        get(): String? = get(14) as String?</span>
 
-    open var processingAttemptId: UUID?
-<span class="nc" id="L82">        set(value): Unit = set(15, value)</span>
-<span class="nc" id="L83">        get(): UUID? = get(15) as UUID?</span>
-
-    open var processingStartedAt: OffsetDateTime?
-<span class="nc" id="L86">        set(value): Unit = set(16, value)</span>
-<span class="nc" id="L87">        get(): OffsetDateTime? = get(16) as OffsetDateTime?</span>
-
-    open var processingAttempts: Int?
-<span class="nc" id="L90">        set(value): Unit = set(17, value)</span>
-<span class="nc" id="L91">        get(): Int? = get(17) as Int?</span>
-
     /**
      * Create a detached, initialised UploadRecord
      */
-<span class="nc" id="L96">    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null, correlationId: UUID? = null, converted: Boolean? = null, contentType: String? = null, processingAttemptId: UUID? = null, processingStartedAt: OffsetDateTime? = null, processingAttempts: Int? = null): this() {</span>
-<span class="nc" id="L97">        this.id = id</span>
-<span class="nc" id="L98">        this.submissionId = submissionId</span>
-<span class="nc" id="L99">        this.originalFilename = originalFilename</span>
-<span class="nc" id="L100">        this.size = size</span>
-<span class="nc" id="L101">        this.uploadOffset = uploadOffset</span>
-<span class="nc" id="L102">        this.filId = filId</span>
-<span class="nc" id="L103">        this.mellomlagringFilnavn = mellomlagringFilnavn</span>
-<span class="nc" id="L104">        this.processingStatus = processingStatus</span>
-<span class="nc" id="L105">        this.mellomlagringStorrelse = mellomlagringStorrelse</span>
-<span class="nc" id="L106">        this.sha512 = sha512</span>
-<span class="nc" id="L107">        this.updatedAt = updatedAt</span>
-<span class="nc" id="L108">        this.gcsKey = gcsKey</span>
-<span class="nc" id="L109">        this.correlationId = correlationId</span>
-<span class="nc" id="L110">        this.converted = converted</span>
-<span class="nc" id="L111">        this.contentType = contentType</span>
-<span class="nc" id="L112">        this.processingAttemptId = processingAttemptId</span>
-<span class="nc" id="L113">        this.processingStartedAt = processingStartedAt</span>
-<span class="nc" id="L114">        this.processingAttempts = processingAttempts</span>
-<span class="nc" id="L115">        resetTouchedOnNotNull()</span>
-<span class="nc" id="L116">    }</span>
+<span class="nc" id="L84">    constructor(id: UUID? = null, submissionId: UUID? = null, originalFilename: String? = null, size: Long? = null, uploadOffset: Long? = null, filId: UUID? = null, mellomlagringFilnavn: String? = null, processingStatus: String? = null, mellomlagringStorrelse: Long? = null, sha512: String? = null, updatedAt: OffsetDateTime? = null, gcsKey: String? = null, correlationId: UUID? = null, converted: Boolean? = null, contentType: String? = null): this() {</span>
+<span class="nc" id="L85">        this.id = id</span>
+<span class="nc" id="L86">        this.submissionId = submissionId</span>
+<span class="nc" id="L87">        this.originalFilename = originalFilename</span>
+<span class="nc" id="L88">        this.size = size</span>
+<span class="nc" id="L89">        this.uploadOffset = uploadOffset</span>
+<span class="nc" id="L90">        this.filId = filId</span>
+<span class="nc" id="L91">        this.mellomlagringFilnavn = mellomlagringFilnavn</span>
+<span class="nc" id="L92">        this.processingStatus = processingStatus</span>
+<span class="nc" id="L93">        this.mellomlagringStorrelse = mellomlagringStorrelse</span>
+<span class="nc" id="L94">        this.sha512 = sha512</span>
+<span class="nc" id="L95">        this.updatedAt = updatedAt</span>
+<span class="nc" id="L96">        this.gcsKey = gcsKey</span>
+<span class="nc" id="L97">        this.correlationId = correlationId</span>
+<span class="nc" id="L98">        this.converted = converted</span>
+<span class="nc" id="L99">        this.contentType = contentType</span>
+<span class="nc" id="L100">        resetTouchedOnNotNull()</span>
+<span class="nc" id="L101">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

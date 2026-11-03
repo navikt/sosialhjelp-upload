@@ -6,71 +6,47 @@ import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.database.submitLockActive
 import no.nav.sosialhjelp.upload.validation.Validation
-import org.jooq.Condition
 import org.jooq.Configuration
 import org.jooq.impl.DSL
 import java.time.OffsetDateTime
 import java.util.UUID
-
-/** A crashed or hung attempt is retried this many times in total before the upload is failed. */
-const val MAX_PROCESSING_ATTEMPTS = 3
 
 /**
  * DB queries for the post-upload processing pipeline:
  * reading upload data for processing, persisting the result, recording errors,
  * and marking uploads as failed.
  */
-<span class="fc" id="L23">class UploadProcessingQueries {</span>
+<span class="fc" id="L19">class UploadProcessingQueries {</span>
     fun getUploadForProcessing(
         tx: Configuration,
         uploadId: UUID,
     ): UploadForProcessing {
-<span class="fc" id="L28">        val record =</span>
-<span class="fc" id="L29">            tx</span>
-<span class="fc" id="L30">                .dsl()</span>
-<span class="fc" id="L31">                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.GCS_KEY, UPLOAD.SUBMISSION_ID)</span>
-<span class="fc" id="L32">                .from(UPLOAD)</span>
-<span class="fc" id="L33">                .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L34">                .fetchSingle()</span>
-<span class="fc" id="L35">        val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!</span>
-<span class="fc" id="L36">        val submissionRecord =</span>
-<span class="fc" id="L37">            tx</span>
-<span class="fc" id="L38">                .dsl()</span>
-<span class="fc" id="L39">                .select(SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.FIKS_DIGISOS_ID)</span>
-<span class="fc" id="L40">                .from(SUBMISSION)</span>
-<span class="fc" id="L41">                .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L42">                .fetchSingle()</span>
-<span class="fc" id="L43">        return UploadForProcessing(</span>
-<span class="fc" id="L44">            filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,</span>
-<span class="fc" id="L45">            gcsKey = record.get(UPLOAD.GCS_KEY)!!,</span>
-<span class="fc" id="L46">            submissionId = submissionId,</span>
-<span class="fc" id="L47">            navEksternRefId = submissionRecord.get(SUBMISSION.NAV_EKSTERN_REF_ID)!!,</span>
-<span class="fc" id="L48">            fiksDigisosId = submissionRecord.get(SUBMISSION.FIKS_DIGISOS_ID),</span>
+<span class="fc" id="L24">        val record =</span>
+<span class="fc" id="L25">            tx</span>
+<span class="fc" id="L26">                .dsl()</span>
+<span class="fc" id="L27">                .select(UPLOAD.ORIGINAL_FILENAME, UPLOAD.GCS_KEY, UPLOAD.SUBMISSION_ID)</span>
+<span class="fc" id="L28">                .from(UPLOAD)</span>
+<span class="fc" id="L29">                .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L30">                .fetchSingle()</span>
+<span class="fc" id="L31">        val submissionId = record.get(UPLOAD.SUBMISSION_ID)!!</span>
+<span class="fc" id="L32">        val submissionRecord =</span>
+<span class="fc" id="L33">            tx</span>
+<span class="fc" id="L34">                .dsl()</span>
+<span class="fc" id="L35">                .select(SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.FIKS_DIGISOS_ID)</span>
+<span class="fc" id="L36">                .from(SUBMISSION)</span>
+<span class="fc" id="L37">                .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L38">                .fetchSingle()</span>
+<span class="fc" id="L39">        return UploadForProcessing(</span>
+<span class="fc" id="L40">            filename = record.get(UPLOAD.ORIGINAL_FILENAME)!!,</span>
+<span class="fc" id="L41">            gcsKey = record.get(UPLOAD.GCS_KEY)!!,</span>
+<span class="fc" id="L42">            submissionId = submissionId,</span>
+<span class="fc" id="L43">            navEksternRefId = submissionRecord.get(SUBMISSION.NAV_EKSTERN_REF_ID)!!,</span>
+<span class="fc" id="L44">            fiksDigisosId = submissionRecord.get(SUBMISSION.FIKS_DIGISOS_ID),</span>
         )
     }
 
-    /** Identifies one processing attempt. Every write the attempt makes is fenced on [attemptId]. */
-<span class="fc" id="L53">    data class Claim(</span>
-<span class="fc" id="L54">        val uploadId: UUID,</span>
-<span class="fc" id="L55">        val attemptId: UUID,</span>
-<span class="fc" id="L56">        val attempt: Int,</span>
-    )
-
-    private fun claimable(leaseCutoff: OffsetDateTime): Condition =
-<span class="fc" id="L60">        UPLOAD.PROCESSING_STATUS</span>
-<span class="fc" id="L61">            .eq(Status.READY.name)</span>
-<span class="fc" id="L62">            .or(</span>
-<span class="fc" id="L63">                UPLOAD.PROCESSING_STATUS</span>
-<span class="fc" id="L64">                    .eq(Status.PROCESSING.name)</span>
-                    // Rows claimed by pre-V1.18 code (e.g. an old pod during rollout) have no
-                    // processing_started_at; fall back to updated_at so they are not stuck forever.
-<span class="fc" id="L67">                    .and(DSL.coalesce(UPLOAD.PROCESSING_STARTED_AT, UPLOAD.UPDATED_AT).lt(leaseCutoff))</span>
-<span class="fc" id="L68">                    .and(UPLOAD.PROCESSING_ATTEMPTS.lt(MAX_PROCESSING_ATTEMPTS)),</span>
-<span class="fc" id="L69">            )</span>
-
     /**
-     * Claims the next READY upload, or a PROCESSING upload whose lease expired (the pod died or
-     * the attempt hung). Returns null if there is nothing claimable right now.
+     * Claims the next READY upload. Processing is attempted once; recovery fails abandoned work.
      *
      * The upload row and its submission row are locked together with SKIP LOCKED. Other writers
      * lock submission, then upload, and wait; this query never waits, so it cannot deadlock with
@@ -80,71 +56,39 @@ const val MAX_PROCESSING_ATTEMPTS = 3
      * submission row lock keeps that check valid until commit (claimSubmit updates the same row).
      */
     @Suppress(&quot;ReturnCount&quot;)
-    fun claimNext(
-        tx: Configuration,
-        leaseCutoff: OffsetDateTime,
-    ): Claim? {
-<span class="fc" id="L87">        val candidate =</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">            tx</span>
-<span class="fc" id="L89">                .dsl()</span>
-<span class="fc" id="L90">                .select(UPLOAD.ID)</span>
-<span class="fc" id="L91">                .from(UPLOAD)</span>
-<span class="fc" id="L92">                .join(SUBMISSION)</span>
-<span class="fc" id="L93">                .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
-<span class="fc" id="L94">                .where(claimable(leaseCutoff))</span>
-<span class="fc" id="L95">                .and(DSL.not(submitLockActive()))</span>
-<span class="fc" id="L96">                .orderBy(UPLOAD.UPDATED_AT)</span>
-<span class="fc" id="L97">                .limit(1)</span>
-<span class="fc" id="L98">                .forUpdate()</span>
-<span class="fc" id="L99">                .of(UPLOAD, SUBMISSION)</span>
-<span class="fc" id="L100">                .skipLocked()</span>
-<span class="fc" id="L101">                .fetchOne() ?: return null</span>
-<span class="fc" id="L102">        val uploadId = candidate.get(UPLOAD.ID)!!</span>
+    fun claimNext(tx: Configuration): UUID? {
+<span class="fc" id="L60">        val candidate =</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            tx</span>
+<span class="fc" id="L62">                .dsl()</span>
+<span class="fc" id="L63">                .select(UPLOAD.ID)</span>
+<span class="fc" id="L64">                .from(UPLOAD)</span>
+<span class="fc" id="L65">                .join(SUBMISSION)</span>
+<span class="fc" id="L66">                .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))</span>
+<span class="fc" id="L67">                .where(UPLOAD.PROCESSING_STATUS.eq(Status.READY.name))</span>
+<span class="fc" id="L68">                .and(DSL.not(submitLockActive()))</span>
+<span class="fc" id="L69">                .orderBy(UPLOAD.UPDATED_AT)</span>
+<span class="fc" id="L70">                .limit(1)</span>
+<span class="fc" id="L71">                .forUpdate()</span>
+<span class="fc" id="L72">                .of(UPLOAD, SUBMISSION)</span>
+<span class="fc" id="L73">                .skipLocked()</span>
+<span class="fc" id="L74">                .fetchOne() ?: return null</span>
+<span class="fc" id="L75">        val uploadId = candidate.get(UPLOAD.ID)!!</span>
 
-<span class="fc" id="L104">        val attemptId = UUID.randomUUID()</span>
-<span class="fc" id="L105">        val now = OffsetDateTime.now()</span>
-        // Plain SQL: jOOQ maps UPDATE ... RETURNING into the generated upload row type, which does
-        // not contain the V1.18 columns until jOOQ is regenerated. Parameters are bound, not concatenated.
-<span class="fc" id="L108">        val attempt =</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            tx</span>
-<span class="fc" id="L110">                .dsl()</span>
-<span class="fc" id="L111">                .resultQuery(</span>
-                    &quot;&quot;&quot;
-                    UPDATE upload
-                       SET processing_status = 'PROCESSING',
-                           processing_attempt_id = {0},
-                           processing_started_at = {1},
-                           processing_attempts = processing_attempts + 1,
-                           updated_at = {1}
-                     WHERE id = {2}
-                       AND {3}
-                    RETURNING processing_attempts
-<span class="fc" id="L122">                    &quot;&quot;&quot;.trimIndent(),</span>
-<span class="fc" id="L123">                    DSL.value(attemptId),</span>
-<span class="fc" id="L124">                    DSL.value(now),</span>
-<span class="fc" id="L125">                    DSL.value(uploadId),</span>
-<span class="fc" id="L126">                    claimable(leaseCutoff),</span>
-<span class="fc" id="L127">                ).fetchOne()</span>
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                ?.get(0, Int::class.java) ?: return null</span>
-<span class="fc" id="L129">        UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L130">        return Claim(uploadId, attemptId, attempt)</span>
+<span class="fc" id="L77">        tx</span>
+<span class="fc" id="L78">            .dsl()</span>
+<span class="fc" id="L79">            .update(UPLOAD)</span>
+<span class="fc" id="L80">            .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)</span>
+<span class="fc" id="L81">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L82">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L83">            .execute()</span>
+<span class="fc" id="L84">        UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L85">        return uploadId</span>
     }
-
-    /** True only while [attemptId] still owns the upload. Null means &quot;not from a processing attempt&quot;. */
-    private fun ownedBy(attemptId: UUID?): Condition =
-<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (attemptId == null) {</span>
-<span class="fc" id="L136">            DSL.noCondition()</span>
-<span class="fc" id="L137">        } else {</span>
-<span class="fc" id="L138">            UPLOAD.PROCESSING_STATUS</span>
-<span class="fc" id="L139">                .eq(Status.PROCESSING.name)</span>
-<span class="fc" id="L140">                .and(UPLOAD.PROCESSING_ATTEMPT_ID.eq(attemptId))</span>
-<span class="fc" id="L141">        }</span>
 
     @Suppress(&quot;LongParameterList&quot;)
     fun setFilId(
         tx: Configuration,
         uploadId: UUID,
-        attemptId: UUID,
         filId: UUID,
         mellomlagringFilnavn: String,
         mellomlagringStorrelse: Long,
@@ -152,58 +96,58 @@ const val MAX_PROCESSING_ATTEMPTS = 3
         converted: Boolean,
         contentType: String,
     ): Boolean =
-<span class="fc bfc" id="L155" title="All 2 branches covered.">        tx</span>
-<span class="fc" id="L156">            .dsl()</span>
-<span class="fc" id="L157">            .update(UPLOAD)</span>
-<span class="fc" id="L158">            .set(UPLOAD.FIL_ID, filId)</span>
-<span class="fc" id="L159">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
-<span class="fc" id="L160">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
-<span class="fc" id="L161">            .set(UPLOAD.SHA512, sha512)</span>
-<span class="fc" id="L162">            .set(UPLOAD.CONVERTED, converted)</span>
-<span class="fc" id="L163">            .set(UPLOAD.CONTENT_TYPE, contentType)</span>
-<span class="fc" id="L164">            .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)</span>
-<span class="fc" id="L165">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L166">            .setNull(UPLOAD.GCS_KEY)</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        tx</span>
+<span class="fc" id="L100">            .dsl()</span>
+<span class="fc" id="L101">            .update(UPLOAD)</span>
+<span class="fc" id="L102">            .set(UPLOAD.FIL_ID, filId)</span>
+<span class="fc" id="L103">            .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)</span>
+<span class="fc" id="L104">            .set(UPLOAD.MELLOMLAGRING_STORRELSE, mellomlagringStorrelse)</span>
+<span class="fc" id="L105">            .set(UPLOAD.SHA512, sha512)</span>
+<span class="fc" id="L106">            .set(UPLOAD.CONVERTED, converted)</span>
+<span class="fc" id="L107">            .set(UPLOAD.CONTENT_TYPE, contentType)</span>
+<span class="fc" id="L108">            .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)</span>
+<span class="fc" id="L109">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L110">            .setNull(UPLOAD.GCS_KEY)</span>
             // UPLOAD.SIZE is intentionally not modified — it holds the original Upload-Length.
-<span class="fc" id="L168">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L169">            .and(ownedBy(attemptId))</span>
-<span class="fc" id="L170">            .execute() == 1</span>
+<span class="fc" id="L112">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc" id="L113">            .and(UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name))</span>
+<span class="fc" id="L114">            .execute() == 1</span>
 
-    /** Marks the upload FAILED. With [attemptId], only if that attempt still owns it. */
-<span class="nc" id="L173">    fun markFailed(</span>
+    /** Marks a processing upload FAILED, without changing a completed or deleted upload. */
+<span class="nc" id="L117">    fun markFailed(</span>
         tx: Configuration,
         uploadId: UUID,
-<span class="nc" id="L176">        attemptId: UUID? = null,</span>
+<span class="nc" id="L120">        onlyProcessing: Boolean = false,</span>
     ): Boolean =
-<span class="fc bfc" id="L178" title="All 2 branches covered.">        tx</span>
-<span class="fc" id="L179">            .dsl()</span>
-<span class="fc" id="L180">            .update(UPLOAD)</span>
-<span class="fc" id="L181">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
-<span class="fc" id="L182">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L183">            .where(UPLOAD.ID.eq(uploadId))</span>
-<span class="fc" id="L184">            .and(ownedBy(attemptId))</span>
-<span class="fc" id="L185">            .execute() == 1</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        tx</span>
+<span class="fc" id="L123">            .dsl()</span>
+<span class="fc" id="L124">            .update(UPLOAD)</span>
+<span class="fc" id="L125">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
+<span class="fc" id="L126">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L127">            .where(UPLOAD.ID.eq(uploadId))</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            .and(if (onlyProcessing) UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name) else DSL.noCondition())</span>
+<span class="fc" id="L129">            .execute() == 1</span>
 
-    /** Records validation errors and marks the upload FAILED. A fenced-out attempt writes nothing. */
-<span class="fc" id="L188">    fun addErrors(</span>
+    /** Records validation errors only if the upload can still be marked failed. */
+<span class="fc" id="L132">    fun addErrors(</span>
         tx: Configuration,
         uploadId: UUID,
         validations: List&lt;Validation&gt;,
-<span class="fc" id="L192">        attemptId: UUID? = null,</span>
+<span class="fc" id="L136">        onlyProcessing: Boolean = false,</span>
     ): Boolean {
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!markFailed(tx, uploadId, attemptId)) return false</span>
-<span class="fc" id="L195">        val errorTable = no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR</span>
-<span class="fc" id="L196">        validations.forEach {</span>
-<span class="fc" id="L197">            tx</span>
-<span class="fc" id="L198">                .dsl()</span>
-<span class="fc" id="L199">                .insertInto(errorTable)</span>
-<span class="fc" id="L200">                .set(errorTable.UPLOAD, uploadId)</span>
-<span class="fc" id="L201">                .set(errorTable.CODE, it.code.name)</span>
-<span class="fc" id="L202">                .set(errorTable.ID, UUID.randomUUID())</span>
-<span class="fc" id="L203">                .execute()</span>
-<span class="fc" id="L204">        }</span>
-<span class="fc" id="L205">        UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L206">        return true</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (!markFailed(tx, uploadId, onlyProcessing)) return false</span>
+<span class="fc" id="L139">        val errorTable = no.nav.sosialhjelp.upload.database.generated.tables.references.ERROR</span>
+<span class="fc" id="L140">        validations.forEach {</span>
+<span class="fc" id="L141">            tx</span>
+<span class="fc" id="L142">                .dsl()</span>
+<span class="fc" id="L143">                .insertInto(errorTable)</span>
+<span class="fc" id="L144">                .set(errorTable.UPLOAD, uploadId)</span>
+<span class="fc" id="L145">                .set(errorTable.CODE, it.code.name)</span>
+<span class="fc" id="L146">                .set(errorTable.ID, UUID.randomUUID())</span>
+<span class="fc" id="L147">                .execute()</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc" id="L149">        UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L150">        return true</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

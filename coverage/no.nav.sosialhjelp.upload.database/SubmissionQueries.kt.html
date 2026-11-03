@@ -105,18 +105,23 @@ fun lockSubmission(
 <span class="fc" id="L105">            .execute() == 1</span>
     }
 
+    fun isSubmitted(
+        tx: Configuration,
+        submissionId: UUID,
+<span class="fc" id="L111">    ): Boolean = tx.dsl().fetchExists(SUBMISSION, SUBMISSION.ID.eq(submissionId).and(SUBMISSION.SUBMITTED_AT.isNotNull))</span>
+
     /** Fencing check: true only if [attemptId] still holds the lock. */
     fun isCurrentAttempt(
         tx: Configuration,
         submissionId: UUID,
         attemptId: UUID,
     ): Boolean =
-<span class="fc" id="L114">        tx</span>
-<span class="fc" id="L115">            .dsl()</span>
-<span class="fc" id="L116">            .fetchExists(</span>
-<span class="fc" id="L117">                SUBMISSION,</span>
-<span class="fc" id="L118">                SUBMISSION.ID.eq(submissionId).and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId)),</span>
-<span class="fc" id="L119">            )</span>
+<span class="fc" id="L119">        tx</span>
+<span class="fc" id="L120">            .dsl()</span>
+<span class="fc" id="L121">            .fetchExists(</span>
+<span class="fc" id="L122">                SUBMISSION,</span>
+<span class="fc" id="L123">                SUBMISSION.ID.eq(submissionId).and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId)),</span>
+<span class="fc" id="L124">            )</span>
 
     /** Releases the lock, but only if [attemptId] still holds it. */
     fun releaseSubmit(
@@ -124,14 +129,14 @@ fun lockSubmission(
         submissionId: UUID,
         attemptId: UUID,
     ): Boolean =
-<span class="fc bfc" id="L127" title="All 2 branches covered.">        tx</span>
-<span class="fc" id="L128">            .dsl()</span>
-<span class="fc" id="L129">            .update(SUBMISSION)</span>
-<span class="fc" id="L130">            .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)</span>
-<span class="fc" id="L131">            .setNull(SUBMISSION.SUBMIT_STARTED_AT)</span>
-<span class="fc" id="L132">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L133">            .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))</span>
-<span class="fc" id="L134">            .execute() == 1</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        tx</span>
+<span class="fc" id="L133">            .dsl()</span>
+<span class="fc" id="L134">            .update(SUBMISSION)</span>
+<span class="fc" id="L135">            .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)</span>
+<span class="fc" id="L136">            .setNull(SUBMISSION.SUBMIT_STARTED_AT)</span>
+<span class="fc" id="L137">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L138">            .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))</span>
+<span class="fc" id="L139">            .execute() == 1</span>
 
     /**
      * Marks the submission as sent, only if [attemptId] still holds the submit lock.
@@ -145,26 +150,26 @@ fun lockSubmission(
         submissionId: UUID,
         attemptId: UUID,
     ): Int {
-<span class="fc" id="L148">        lockSubmission(tx, submissionId)</span>
-<span class="fc" id="L149">        val updated =</span>
-<span class="fc" id="L150">            tx</span>
-<span class="fc" id="L151">                .dsl()</span>
-<span class="fc" id="L152">                .update(SUBMISSION)</span>
-<span class="fc" id="L153">                .set(SUBMISSION.SUBMITTED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L154">                .set(SUBMISSION.CONTEXT_ID, DSL.concat(SUBMISSION.CONTEXT_ID, DSL.inline(&quot;:submitted:$submissionId&quot;)))</span>
-<span class="fc" id="L155">                .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)</span>
-<span class="fc" id="L156">                .setNull(SUBMISSION.SUBMIT_STARTED_AT)</span>
-<span class="fc" id="L157">                .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L158">                .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))</span>
-<span class="fc" id="L159">                .execute()</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (updated == 1) {</span>
-<span class="fc" id="L161">            tx</span>
-<span class="fc" id="L162">                .dsl()</span>
-<span class="fc" id="L163">                .deleteFrom(UPLOAD)</span>
-<span class="fc" id="L164">                .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
-<span class="fc" id="L165">                .execute()</span>
+<span class="fc" id="L153">        lockSubmission(tx, submissionId)</span>
+<span class="fc" id="L154">        val updated =</span>
+<span class="fc" id="L155">            tx</span>
+<span class="fc" id="L156">                .dsl()</span>
+<span class="fc" id="L157">                .update(SUBMISSION)</span>
+<span class="fc" id="L158">                .set(SUBMISSION.SUBMITTED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L159">                .set(SUBMISSION.CONTEXT_ID, DSL.concat(SUBMISSION.CONTEXT_ID, DSL.inline(&quot;:submitted:$submissionId&quot;)))</span>
+<span class="fc" id="L160">                .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)</span>
+<span class="fc" id="L161">                .setNull(SUBMISSION.SUBMIT_STARTED_AT)</span>
+<span class="fc" id="L162">                .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L163">                .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))</span>
+<span class="fc" id="L164">                .execute()</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (updated == 1) {</span>
+<span class="fc" id="L166">            tx</span>
+<span class="fc" id="L167">                .dsl()</span>
+<span class="fc" id="L168">                .deleteFrom(UPLOAD)</span>
+<span class="fc" id="L169">                .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
+<span class="fc" id="L170">                .execute()</span>
         }
-<span class="fc" id="L167">        return updated</span>
+<span class="fc" id="L172">        return updated</span>
     }
 
     /** Deletes sent submissions older than [cutoff]. They only hold a ref and a fødselsnummer. */
@@ -172,32 +177,32 @@ fun lockSubmission(
         tx: Configuration,
         cutoff: OffsetDateTime,
     ): Int =
-<span class="fc" id="L175">        tx</span>
-<span class="fc" id="L176">            .dsl()</span>
-<span class="fc" id="L177">            .deleteFrom(SUBMISSION)</span>
-<span class="fc" id="L178">            .where(SUBMISSION.SUBMITTED_AT.lt(cutoff))</span>
-<span class="fc" id="L179">            .execute()</span>
+<span class="fc" id="L180">        tx</span>
+<span class="fc" id="L181">            .dsl()</span>
+<span class="fc" id="L182">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L183">            .where(SUBMISSION.SUBMITTED_AT.lt(cutoff))</span>
+<span class="fc" id="L184">            .execute()</span>
 
     /** Deletes the submission unless a submit holds a live lock. Atomic with claimSubmit. */
     fun cleanupIfNotSubmitting(
         tx: Configuration,
         submissionId: UUID,
     ): Int =
-<span class="fc" id="L186">        tx</span>
-<span class="fc" id="L187">            .dsl()</span>
-<span class="fc" id="L188">            .deleteFrom(SUBMISSION)</span>
-<span class="fc" id="L189">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L190">            .and(submitLockInactive())</span>
-<span class="fc" id="L191">            .execute()</span>
+<span class="fc" id="L191">        tx</span>
+<span class="fc" id="L192">            .dsl()</span>
+<span class="fc" id="L193">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L194">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L195">            .and(submitLockInactive())</span>
+<span class="fc" id="L196">            .execute()</span>
 
     fun cleanup(
         tx: Configuration,
         submissionId: UUID,
     ): Int =
-<span class="fc" id="L197">        tx</span>
-<span class="fc" id="L198">            .dsl()</span>
-<span class="fc" id="L199">            .deleteFrom(SUBMISSION)</span>
-<span class="fc" id="L200">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L201">            .execute()</span>
+<span class="fc" id="L202">        tx</span>
+<span class="fc" id="L203">            .dsl()</span>
+<span class="fc" id="L204">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L205">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L206">            .execute()</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

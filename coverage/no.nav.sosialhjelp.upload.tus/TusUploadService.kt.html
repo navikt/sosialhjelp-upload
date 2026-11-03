@@ -165,31 +165,32 @@ import java.util.UUID
 <span class="nc" id="L165">                    &quot;Cannot delete upload while submission $submissionId is being submitted&quot;,</span>
                 )
             }
-<span class="fc" id="L168">            val upload = tusUploadQueries.getUpload(tx, uploadId)</span>
-<span class="fc" id="L169">            val filId = upload.filId</span>
-<span class="fc" id="L170">            val navEksternRefId = upload.navEksternRefId</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            check(tusUploadQueries.lockUpload(tx, uploadId)) { &quot;Upload $uploadId not found&quot; }</span>
+<span class="fc" id="L169">            val upload = tusUploadQueries.getUpload(tx, uploadId)</span>
+<span class="fc" id="L170">            val filId = upload.filId</span>
+<span class="fc" id="L171">            val navEksternRefId = upload.navEksternRefId</span>
 
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            withMdc(&quot;navEksternRefId&quot; to navEksternRefId) {</span>
-<span class="pc bpc" id="L173" title="1 of 4 branches missed.">                if (filId != null &amp;&amp; navEksternRefId != null) {</span>
-<span class="fc" id="L174">                    runCatching {</span>
-<span class="fc" id="L175">                        mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">                    }.onFailure { e -&gt;</span>
-<span class="fc" id="L177">                        throw MellomlagringDeleteException(&quot;Mellomlagring delete failed&quot;, e)</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            withMdc(&quot;navEksternRefId&quot; to navEksternRefId) {</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">                if (filId != null &amp;&amp; navEksternRefId != null) {</span>
+<span class="fc" id="L175">                    runCatching {</span>
+<span class="fc" id="L176">                        mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                    }.onFailure { e -&gt;</span>
+<span class="fc" id="L178">                        throw MellomlagringDeleteException(&quot;Mellomlagring delete failed&quot;, e)</span>
                     }
                 }
-<span class="fc" id="L180">                tusUploadQueries.deleteUpload(tx, uploadId)</span>
-<span class="fc" id="L181">            }</span>
+<span class="fc" id="L181">                tusUploadQueries.deleteUpload(tx, uploadId)</span>
+<span class="fc" id="L182">            }</span>
         }
-<span class="fc" id="L183">        chunkAssemblyService.deleteGcsObjects(uploadId)</span>
-<span class="fc" id="L184">    }</span>
+<span class="fc" id="L184">        chunkAssemblyService.deleteGcsObjects(uploadId)</span>
+<span class="fc" id="L185">    }</span>
 
-<span class="fc" id="L186">    class UploadForbiddenException(</span>
+<span class="fc" id="L187">    class UploadForbiddenException(</span>
         message: String,
-<span class="fc" id="L188">    ) : RuntimeException(message)</span>
+<span class="fc" id="L189">    ) : RuntimeException(message)</span>
 
-<span class="fc" id="L190">    class MellomlagringDeleteException(</span>
+<span class="fc" id="L191">    class MellomlagringDeleteException(</span>
         message: String,
         cause: Throwable,
-<span class="fc" id="L193">    ) : RuntimeException(message, cause)</span>
+<span class="fc" id="L194">    ) : RuntimeException(message, cause)</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
