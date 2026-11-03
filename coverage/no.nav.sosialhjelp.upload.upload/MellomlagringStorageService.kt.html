@@ -22,31 +22,44 @@ import java.util.UUID
 <span class="fc" id="L22">        val storedSize: Long,</span>
     )
 
+    suspend fun delete(
+        navEksternRefId: String,
+        filId: UUID,
+<span class="fc" id="L28">    ) = mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)</span>
+
     /**
      * Encrypts [data], uses the detected [contentType], generates a unique
      * mellomlagring filename, uploads the encrypted bytes, and returns the result.
      */
-<span class="fc" id="L29">    suspend fun store(</span>
+    @Suppress(&quot;LongParameterList&quot;)
+<span class="pc" id="L35">    suspend fun store(</span>
         navEksternRefId: String,
         filename: String,
         contentType: String,
         uploadId: UUID,
         data: ByteArray,
+<span class="nc" id="L41">        replaceExisting: Boolean = false,</span>
     ): StorageResult {
-<span class="fc" id="L36">        val mellomlagringFilnavn = makeUniqueMellomlagringFilename(filename, uploadId)</span>
-<span class="fc" id="L37">        val encrypted = encryptionService.encryptBytes(data)</span>
-<span class="fc" id="L38">        logger.info(&quot;Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId&quot;)</span>
-<span class="fc" id="L39">        val filId =</span>
-<span class="fc" id="L40">            mellomlagringClient.uploadFile(</span>
-<span class="fc" id="L41">                navEksternRefId = navEksternRefId,</span>
-<span class="fc" id="L42">                filename = mellomlagringFilnavn,</span>
-<span class="fc" id="L43">                contentType = contentType,</span>
-<span class="fc" id="L44">                data = encrypted,</span>
-            )
-<span class="fc" id="L46">        return StorageResult(</span>
-<span class="fc" id="L47">            filId = filId,</span>
-<span class="fc" id="L48">            mellomlagringFilnavn = mellomlagringFilnavn,</span>
-<span class="fc" id="L49">            storedSize = data.size.toLong(),</span>
+<span class="fc" id="L43">        val mellomlagringFilnavn = makeUniqueMellomlagringFilename(filename, uploadId)</span>
+<span class="fc" id="L44">        val encrypted = encryptionService.encryptBytes(data)</span>
+<span class="fc" id="L45">        logger.info(&quot;Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId&quot;)</span>
+        // The filename is derived from the upload id, so replacing by name removes a copy left
+        // behind by an earlier attempt that died after storing.
+<span class="fc" id="L48">        val filId =</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (replaceExisting) {</span>
+<span class="nc" id="L50">                mellomlagringClient.replaceFile(navEksternRefId, mellomlagringFilnavn, contentType, encrypted)</span>
+            } else {
+<span class="fc" id="L52">                mellomlagringClient.uploadFile(</span>
+<span class="fc" id="L53">                    navEksternRefId = navEksternRefId,</span>
+<span class="fc" id="L54">                    filename = mellomlagringFilnavn,</span>
+<span class="fc" id="L55">                    contentType = contentType,</span>
+<span class="fc" id="L56">                    data = encrypted,</span>
+                )
+            }
+<span class="fc" id="L59">        return StorageResult(</span>
+<span class="fc" id="L60">            filId = filId,</span>
+<span class="fc" id="L61">            mellomlagringFilnavn = mellomlagringFilnavn,</span>
+<span class="fc" id="L62">            storedSize = data.size.toLong(),</span>
         )
     }
 }

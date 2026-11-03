@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UploadRecoveryQueries.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.upload</a> &gt; <span class="el_source">UploadRecoveryQueries.kt</span></div><h1>UploadRecoveryQueries.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.upload
 
+import no.nav.sosialhjelp.upload.database.UPLOAD_PROCESSING_ATTEMPTS
+import no.nav.sosialhjelp.upload.database.UPLOAD_PROCESSING_STARTED_AT
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import org.jooq.Configuration
 import java.time.OffsetDateTime
@@ -8,32 +10,34 @@ import java.util.UUID
 /**
  * DB queries for the upload recovery job: finding and marking stale uploads as failed.
  */
-<span class="fc" id="L11">class UploadRecoveryQueries {</span>
-<span class="fc" id="L12">    data class StaleUploadInfo(</span>
-<span class="fc" id="L13">        val submissionId: UUID,</span>
-<span class="pc" id="L14">        val gcsKey: String?,</span>
+<span class="fc" id="L13">class UploadRecoveryQueries {</span>
+<span class="fc" id="L14">    data class StaleUploadInfo(</span>
+<span class="fc" id="L15">        val submissionId: UUID,</span>
+<span class="pc" id="L16">        val gcsKey: String?,</span>
     )
 
     /**
-     * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
+     * Fails uploads whose last allowed attempt has an expired lease. Uploads with attempts left
+     * are retried by [ProcessingWorker] instead.
      * Returns info needed for SSE notification and GCS cleanup.
      */
     fun markStaleProcessingAsFailed(
         tx: Configuration,
         cutoff: OffsetDateTime,
     ): List&lt;StaleUploadInfo&gt; =
-<span class="fc" id="L25">        tx</span>
-<span class="fc" id="L26">            .dsl()</span>
-<span class="fc" id="L27">            .update(UPLOAD)</span>
-<span class="fc" id="L28">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
-<span class="fc" id="L29">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L30">            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name))</span>
-<span class="fc" id="L31">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
-<span class="fc" id="L32">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
-<span class="fc" id="L33">            .fetch()</span>
-<span class="fc" id="L34">            .mapNotNull { record -&gt;</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
-<span class="fc" id="L36">            }</span>
+<span class="fc" id="L28">        tx</span>
+<span class="fc" id="L29">            .dsl()</span>
+<span class="fc" id="L30">            .update(UPLOAD)</span>
+<span class="fc" id="L31">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
+<span class="fc" id="L32">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L33">            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PROCESSING.name))</span>
+<span class="fc" id="L34">            .and(UPLOAD_PROCESSING_STARTED_AT.lt(cutoff))</span>
+<span class="fc" id="L35">            .and(UPLOAD_PROCESSING_ATTEMPTS.ge(MAX_PROCESSING_ATTEMPTS))</span>
+<span class="fc" id="L36">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L37">            .fetch()</span>
+<span class="fc" id="L38">            .mapNotNull { record -&gt;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
+<span class="fc" id="L40">            }</span>
 
     /**
      * Finds PENDING uploads that have stalled since before [cutoff].
@@ -43,17 +47,17 @@ import java.util.UUID
         tx: Configuration,
         cutoff: OffsetDateTime,
     ): List&lt;StaleUploadInfo&gt; =
-<span class="fc" id="L46">        tx</span>
-<span class="fc" id="L47">            .dsl()</span>
-<span class="fc" id="L48">            .update(UPLOAD)</span>
-<span class="fc" id="L49">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
-<span class="fc" id="L50">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
-<span class="fc" id="L51">            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))</span>
-<span class="fc" id="L52">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
-<span class="fc" id="L53">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
-<span class="fc" id="L54">            .fetch()</span>
-<span class="fc" id="L55">            .mapNotNull { record -&gt;</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
-<span class="fc" id="L57">            }</span>
+<span class="fc" id="L50">        tx</span>
+<span class="fc" id="L51">            .dsl()</span>
+<span class="fc" id="L52">            .update(UPLOAD)</span>
+<span class="fc" id="L53">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
+<span class="fc" id="L54">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L55">            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))</span>
+<span class="fc" id="L56">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
+<span class="fc" id="L57">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L58">            .fetch()</span>
+<span class="fc" id="L59">            .mapNotNull { record -&gt;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
+<span class="fc" id="L61">            }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

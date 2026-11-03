@@ -9,7 +9,6 @@ import io.ktor.server.plugins.di.*
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,7 +22,6 @@ import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceImpl
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
-import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
@@ -36,6 +34,7 @@ import no.nav.sosialhjelp.upload.tus.storage.GcsBucketStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
+import no.nav.sosialhjelp.upload.upload.ProcessingWorker
 import no.nav.sosialhjelp.upload.upload.StaleSubmissionCleanupService
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
@@ -55,11 +54,6 @@ fun main(args: Array&lt;String&gt;) {
     io.ktor.server.netty.EngineMain
         .main(args)
 }
-
-private const val IO_PARALLELISM = 64
-private const val MIN_CPU_PARALLELISM = 2
-
-private fun cpuParallelism() = maxOf(MIN_CPU_PARALLELISM, Runtime.getRuntime().availableProcessors())
 
 private fun getDataSource(config: ApplicationConfig): DataSource {
     val user = config.property(&quot;database.user&quot;).getString()
@@ -109,20 +103,37 @@ fun Application.module() {
     val isMock = runtimeEnv == &quot;mock&quot; || isLocalOrTest
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val chunkStorageDirectory =
+        // A fresh directory per test run: a shared /tmp path breaks when another user owns it.
+        if (isTest) {
+            java.nio.file.Files
+                .createTempDirectory(&quot;sosialhjelp-upload&quot;)
+                .toFile()
+        } else {
+            null
+        }
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     val chunkStorage: ChunkStorage =
         if (isLocalOrTest) {
-            FileSystemStorage()
+            chunkStorageDirectory?.let { FileSystemStorage(it) } ?: FileSystemStorage()
         } else {
             val bucketName = environment.config.property(&quot;gcs.bucketName&quot;).getString()
             GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
         }
-    configureDependencies(dataSource, notificationScope, processingScope, appMicrometerRegistry, chunkStorage, isMock)
+    configureDependencies(dataSource, notificationScope, appMicrometerRegistry, chunkStorage, isMock)
     configureSecurity()
     configureHTTP()
     configureMonitoring(appMicrometerRegistry)
     configureStatusPages()
     configureRouting()
+
+    // Processing runs in every mode (tests included): it is part of the upload flow, not a sweep.
+    // Resolve after startup, not during module(): dependency overrides registered after module()
+    // (as the integration tests do) must be in place before the worker builds its object graph.
+    monitor.subscribe(ApplicationStarted) {
+        val processingWorker: ProcessingWorker by dependencies
+        processingWorker.start(processingScope)
+    }
 
     val scopes =
         if (!isTest) startBackgroundJobs() else emptyList()
@@ -138,30 +149,24 @@ fun Application.module() {
 private fun Application.configureDependencies(
     dataSource: DataSource,
     notificationScope: CoroutineScope,
-    processingScope: CoroutineScope,
     appMicrometerRegistry: PrometheusMeterRegistry,
     chunkStorage: ChunkStorage,
     isMock: Boolean,
 ) {
     dependencies {
-<span class="nc" id="L147">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="fc" id="L148">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="nc" id="L149">        provide&lt;DataSource&gt; { dataSource }</span>
-<span class="fc" id="L150">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
-<span class="pc bpc" id="L151" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (isMock) {</span>
-<span class="fc" id="L153">                create(EncryptionServiceMock::class)</span>
+<span class="nc" id="L157">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="fc" id="L158">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="nc" id="L159">        provide&lt;DataSource&gt; { dataSource }</span>
+<span class="fc" id="L160">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
+<span class="pc bpc" id="L161" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (isMock) {</span>
+<span class="fc" id="L163">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L155">                create(EncryptionServiceImpl::class)</span>
-<span class="fc" id="L156">            }</span>
+<span class="nc" id="L165">                create(EncryptionServiceImpl::class)</span>
+<span class="fc" id="L166">            }</span>
         }
-<span class="fc" id="L158">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
-        // Wrapped to keep DI from closing the shared Dispatchers.IO on shutdown.
-<span class="fc" id="L160">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO.limitedParallelism(IO_PARALLELISM, &quot;app-io&quot;) }</span>
-        // Deliberately bounded: PDF parsing and CMS encryption must not be able to saturate the host.
-<span class="fc" id="L162">        provide { CpuDispatcher(Dispatchers.Default.limitedParallelism(cpuParallelism(), &quot;app-cpu&quot;)) }</span>
-<span class="fc" id="L163">        provide&lt;CoroutineScope&gt; { processingScope }</span>
-<span class="fc" id="L164">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
+<span class="fc" id="L168">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
+<span class="fc" id="L169">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
         provide(VirusScanner::class)
@@ -180,6 +185,7 @@ private fun Application.configureDependencies(
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
         provide(UploadProcessingService::class)
+        provide(ProcessingWorker::class)
         provide(TusUploadService::class)
         provide(SubmissionService::class)
         provide(GotenbergService::class)
@@ -194,21 +200,21 @@ private fun Application.configureDependencies(
 private fun Application.startBackgroundJobs(): List&lt;CoroutineScope&gt; {
     val recoveryService: UploadRecoveryService by dependencies
     val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-<span class="nc bnc" id="L197" title="All 4 branches missed.">    recoveryScope.launch {</span>
-<span class="nc" id="L198">        while (true) {</span>
-<span class="nc bnc" id="L199" title="All 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc bnc" id="L200" title="All 2 branches missed.">            runCatching { recoveryService.recoverAll() }</span>
-<span class="nc bnc" id="L201" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L203" title="All 4 branches missed.">    recoveryScope.launch {</span>
+<span class="nc" id="L204">        while (true) {</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
         }
     }
 
     val cleanupService: StaleSubmissionCleanupService by dependencies
     val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-<span class="nc bnc" id="L207" title="All 4 branches missed.">    cleanupScope.launch {</span>
-<span class="nc" id="L208">        while (true) {</span>
-<span class="nc bnc" id="L209" title="All 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc bnc" id="L210" title="All 2 branches missed.">            runCatching { cleanupService.runCleanup() }</span>
-<span class="nc bnc" id="L211" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L213" title="All 4 branches missed.">    cleanupScope.launch {</span>
+<span class="nc" id="L214">        while (true) {</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            runCatching { cleanupService.runCleanup() }</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
         }
     }
     return listOf(cleanupScope, recoveryScope)

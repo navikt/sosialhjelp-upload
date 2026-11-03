@@ -10,7 +10,6 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.util.AttributeKey
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.VerifiedPersonident
@@ -18,42 +17,42 @@ import org.jooq.DSLContext
 import java.util.UUID
 
 /** Set by [verifyUploadOwnership] — the validated upload ID parsed from the path parameter. */
-<span class="fc" id="L21">val VerifiedUploadId = AttributeKey&lt;UUID&gt;(&quot;VerifiedUploadId&quot;)</span>
+<span class="fc" id="L20">val VerifiedUploadId = AttributeKey&lt;UUID&gt;(&quot;VerifiedUploadId&quot;)</span>
 
-<span class="nc" id="L23">private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =</span>
-<span class="fc" id="L24">    createRouteScopedPlugin(&quot;VerifyUploadOwnership&quot;) {</span>
-<span class="fc" id="L25">        val dsl: DSLContext by application.dependencies</span>
-<span class="fc" id="L26">        val tusUploadQueries: TusUploadQueries by application.dependencies</span>
+private fun verifyUploadOwnershipPlugin() =
+<span class="fc" id="L23">    createRouteScopedPlugin(&quot;VerifyUploadOwnership&quot;) {</span>
+<span class="fc" id="L24">        val dsl: DSLContext by application.dependencies</span>
+<span class="fc" id="L25">        val tusUploadQueries: TusUploadQueries by application.dependencies</span>
 
-<span class="pc bpc" id="L28" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
+<span class="pc bpc" id="L27" title="4 of 6 branches missed.">        on(AuthenticationChecked) { call -&gt;</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">            if (call.isHandled) return@on</span>
 
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if (personident == null) {</span>
-<span class="nc" id="L33">                call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="nc" id="L34">                return@on</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (personident == null) {</span>
+<span class="nc" id="L32">                call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="nc" id="L33">                return@on</span>
             }
 
-<span class="pc bpc" id="L37" title="2 of 4 branches missed.">            val uploadId = call.parameters[&quot;id&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            if (uploadId == null) {</span>
-<span class="nc" id="L39">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L40">                return@on</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">            val uploadId = call.parameters[&quot;id&quot;]?.let { runCatching { UUID.fromString(it) }.getOrNull() }</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (uploadId == null) {</span>
+<span class="nc" id="L38">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L39">                return@on</span>
             }
 
-<span class="fc" id="L43">            val owned =</span>
-<span class="fc bfc" id="L44" title="All 2 branches covered.">                withContext(ioDispatcher) {</span>
-<span class="fc" id="L45">                    dsl.transactionResult { tx -&gt; tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }</span>
+<span class="fc" id="L42">            val owned =</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                withContext(Dispatchers.IO) {</span>
+<span class="fc" id="L44">                    dsl.transactionResult { tx -&gt; tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }</span>
                 }
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (!owned) {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (!owned) {</span>
                 // Return 404 rather than 403 to avoid leaking whether the resource exists.
-<span class="nc" id="L49">                call.respond(HttpStatusCode.NotFound)</span>
-<span class="nc" id="L50">                return@on</span>
+<span class="nc" id="L48">                call.respond(HttpStatusCode.NotFound)</span>
+<span class="nc" id="L49">                return@on</span>
             }
 
-<span class="fc" id="L53">            call.attributes.put(VerifiedUploadId, uploadId)</span>
-<span class="fc" id="L54">            call.attributes.put(VerifiedPersonident, personident)</span>
-<span class="fc" id="L55">        }</span>
-<span class="fc" id="L56">    }</span>
+<span class="fc" id="L52">            call.attributes.put(VerifiedUploadId, uploadId)</span>
+<span class="fc" id="L53">            call.attributes.put(VerifiedPersonident, personident)</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">    }</span>
 
 /**
  * Route-scoped ownership interceptor for upload resources.
@@ -71,7 +70,7 @@ import java.util.UUID
  * On success, [VerifiedUploadId] and [VerifiedPersonident] are available in `call.attributes`.
  * On failure the pipeline is short-circuited via `call.respond` (404/401); the handler never runs.
  */
-<span class="fc" id="L74">fun Route.verifyUploadOwnership(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {</span>
-<span class="fc" id="L75">    install(verifyUploadOwnershipPlugin(ioDispatcher))</span>
-<span class="fc" id="L76">}</span>
+fun Route.verifyUploadOwnership() {
+<span class="fc" id="L74">    install(verifyUploadOwnershipPlugin())</span>
+<span class="fc" id="L75">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
