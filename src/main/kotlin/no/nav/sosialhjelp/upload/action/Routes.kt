@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 import no.nav.sosialhjelp.upload.VerifiedPersonident
 import no.nav.sosialhjelp.upload.VerifiedSubmissionId
 import no.nav.sosialhjelp.upload.common.withMdc
+import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.verifySubmissionOwnership
 import java.util.UUID
 
@@ -31,9 +32,16 @@ data class SubmitInput(
 
 fun Route.configureActionRoutes() {
     val ettersendelseService: EttersendelseService by application.dependencies
+    val submissionDeletionService: SubmissionDeletionService by application.dependencies
 
     route("/submission/{submissionId}") {
         verifySubmissionOwnership()
+
+        delete {
+            val submissionId = call.attributes[VerifiedSubmissionId]
+            submissionDeletionService.deleteSubmission(submissionId, keepMellomlagring = false)
+            call.respond(HttpStatusCode.NoContent)
+        }
 
         post("/submit") {
             val submissionId = call.attributes[VerifiedSubmissionId]
