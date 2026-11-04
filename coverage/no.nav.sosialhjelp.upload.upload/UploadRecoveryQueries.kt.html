@@ -15,7 +15,7 @@ import java.util.UUID
     )
 
     /**
-     * Fails abandoned processing uploads. The user can upload the file again.
+     * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
      * Returns info needed for SSE notification and GCS cleanup.
      */
     fun markStaleProcessingAsFailed(

@@ -5,7 +5,6 @@ package no.nav.sosialhjelp.upload.validation
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -14,65 +13,58 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.di.annotations.Property
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import org.slf4j.LoggerFactory
 
-<span class="fc" id="L23">class VirusScanner(</span>
-<span class="pc" id="L24">    @Property(&quot;virus.scanner.url&quot;) val url: String,</span>
-<span class="fc" id="L25">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L21">class VirusScanner(</span>
+<span class="pc" id="L22">    @Property(&quot;virus.scanner.url&quot;) val url: String,</span>
+<span class="fc" id="L23">    private val meterRegistry: MeterRegistry,</span>
 ) {
-<span class="fc" id="L27">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L25">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
 
     private val httpClient =
-<span class="fc" id="L30">        HttpClient(CIO) {</span>
-<span class="fc" id="L31">            expectSuccess = true</span>
-<span class="fc" id="L32">            install(HttpTimeout) {</span>
-<span class="fc" id="L33">                requestTimeoutMillis = 30_000</span>
-<span class="fc" id="L34">                connectTimeoutMillis = 10_000</span>
-<span class="fc" id="L35">            }</span>
-<span class="fc" id="L36">            install(ContentNegotiation) {</span>
-<span class="fc" id="L37">                json()</span>
-<span class="fc" id="L38">            }</span>
-<span class="fc" id="L39">        }</span>
+<span class="fc" id="L28">        HttpClient(CIO) {</span>
+<span class="fc" id="L29">            expectSuccess = true</span>
+<span class="fc" id="L30">            install(ContentNegotiation) {</span>
+<span class="fc" id="L31">                json()</span>
+<span class="fc" id="L32">            }</span>
+<span class="fc" id="L33">        }</span>
 
     suspend fun scan(data: ByteArray): Result {
-<span class="fc bfc" id="L42" title="All 4 branches covered.">        if (url.isEmpty()) {</span>
-<span class="fc" id="L43">            meterRegistry.counter(&quot;virus.scan.skipped&quot;, &quot;reason&quot;, &quot;not_configured&quot;).increment()</span>
-<span class="fc" id="L44">            return Result.OK</span>
+<span class="fc bfc" id="L36" title="All 4 branches covered.">        if (url.isEmpty()) {</span>
+<span class="fc" id="L37">            meterRegistry.counter(&quot;virus.scan.skipped&quot;, &quot;reason&quot;, &quot;not_configured&quot;).increment()</span>
+<span class="fc" id="L38">            return Result.OK</span>
         }
-<span class="fc" id="L46">        return try {</span>
-<span class="fc" id="L47">            val body =</span>
-<span class="fc" id="L48">                httpClient</span>
-<span class="fc" id="L49">                    .put(url) {</span>
-<span class="fc" id="L50">                        contentType(ContentType.Application.OctetStream)</span>
-<span class="fc" id="L51">                        setBody(data)</span>
-<span class="fc" id="L52">                    }.body&lt;List&lt;ScanResult&gt;&gt;()</span>
-<span class="fc bfc" id="L53" title="All 4 branches covered.">            if (body.all { it.result == Result.OK }) Result.OK else Result.FOUND</span>
-<span class="nc" id="L54">        } catch (e: CancellationException) {</span>
-<span class="nc" id="L55">            throw e</span>
-<span class="fc" id="L56">        } catch (e: Exception) {</span>
-<span class="fc" id="L57">            logger.warn(&quot;Virus scanner error: ${e.message}, treating file as unverified&quot;, e)</span>
-<span class="fc" id="L58">            meterRegistry.counter(&quot;virus.scan.skipped&quot;, &quot;reason&quot;, &quot;error&quot;).increment()</span>
-<span class="fc" id="L59">            Result.ERROR</span>
+<span class="fc" id="L40">        return try {</span>
+<span class="fc" id="L41">            val body =</span>
+<span class="fc" id="L42">                httpClient</span>
+<span class="fc" id="L43">                    .put(url) {</span>
+<span class="fc" id="L44">                        contentType(ContentType.Application.OctetStream)</span>
+<span class="fc" id="L45">                        setBody(data)</span>
+<span class="fc" id="L46">                    }.body&lt;List&lt;ScanResult&gt;&gt;()</span>
+<span class="fc bfc" id="L47" title="All 4 branches covered.">            if (body.all { it.result == Result.OK }) Result.OK else Result.FOUND</span>
+<span class="fc" id="L48">        } catch (e: Exception) {</span>
+<span class="fc" id="L49">            logger.warn(&quot;Virus scanner error: ${e.message}, treating file as unverified&quot;, e)</span>
+<span class="fc" id="L50">            meterRegistry.counter(&quot;virus.scan.skipped&quot;, &quot;reason&quot;, &quot;error&quot;).increment()</span>
+<span class="fc" id="L51">            Result.ERROR</span>
         }
     }
 }
 
 enum class Result {
-<span class="fc" id="L65">    FOUND,</span>
-<span class="fc" id="L66">    OK,</span>
-<span class="fc" id="L67">    ERROR,</span>
+<span class="fc" id="L57">    FOUND,</span>
+<span class="fc" id="L58">    OK,</span>
+<span class="fc" id="L59">    ERROR,</span>
 }
 
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">@OptIn(ExperimentalSerializationApi::class)</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">@OptIn(ExperimentalSerializationApi::class)</span>
 @Serializable
-<span class="nc" id="L72">data class ScanResult(</span>
-<span class="nc" id="L73">    @JsonNames(&quot;filename&quot;, &quot;Filename&quot;)</span>
-<span class="nc" id="L74">    val filename: String,</span>
-<span class="nc" id="L75">    @JsonNames(&quot;result&quot;, &quot;Result&quot;)</span>
-<span class="fc" id="L76">    val result: Result,</span>
+<span class="nc" id="L64">data class ScanResult(</span>
+<span class="nc" id="L65">    @JsonNames(&quot;filename&quot;, &quot;Filename&quot;)</span>
+<span class="nc" id="L66">    val filename: String,</span>
+<span class="nc" id="L67">    @JsonNames(&quot;result&quot;, &quot;Result&quot;)</span>
+<span class="fc" id="L68">    val result: Result,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -12,35 +12,30 @@ enum class SubmissionValidationCode {
 <span class="fc" id="L12">    NO_FILES,</span>
 <span class="fc" id="L13">    TOO_MANY_FILES,</span>
 <span class="fc" id="L14">    TOTAL_SIZE_TOO_LARGE,</span>
-<span class="fc" id="L15">    UPLOADS_PROCESSING,</span>
-<span class="fc" id="L16">}</span>
+<span class="fc" id="L15">}</span>
 
-<span class="nc bnc" id="L18" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L19">data class SubmissionValidationErrorResponse(</span>
-<span class="nc" id="L20">    val errors: List&lt;SubmissionValidationCode&gt;,</span>
+<span class="nc bnc" id="L17" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L18">data class SubmissionValidationErrorResponse(</span>
+<span class="nc" id="L19">    val errors: List&lt;SubmissionValidationCode&gt;,</span>
 )
 
-<span class="nc" id="L23">class SubmissionValidationException(</span>
-<span class="nc" id="L24">    val violations: List&lt;SubmissionValidationCode&gt;,</span>
-<span class="nc" id="L25">) : Exception(&quot;Submission validation failed: ${violations.joinToString()}&quot;)</span>
+<span class="nc" id="L22">class SubmissionValidationException(</span>
+<span class="nc" id="L23">    val violations: List&lt;SubmissionValidationCode&gt;,</span>
+<span class="nc" id="L24">) : Exception(&quot;Submission validation failed: ${violations.joinToString()}&quot;)</span>
 
 fun validateSubmissionUploads(uploads: List&lt;Upload&gt;): List&lt;SubmissionValidationCode&gt; {
-<span class="fc bfc" id="L28" title="All 2 branches covered.">    val completeUploads = uploads.filter { it.status == Status.COMPLETE }</span>
-<span class="fc" id="L29">    val violations = mutableListOf&lt;SubmissionValidationCode&gt;()</span>
-    // A file still being processed may reach mellomlagring after vedlegg.json is built.
-<span class="pc bpc" id="L31" title="1 of 6 branches missed.">    if (uploads.any { it.status == Status.PROCESSING || it.status == Status.READY }) {</span>
-<span class="fc" id="L32">        violations += SubmissionValidationCode.UPLOADS_PROCESSING</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    val completeUploads = uploads.filter { it.status == Status.COMPLETE }</span>
+<span class="fc" id="L28">    val violations = mutableListOf&lt;SubmissionValidationCode&gt;()</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    if (completeUploads.isEmpty()) {</span>
+<span class="fc" id="L30">        violations += SubmissionValidationCode.NO_FILES</span>
     }
-<span class="fc bfc" id="L34" title="All 2 branches covered.">    if (completeUploads.isEmpty()) {</span>
-<span class="fc" id="L35">        violations += SubmissionValidationCode.NO_FILES</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">    if (completeUploads.size &gt; MAX_FILES_PER_SUBMISSION) {</span>
+<span class="fc" id="L33">        violations += SubmissionValidationCode.TOO_MANY_FILES</span>
     }
-<span class="fc bfc" id="L37" title="All 2 branches covered.">    if (completeUploads.size &gt; MAX_FILES_PER_SUBMISSION) {</span>
-<span class="fc" id="L38">        violations += SubmissionValidationCode.TOO_MANY_FILES</span>
+<span class="fc bfc" id="L35" title="All 4 branches covered.">    val totalSize = completeUploads.sumOf { it.mellomlagringStorrelse ?: 0L }</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">    if (totalSize &gt; MAX_TOTAL_SIZE_BYTES) {</span>
+<span class="fc" id="L37">        violations += SubmissionValidationCode.TOTAL_SIZE_TOO_LARGE</span>
     }
-<span class="fc bfc" id="L40" title="All 4 branches covered.">    val totalSize = completeUploads.sumOf { it.mellomlagringStorrelse ?: 0L }</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">    if (totalSize &gt; MAX_TOTAL_SIZE_BYTES) {</span>
-<span class="fc" id="L42">        violations += SubmissionValidationCode.TOTAL_SIZE_TOO_LARGE</span>
-    }
-<span class="fc" id="L44">    return violations</span>
+<span class="fc" id="L39">    return violations</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
