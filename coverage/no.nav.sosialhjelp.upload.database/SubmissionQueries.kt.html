@@ -1,16 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubmissionQueries.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.database</a> &gt; <span class="el_source">SubmissionQueries.kt</span></div><h1>SubmissionQueries.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.database
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
+import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import org.jooq.Condition
 import org.jooq.Configuration
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
+import java.time.OffsetDateTime
 import java.util.UUID
+
+/** How long a submit lock is honoured. Must exceed the worst-case submit duration (Fiks upload timeout is 5 min). */
+const val SUBMIT_LOCK_MINUTES = 15L
+
+/** True when a submit lock is held and has not expired. */
+<span class="fc" id="L16">fun submitLockActive(now: OffsetDateTime = OffsetDateTime.now()): Condition =</span>
+<span class="fc" id="L17">    SUBMISSION.SUBMIT_ATTEMPT_ID</span>
+<span class="fc" id="L18">        .isNotNull</span>
+<span class="fc" id="L19">        .and(SUBMISSION.SUBMIT_STARTED_AT.gt(now.minusMinutes(SUBMIT_LOCK_MINUTES)))</span>
+
+/** True when no submit lock is held, or the held lock has expired. */
+<span class="fc" id="L22">fun submitLockInactive(now: OffsetDateTime = OffsetDateTime.now()): Condition =</span>
+<span class="fc" id="L23">    SUBMISSION.SUBMIT_ATTEMPT_ID</span>
+<span class="fc" id="L24">        .isNull</span>
+<span class="fc" id="L25">        .or(SUBMISSION.SUBMIT_STARTED_AT.le(now.minusMinutes(SUBMIT_LOCK_MINUTES)))</span>
+
+/**
+ * Locks the submission row for the rest of the transaction. Always take this before any upload
+ * row lock. claimSubmit updates the same row, so a lease check made after this call stays valid
+ * until commit.
+ */
+fun lockSubmission(
+    tx: Configuration,
+    submissionId: UUID,
+) {
+<span class="fc" id="L36">    tx</span>
+<span class="fc" id="L37">        .dsl()</span>
+<span class="fc" id="L38">        .select(SUBMISSION.ID)</span>
+<span class="fc" id="L39">        .from(SUBMISSION)</span>
+<span class="fc" id="L40">        .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L41">        .forUpdate()</span>
+<span class="fc" id="L42">        .fetch()</span>
+<span class="fc" id="L43">}</span>
 
 /**
  * Shared submission DB queries used across multiple features:
  * ownership verification (interceptors) and submission cleanup (action + retention).
  */
-<span class="fc" id="L12">class SubmissionQueries(</span>
-<span class="fc" id="L13">    private val dsl: DSLContext,</span>
+<span class="fc" id="L49">class SubmissionQueries(</span>
+<span class="fc" id="L50">    private val dsl: DSLContext,</span>
 ) {
     /**
      * Ownership check for the submission interceptor — uses DSLContext directly
@@ -20,41 +57,152 @@ import java.util.UUID
         id: UUID,
         personIdent: String,
     ): Boolean =
-<span class="fc" id="L23">        dsl</span>
-<span class="fc" id="L24">            .selectCount()</span>
-<span class="fc" id="L25">            .from(SUBMISSION)</span>
-<span class="fc" id="L26">            .where(</span>
-<span class="fc" id="L27">                SUBMISSION.ID</span>
-<span class="fc" id="L28">                    .eq(id)</span>
-<span class="fc" id="L29">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-<span class="fc" id="L30">            ).fetchOne()</span>
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            ?.value1()</span>
-<span class="pc bpc" id="L32" title="1 of 4 branches missed.">            .let { (it ?: 0) != 0 }</span>
+<span class="fc" id="L60">        dsl</span>
+<span class="fc" id="L61">            .selectCount()</span>
+<span class="fc" id="L62">            .from(SUBMISSION)</span>
+<span class="fc" id="L63">            .where(</span>
+<span class="fc" id="L64">                SUBMISSION.ID</span>
+<span class="fc" id="L65">                    .eq(id)</span>
+<span class="fc" id="L66">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="fc" id="L67">            ).fetchOne()</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            ?.value1()</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            .let { (it ?: 0) != 0 }</span>
 
     fun isNavEksternRefIdOwnedByUser(
         tx: Configuration,
         navEksternRefId: String,
         personIdent: String,
     ): Boolean =
-<span class="nc bnc" id="L39" title="All 2 branches missed.">        tx</span>
-<span class="nc" id="L40">            .dsl()</span>
-<span class="nc" id="L41">            .selectCount()</span>
-<span class="nc" id="L42">            .from(SUBMISSION)</span>
-<span class="nc" id="L43">            .where(</span>
-<span class="nc" id="L44">                SUBMISSION.NAV_EKSTERN_REF_ID</span>
-<span class="nc" id="L45">                    .eq(navEksternRefId)</span>
-<span class="nc" id="L46">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
-<span class="nc" id="L47">            ).fetchSingle()</span>
-<span class="nc" id="L48">            .value1() &gt; 0</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        tx</span>
+<span class="nc" id="L77">            .dsl()</span>
+<span class="nc" id="L78">            .selectCount()</span>
+<span class="nc" id="L79">            .from(SUBMISSION)</span>
+<span class="nc" id="L80">            .where(</span>
+<span class="nc" id="L81">                SUBMISSION.NAV_EKSTERN_REF_ID</span>
+<span class="nc" id="L82">                    .eq(navEksternRefId)</span>
+<span class="nc" id="L83">                    .and(SUBMISSION.OWNER_IDENT.eq(personIdent)),</span>
+<span class="nc" id="L84">            ).fetchSingle()</span>
+<span class="nc" id="L85">            .value1() &gt; 0</span>
+
+    /**
+     * Takes the submit lock for [attemptId]. A single conditional UPDATE, so Postgres' row lock
+     * makes concurrent claims safe: exactly one caller sees `true`. An expired lock can be taken over.
+     */
+    fun claimSubmit(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Boolean {
+<span class="fc" id="L96">        val now = OffsetDateTime.now()</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        return tx</span>
+<span class="fc" id="L98">            .dsl()</span>
+<span class="fc" id="L99">            .update(SUBMISSION)</span>
+<span class="fc" id="L100">            .set(SUBMISSION.SUBMIT_ATTEMPT_ID, attemptId)</span>
+<span class="fc" id="L101">            .set(SUBMISSION.SUBMIT_STARTED_AT, now)</span>
+<span class="fc" id="L102">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L103">            .and(SUBMISSION.SUBMITTED_AT.isNull)</span>
+<span class="fc" id="L104">            .and(submitLockInactive(now))</span>
+<span class="fc" id="L105">            .execute() == 1</span>
+    }
+
+    fun isSubmitted(
+        tx: Configuration,
+        submissionId: UUID,
+<span class="fc" id="L111">    ): Boolean = tx.dsl().fetchExists(SUBMISSION, SUBMISSION.ID.eq(submissionId).and(SUBMISSION.SUBMITTED_AT.isNotNull))</span>
+
+    /** Fencing check: true only if [attemptId] still holds the lock. */
+    fun isCurrentAttempt(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Boolean =
+<span class="fc" id="L119">        tx</span>
+<span class="fc" id="L120">            .dsl()</span>
+<span class="fc" id="L121">            .fetchExists(</span>
+<span class="fc" id="L122">                SUBMISSION,</span>
+<span class="fc" id="L123">                SUBMISSION.ID.eq(submissionId).and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId)),</span>
+<span class="fc" id="L124">            )</span>
+
+    /** Releases the lock, but only if [attemptId] still holds it. */
+    fun releaseSubmit(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Boolean =
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        tx</span>
+<span class="fc" id="L133">            .dsl()</span>
+<span class="fc" id="L134">            .update(SUBMISSION)</span>
+<span class="fc" id="L135">            .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)</span>
+<span class="fc" id="L136">            .setNull(SUBMISSION.SUBMIT_STARTED_AT)</span>
+<span class="fc" id="L137">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L138">            .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))</span>
+<span class="fc" id="L139">            .execute() == 1</span>
+
+    /**
+     * Marks the submission as sent, only if [attemptId] still holds the submit lock.
+     *
+     * The row is kept (its uploads are deleted) so its navEksternRefId still counts when the next
+     * ref for the same fiksDigisosId is derived. Fiks may not list the new ettersendelse yet.
+     * The context id is released so the frontend can start a new submission with it.
+     */
+    fun markSubmitted(
+        tx: Configuration,
+        submissionId: UUID,
+        attemptId: UUID,
+    ): Int {
+<span class="fc" id="L153">        lockSubmission(tx, submissionId)</span>
+<span class="fc" id="L154">        val updated =</span>
+<span class="fc" id="L155">            tx</span>
+<span class="fc" id="L156">                .dsl()</span>
+<span class="fc" id="L157">                .update(SUBMISSION)</span>
+<span class="fc" id="L158">                .set(SUBMISSION.SUBMITTED_AT, OffsetDateTime.now())</span>
+<span class="fc" id="L159">                .set(SUBMISSION.CONTEXT_ID, DSL.concat(SUBMISSION.CONTEXT_ID, DSL.inline(&quot;:submitted:$submissionId&quot;)))</span>
+<span class="fc" id="L160">                .setNull(SUBMISSION.SUBMIT_ATTEMPT_ID)</span>
+<span class="fc" id="L161">                .setNull(SUBMISSION.SUBMIT_STARTED_AT)</span>
+<span class="fc" id="L162">                .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L163">                .and(SUBMISSION.SUBMIT_ATTEMPT_ID.eq(attemptId))</span>
+<span class="fc" id="L164">                .execute()</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (updated == 1) {</span>
+<span class="fc" id="L166">            tx</span>
+<span class="fc" id="L167">                .dsl()</span>
+<span class="fc" id="L168">                .deleteFrom(UPLOAD)</span>
+<span class="fc" id="L169">                .where(UPLOAD.SUBMISSION_ID.eq(submissionId))</span>
+<span class="fc" id="L170">                .execute()</span>
+        }
+<span class="fc" id="L172">        return updated</span>
+    }
+
+    /** Deletes sent submissions older than [cutoff]. They only hold a ref and a fødselsnummer. */
+    fun deleteSubmittedBefore(
+        tx: Configuration,
+        cutoff: OffsetDateTime,
+    ): Int =
+<span class="fc" id="L180">        tx</span>
+<span class="fc" id="L181">            .dsl()</span>
+<span class="fc" id="L182">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L183">            .where(SUBMISSION.SUBMITTED_AT.lt(cutoff))</span>
+<span class="fc" id="L184">            .execute()</span>
+
+    /** Deletes the submission unless a submit holds a live lock. Atomic with claimSubmit. */
+    fun cleanupIfNotSubmitting(
+        tx: Configuration,
+        submissionId: UUID,
+    ): Int =
+<span class="fc" id="L191">        tx</span>
+<span class="fc" id="L192">            .dsl()</span>
+<span class="fc" id="L193">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L194">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L195">            .and(submitLockInactive())</span>
+<span class="fc" id="L196">            .execute()</span>
 
     fun cleanup(
         tx: Configuration,
         submissionId: UUID,
     ): Int =
-<span class="fc" id="L54">        tx</span>
-<span class="fc" id="L55">            .dsl()</span>
-<span class="fc" id="L56">            .deleteFrom(SUBMISSION)</span>
-<span class="fc" id="L57">            .where(SUBMISSION.ID.eq(submissionId))</span>
-<span class="fc" id="L58">            .execute()</span>
+<span class="fc" id="L202">        tx</span>
+<span class="fc" id="L203">            .dsl()</span>
+<span class="fc" id="L204">            .deleteFrom(SUBMISSION)</span>
+<span class="fc" id="L205">            .where(SUBMISSION.ID.eq(submissionId))</span>
+<span class="fc" id="L206">            .execute()</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

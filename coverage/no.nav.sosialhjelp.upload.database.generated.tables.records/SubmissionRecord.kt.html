@@ -50,19 +50,34 @@ import org.jooq.impl.TableRecordImpl
 <span class="nc" id="L50">        set(value): Unit = set(7, value)</span>
 <span class="nc" id="L51">        get(): Boolean? = get(7) as Boolean?</span>
 
+    open var submitAttemptId: UUID?
+<span class="nc" id="L54">        set(value): Unit = set(8, value)</span>
+<span class="nc" id="L55">        get(): UUID? = get(8) as UUID?</span>
+
+    open var submitStartedAt: OffsetDateTime?
+<span class="nc" id="L58">        set(value): Unit = set(9, value)</span>
+<span class="nc" id="L59">        get(): OffsetDateTime? = get(9) as OffsetDateTime?</span>
+
+    open var submittedAt: OffsetDateTime?
+<span class="nc" id="L62">        set(value): Unit = set(10, value)</span>
+<span class="nc" id="L63">        get(): OffsetDateTime? = get(10) as OffsetDateTime?</span>
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-<span class="nc" id="L56">    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null, automaticCleanup: Boolean? = null): this() {</span>
-<span class="nc" id="L57">        this.id = id</span>
-<span class="nc" id="L58">        this.contextId = contextId</span>
-<span class="nc" id="L59">        this.ownerIdent = ownerIdent</span>
-<span class="nc" id="L60">        this.navEksternRefId = navEksternRefId</span>
-<span class="nc" id="L61">        this.createdAt = createdAt</span>
-<span class="nc" id="L62">        this.fiksDigisosId = fiksDigisosId</span>
-<span class="nc" id="L63">        this.kategori = kategori</span>
-<span class="nc" id="L64">        this.automaticCleanup = automaticCleanup</span>
-<span class="nc" id="L65">        resetTouchedOnNotNull()</span>
-<span class="nc" id="L66">    }</span>
+<span class="nc" id="L68">    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null, automaticCleanup: Boolean? = null, submitAttemptId: UUID? = null, submitStartedAt: OffsetDateTime? = null, submittedAt: OffsetDateTime? = null): this() {</span>
+<span class="nc" id="L69">        this.id = id</span>
+<span class="nc" id="L70">        this.contextId = contextId</span>
+<span class="nc" id="L71">        this.ownerIdent = ownerIdent</span>
+<span class="nc" id="L72">        this.navEksternRefId = navEksternRefId</span>
+<span class="nc" id="L73">        this.createdAt = createdAt</span>
+<span class="nc" id="L74">        this.fiksDigisosId = fiksDigisosId</span>
+<span class="nc" id="L75">        this.kategori = kategori</span>
+<span class="nc" id="L76">        this.automaticCleanup = automaticCleanup</span>
+<span class="nc" id="L77">        this.submitAttemptId = submitAttemptId</span>
+<span class="nc" id="L78">        this.submitStartedAt = submitStartedAt</span>
+<span class="nc" id="L79">        this.submittedAt = submittedAt</span>
+<span class="nc" id="L80">        resetTouchedOnNotNull()</span>
+<span class="nc" id="L81">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

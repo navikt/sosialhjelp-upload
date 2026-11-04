@@ -15,7 +15,7 @@ import java.util.UUID
     )
 
     /**
-     * Finds uploads stuck in PROCESSING since before [cutoff] and marks them FAILED.
+     * Fails abandoned processing uploads. The user can upload the file again.
      * Returns info needed for SSE notification and GCS cleanup.
      */
     fun markStaleProcessingAsFailed(
@@ -36,7 +36,7 @@ import java.util.UUID
 <span class="fc" id="L36">            }</span>
 
     /**
-     * Finds PENDING uploads that have stalled since before [cutoff].
+     * Finds incomplete PENDING uploads that have stalled since before [cutoff].
      * Marks them FAILED. Returns info needed for SSE notification and GCS cleanup.
      */
     fun markHaltedPendingAsFailed(
@@ -49,11 +49,16 @@ import java.util.UUID
 <span class="fc" id="L49">            .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)</span>
 <span class="fc" id="L50">            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())</span>
 <span class="fc" id="L51">            .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))</span>
-<span class="fc" id="L52">            .and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
-<span class="fc" id="L53">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
-<span class="fc" id="L54">            .fetch()</span>
-<span class="fc" id="L55">            .mapNotNull { record -&gt;</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
-<span class="fc" id="L57">            }</span>
+<span class="fc" id="L52">            .and(</span>
+<span class="fc" id="L53">                UPLOAD.UPLOAD_OFFSET</span>
+<span class="fc" id="L54">                    .ne(UPLOAD.SIZE)</span>
+<span class="fc" id="L55">                    .or(UPLOAD.SIZE.isNull)</span>
+<span class="fc" id="L56">                    .or(UPLOAD.SIZE.le(0L)),</span>
+<span class="fc" id="L57">            ).and(UPLOAD.UPDATED_AT.lt(cutoff))</span>
+<span class="fc" id="L58">            .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)</span>
+<span class="fc" id="L59">            .fetch()</span>
+<span class="fc" id="L60">            .mapNotNull { record -&gt;</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                record.get(UPLOAD.SUBMISSION_ID)?.let { StaleUploadInfo(it, record.get(UPLOAD.GCS_KEY)) }</span>
+<span class="fc" id="L62">            }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
