@@ -6,6 +6,7 @@ import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.upload.Status
+import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.DSLContext
@@ -59,12 +60,7 @@ class SubmissionService(
                                         val originalBase = File(upload.originalFilename ?: "").nameWithoutExtension
                                         if (ext.isNotEmpty()) "$originalBase.$ext" else originalBase
                                     },
-                                status =
-                                    when (upload.status) {
-                                        // READY is internal (queued); clients only know PROCESSING.
-                                        Status.READY -> UploadDto.Status.PROCESSING
-                                        else -> UploadDto.Status.valueOf(upload.status.name)
-                                    },
+                                status = upload.clientStatus(),
                                 upload.fileSize,
                                 upload.kategori,
                                 upload.correlationId,
@@ -85,5 +81,12 @@ class SubmissionService(
                     ),
                 status = SubmissionState.Status.ACTIVE,
             )
+        }
+
+    private fun Upload.clientStatus(): UploadDto.Status =
+        if (status == Status.PENDING && (fileSize ?: 0L) > 0 && uploadOffset == fileSize) {
+            UploadDto.Status.PROCESSING
+        } else {
+            UploadDto.Status.valueOf(status.name)
         }
 }

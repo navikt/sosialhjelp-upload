@@ -321,8 +321,8 @@ Two background coroutines run continuously on application start:
 
 | Service | Interval | Purpose |
 |---|---|---|
-| `ProcessingWorker` | Continuous (4 per pod) | Claims `READY` uploads and processes each once, with a 150-second timeout |
-| `UploadRecoveryService` | 1 minute | Fails `PENDING` and `PROCESSING` uploads idle for 3 minutes |
+| `ProcessingWorker` | Continuous (4 per pod) | Claims fully received `PENDING` uploads and processes each once, with a 150-second timeout |
+| `UploadRecoveryService` | 1 minute | Fails incomplete `PENDING` uploads and `PROCESSING` uploads idle for 3 minutes |
 | `StaleSubmissionCleanupService` | 1 minute | Deletes idle unsubmitted submissions (`automatic_cleanup = true`), and submitted submissions after 7 days |
 
 ---

@@ -144,7 +144,7 @@ class TusUploadService(
         meterRegistry.summary("upload.chunk.bytes").record(data.size.toDouble())
 
         if (newOffset == totalSize) {
-            // appendChunk marked the upload READY in the same transaction; a worker picks it up.
+            // The committed offset makes the upload eligible for a worker.
             logger.info("Upload $uploadId complete, queued for processing")
             processingWorker.wake()
         }

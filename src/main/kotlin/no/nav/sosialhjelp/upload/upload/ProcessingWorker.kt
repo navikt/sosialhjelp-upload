@@ -22,7 +22,7 @@ import kotlin.time.Duration.Companion.seconds
 val PROCESSING_TIMEOUT = 150.seconds
 
 /**
- * Pulls READY uploads from the database and processes each once.
+ * Pulls fully received PENDING uploads from the database and processes each once.
  *
  * The database is the queue, so work survives pod restarts and is shared between pods.
  * A fixed number of workers per pod bounds memory: each attempt holds the file in memory a few times.

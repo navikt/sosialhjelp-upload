@@ -54,7 +54,7 @@ class ProcessingClaimTest {
         val uploadId = dsl.transactionResult { tx -> TusUploadQueries().create(tx, submissionId, "a.pdf", 10L, null) }!!
         dsl
             .update(UPLOAD)
-            .set(UPLOAD.PROCESSING_STATUS, Status.READY.name)
+            .set(UPLOAD.UPLOAD_OFFSET, 10L)
             .where(UPLOAD.ID.eq(uploadId))
             .execute()
         return submissionId to uploadId
@@ -69,6 +69,49 @@ class ProcessingClaimTest {
             val claims = (1..10).map { async(Dispatchers.IO) { claim() } }.awaitAll()
             assertEquals(1, claims.count { it != null })
         }
+
+    @Test
+    fun `old and new workers cannot claim the same upload`() =
+        runBlocking {
+            val (_, uploadId) = readyUpload()
+            val old =
+                async(Dispatchers.IO) {
+                    dsl.transactionResult { tx ->
+                        tx
+                            .dsl()
+                            .update(UPLOAD)
+                            .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)
+                            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
+                            .where(UPLOAD.ID.eq(uploadId))
+                            .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
+                            .execute() == 1
+                    }
+                }
+            val new = async(Dispatchers.IO) { claim() }
+            assertEquals(1, listOf(old.await(), new.await() == uploadId).count { it })
+        }
+
+    @Test
+    fun `incomplete uploads are not claimed and completed uploads are not timed out while queued`() {
+        val (_, completeId) = readyUpload()
+        val submissionId = createMockSubmission(dsl)
+        val incompleteId =
+            dsl.transactionResult { tx ->
+                TusUploadQueries().create(tx, submissionId, "b.pdf", 10L, null)
+            }!!
+        dsl
+            .update(UPLOAD)
+            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now().minusMinutes(10))
+            .where(UPLOAD.ID.`in`(completeId, incompleteId))
+            .execute()
+        val recovered =
+            dsl.transactionResult { tx ->
+                UploadRecoveryQueries().markHaltedPendingAsFailed(tx, OffsetDateTime.now().minusMinutes(3))
+            }
+        assertEquals(listOf(submissionId), recovered.map { it.submissionId })
+        assertEquals(completeId, claim())
+        assertNull(claim())
+    }
 
     @Test
     fun `abandoned processing fails rather than being claimed again`() {

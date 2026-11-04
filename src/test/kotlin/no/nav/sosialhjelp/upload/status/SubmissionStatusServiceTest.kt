@@ -101,4 +101,39 @@ class SubmissionStatusServiceTest {
             assertEquals("first.pdf", firstUpload.originalFilename)
             assertEquals("second.pdf", secondUpload.originalFilename)
         }
+
+    @Test
+    fun `fully uploaded pending file is shown as processing`() =
+        runTest {
+            val submissionId = createMockSubmission(dsl)
+            val uploadId = createUpload(submissionId, "queued.pdf")!!
+            dsl
+                .update(UPLOAD)
+                .set(UPLOAD.SIZE, 10L)
+                .set(UPLOAD.UPLOAD_OFFSET, 10L)
+                .where(UPLOAD.ID.eq(uploadId))
+                .execute()
+            val service = SubmissionService(uploadRepository, tusSubmissionQueries, dsl)
+            assertEquals(
+                UploadDto.Status.PROCESSING,
+                service
+                    .getSubmissionStatus(submissionId)
+                    .uploads
+                    .single()
+                    .status,
+            )
+            dsl
+                .update(UPLOAD)
+                .set(UPLOAD.UPLOAD_OFFSET, 5L)
+                .where(UPLOAD.ID.eq(uploadId))
+                .execute()
+            assertEquals(
+                UploadDto.Status.PENDING,
+                service
+                    .getSubmissionStatus(submissionId)
+                    .uploads
+                    .single()
+                    .status,
+            )
+        }
 }

@@ -23,11 +23,10 @@ data class Upload(
     val correlationId: UUID? = null,
     val converted: Boolean = false,
     val contentType: String? = null,
+    val uploadOffset: Long? = null,
 )
 
 enum class Status {
-    /** All bytes received; waiting for a processing worker. */
-    READY,
     PROCESSING,
     FAILED,
     PENDING,
@@ -142,6 +141,7 @@ class UploadRepository {
                 SUBMISSION.NAV_EKSTERN_REF_ID,
                 UPLOAD.MELLOMLAGRING_FILNAVN,
                 UPLOAD.SIZE,
+                UPLOAD.UPLOAD_OFFSET,
                 UPLOAD.MELLOMLAGRING_STORRELSE,
                 UPLOAD.PROCESSING_STATUS,
                 UPLOAD.SHA512,
@@ -178,6 +178,7 @@ class UploadRepository {
                     correlationId = records.first().get(UPLOAD.CORRELATION_ID),
                     converted = records.first().get(UPLOAD.CONVERTED) ?: false,
                     contentType = records.first().get(UPLOAD.CONTENT_TYPE),
+                    uploadOffset = records.first().get(UPLOAD.UPLOAD_OFFSET),
                 )
             }
 

@@ -47,7 +47,7 @@ class StaleSubmissionQueries {
                         DSL
                             .count()
                             .filterWhere(
-                                UPLOAD.PROCESSING_STATUS.`in`("PENDING", "READY", "PROCESSING"),
+                                UPLOAD.PROCESSING_STATUS.`in`("PENDING", "PROCESSING"),
                             ).eq(0),
                     ),
             ).fetch()

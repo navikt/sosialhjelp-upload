@@ -136,13 +136,7 @@ class TusUploadQueries {
                 .fetchSingle()
                 .get(UPLOAD.SIZE)!!
         if (newOffset == totalSize) {
-            // Hand over to the processing workers in the same transaction as the last chunk.
-            tx
-                .dsl()
-                .update(UPLOAD)
-                .set(UPLOAD.PROCESSING_STATUS, Status.READY.name)
-                .where(UPLOAD.ID.eq(uploadId))
-                .execute()
+            // The offset update makes the upload eligible for a worker on commit.
             UploadNotifications.notifyChange(tx, uploadId)
         }
         return totalSize to newOffset

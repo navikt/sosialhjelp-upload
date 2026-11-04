@@ -46,7 +46,7 @@ class UploadProcessingQueries {
     }
 
     /**
-     * Claims the next READY upload. Processing is attempted once; recovery fails abandoned work.
+     * Claims a fully uploaded PENDING upload. Processing is attempted once.
      *
      * The upload row and its submission row are locked together with SKIP LOCKED. Other writers
      * lock submission, then upload, and wait; this query never waits, so it cannot deadlock with
@@ -64,7 +64,9 @@ class UploadProcessingQueries {
                 .from(UPLOAD)
                 .join(SUBMISSION)
                 .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
-                .where(UPLOAD.PROCESSING_STATUS.eq(Status.READY.name))
+                .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
+                .and(UPLOAD.SIZE.gt(0L))
+                .and(UPLOAD.UPLOAD_OFFSET.eq(UPLOAD.SIZE))
                 .and(DSL.not(submitLockActive()))
                 .orderBy(UPLOAD.UPDATED_AT)
                 .limit(1)

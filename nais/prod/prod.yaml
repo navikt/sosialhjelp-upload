@@ -24,9 +24,6 @@ spec:
   replicas:
     min: 2
     max: 6
-  # Older versions cannot read the READY processing status.
-  strategy:
-    type: Recreate
   observability:
     autoInstrumentation:
       enabled: true

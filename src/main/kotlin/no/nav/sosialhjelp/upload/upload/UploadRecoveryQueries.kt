@@ -36,7 +36,7 @@ class UploadRecoveryQueries {
             }
 
     /**
-     * Finds PENDING uploads that have stalled since before [cutoff].
+     * Finds incomplete PENDING uploads that have stalled since before [cutoff].
      * Marks them FAILED. Returns info needed for SSE notification and GCS cleanup.
      */
     fun markHaltedPendingAsFailed(
@@ -49,7 +49,12 @@ class UploadRecoveryQueries {
             .set(UPLOAD.PROCESSING_STATUS, Status.FAILED.name)
             .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
             .where(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
-            .and(UPLOAD.UPDATED_AT.lt(cutoff))
+            .and(
+                UPLOAD.UPLOAD_OFFSET
+                    .ne(UPLOAD.SIZE)
+                    .or(UPLOAD.SIZE.isNull)
+                    .or(UPLOAD.SIZE.le(0L)),
+            ).and(UPLOAD.UPDATED_AT.lt(cutoff))
             .returning(UPLOAD.SUBMISSION_ID, UPLOAD.GCS_KEY)
             .fetch()
             .mapNotNull { record ->

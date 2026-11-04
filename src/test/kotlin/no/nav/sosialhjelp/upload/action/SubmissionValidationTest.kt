@@ -36,6 +36,12 @@ class SubmissionValidationTest {
     }
 
     @Test
+    fun `returns UPLOADS_PROCESSING when an upload is pending`() {
+        val uploads = listOf(makeCompleteUpload(), makeCompleteUpload(status = Status.PENDING))
+        assertContains(validateSubmissionUploads(uploads), SubmissionValidationCode.UPLOADS_PROCESSING)
+    }
+
+    @Test
     fun `returns TOO_MANY_FILES when more than 30 complete uploads exist`() {
         val uploads = (1..MAX_FILES_PER_SUBMISSION + 1).map { makeCompleteUpload() }
         val violations = validateSubmissionUploads(uploads)
