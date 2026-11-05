@@ -22,37 +22,31 @@ import java.util.UUID
 <span class="fc" id="L22">        val storedSize: Long,</span>
     )
 
-    suspend fun delete(
-        navEksternRefId: String,
-        filId: UUID,
-<span class="fc" id="L28">    ) = mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)</span>
-
     /**
      * Encrypts [data], uses the detected [contentType], generates a unique
      * mellomlagring filename, uploads the encrypted bytes, and returns the result.
      */
-    @Suppress(&quot;LongParameterList&quot;)
-<span class="fc" id="L35">    suspend fun store(</span>
+<span class="fc" id="L29">    suspend fun store(</span>
         navEksternRefId: String,
         filename: String,
         contentType: String,
         uploadId: UUID,
         data: ByteArray,
     ): StorageResult {
-<span class="fc" id="L42">        val mellomlagringFilnavn = makeUniqueMellomlagringFilename(filename, uploadId)</span>
-<span class="fc" id="L43">        val encrypted = encryptionService.encryptBytes(data)</span>
-<span class="fc" id="L44">        logger.info(&quot;Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId&quot;)</span>
-<span class="fc" id="L45">        val filId =</span>
-<span class="fc" id="L46">            mellomlagringClient.uploadFile(</span>
-<span class="fc" id="L47">                navEksternRefId = navEksternRefId,</span>
-<span class="fc" id="L48">                filename = mellomlagringFilnavn,</span>
-<span class="fc" id="L49">                contentType = contentType,</span>
-<span class="fc" id="L50">                data = encrypted,</span>
+<span class="fc" id="L36">        val mellomlagringFilnavn = makeUniqueMellomlagringFilename(filename, uploadId)</span>
+<span class="fc" id="L37">        val encrypted = encryptionService.encryptBytes(data)</span>
+<span class="fc" id="L38">        logger.info(&quot;Uploading file (${encrypted.size} bytes) to mellomlagring for $navEksternRefId&quot;)</span>
+<span class="fc" id="L39">        val filId =</span>
+<span class="fc" id="L40">            mellomlagringClient.uploadFile(</span>
+<span class="fc" id="L41">                navEksternRefId = navEksternRefId,</span>
+<span class="fc" id="L42">                filename = mellomlagringFilnavn,</span>
+<span class="fc" id="L43">                contentType = contentType,</span>
+<span class="fc" id="L44">                data = encrypted,</span>
             )
-<span class="fc" id="L52">        return StorageResult(</span>
-<span class="fc" id="L53">            filId = filId,</span>
-<span class="fc" id="L54">            mellomlagringFilnavn = mellomlagringFilnavn,</span>
-<span class="fc" id="L55">            storedSize = data.size.toLong(),</span>
+<span class="fc" id="L46">        return StorageResult(</span>
+<span class="fc" id="L47">            filId = filId,</span>
+<span class="fc" id="L48">            mellomlagringFilnavn = mellomlagringFilnavn,</span>
+<span class="fc" id="L49">            storedSize = data.size.toLong(),</span>
         )
     }
 }
