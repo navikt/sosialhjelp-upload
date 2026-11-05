@@ -4,8 +4,8 @@ package no.nav.sosialhjelp.upload.action
 
 import io.ktor.http.*
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.EttersendelseAlreadyExistsException
 import no.nav.sosialhjelp.upload.action.fiks.EttersendelseMottaker
@@ -14,6 +14,7 @@ import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
@@ -41,7 +42,6 @@ class EttersendelseService(
     private val uploadRepository: UploadRepository,
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -55,29 +55,66 @@ class EttersendelseService(
         personIdent: String,
         klageId: UUID? = null,
     ): Boolean {
+        val attemptId = UUID.randomUUID()
+        val claimed =
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx -> submissionQueries.claimSubmit(tx, submissionId, attemptId) }
+            }
+        if (!claimed) {
+            val alreadySubmitted =
+                withContext(Dispatchers.IO) {
+                    dsl.transactionResult { tx -> submissionQueries.isSubmitted(tx, submissionId) }
+                }
+            if (alreadySubmitted) return true
+            logger.warn("Submit rejected, another submit holds the lock for submission $submissionId")
+            meterRegistry.counter("fiks.submission.rejected_in_progress").increment()
+            throw SubmitInProgressException("Submit already in progress for submission $submissionId")
+        }
+        logger.info("Submit started for submission $submissionId, attempt $attemptId")
+
+        var succeeded = false
+        try {
+            return doUpload(metadata, fiksDigisosId, token, submissionId, attemptId, personIdent, klageId)
+                .also { succeeded = it }
+        } finally {
+            if (!succeeded) releaseSubmit(submissionId, attemptId)
+        }
+    }
+
+    private suspend fun doUpload(
+        metadata: Metadata,
+        fiksDigisosId: String,
+        token: String,
+        submissionId: UUID,
+        attemptId: UUID,
+        personIdent: String,
+        klageId: UUID?,
+    ): Boolean {
         // Klage-endepunktet trenger ikke kommunenummer, så vi henter bare saken for søknad.
         val mottaker =
             klageId?.let { EttersendelseMottaker.Klage(it) }
                 ?: EttersendelseMottaker.Soknad(fiksClient.getSak(fiksDigisosId, token).kommunenummer)
         val navEksternRefId =
-            withContext(ioDispatcher) {
+            withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
                     ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
                 }
             }
         return withMdc("navEksternRefId" to navEksternRefId) {
             val uploads =
-                withContext(ioDispatcher) {
+                withContext(Dispatchers.IO) {
                     dsl.transactionResult { tx -> uploadRepository.getUploads(tx, submissionId) }
                 }
 
             val violations = validateSubmissionUploads(uploads)
             if (violations.isNotEmpty()) throw SubmissionValidationException(violations)
 
+            ensureCurrentAttempt(submissionId, attemptId)
             generateAndUploadPdf(metadata, uploads, navEksternRefId, personIdent)
 
             val filer = buildFilerList(uploads)
 
+            ensureCurrentAttempt(submissionId, attemptId)
             submitToFiks(
                 metadata,
                 fiksDigisosId,
@@ -86,8 +123,35 @@ class EttersendelseService(
                 token,
                 filer,
                 submissionId,
+                attemptId,
             )
         }
+    }
+
+    /** Fencing: stop if this attempt's lock expired and another attempt took over. */
+    private suspend fun ensureCurrentAttempt(
+        submissionId: UUID,
+        attemptId: UUID,
+    ) {
+        val current =
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx -> submissionQueries.isCurrentAttempt(tx, submissionId, attemptId) }
+            }
+        if (!current) {
+            logger.warn("Submit attempt $attemptId for submission $submissionId lost its lock, aborting")
+            throw SubmitInProgressException("Submit attempt $attemptId no longer holds the lock")
+        }
+    }
+
+    private suspend fun releaseSubmit(
+        submissionId: UUID,
+        attemptId: UUID,
+    ) {
+        runCatching {
+            withContext(NonCancellable + Dispatchers.IO) {
+                dsl.transactionResult { tx -> submissionQueries.releaseSubmit(tx, submissionId, attemptId) }
+            }
+        }.onFailure { logger.error("Failed to release submit lock for submission $submissionId", it) }
     }
 
     private suspend fun generateAndUploadPdf(
@@ -119,12 +183,14 @@ class EttersendelseService(
                     EttersendelsePdfGenerator.generate(degraded, personIdent)
                 }
             }
-        mellomlagringClient.replaceFile(
-            navEksternRefId,
-            "ettersendelse.pdf",
-            "application/pdf",
-            encryptionService.encryptBytes(ettersendelsePdf),
-        )
+        val pdfFilId =
+            mellomlagringClient.replaceFile(
+                navEksternRefId,
+                "ettersendelse.pdf",
+                "application/pdf",
+                encryptionService.encryptBytes(ettersendelsePdf),
+            )
+        logger.info("Uploaded ettersendelse.pdf to mellomlagring as $pdfFilId")
     }
 
     private fun buildFilerList(uploads: List<no.nav.sosialhjelp.upload.upload.Upload>): List<Fil> =
@@ -141,6 +207,7 @@ class EttersendelseService(
         token: String,
         filer: List<Fil>,
         submissionId: UUID,
+        attemptId: UUID,
     ): Boolean {
         val (response, duration) =
             try {
@@ -160,7 +227,7 @@ class EttersendelseService(
                         "— treating as success",
                 )
                 meterRegistry.counter("fiks.submission.already_exists").increment()
-                cleanupSubmission(submissionId)
+                cleanupSubmission(submissionId, attemptId)
                 return true
             }
 
@@ -168,17 +235,28 @@ class EttersendelseService(
         meterRegistry.timer("fiks.submission", "result", result).record(duration.toJavaDuration())
 
         if (response.status.isSuccess()) {
-            cleanupSubmission(submissionId)
+            cleanupSubmission(submissionId, attemptId)
             logger.info("Successfully submitted ettersendelse for $fiksDigisosId to Fiks")
             return true
         }
         return false
     }
 
-    private suspend fun cleanupSubmission(submissionId: UUID) {
-        withContext(ioDispatcher) {
-            dsl.transactionResult { tx -> submissionQueries.cleanup(tx, submissionId) }
+    private suspend fun cleanupSubmission(
+        submissionId: UUID,
+        attemptId: UUID,
+    ) {
+        val deleted =
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx -> submissionQueries.markSubmitted(tx, submissionId, attemptId) }
+            }
+        if (deleted > 0) {
+            runCatching { notificationService.notifyDeleted(submissionId) }
+                .onFailure { logger.warn("Failed to notify submitted submission $submissionId", it) }
+        } else {
+            logger.warn(
+                "Submission $submissionId was not marked submitted, attempt $attemptId no longer holds the lock",
+            )
         }
-        notificationService.notifyDeleted(submissionId)
     }
 }

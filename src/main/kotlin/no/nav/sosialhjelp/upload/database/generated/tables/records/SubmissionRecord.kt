@@ -50,10 +50,22 @@ open class SubmissionRecord() : TableRecordImpl<SubmissionRecord>(Submission.SUB
         set(value): Unit = set(7, value)
         get(): Boolean? = get(7) as Boolean?
 
+    open var submitAttemptId: UUID?
+        set(value): Unit = set(8, value)
+        get(): UUID? = get(8) as UUID?
+
+    open var submitStartedAt: OffsetDateTime?
+        set(value): Unit = set(9, value)
+        get(): OffsetDateTime? = get(9) as OffsetDateTime?
+
+    open var submittedAt: OffsetDateTime?
+        set(value): Unit = set(10, value)
+        get(): OffsetDateTime? = get(10) as OffsetDateTime?
+
     /**
      * Create a detached, initialised SubmissionRecord
      */
-    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null, automaticCleanup: Boolean? = null): this() {
+    constructor(id: UUID? = null, contextId: String? = null, ownerIdent: String? = null, navEksternRefId: String? = null, createdAt: OffsetDateTime? = null, fiksDigisosId: String? = null, kategori: String? = null, automaticCleanup: Boolean? = null, submitAttemptId: UUID? = null, submitStartedAt: OffsetDateTime? = null, submittedAt: OffsetDateTime? = null): this() {
         this.id = id
         this.contextId = contextId
         this.ownerIdent = ownerIdent
@@ -62,6 +74,9 @@ open class SubmissionRecord() : TableRecordImpl<SubmissionRecord>(Submission.SUB
         this.fiksDigisosId = fiksDigisosId
         this.kategori = kategori
         this.automaticCleanup = automaticCleanup
+        this.submitAttemptId = submitAttemptId
+        this.submitStartedAt = submitStartedAt
+        this.submittedAt = submittedAt
         resetTouchedOnNotNull()
     }
 }

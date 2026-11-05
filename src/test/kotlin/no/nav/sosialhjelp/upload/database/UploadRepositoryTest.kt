@@ -132,7 +132,7 @@ class UploadRepositoryTest {
         }
 
     @Test
-    fun `markStaleProcessingAsFailed marks stuck uploads as failed`() =
+    fun `markStaleProcessingAsFailed fails abandoned uploads`() =
         runTest {
             val submissionId = TestUtils.createMockSubmission(dsl)
             coEvery { notificationServiceMock.notifyUpdate(any()) } returns Unit
@@ -143,8 +143,8 @@ class UploadRepositoryTest {
 
             // Set PROCESSING state with an old updated_at
             dsl.execute(
-                "UPDATE upload SET processing_status = 'PROCESSING', updated_at = NOW() - INTERVAL '10 minutes'" +
-                    " WHERE id = ?",
+                "UPDATE upload SET processing_status = 'PROCESSING', " +
+                    "updated_at = NOW() - INTERVAL '10 minutes' WHERE id = ?",
                 uploadId,
             )
 

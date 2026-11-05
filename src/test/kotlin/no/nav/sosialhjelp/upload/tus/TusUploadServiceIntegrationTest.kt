@@ -1,12 +1,21 @@
 package no.nav.sosialhjelp.upload.tus
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.mockk.clearMocks
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
@@ -22,6 +31,7 @@ import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
+import no.nav.sosialhjelp.upload.upload.ProcessingWorker
 import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.validation.MAX_FILE_SIZE
@@ -31,6 +41,7 @@ import no.nav.sosialhjelp.upload.validation.VirusScanner
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.PDPage
 import org.jooq.DSLContext
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -44,6 +55,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Suppress("LargeClass")
 class TusUploadServiceIntegrationTest {
     private lateinit var dsl: DSLContext
     private lateinit var tusSubmissionQueries: TusSubmissionQueries
@@ -95,6 +107,9 @@ class TusUploadServiceIntegrationTest {
                 meterRegistry = meterRegistry,
             )
 
+        val processingWorker = ProcessingWorker(dsl, uploadProcessingQueries, uploadProcessingService)
+        processingWorker.start(processingScope)
+
         tusUploadService =
             TusUploadService(
                 tusUploadQueries = tusUploadQueries,
@@ -106,10 +121,15 @@ class TusUploadServiceIntegrationTest {
                 mellomlagringClient = mellomlagringClient,
                 chunkStorage = chunkStorage,
                 chunkAssemblyService = chunkAssemblyService,
-                uploadProcessingService = uploadProcessingService,
-                processingScope = processingScope,
+                processingWorker = processingWorker,
                 meterRegistry = meterRegistry,
             )
+    }
+
+    @AfterAll
+    fun stopWorkers() {
+        // The test DB is shared between test classes; idle workers must not claim their uploads.
+        processingScope.cancel()
     }
 
     @BeforeEach
@@ -246,7 +266,7 @@ class TusUploadServiceIntegrationTest {
         }
 
     @Test
-    fun `appendChunk stores errors and clears chunk when file is too large`() =
+    fun `oversized upload is rejected at create and refuses chunks`() =
         runTest {
             val externalId = UUID.randomUUID().toString()
             val personident = "12345678910"
@@ -260,9 +280,9 @@ class TusUploadServiceIntegrationTest {
                     personident,
                     "test-token",
                 )
-            tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
-
-            awaitUploadTerminal(dsl, uploadId)
+            assertFailsWith<TusUploadQueries.UploadNotAcceptingChunksException> {
+                tusUploadService.appendChunk(uploadId, 0L, oversizedContent)
+            }
 
             val errors =
                 dsl
@@ -584,6 +604,118 @@ class TusUploadServiceIntegrationTest {
                 "$fiksDigisosId-0001",
                 tusSubmissionQueries.getNavEksternRefIdByContextId(dsl.configuration(), soknadContext),
             )
+        }
+
+    // endregion
+
+    // region races
+
+    /** Starts an upload whose mellomlagring call blocks until [release] completes. */
+    private suspend fun startBlockedUpload(
+        filId: UUID,
+        release: CompletableDeferred<Unit>,
+    ): UUID {
+        val entered = CompletableDeferred<Unit>()
+        coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } coAnswers {
+            entered.complete(Unit)
+            release.await()
+            filId
+        }
+        coEvery { mellomlagringClient.deleteFile(any(), any(), any()) } returns Unit
+        val content = minimalPdf()
+        val contextId = UUID.randomUUID().toString()
+        createMockSubmission(dsl, contextId)
+        val uploadId =
+            tusUploadService.create(
+                TusMetadata("race.pdf", contextId, correlationId, null, "id", null),
+                content.size.toLong(),
+                "12345678910",
+                "token",
+            )
+        tusUploadService.appendChunk(uploadId, 0L, content)
+        withContext(Dispatchers.Default) { withTimeout(10_000) { entered.await() } }
+        return uploadId
+    }
+
+    private suspend fun settle() = withContext(Dispatchers.Default) { delay(1_500) }
+
+    @Test
+    fun `delete during storage removes the upload and cleans up the late file`() =
+        runBlocking {
+            val filId = UUID.randomUUID()
+            val release = CompletableDeferred<Unit>()
+            val uploadId = startBlockedUpload(filId, release)
+
+            val deletion = async(Dispatchers.IO) { tusUploadService.delete(uploadId) }
+            withTimeout(10_000) { deletion.await() }
+            release.complete(Unit)
+
+            coVerify(timeout = 3_000) { mellomlagringClient.deleteFile(any(), eq(filId), any()) }
+            assertNull(dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne())
+        }
+
+    @Test
+    fun `late processing result does not overwrite an upload that recovery marked FAILED`() =
+        runBlocking {
+            clearMocks(mellomlagringClient)
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val filId = UUID.randomUUID()
+            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            coEvery { mellomlagringClient.deleteFile(any(), any(), any()) } returns Unit
+            coEvery { virusScanner.scan(any()) } coAnswers {
+                entered.complete(Unit)
+                release.await()
+                Result.OK
+            }
+            val content = minimalPdf()
+            val contextId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, contextId)
+            val uploadId =
+                tusUploadService.create(
+                    TusMetadata("late.pdf", contextId, correlationId, null, "id", null),
+                    content.size.toLong(),
+                    "12345678910",
+                    "token",
+                )
+            tusUploadService.appendChunk(uploadId, 0L, content)
+            withTimeout(10_000) { entered.await() }
+
+            dsl
+                .update(UPLOAD)
+                .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+                .where(UPLOAD.ID.eq(uploadId))
+                .execute()
+            release.complete(Unit)
+            settle()
+
+            val row = dsl.selectFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).fetchOne()
+            assertEquals("FAILED", row!![UPLOAD.PROCESSING_STATUS])
+            assertNull(row[UPLOAD.FIL_ID])
+            coVerify { mellomlagringClient.deleteFile(any(), filId, any()) }
+        }
+
+    @Test
+    fun `appendChunk is rejected for an upload that is no longer PENDING`() =
+        runTest {
+            val contextId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, contextId)
+            val uploadId =
+                tusUploadService.create(
+                    TusMetadata("late.pdf", contextId, correlationId, null, "id", null),
+                    20L,
+                    "12345678910",
+                    "token",
+                )
+            dsl
+                .update(UPLOAD)
+                .set(UPLOAD.PROCESSING_STATUS, "FAILED")
+                .where(UPLOAD.ID.eq(uploadId))
+                .execute()
+
+            assertFailsWith<TusUploadQueries.UploadNotAcceptingChunksException> {
+                tusUploadService.appendChunk(uploadId, 0L, ByteArray(10))
+            }
         }
 
     // endregion

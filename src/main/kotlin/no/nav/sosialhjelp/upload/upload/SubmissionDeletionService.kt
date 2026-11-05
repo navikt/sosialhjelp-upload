@@ -3,12 +3,13 @@
 package no.nav.sosialhjelp.upload.upload
 
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
+import no.nav.sosialhjelp.upload.database.lockSubmission
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import org.jooq.DSLContext
@@ -23,28 +24,36 @@ class SubmissionDeletionService(
     private val chunkStorage: ChunkStorage,
     private val notificationService: SubmissionNotificationService,
     private val meterRegistry: MeterRegistry,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     suspend fun deleteSubmission(
         submissionId: UUID,
         keepMellomlagring: Boolean,
+        skipIfSubmitting: Boolean = false,
     ): Boolean {
         val resources =
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> uploadRepository.getSubmissionResources(tx, submissionId) }
+            withContext(Dispatchers.IO) {
+                dsl.transactionResult { tx ->
+                    lockSubmission(tx, submissionId)
+                    uploadRepository.lockUploads(tx, submissionId)
+                    val current =
+                        uploadRepository.getSubmissionResources(tx, submissionId) ?: return@transactionResult null
+                    val deleted =
+                        if (skipIfSubmitting) {
+                            submissionQueries.cleanupIfNotSubmitting(tx, submissionId)
+                        } else {
+                            submissionQueries.cleanup(tx, submissionId)
+                        }
+                    if (deleted == 1) current else null
+                }
             } ?: return false
 
-        withMdc("navEksternRefId" to resources.navEksternRefId) {
+        return withMdc("navEksternRefId" to resources.navEksternRefId) {
             logger.info(
                 "Deleting submission $submissionId " +
                     "(kategori=${resources.kategori}, filer=${resources.filIds.size})",
             )
-            withContext(ioDispatcher) {
-                dsl.transaction { tx -> submissionQueries.cleanup(tx, submissionId) }
-            }
-
             runCatching { notificationService.notifyDeleted(submissionId) }
                 .onFailure { logger.warn("Failed to notify deletion of submission $submissionId", it) }
 
@@ -56,8 +65,8 @@ class SubmissionDeletionService(
             logger.info(
                 "Deleted submission $submissionId (kategori=${resources.kategori}, filer=${resources.filIds.size})",
             )
+            true
         }
-        return true
     }
 
     suspend fun deleteByNavEksternRefId(
@@ -66,11 +75,24 @@ class SubmissionDeletionService(
         kategori: String? = null,
     ): Int {
         val submissionIds =
-            withContext(ioDispatcher) {
+            withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx -> uploadRepository.findSubmissionIds(tx, navEksternRefId, kategori) }
             }
-        return submissionIds.count { deleteSubmission(it, keepMellomlagring) }
+        // Never delete under a running submit: the files would vanish from mellomlagring after
+        // vedlegg.json was built. 409 lets the caller retry once the submit has finished.
+        return submissionIds.count { submissionId ->
+            val deleted = deleteSubmission(submissionId, keepMellomlagring, skipIfSubmitting = true)
+            if (!deleted && submissionExists(submissionId)) {
+                throw SubmitInProgressException("Submit in progress for submission $submissionId")
+            }
+            deleted
+        }
     }
+
+    private suspend fun submissionExists(submissionId: UUID): Boolean =
+        withContext(Dispatchers.IO) {
+            dsl.transactionResult { tx -> uploadRepository.getSubmissionResources(tx, submissionId) != null }
+        }
 
     private suspend fun deleteMellomlagringFiles(resources: SubmissionResources) {
         val navEksternRefId = resources.navEksternRefId ?: return
@@ -87,7 +109,7 @@ class SubmissionDeletionService(
     private suspend fun deleteGcsObjects(resources: SubmissionResources) {
         resources.gcsKeys.forEach { gcsKey ->
             runCatching {
-                val chunkKeys = chunkStorage.listKeys("$gcsKey-chunk-")
+                val chunkKeys = chunkStorage.listKeys(gcsKey)
                 (chunkKeys + listOf(gcsKey)).forEach { key ->
                     runCatching { chunkStorage.deleteObject(key) }
                         .onFailure { logger.warn("Failed to delete GCS object $key", it) }

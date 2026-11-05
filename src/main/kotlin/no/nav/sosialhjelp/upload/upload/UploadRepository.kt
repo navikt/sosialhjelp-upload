@@ -23,6 +23,7 @@ data class Upload(
     val correlationId: UUID? = null,
     val converted: Boolean = false,
     val contentType: String? = null,
+    val uploadOffset: Long? = null,
 )
 
 enum class Status {
@@ -58,6 +59,21 @@ data class SubmissionResources(
 )
 
 class UploadRepository {
+    /** Lock upload rows after locking the submission, before collecting remote resource IDs. */
+    fun lockUploads(
+        tx: Configuration,
+        submissionId: UUID,
+    ) {
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
+            .orderBy(UPLOAD.ID)
+            .forUpdate()
+            .fetch()
+    }
+
     /**
      * Returns the ids of all submissions for [navEksternRefId], optionally narrowed to [kategori].
      *
@@ -125,6 +141,7 @@ class UploadRepository {
                 SUBMISSION.NAV_EKSTERN_REF_ID,
                 UPLOAD.MELLOMLAGRING_FILNAVN,
                 UPLOAD.SIZE,
+                UPLOAD.UPLOAD_OFFSET,
                 UPLOAD.MELLOMLAGRING_STORRELSE,
                 UPLOAD.PROCESSING_STATUS,
                 UPLOAD.SHA512,
@@ -161,6 +178,7 @@ class UploadRepository {
                     correlationId = records.first().get(UPLOAD.CORRELATION_ID),
                     converted = records.first().get(UPLOAD.CONVERTED) ?: false,
                     contentType = records.first().get(UPLOAD.CONTENT_TYPE),
+                    uploadOffset = records.first().get(UPLOAD.UPLOAD_OFFSET),
                 )
             }
 

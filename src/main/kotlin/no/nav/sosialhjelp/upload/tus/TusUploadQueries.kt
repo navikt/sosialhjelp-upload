@@ -18,6 +18,11 @@ class TusUploadQueries {
         message: String,
     ) : RuntimeException(message)
 
+    /** The upload has left PENDING (rejected, failed or processing) and takes no more chunks. */
+    class UploadNotAcceptingChunksException(
+        message: String,
+    ) : RuntimeException(message)
+
     fun create(
         tx: Configuration,
         submissionId: UUID,
@@ -95,14 +100,19 @@ class TusUploadQueries {
         chunkSize: Int,
     ): Pair<Long, Long> {
         // Lock the row to serialize concurrent chunk uploads to the same upload ID.
-        tx
-            .dsl()
-            .select(UPLOAD.ID)
-            .from(UPLOAD)
-            .where(UPLOAD.ID.eq(uploadId))
-            .forUpdate()
-            .fetchOne()
-            ?: throw OffsetMismatchException("Upload $uploadId not found")
+        val status =
+            tx
+                .dsl()
+                .select(UPLOAD.PROCESSING_STATUS)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.eq(uploadId))
+                .forUpdate()
+                .fetchOne()
+                ?.value1()
+                ?: throw OffsetMismatchException("Upload $uploadId not found")
+        if (status != Status.PENDING.name) {
+            throw UploadNotAcceptingChunksException("Upload $uploadId is $status, not accepting chunks")
+        }
         val newOffset = expectedOffset + chunkSize
         val affected =
             tx
@@ -112,6 +122,7 @@ class TusUploadQueries {
                 .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
                 .where(UPLOAD.ID.eq(uploadId))
                 .and(UPLOAD.UPLOAD_OFFSET.eq(expectedOffset))
+                .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
                 .execute()
         if (affected == 0) {
             throw OffsetMismatchException("Upload $uploadId offset mismatch: expected $expectedOffset")
@@ -124,25 +135,12 @@ class TusUploadQueries {
                 .where(UPLOAD.ID.eq(uploadId))
                 .fetchSingle()
                 .get(UPLOAD.SIZE)!!
+        if (newOffset == totalSize) {
+            // The offset update makes the upload eligible for a worker on commit.
+            UploadNotifications.notifyChange(tx, uploadId)
+        }
         return totalSize to newOffset
     }
-
-    /**
-     * Atomically claims an upload for processing by transitioning PENDING → PROCESSING.
-     * Returns true if this caller claimed it, false if already claimed or processed.
-     */
-    fun claimForProcessing(
-        tx: Configuration,
-        uploadId: UUID,
-    ): Boolean =
-        tx
-            .dsl()
-            .update(UPLOAD)
-            .set(UPLOAD.PROCESSING_STATUS, Status.PROCESSING.name)
-            .set(UPLOAD.UPDATED_AT, OffsetDateTime.now())
-            .where(UPLOAD.ID.eq(uploadId))
-            .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
-            .execute() > 0
 
     fun getUpload(
         tx: Configuration,
@@ -183,6 +181,18 @@ class TusUploadQueries {
                     contentType = it.get(UPLOAD.CONTENT_TYPE),
                 )
             }
+
+    fun lockUpload(
+        tx: Configuration,
+        uploadId: UUID,
+    ): Boolean =
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.ID.eq(uploadId))
+            .forUpdate()
+            .fetchOne() != null
 
     fun deleteUpload(
         tx: Configuration,

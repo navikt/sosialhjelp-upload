@@ -9,8 +9,9 @@ import io.ktor.sse.*
 import io.ktor.util.cio.ChannelWriteException
 import io.ktor.util.reflect.*
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -49,15 +50,22 @@ fun Route.configureStatusRoutes() {
 
             val submissionId = submissionService.getOrCreate(id, personident)
 
-            send(submissionService.getSubmissionStatus(submissionId))
-
-            statusChannelFactory
-                .getSubmissionFlow(submissionId)
-                .onEach {
-                    if (it == SubmissionUpdateNotification.UpdateType.UPDATE) {
-                        send(submissionService.getSubmissionStatus(submissionId))
-                    }
-                }.first { it == SubmissionUpdateNotification.UpdateType.DELETE }
+            // Subscribe before the first read so no notification can fall in the gap.
+            val events = Channel<SubmissionUpdateNotification.UpdateType>(Channel.UNLIMITED)
+            val collector =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    statusChannelFactory.getSubmissionFlow(submissionId).collect { events.send(it) }
+                }
+            try {
+                send(submissionService.getSubmissionStatus(submissionId))
+                for (type in events) {
+                    if (type == SubmissionUpdateNotification.UpdateType.DELETE) break
+                    send(submissionService.getSubmissionStatus(submissionId))
+                }
+            } finally {
+                collector.cancel()
+                events.close()
+            }
         } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {
             application.environment.log.warn("SSE /status/$id: submission owned by another user, closing connection")
             runCatching {

@@ -2,6 +2,7 @@ package no.nav.sosialhjelp.upload.upload
 
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.database.submitLockInactive
 import org.jooq.Configuration
 import org.jooq.impl.DSL
 import java.time.OffsetDateTime
@@ -36,6 +37,7 @@ class StaleSubmissionQueries {
             .join(UPLOAD)
             .on(UPLOAD.SUBMISSION_ID.eq(SUBMISSION.ID))
             .where(SUBMISSION.AUTOMATIC_CLEANUP.isTrue)
+            .and(submitLockInactive())
             .groupBy(SUBMISSION.ID, SUBMISSION.NAV_EKSTERN_REF_ID, SUBMISSION.KATEGORI)
             .having(
                 DSL

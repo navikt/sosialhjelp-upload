@@ -3,19 +3,18 @@
 package no.nav.sosialhjelp.upload.tus
 
 import io.micrometer.core.instrument.MeterRegistry
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.common.withMdc
+import no.nav.sosialhjelp.upload.database.lockSubmission
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
+import no.nav.sosialhjelp.upload.upload.ProcessingWorker
 import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
-import no.nav.sosialhjelp.upload.upload.UploadProcessingService
 import no.nav.sosialhjelp.upload.validation.UploadValidator
 import org.jooq.DSLContext
 import org.jooq.kotlin.coroutines.transactionCoroutine
@@ -33,10 +32,8 @@ class TusUploadService(
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
     private val chunkAssemblyService: ChunkAssemblyService,
-    private val uploadProcessingService: UploadProcessingService,
-    private val processingScope: CoroutineScope,
+    private val processingWorker: ProcessingWorker,
     private val meterRegistry: MeterRegistry,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -94,6 +91,13 @@ class TusUploadService(
                         }
                         ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
 
+                lockSubmission(tx, submissionId)
+                if (tusSubmissionQueries.isSubmitLocked(tx, submissionId)) {
+                    throw SubmitInProgressException(
+                        "Cannot add uploads while submission $submissionId is being submitted",
+                    )
+                }
+
                 tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)
                 val uploadId =
                     tusUploadQueries
@@ -116,7 +120,7 @@ class TusUploadService(
     }
 
     suspend fun getUploadInfo(uploadId: UUID): Pair<Long, Long> =
-        withContext(ioDispatcher) {
+        withContext(Dispatchers.IO) {
             dsl.transactionResult { tx ->
                 tusUploadQueries.getUploadInfo(tx, uploadId)
             }
@@ -131,7 +135,7 @@ class TusUploadService(
         chunkStorage.writeChunk(chunkKey, data)
 
         val (totalSize, newOffset) =
-            withContext(ioDispatcher) {
+            withContext(Dispatchers.IO) {
                 dsl.transactionResult { tx ->
                     // Throws OffsetMismatchException if offset doesn't match (→ 409 in route)
                     tusUploadQueries.appendChunk(tx, uploadId, expectedOffset, data.size)
@@ -140,49 +144,44 @@ class TusUploadService(
         meterRegistry.summary("upload.chunk.bytes").record(data.size.toDouble())
 
         if (newOffset == totalSize) {
-            val claimed =
-                withContext(ioDispatcher) {
-                    dsl.transactionResult { tx -> tusUploadQueries.claimForProcessing(tx, uploadId) }
-                }
-            if (claimed) {
-                logger.info("Upload $uploadId complete — launching background processing")
-                processingScope.launch {
-                    runCatching { uploadProcessingService.process(uploadId) }
-                        .onFailure { logger.error("Unhandled error processing upload $uploadId", it) }
-                }
-            } else {
-                logger.info("Upload $uploadId already claimed for processing, skipping")
-            }
+            // The committed offset makes the upload eligible for a worker.
+            logger.info("Upload $uploadId complete, queued for processing")
+            processingWorker.wake()
         }
 
         return newOffset
     }
 
     suspend fun delete(uploadId: UUID) {
-        val upload =
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.getUpload(tx, uploadId) }
+        // The submission lock is held across the mellomlagring call so a submit cannot start
+        // between the lease check and the delete (it waits instead).
+        dsl.transactionCoroutine { tx ->
+            val submissionId =
+                tusUploadQueries.getSubmissionIdFromUploadId(tx, uploadId)
+                    ?: error("Upload $uploadId not found")
+            lockSubmission(tx, submissionId)
+            if (tusSubmissionQueries.isSubmitLocked(tx, submissionId)) {
+                throw SubmitInProgressException(
+                    "Cannot delete upload while submission $submissionId is being submitted",
+                )
             }
-        val filId = upload.filId
-        val navEksternRefId = upload.navEksternRefId
+            check(tusUploadQueries.lockUpload(tx, uploadId)) { "Upload $uploadId not found" }
+            val upload = tusUploadQueries.getUpload(tx, uploadId)
+            val filId = upload.filId
+            val navEksternRefId = upload.navEksternRefId
 
-        withMdc("navEksternRefId" to navEksternRefId) {
-            if (filId != null && navEksternRefId != null) {
-                runCatching {
-                    mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
-                }.onFailure { e ->
-                    throw MellomlagringDeleteException(
-                        "Mellomlagring delete failed",
-                        e,
-                    )
+            withMdc("navEksternRefId" to navEksternRefId) {
+                if (filId != null && navEksternRefId != null) {
+                    runCatching {
+                        mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
+                    }.onFailure { e ->
+                        throw MellomlagringDeleteException("Mellomlagring delete failed", e)
+                    }
                 }
+                tusUploadQueries.deleteUpload(tx, uploadId)
             }
-
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.deleteUpload(tx, uploadId) }
-            }
-            chunkAssemblyService.deleteGcsObjects(uploadId)
         }
+        chunkAssemblyService.deleteGcsObjects(uploadId)
     }
 
     class UploadForbiddenException(

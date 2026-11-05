@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -45,7 +46,11 @@ class SubmissionNotificationService(
     private val log = LoggerFactory.getLogger(SubmissionNotificationService::class.java)
 
     @Suppress("PropertyName")
-    private val _updates = MutableSharedFlow<SubmissionUpdateNotification>(extraBufferCapacity = 64)
+    private val _updates =
+        MutableSharedFlow<SubmissionUpdateNotification>(
+            extraBufferCapacity = 64,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
 
     /** All submission update/delete notifications, unfiltered. */
     val allUpdates: Flow<SubmissionUpdateNotification> = _updates.asSharedFlow()

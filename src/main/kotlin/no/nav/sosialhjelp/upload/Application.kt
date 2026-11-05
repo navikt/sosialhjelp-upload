@@ -36,6 +36,7 @@ import no.nav.sosialhjelp.upload.tus.storage.GcsBucketStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
+import no.nav.sosialhjelp.upload.upload.ProcessingWorker
 import no.nav.sosialhjelp.upload.upload.StaleSubmissionCleanupService
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
@@ -109,20 +110,37 @@ fun Application.module() {
     val isMock = runtimeEnv == "mock" || isLocalOrTest
     val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val chunkStorageDirectory =
+        // A fresh directory per test run: a shared /tmp path breaks when another user owns it.
+        if (isTest) {
+            java.nio.file.Files
+                .createTempDirectory("sosialhjelp-upload")
+                .toFile()
+        } else {
+            null
+        }
     val appMicrometerRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     val chunkStorage: ChunkStorage =
         if (isLocalOrTest) {
-            FileSystemStorage()
+            chunkStorageDirectory?.let { FileSystemStorage(it) } ?: FileSystemStorage()
         } else {
             val bucketName = environment.config.property("gcs.bucketName").getString()
             GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
         }
-    configureDependencies(dataSource, notificationScope, processingScope, appMicrometerRegistry, chunkStorage, isMock)
+    configureDependencies(dataSource, notificationScope, appMicrometerRegistry, chunkStorage, isMock)
     configureSecurity()
     configureHTTP()
     configureMonitoring(appMicrometerRegistry)
     configureStatusPages()
     configureRouting()
+
+    // Processing runs in every mode (tests included): it is part of the upload flow, not a sweep.
+    // Resolve after startup, not during module(): dependency overrides registered after module()
+    // (as the integration tests do) must be in place before the worker builds its object graph.
+    monitor.subscribe(ApplicationStarted) {
+        val processingWorker: ProcessingWorker by dependencies
+        processingWorker.start(processingScope)
+    }
 
     val scopes =
         if (!isTest) startBackgroundJobs() else emptyList()
@@ -138,7 +156,6 @@ fun Application.module() {
 private fun Application.configureDependencies(
     dataSource: DataSource,
     notificationScope: CoroutineScope,
-    processingScope: CoroutineScope,
     appMicrometerRegistry: PrometheusMeterRegistry,
     chunkStorage: ChunkStorage,
     isMock: Boolean,
@@ -156,11 +173,8 @@ private fun Application.configureDependencies(
             }
         }
         provide<ChunkStorage> { chunkStorage }
-        // Wrapped to keep DI from closing the shared Dispatchers.IO on shutdown.
         provide<CoroutineDispatcher> { Dispatchers.IO.limitedParallelism(IO_PARALLELISM, "app-io") }
-        // Deliberately bounded: PDF parsing and CMS encryption must not be able to saturate the host.
         provide { CpuDispatcher(Dispatchers.Default.limitedParallelism(cpuParallelism(), "app-cpu")) }
-        provide<CoroutineScope> { processingScope }
         provide<SubmissionNotificationService> { SubmissionNotificationService(dataSource, notificationScope) }
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
@@ -180,6 +194,7 @@ private fun Application.configureDependencies(
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
         provide(UploadProcessingService::class)
+        provide(ProcessingWorker::class)
         provide(TusUploadService::class)
         provide(SubmissionService::class)
         provide(GotenbergService::class)

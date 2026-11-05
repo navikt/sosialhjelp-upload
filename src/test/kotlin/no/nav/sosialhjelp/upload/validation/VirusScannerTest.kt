@@ -1,13 +1,17 @@
 package no.nav.sosialhjelp.upload.validation
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class VirusScannerTest {
     private lateinit var server: MockWebServer
@@ -87,5 +91,13 @@ class VirusScannerTest {
         runTest {
             val unconfiguredScanner = VirusScanner(url = "", meterRegistry = meterRegistry)
             assertEquals(Result.OK, unconfiguredScanner.scan("data".toByteArray()))
+        }
+
+    @Test
+    fun `propagates cancellation while waiting for scanner`() =
+        runBlocking {
+            assertFailsWith<TimeoutCancellationException> {
+                withTimeout(200) { scanner.scan("data".toByteArray()) }
+            }
         }
 }

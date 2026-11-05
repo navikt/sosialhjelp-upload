@@ -22,10 +22,16 @@ class MellomlagringStorageService(
         val storedSize: Long,
     )
 
+    suspend fun delete(
+        navEksternRefId: String,
+        filId: UUID,
+    ) = mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
+
     /**
      * Encrypts [data], uses the detected [contentType], generates a unique
      * mellomlagring filename, uploads the encrypted bytes, and returns the result.
      */
+    @Suppress("LongParameterList")
     suspend fun store(
         navEksternRefId: String,
         filename: String,

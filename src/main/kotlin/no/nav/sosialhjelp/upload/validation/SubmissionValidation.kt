@@ -12,6 +12,7 @@ enum class SubmissionValidationCode {
     NO_FILES,
     TOO_MANY_FILES,
     TOTAL_SIZE_TOO_LARGE,
+    UPLOADS_PROCESSING,
 }
 
 @Serializable
@@ -26,6 +27,10 @@ class SubmissionValidationException(
 fun validateSubmissionUploads(uploads: List<Upload>): List<SubmissionValidationCode> {
     val completeUploads = uploads.filter { it.status == Status.COMPLETE }
     val violations = mutableListOf<SubmissionValidationCode>()
+    // A file still being processed may reach mellomlagring after vedlegg.json is built.
+    if (uploads.any { it.status == Status.PROCESSING || it.status == Status.PENDING }) {
+        violations += SubmissionValidationCode.UPLOADS_PROCESSING
+    }
     if (completeUploads.isEmpty()) {
         violations += SubmissionValidationCode.NO_FILES
     }

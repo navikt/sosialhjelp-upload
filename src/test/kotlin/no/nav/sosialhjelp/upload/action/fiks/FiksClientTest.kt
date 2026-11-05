@@ -12,12 +12,14 @@ import no.nav.sosialhjelp.api.fiks.Ettersendelse
 import no.nav.sosialhjelp.api.fiks.EttersendtInfoNAV
 import no.nav.sosialhjelp.api.fiks.OriginalSoknadNAV
 import no.nav.sosialhjelp.upload.action.Metadata
+import no.nav.sosialhjelp.upload.common.SubmitInProgressException
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class FiksClientTest {
@@ -61,6 +63,25 @@ class FiksClientTest {
         fiksServer.enqueue(MockResponse().newBuilder().code(HttpStatusCode.Created.value).build())
     }
 
+    private fun enqueueTokenAndBadRequest(message: String) {
+        texasServer.enqueue(
+            MockResponse()
+                .newBuilder()
+                .code(HttpStatusCode.OK.value)
+                .addHeader("Content-Type", "application/json")
+                .body("""{"access_token":"maskinporten-token","expires_in":3600,"token_type":"Bearer"}""")
+                .build(),
+        )
+        fiksServer.enqueue(
+            MockResponse()
+                .newBuilder()
+                .code(HttpStatusCode.BadRequest.value)
+                .addHeader("Content-Type", "application/json")
+                .body("""{"errorId":"error-id","message":"$message"}""")
+                .build(),
+        )
+    }
+
     private fun assertVedleggJson(
         requestBody: String,
         klageId: String?,
@@ -101,6 +122,23 @@ class FiksClientTest {
             assertEquals("/digisos/klage/api/v1/$fiksDigisosId/$navEksternRefId/$klageId/vedlegg", request.target)
             assertTrue(request.headers["Content-Type"]!!.startsWith("multipart/form-data"))
             assertVedleggJson(request.body!!.utf8(), klageId.toString())
+        }
+
+    @Test
+    fun `maps Fiks 'allerede påbegynt' to SubmitInProgressException`() =
+        runTest {
+            enqueueTokenAndBadRequest("Mottak av søknad med navExternRefId ref-0001 er allerede påbegynt")
+
+            assertFailsWith<SubmitInProgressException> {
+                fiksClient.uploadEttersendelse(
+                    UUID.randomUUID().toString(),
+                    "ref-0001",
+                    EttersendelseMottaker.Soknad("0301"),
+                    Metadata("dok", "info"),
+                    "user-token",
+                    listOf(Fil("vedlegg.pdf", "checksum")),
+                )
+            }
         }
 
     @Test

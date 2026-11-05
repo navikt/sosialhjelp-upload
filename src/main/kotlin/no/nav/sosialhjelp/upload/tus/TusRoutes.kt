@@ -12,6 +12,7 @@ import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
+import no.nav.sosialhjelp.upload.tus.TusUploadQueries.UploadNotAcceptingChunksException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.MellomlagringDeleteException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
 
@@ -116,6 +117,7 @@ private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) 
         }.getOrElse { e ->
             when (e) {
                 is OffsetMismatchException -> return call.respond(HttpStatusCode.Conflict)
+                is UploadNotAcceptingChunksException -> return call.respond(HttpStatusCode.Gone)
                 else -> {
                     call.application.environment.log
                         .error("Error appending chunk to upload $uploadId", e)

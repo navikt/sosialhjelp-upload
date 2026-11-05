@@ -148,7 +148,9 @@ Tjenesten kjører periodiske oppryddingsjobber:
 
 | Jobb | Timeout | Handling |
 |------|---------|----------|
-| **Stuck uploads** | 3 minutter | Opplastinger som står i `PENDING` eller `PROCESSING` i mer enn 3 minutter markeres som `FAILED`. Brukeren kan deretter forkaste dem selv via UI. |
+| **Behandling** | 150 sekunder | Ferdig opplastede filer venter i `PENDING` og behandles én gang av en worker. Ved feil kan brukeren laste opp filen på nytt. |
+| **Stuck uploads** | 3 minutter | Ufullstendige opplastinger i `PENDING` og opplastinger som står i `PROCESSING` i mer enn 3 minutter markeres som `FAILED`. Brukeren kan deretter forkaste dem selv via UI. |
+| **Innsendte submissions** | 7 dager | Raden beholdes uten filer etter innsending, slik at neste `navEksternRefId` på saken ikke gjenbruker referansen. |
 | **Stale submissions** | 1 time | Submissions som ikke har blitt sendt inn og ikke har hatt aktivitet på 1 time slettes automatisk, inkludert tilhørende filer i GCS og mellomlagring. |
 
 GCS-bucketen har i tillegg en lifecycle-regel som sletter objekter etter 1 dag som siste sikkerhetsnett.
