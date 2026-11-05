@@ -55,7 +55,7 @@ fun Route.configureStatusRoutes() {
 <span class="fc" id="L55">                .getSubmissionFlow(submissionId)</span>
 <span class="pc bpc" id="L56" title="2 of 4 branches missed.">                .onEach {</span>
 <span class="fc bfc" id="L57" title="All 2 branches covered.">                    if (it == SubmissionUpdateNotification.UpdateType.UPDATE) {</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                        send(submissionService.getSubmissionStatus(submissionId))</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                        send(submissionService.getSubmissionStatus(submissionId))</span>
                     }
 <span class="pc bpc" id="L60" title="2 of 6 branches missed.">                }.first { it == SubmissionUpdateNotification.UpdateType.DELETE }</span>
 <span class="nc" id="L61">        } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {</span>
