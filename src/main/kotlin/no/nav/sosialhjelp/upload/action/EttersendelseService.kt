@@ -65,6 +65,14 @@ class EttersendelseService(
                     ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
                 }
             }
+        val hasDirectUploads =
+            withContext(ioDispatcher) {
+                dsl.fetchOne(
+                    "SELECT 1 FROM direct_upload_transfer WHERE nav_ekstern_ref_id = ? LIMIT 1",
+                    navEksternRefId,
+                ) != null
+            }
+        check(!hasDirectUploads) { "Direct uploads cannot be submitted through the legacy submission path" }
         return withMdc("navEksternRefId" to navEksternRefId) {
             val uploads =
                 withContext(ioDispatcher) {

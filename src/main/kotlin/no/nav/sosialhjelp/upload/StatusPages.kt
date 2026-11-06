@@ -8,12 +8,16 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
 import io.ktor.utils.io.ClosedWriteChannelException
+import no.nav.sosialhjelp.upload.direct.DirectFiksUnavailable
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
+        exception<DirectFiksUnavailable> { call, _ ->
+            call.respondText("Fiks unavailable", status = HttpStatusCode.BadGateway)
+        }
         exception<ChannelWriteException> { call, _ ->
             // Client disconnected (tab closed, navigated away, network drop) — normal for SSE
             this@configureStatusPages.environment.log.debug("Client disconnected from ${call.request.uri}")

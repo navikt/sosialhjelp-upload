@@ -38,6 +38,14 @@ class VedleggService(
         )
 
     suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
+        val hasDirectUploads =
+            withContext(ioDispatcher) {
+                dsl.fetchOne(
+                    "SELECT 1 FROM direct_upload_transfer WHERE nav_ekstern_ref_id = ? LIMIT 1",
+                    navEksternRefId,
+                ) != null
+            }
+        check(!hasDirectUploads) { "Direct uploads cannot be submitted through the legacy metadata path" }
         val uploads =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->

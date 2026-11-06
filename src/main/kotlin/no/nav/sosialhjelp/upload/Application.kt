@@ -26,6 +26,8 @@ import no.nav.sosialhjelp.upload.action.kryptering.EncryptionServiceMock
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import no.nav.sosialhjelp.upload.direct.DirectUploadRepository
+import no.nav.sosialhjelp.upload.direct.DirectUploadService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.SubmissionService
 import no.nav.sosialhjelp.upload.texas.TexasClient
@@ -168,6 +170,8 @@ private fun Application.configureDependencies(
         provide(UploadValidator::class)
         provide(FiksClient::class)
         provide(MellomlagringClient::class)
+        provide(DirectUploadRepository::class)
+        provide(DirectUploadService::class)
         provide(UploadRepository::class)
         provide(SubmissionQueries::class)
         provide(no.nav.sosialhjelp.upload.tus.TusSubmissionQueries::class)

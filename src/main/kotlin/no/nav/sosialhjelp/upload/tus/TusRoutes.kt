@@ -10,6 +10,9 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.MellomlagringDeleteException
@@ -113,6 +116,10 @@ private suspend fun RoutingContext.tusPatch(tusUploadService: TusUploadService) 
     val newOffset =
         runCatching {
             tusUploadService.appendChunk(uploadId, uploadOffset, data)
+        }.onFailure {
+            if (it is CancellationException) {
+                currentCoroutineContext().ensureActive()
+            }
         }.getOrElse { e ->
             when (e) {
                 is OffsetMismatchException -> return call.respond(HttpStatusCode.Conflict)
