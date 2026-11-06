@@ -1,4 +1,6 @@
 runtimeEnv: ${RUNTIME_ENV:local}
+directUpload:
+  enabled: "$DIRECT_UPLOAD_ENABLED:false"
 ktor:
   application:
     modules:

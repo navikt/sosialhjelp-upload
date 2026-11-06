@@ -85,4 +85,6 @@ spec:
       value: "https://sosiauth2.ekstern.dev.nav.no/tokenx"
     - name: TOKEN_X_CLIENT_ID
       value: "dev-gcp:teamdigisos:sosialhjelp-upload-mock"
+    - name: DIRECT_UPLOAD_ENABLED
+      value: "true"
 

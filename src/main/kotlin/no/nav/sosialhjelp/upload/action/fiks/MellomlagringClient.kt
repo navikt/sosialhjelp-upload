@@ -99,6 +99,21 @@ class MellomlagringClient(
         filename: String,
         contentType: String,
         data: ByteArray,
+    ): UUID = uploadFileInternal(navEksternRefId, filename, contentType, data, matchFilename = false)
+
+    suspend fun uploadFileMatchingReceipt(
+        navEksternRefId: String,
+        filename: String,
+        contentType: String,
+        data: ByteArray,
+    ): UUID = uploadFileInternal(navEksternRefId, filename, contentType, data, matchFilename = true)
+
+    private suspend fun uploadFileInternal(
+        navEksternRefId: String,
+        filename: String,
+        contentType: String,
+        data: ByteArray,
+        matchFilename: Boolean,
     ): UUID =
         measureTimedValue {
             val metadataPart =
@@ -138,14 +153,24 @@ class MellomlagringClient(
                     bearerAuth(texasClient.getMaskinportenToken())
                 }
 
+            if (matchFilename && response.status == HttpStatusCode.Conflict) {
+                throw DuplicateMellomlagringFilenameException()
+            }
             check(response.status.isSuccess()) {
                 "Mellomlagring upload failed: ${response.status}. Body: ${response.bodyAsText()}"
             }
 
             val mellomlagring = response.body<MellomlagringResponse>()
             mellomlagring.mellomlagringMetadataList
-                .firstOrNull()
-                ?.filId
+                .let { files ->
+                    if (matchFilename) {
+                        files
+                            .singleOrNull { it.filnavn == filename }
+                            ?.takeIf { it.storrelse == data.size.toLong() && it.mimetype == contentType }
+                    } else {
+                        files.firstOrNull()
+                    }
+                }?.filId
                 ?.let { UUID.fromString(it) }
                 ?: error("No filId returned from mellomlagring for upload to $navEksternRefId")
         }.also {
@@ -214,6 +239,8 @@ class MellomlagringClient(
         }
     }
 }
+
+class DuplicateMellomlagringFilenameException : RuntimeException()
 
 @Serializable
 private data class MellomlagringMetadata(
