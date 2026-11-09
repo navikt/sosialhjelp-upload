@@ -14,7 +14,6 @@ import no.nav.sosialhjelp.upload.action.fiks.Fil
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.action.kryptering.EncryptionService
 import no.nav.sosialhjelp.upload.common.CpuDispatcher
-import no.nav.sosialhjelp.upload.common.teamLogger
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
@@ -22,6 +21,7 @@ import no.nav.sosialhjelp.upload.pdf.EttersendelsePdfGenerator
 import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfGenerationException
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
+import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
@@ -45,7 +45,6 @@ class EttersendelseService(
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
-    private val teamLogger = teamLogger(this::class)
 
     suspend fun upload(
         metadata: Metadata,
@@ -74,7 +73,7 @@ class EttersendelseService(
             val violations = validateSubmissionUploads(uploads)
             if (violations.isNotEmpty()) throw SubmissionValidationException(violations)
 
-            generateAndUploadPdf(metadata, uploads, navEksternRefId, personIdent)
+            generateAndUploadPdf(metadata, uploads, navEksternRefId, personIdent, mottaker)
 
             val filer = buildFilerList(uploads)
 
@@ -92,9 +91,10 @@ class EttersendelseService(
 
     private suspend fun generateAndUploadPdf(
         metadata: Metadata,
-        uploads: List<no.nav.sosialhjelp.upload.upload.Upload>,
+        uploads: List<Upload>,
         navEksternRefId: String,
         personIdent: String,
+        mottaker: EttersendelseMottaker,
     ) {
         val ettersendelsePdf =
             withContext(cpuDispatcher) {
@@ -108,15 +108,15 @@ class EttersendelseService(
                         },
                     )
                 try {
-                    EttersendelsePdfGenerator.generate(pdfMetadata, personIdent)
+                    EttersendelsePdfGenerator.generate(pdfMetadata, personIdent, mottaker)
                 } catch (e: PdfGenerationException) {
                     logger.error("PDF generation failed, retrying with degraded filenames", e)
                     meterRegistry.counter("pdf.degraded_fallback").increment()
                     val degraded =
                         pdfMetadata.copy(
-                            filer = pdfMetadata.filer.mapIndexed { idx, _ -> PdfFil("Vedlegg ${idx + 1}") },
+                            filer = List(pdfMetadata.filer.size) { idx -> PdfFil("Vedlegg ${idx + 1}") },
                         )
-                    EttersendelsePdfGenerator.generate(degraded, personIdent)
+                    EttersendelsePdfGenerator.generate(degraded, personIdent, mottaker)
                 }
             }
         mellomlagringClient.replaceFile(
@@ -127,7 +127,7 @@ class EttersendelseService(
         )
     }
 
-    private fun buildFilerList(uploads: List<no.nav.sosialhjelp.upload.upload.Upload>): List<Fil> =
+    private fun buildFilerList(uploads: List<Upload>): List<Fil> =
         uploads.mapNotNull { upload ->
             if (upload.mellomlagringFilnavn == null || upload.sha512 == null) return@mapNotNull null
             Fil(upload.mellomlagringFilnavn, upload.sha512)

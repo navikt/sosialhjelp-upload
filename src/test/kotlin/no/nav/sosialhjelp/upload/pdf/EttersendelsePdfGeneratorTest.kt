@@ -12,6 +12,7 @@ class EttersendelsePdfGeneratorTest {
         EttersendelsePdfGenerator.generate(
             PdfMetadata(type = type, filer = filenames.map { PdfFil(it) }),
             fodselsnummer = "12345678901",
+            mottaker,
         )
 
     @Test

@@ -2,6 +2,7 @@
 
 package no.nav.sosialhjelp.upload.pdf
 
+import no.nav.sosialhjelp.upload.action.fiks.EttersendelseMottaker
 import org.apache.pdfbox.pdmodel.PDDocument
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -20,13 +21,19 @@ object EttersendelsePdfGenerator {
     fun generate(
         metadata: PdfMetadata,
         fodselsnummer: String,
+        mottaker: EttersendelseMottaker,
     ): ByteArray =
         try {
             PDDocument().use { document ->
                 val pdf = PdfGenerator(document)
 
                 pdf.addCenteredH1Bold("Ettersendelse av vedlegg")
-                pdf.addCenteredH1Bold("Søknad om økonomisk sosialhjelp")
+                if (mottaker is EttersendelseMottaker.Klage) {
+                    pdf.addCenteredH1Bold("Klage på søknad om økonomisk sosialhjelp")
+                } else {
+                    pdf.addCenteredH1Bold("Søknad om økonomisk sosialhjelp")
+                }
+
                 pdf.addBlankLine()
                 pdf.addSmallDividerLine()
                 pdf.addBlankLine()
