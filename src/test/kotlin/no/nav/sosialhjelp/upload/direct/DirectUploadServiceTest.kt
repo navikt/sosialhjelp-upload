@@ -31,7 +31,7 @@ class DirectUploadServiceTest {
             null,
             "reference",
             "document.pdf",
-            "upload-$operationId.pdf",
+            "upload-${UUID.randomUUID()}.pdf",
             "application/pdf",
             100,
             150,
@@ -42,13 +42,11 @@ class DirectUploadServiceTest {
         )
 
     @Test
-    fun `status resolves a lost receipt using Fiks metadata`() =
+    fun `status finds a remotely stored file from committed metadata`() =
         runTest {
             every { repository.find(operationId, owner) } returns transfer
             coEvery { fiks.listFiles("reference") } returns
                 listOf(MellomlagringFilInfo(transfer.remoteFilename, filId.toString(), 150, "application/pdf"))
-            every { repository.confirm(operationId, owner, filId) } returns true
-
             val result = service.status(operationId, owner, "test-client")
 
             assertEquals("READY", result?.status)
@@ -66,7 +64,7 @@ class DirectUploadServiceTest {
         }
 
     @Test
-    fun `listing includes only owned records still present at Fiks`() =
+    fun `listing rejects remotely stored files without metadata`() =
         runTest {
             val present = transfer.copy(filId = filId)
             val missing = transfer.copy(operationId = UUID.randomUUID(), filId = UUID.randomUUID())
@@ -77,10 +75,27 @@ class DirectUploadServiceTest {
                     MellomlagringFilInfo("other.pdf", UUID.randomUUID().toString(), 10, "application/pdf"),
                 )
 
+            assertFailsWith<DirectInconsistent> { service.list("reference", owner, "test-client") }
+        }
+
+    @Test
+    fun `listing ignores orphan metadata and reflects remote deletion`() =
+        runTest {
+            val orphan =
+                transfer.copy(
+                    operationId = UUID.randomUUID(),
+                    remoteFilename = "other-${UUID.randomUUID()}.pdf",
+                )
+            every { repository.list("reference", owner) } returns listOf(transfer, orphan)
+            coEvery { fiks.listFiles("reference") } returns
+                listOf(MellomlagringFilInfo(transfer.remoteFilename, filId.toString(), 150, "application/pdf"))
+
             assertEquals(
                 listOf(operationId.toString()),
                 service.list("reference", owner, "test-client").map { it.operationId },
             )
+            coEvery { fiks.listFiles("reference") } returns emptyList()
+            assertEquals(emptyList(), service.list("reference", owner, "test-client"))
         }
 
     @Test
@@ -111,6 +126,16 @@ class DirectUploadServiceTest {
         }
 
     @Test
+    fun `remote metadata mismatch is not presented as an uploaded file`() =
+        runTest {
+            every { repository.list("reference", owner) } returns listOf(transfer)
+            coEvery { fiks.listFiles("reference") } returns
+                listOf(MellomlagringFilInfo(transfer.remoteFilename, filId.toString(), 151, "application/pdf"))
+
+            assertFailsWith<DirectInconsistent> { service.list("reference", owner, "test-client") }
+        }
+
+    @Test
     fun `multiple filename matches remain unresolved`() =
         runTest {
             every { repository.find(operationId, owner) } returns transfer
@@ -120,21 +145,11 @@ class DirectUploadServiceTest {
                     MellomlagringFilInfo(transfer.remoteFilename, UUID.randomUUID().toString(), 100, "application/pdf"),
                 )
 
-            assertEquals("UNKNOWN", service.status(operationId, owner, "test-client")?.status)
+            assertFailsWith<DirectInconsistent> { service.status(operationId, owner, "test-client") }
         }
 
     @Test
-    fun `download refuses a stale receipt when Fiks no longer lists it`() =
-        runTest {
-            every { repository.find(operationId, owner) } returns transfer.copy(filId = filId)
-            coEvery { fiks.listFiles("reference") } returns emptyList()
-
-            assertNull(service.download(operationId, owner, "test-client"))
-            coVerify(exactly = 0) { fiks.getFile(any(), any()) }
-        }
-
-    @Test
-    fun `confirmed receipt is not rebound to a different Fiks file`() =
+    fun `listing uses the currently listed Fiks identifier`() =
         runTest {
             every { repository.find(operationId, owner) } returns transfer.copy(filId = filId)
             coEvery { fiks.listFiles("reference") } returns
@@ -142,6 +157,6 @@ class DirectUploadServiceTest {
                     MellomlagringFilInfo(transfer.remoteFilename, UUID.randomUUID().toString(), 150, "application/pdf"),
                 )
 
-            assertEquals("MISSING", service.status(operationId, owner, "test-client")?.status)
+            assertEquals("READY", service.status(operationId, owner, "test-client")?.status)
         }
 }

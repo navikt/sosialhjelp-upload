@@ -157,7 +157,7 @@ open class Upload(
     /**
      * Create an aliased <code>public.upload</code> table reference
      */
-    constructor(alias: Name): this(alias, null)
+    constructor(alias: Name): this(alias, UPLOAD)
 
     /**
      * Create a <code>public.upload</code> table reference

@@ -51,9 +51,6 @@ class DirectUploadRepositoryIntegrationTest {
         assertEquals(transfer, repository.find(transfer.operationId, owner))
         assertNull(repository.find(transfer.operationId, "22222222222"))
 
-        val fileId = UUID.randomUUID()
-        assertTrue(repository.confirm(transfer.operationId, owner, fileId))
-        assertFalse(repository.confirm(transfer.operationId, owner, UUID.randomUUID()))
-        assertEquals(fileId, repository.find(transfer.operationId, owner)?.filId)
+        assertNull(repository.find(transfer.operationId, owner)?.filId)
     }
 }

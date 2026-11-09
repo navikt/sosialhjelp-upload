@@ -3,18 +3,34 @@ package no.nav.sosialhjelp.upload
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.httpMethod
 import io.ktor.server.request.uri
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
 import io.ktor.utils.io.ClosedWriteChannelException
 import no.nav.sosialhjelp.upload.direct.DirectFiksUnavailable
+import no.nav.sosialhjelp.upload.direct.DirectInconsistent
+import no.nav.sosialhjelp.upload.direct.DirectUploadConflict
+import no.nav.sosialhjelp.upload.direct.DirectUploadInvalid
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
+        exception<DirectUploadConflict> { call, cause ->
+            this@configureStatusPages.environment.log.warn(
+                "Direct upload conflict on ${call.request.httpMethod.value} ${call.request.uri}: ${cause.reason}",
+            )
+            call.respond(HttpStatusCode.Conflict)
+        }
+        exception<DirectInconsistent> { call, _ ->
+            call.respond(HttpStatusCode.Conflict, "Mellomlagring metadata mismatch")
+        }
+        exception<DirectUploadInvalid> { call, _ ->
+            call.respond(HttpStatusCode.BadRequest)
+        }
         exception<DirectFiksUnavailable> { call, _ ->
             call.respondText("Fiks unavailable", status = HttpStatusCode.BadGateway)
         }
