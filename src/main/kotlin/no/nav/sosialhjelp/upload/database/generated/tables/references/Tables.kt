@@ -5,11 +5,23 @@
 package no.nav.sosialhjelp.upload.database.generated.tables.references
 
 
+import no.nav.sosialhjelp.upload.database.generated.tables.DirectSubmissionLifecycle
+import no.nav.sosialhjelp.upload.database.generated.tables.DirectUploadTransfer
 import no.nav.sosialhjelp.upload.database.generated.tables.Error
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
 
 
+
+/**
+ * The table <code>public.direct_submission_lifecycle</code>.
+ */
+val DIRECT_SUBMISSION_LIFECYCLE: DirectSubmissionLifecycle = DirectSubmissionLifecycle.DIRECT_SUBMISSION_LIFECYCLE
+
+/**
+ * The table <code>public.direct_upload_transfer</code>.
+ */
+val DIRECT_UPLOAD_TRANSFER: DirectUploadTransfer = DirectUploadTransfer.DIRECT_UPLOAD_TRANSFER
 
 /**
  * The table <code>public.error</code>.

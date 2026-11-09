@@ -6,6 +6,8 @@ package no.nav.sosialhjelp.upload.database.generated
 
 import kotlin.collections.List
 
+import no.nav.sosialhjelp.upload.database.generated.tables.DirectSubmissionLifecycle
+import no.nav.sosialhjelp.upload.database.generated.tables.DirectUploadTransfer
 import no.nav.sosialhjelp.upload.database.generated.tables.Error
 import no.nav.sosialhjelp.upload.database.generated.tables.Submission
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload
@@ -29,6 +31,16 @@ open class Public : SchemaImpl(DSL.name("public"), null, DSL.comment("standard p
     }
 
     /**
+     * The table <code>public.direct_submission_lifecycle</code>.
+     */
+    val DIRECT_SUBMISSION_LIFECYCLE: DirectSubmissionLifecycle get() = DirectSubmissionLifecycle.DIRECT_SUBMISSION_LIFECYCLE
+
+    /**
+     * The table <code>public.direct_upload_transfer</code>.
+     */
+    val DIRECT_UPLOAD_TRANSFER: DirectUploadTransfer get() = DirectUploadTransfer.DIRECT_UPLOAD_TRANSFER
+
+    /**
      * The table <code>public.error</code>.
      */
     val ERROR: Error get() = Error.ERROR
@@ -44,6 +56,8 @@ open class Public : SchemaImpl(DSL.name("public"), null, DSL.comment("standard p
     val UPLOAD: Upload get() = Upload.UPLOAD
 
     override fun getTables(): List<Table<*>> = listOf(
+        DirectSubmissionLifecycle.DIRECT_SUBMISSION_LIFECYCLE,
+        DirectUploadTransfer.DIRECT_UPLOAD_TRANSFER,
         Error.ERROR,
         Submission.SUBMISSION,
         Upload.UPLOAD

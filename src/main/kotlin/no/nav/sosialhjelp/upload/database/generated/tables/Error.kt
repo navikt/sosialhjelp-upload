@@ -96,7 +96,7 @@ open class Error(
     /**
      * Create an aliased <code>public.error</code> table reference
      */
-    constructor(alias: Name): this(alias, null)
+    constructor(alias: Name): this(alias, ERROR)
 
     /**
      * Create a <code>public.error</code> table reference

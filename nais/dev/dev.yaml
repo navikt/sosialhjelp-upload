@@ -89,3 +89,5 @@ spec:
       value: "dev"
     - name: GCS_BUCKET_NAME
       value: "sosialhjelp-upload-dev"
+    - name: DIRECT_UPLOAD_ENABLED
+      value: "true"

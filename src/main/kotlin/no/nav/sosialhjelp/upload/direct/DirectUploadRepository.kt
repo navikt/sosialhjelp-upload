@@ -67,6 +67,17 @@ class DirectUploadRepository(
                 owner,
             )?.let(::mapTransfer)
 
+    fun findForDeletion(
+        operationId: UUID,
+        owner: String,
+    ): DirectTransfer? =
+        dsl
+            .fetchOne(
+                "SELECT * FROM direct_upload_transfer WHERE operation_id = ? AND owner_ident = ?",
+                operationId,
+                owner,
+            )?.let(::mapTransfer)
+
     fun list(
         reference: String,
         owner: String,
@@ -79,19 +90,26 @@ class DirectUploadRepository(
                 owner,
             ).map(::mapTransfer)
 
-    fun confirm(
-        operationId: UUID,
+    fun listBySubmission(
+        submissionId: UUID,
         owner: String,
-        filId: UUID,
+    ): List<DirectTransfer> =
+        dsl
+            .fetch(
+                "SELECT * FROM direct_upload_transfer WHERE submission_id = ? AND owner_ident = ? ORDER BY created_at",
+                submissionId,
+                owner,
+            ).map(::mapTransfer)
+
+    fun ownsReference(
+        reference: String,
+        owner: String,
     ): Boolean =
-        dsl.execute(
-            """UPDATE direct_upload_transfer SET fil_id = ?, updated_at = now()
-               WHERE operation_id = ? AND owner_ident = ? AND (fil_id IS NULL OR fil_id = ?)""",
-            filId,
-            operationId,
+        dsl.fetchOne(
+            "SELECT 1 FROM submission WHERE nav_ekstern_ref_id = ? AND owner_ident = ? AND fiks_digisos_id IS NOT NULL",
+            reference,
             owner,
-            filId,
-        ) == 1
+        ) != null
 
     private fun mapTransfer(record: org.jooq.Record) =
         DirectTransfer(

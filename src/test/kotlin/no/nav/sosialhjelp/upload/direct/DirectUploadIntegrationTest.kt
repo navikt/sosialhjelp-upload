@@ -61,9 +61,16 @@ class DirectUploadIntegrationTest {
     )
 
     @Test
-    fun `intent is committed before upload and receipt can be recovered`() =
+    fun `metadata is committed before upload and remote listing recovers lost receipt`() =
         runTest {
-            val input = input()
+            val caseId = UUID.randomUUID().toString()
+            val input = input(fiksId = caseId, reference = null)
+            val case = mockk<no.nav.sosialhjelp.api.fiks.DigisosSak>()
+            every { case.sokerFnr } returns owner
+            every { case.ettersendtInfoNAV } returns null
+            every { case.originalSoknadNAV } returns null
+            every { case.fiksDigisosId } returns caseId
+            coEvery { fiks.getSak(caseId, any()) } returns case
             val fileId = UUID.randomUUID()
             coEvery { storage.uploadFileMatchingReceipt(any(), any(), any(), any()) } coAnswers {
                 val intent = assertNotNull(repository.find(input.operationId, owner))
@@ -79,7 +86,7 @@ class DirectUploadIntegrationTest {
 
             val recovered = service.upload(input, owner, "token")
             assertEquals("READY", recovered.status)
-            assertEquals(fileId, repository.find(input.operationId, owner)?.filId)
+            assertEquals(null, repository.find(input.operationId, owner)?.filId)
             coVerify(exactly = 1) { storage.uploadFileMatchingReceipt(any(), any(), any(), any()) }
         }
 
@@ -88,8 +95,13 @@ class DirectUploadIntegrationTest {
         runTest {
             val fiksId = UUID.randomUUID().toString()
             val input = input(fiksId = fiksId, reference = null)
-            val reference = "reference0001"
-            coEvery { fiks.getNewNavEksternRefId(fiksId, any(), any()) } returns reference
+            val reference = "${fiksId}0001"
+            val case = mockk<no.nav.sosialhjelp.api.fiks.DigisosSak>()
+            every { case.sokerFnr } returns owner
+            every { case.ettersendtInfoNAV } returns null
+            every { case.originalSoknadNAV } returns null
+            every { case.fiksDigisosId } returns fiksId
+            coEvery { fiks.getSak(fiksId, any()) } returns case
             coEvery { storage.uploadFileMatchingReceipt(reference, any(), any(), any()) } returns UUID.randomUUID()
 
             val result = service.upload(input, owner, "token")

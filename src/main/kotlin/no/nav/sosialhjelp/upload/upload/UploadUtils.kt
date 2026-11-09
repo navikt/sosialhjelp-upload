@@ -25,10 +25,11 @@ fun getSha512(data: ByteArray): String {
 internal fun makeUniqueMellomlagringFilename(
     filename: String,
     uploadId: UUID,
+    fullUuid: Boolean = false,
 ): String {
     val file = File(filename)
     val extension = file.extension
     val baseName = file.nameWithoutExtension.take(50)
-    val uuidSuffix = uploadId.toString().substringBefore('-')
+    val uuidSuffix = if (fullUuid) uploadId.toString() else uploadId.toString().substringBefore('-')
     return if (extension.isNotEmpty()) "$baseName-$uuidSuffix.$extension" else "$baseName-$uuidSuffix"
 }
