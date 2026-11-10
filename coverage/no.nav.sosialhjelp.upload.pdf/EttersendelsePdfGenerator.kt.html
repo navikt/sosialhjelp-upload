@@ -2,61 +2,68 @@
 
 package no.nav.sosialhjelp.upload.pdf
 
+import no.nav.sosialhjelp.upload.action.fiks.EttersendelseMottaker
 import org.apache.pdfbox.pdmodel.PDDocument
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-<span class="fc" id="L10">data class PdfFil(</span>
-<span class="fc" id="L11">    val filnavn: String,</span>
+<span class="fc" id="L11">data class PdfFil(</span>
+<span class="fc" id="L12">    val filnavn: String,</span>
 )
 
-<span class="fc" id="L14">data class PdfMetadata(</span>
-<span class="fc" id="L15">    val type: String,</span>
-<span class="fc" id="L16">    val filer: List&lt;PdfFil&gt;,</span>
+<span class="fc" id="L15">data class PdfMetadata(</span>
+<span class="fc" id="L16">    val type: String,</span>
+<span class="fc" id="L17">    val filer: List&lt;PdfFil&gt;,</span>
 )
 
 object EttersendelsePdfGenerator {
     fun generate(
         metadata: PdfMetadata,
         fodselsnummer: String,
+        mottaker: EttersendelseMottaker,
     ): ByteArray =
-<span class="fc" id="L24">        try {</span>
-<span class="pc" id="L25">            PDDocument().use { document -&gt;</span>
-<span class="fc" id="L26">                val pdf = PdfGenerator(document)</span>
+<span class="fc" id="L26">        try {</span>
+<span class="pc" id="L27">            PDDocument().use { document -&gt;</span>
+<span class="fc" id="L28">                val pdf = PdfGenerator(document)</span>
 
-<span class="fc" id="L28">                pdf.addCenteredH1Bold(&quot;Ettersendelse av vedlegg&quot;)</span>
-<span class="fc" id="L29">                pdf.addCenteredH1Bold(&quot;Søknad om økonomisk sosialhjelp&quot;)</span>
-<span class="fc" id="L30">                pdf.addBlankLine()</span>
-<span class="fc" id="L31">                pdf.addSmallDividerLine()</span>
-<span class="fc" id="L32">                pdf.addBlankLine()</span>
-<span class="fc" id="L33">                pdf.addCenteredH4Bold(fodselsnummer)</span>
-<span class="fc" id="L34">                pdf.addSmallDividerLine()</span>
+<span class="fc" id="L30">                pdf.addCenteredH1Bold(&quot;Ettersendelse av vedlegg&quot;)</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">                if (mottaker is EttersendelseMottaker.Klage) {</span>
+<span class="fc" id="L32">                    pdf.addCenteredH1Bold(&quot;Klage på søknad om økonomisk sosialhjelp&quot;)</span>
+                } else {
+<span class="fc" id="L34">                    pdf.addCenteredH1Bold(&quot;Søknad om økonomisk sosialhjelp&quot;)</span>
+                }
 
-<span class="fc" id="L36">                pdf.addBlankLine()</span>
+<span class="fc" id="L37">                pdf.addBlankLine()</span>
+<span class="fc" id="L38">                pdf.addSmallDividerLine()</span>
+<span class="fc" id="L39">                pdf.addBlankLine()</span>
+<span class="fc" id="L40">                pdf.addCenteredH4Bold(fodselsnummer)</span>
+<span class="fc" id="L41">                pdf.addSmallDividerLine()</span>
 
-<span class="fc" id="L38">                pdf.addText(&quot;Følgende vedlegg er sendt &quot; + formatLocalDateTime(LocalDateTime.now()))</span>
+<span class="fc" id="L43">                pdf.addBlankLine()</span>
 
-<span class="fc" id="L40">                pdf.addBlankLine()</span>
-<span class="fc" id="L41">                pdf.addText(&quot;Type: &quot; + metadata.type)</span>
-<span class="fc" id="L42">                metadata.filer.forEach { fil -&gt;</span>
-<span class="fc" id="L43">                    pdf.addText(&quot;Filnavn: &quot; + fil.filnavn)</span>
-<span class="fc" id="L44">                }</span>
+<span class="fc" id="L45">                pdf.addText(&quot;Følgende vedlegg er sendt &quot; + formatLocalDateTime(LocalDateTime.now()))</span>
 
-<span class="fc" id="L46">                pdf.finish()</span>
+<span class="fc" id="L47">                pdf.addBlankLine()</span>
+<span class="fc" id="L48">                pdf.addText(&quot;Type: &quot; + metadata.type)</span>
+<span class="fc" id="L49">                metadata.filer.forEach { fil -&gt;</span>
+<span class="fc" id="L50">                    pdf.addText(&quot;Filnavn: &quot; + fil.filnavn)</span>
+<span class="fc" id="L51">                }</span>
+
+<span class="fc" id="L53">                pdf.finish()</span>
             }
-<span class="nc" id="L48">        } catch (e: Exception) {</span>
-<span class="pc" id="L49">            throw PdfGenerationException(&quot;Error while creating pdf&quot;, e)</span>
-<span class="fc" id="L50">        }</span>
+<span class="nc" id="L55">        } catch (e: Exception) {</span>
+<span class="pc" id="L56">            throw PdfGenerationException(&quot;Error while creating pdf&quot;, e)</span>
+<span class="fc" id="L57">        }</span>
 }
 
 fun formatLocalDateTime(dato: LocalDateTime): String {
-<span class="fc" id="L54">    val datoFormatter = DateTimeFormatter.ofPattern(&quot;d. MMMM yyyy 'kl.' HH.mm&quot;, Locale.forLanguageTag(&quot;nb&quot;))</span>
-<span class="fc" id="L55">    return dato.format(datoFormatter)</span>
+<span class="fc" id="L61">    val datoFormatter = DateTimeFormatter.ofPattern(&quot;d. MMMM yyyy 'kl.' HH.mm&quot;, Locale.forLanguageTag(&quot;nb&quot;))</span>
+<span class="fc" id="L62">    return dato.format(datoFormatter)</span>
 }
 
-<span class="nc" id="L58">class PdfGenerationException(</span>
+<span class="nc" id="L65">class PdfGenerationException(</span>
     message: String,
     cause: Throwable,
-<span class="nc" id="L61">) : RuntimeException(message, cause)</span>
+<span class="nc" id="L68">) : RuntimeException(message, cause)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
