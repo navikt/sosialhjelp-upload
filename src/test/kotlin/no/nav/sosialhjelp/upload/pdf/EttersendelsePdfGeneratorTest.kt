@@ -1,5 +1,6 @@
 package no.nav.sosialhjelp.upload.pdf
 
+import no.nav.sosialhjelp.upload.action.fiks.EttersendelseMottaker
 import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -12,7 +13,7 @@ class EttersendelsePdfGeneratorTest {
         EttersendelsePdfGenerator.generate(
             PdfMetadata(type = type, filer = filenames.map { PdfFil(it) }),
             fodselsnummer = "12345678901",
-            mottaker,
+            EttersendelseMottaker.Soknad("1234"),
         )
 
     @Test
