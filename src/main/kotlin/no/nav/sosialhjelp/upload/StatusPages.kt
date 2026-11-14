@@ -8,6 +8,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
 import io.ktor.utils.io.ClosedWriteChannelException
+import no.nav.sosialhjelp.upload.action.KlageNotFoundException
+import no.nav.sosialhjelp.upload.action.fiks.FiksGetKlagerException
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
@@ -24,6 +26,13 @@ fun Application.configureStatusPages() {
         }
         exception<SubmissionValidationException> { call, cause ->
             call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))
+        }
+        exception<KlageNotFoundException> { call, _ ->
+            call.respond(HttpStatusCode.NotFound)
+        }
+        exception<FiksGetKlagerException> { call, _ ->
+            this@configureStatusPages.environment.log.error("Henting av klager fra Fiks feilet")
+            call.respond(HttpStatusCode.BadGateway)
         }
         exception<TusSubmissionQueries.SubmissionOwnedByAnotherUserException> { call, _ ->
             this@configureStatusPages.environment.log.warn("Submission owned by another user: ${call.request.uri}")

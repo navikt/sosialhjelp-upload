@@ -23,10 +23,12 @@ import no.nav.sosialhjelp.upload.pdf.PdfGenerationException
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
 import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationCode
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 import no.nav.sosialhjelp.upload.validation.validateSubmissionUploads
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
+import java.time.Clock
 import java.util.*
 import kotlin.time.measureTimedValue
 import kotlin.time.toJavaDuration
@@ -43,6 +45,7 @@ class EttersendelseService(
     private val encryptionService: EncryptionService,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -54,9 +57,8 @@ class EttersendelseService(
         personIdent: String,
         klageId: UUID? = null,
     ): Boolean {
-        // Klage-endepunktet trenger ikke kommunenummer, så vi henter bare saken for søknad.
         val mottaker =
-            klageId?.let { EttersendelseMottaker.Klage(it) }
+            klageId?.let { validateKlage(fiksDigisosId, it, token) }
                 ?: EttersendelseMottaker.Soknad(fiksClient.getSak(fiksDigisosId, token).kommunenummer)
         val navEksternRefId =
             withContext(ioDispatcher) {
@@ -87,6 +89,26 @@ class EttersendelseService(
                 submissionId,
             )
         }
+    }
+
+    private suspend fun validateKlage(
+        fiksDigisosId: String,
+        klageId: UUID,
+        token: String,
+    ): EttersendelseMottaker.Klage {
+        val klage =
+            fiksClient.getKlager(fiksDigisosId, token).firstOrNull {
+                it.klageId == klageId &&
+                    it.digisosId?.toString()?.equals(fiksDigisosId, ignoreCase = true) == true
+            } ?: throw KlageNotFoundException()
+        if (klage.trukket == true) {
+            throw SubmissionValidationException(listOf(SubmissionValidationCode.KLAGE_TRUKKET))
+        }
+        val sendt = klageSendtTidspunkt(klage)
+        if (sendt != null && klageFristUtlopt(sendt, clock.instant())) {
+            throw SubmissionValidationException(listOf(SubmissionValidationCode.KLAGE_ETTERSENDELSE_FRIST_UTLOPT))
+        }
+        return EttersendelseMottaker.Klage(klageId)
     }
 
     private suspend fun generateAndUploadPdf(

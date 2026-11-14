@@ -12,6 +12,8 @@ enum class SubmissionValidationCode {
     NO_FILES,
     TOO_MANY_FILES,
     TOTAL_SIZE_TOO_LARGE,
+    KLAGE_TRUKKET,
+    KLAGE_ETTERSENDELSE_FRIST_UTLOPT,
 }
 
 @Serializable

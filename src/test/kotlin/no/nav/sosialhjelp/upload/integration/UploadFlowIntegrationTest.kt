@@ -12,6 +12,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.prepareGet
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -55,7 +56,11 @@ import no.nav.sosialhjelp.api.fiks.DigisosSak
 import no.nav.sosialhjelp.upload.action.fiks.EttersendelseAlreadyExistsException
 import no.nav.sosialhjelp.upload.action.fiks.EttersendelseMottaker
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
+import no.nav.sosialhjelp.upload.action.fiks.FiksGetKlagerException
+import no.nav.sosialhjelp.upload.action.fiks.KlageNAV
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.action.fiks.SendtKvittering
+import no.nav.sosialhjelp.upload.action.fiks.SendtStatus
 import no.nav.sosialhjelp.upload.common.TestUtils.awaitUploadTerminal
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
@@ -73,6 +78,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayOutputStream
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Base64
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -417,7 +424,6 @@ class UploadFlowIntegrationTest {
     @Test
     fun `submit with klageId sends to klage mottaker without fetching sak`() =
         appTest {
-            val contextId = UUID.randomUUID().toString()
             val token = JwtTestUtils.issueToken()
             val fiksDigisosId = UUID.randomUUID().toString()
             val klageId = UUID.randomUUID()
@@ -426,20 +432,25 @@ class UploadFlowIntegrationTest {
             coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } returns
                 mockk<HttpResponse> { every { status } returns HttpStatusCode.OK }
 
-            val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
-            val uploadId = tusUpload(client, contextId, minimalPdf(), token)
-            awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
+            for (statuses in listOf(emptyList(), listOf(SendtStatus("SENDT", Instant.now().toEpochMilli())))) {
+                coEvery { fiksClient.getKlager(fiksDigisosId, token) } returns
+                    listOf(KlageNAV(klageId, UUID.fromString(fiksDigisosId), SendtKvittering(statuses)))
+                val contextId = UUID.randomUUID().toString()
+                val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+                val uploadId = tusUpload(client, contextId, minimalPdf(), token)
+                awaitUploadTerminal(PostgresTestContainer.dsl, uploadId)
 
-            val submitResp =
-                client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
-                    header("Authorization", "Bearer $token")
-                    contentType(ContentType.Application.Json)
-                    setBody(
-                        """{"fiksDigisosId":"$fiksDigisosId","klageId":"$klageId",""" +
-                            """"metadata":{"type":"dok","tilleggsinfo":"info"}}""",
-                    )
-                }
-            assertEquals(HttpStatusCode.Created, submitResp.status)
+                val submitResp =
+                    client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+                        header("Authorization", "Bearer $token")
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            """{"fiksDigisosId":"$fiksDigisosId","klageId":"$klageId",""" +
+                                """"metadata":{"type":"dok","tilleggsinfo":"info"}}""",
+                        )
+                    }
+                assertEquals(HttpStatusCode.Created, submitResp.status)
+            }
 
             coVerify(exactly = 0) { fiksClient.getSak(any(), any()) }
             coVerify {
@@ -452,6 +463,50 @@ class UploadFlowIntegrationTest {
                     any(),
                 )
             }
+        }
+
+    @Test
+    fun `submit rejects expired withdrawn missing or unavailable complaints before uploads`() =
+        appTest {
+            val contextId = UUID.randomUUID().toString()
+            val token = JwtTestUtils.issueToken()
+            val digisosId = UUID.randomUUID()
+            val klageId = UUID.randomUUID()
+            val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
+
+            suspend fun submit(): HttpResponse =
+                client.post("/sosialhjelp/upload/submission/$submissionId/submit") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"fiksDigisosId":"$digisosId","klageId":"$klageId",""" +
+                            """"metadata":{"type":"dok","tilleggsinfo":"info"}}""",
+                    )
+                }
+
+            val old = Instant.now().minus(30, ChronoUnit.DAYS).toEpochMilli()
+            coEvery { fiksClient.getKlager(digisosId.toString(), token) } returns
+                listOf(KlageNAV(klageId, digisosId, SendtKvittering(listOf(SendtStatus("SENDT", old)))))
+            val expired = submit()
+            assertEquals(HttpStatusCode.UnprocessableEntity, expired.status)
+            assertTrue(expired.bodyAsText().contains("KLAGE_ETTERSENDELSE_FRIST_UTLOPT"))
+
+            coEvery { fiksClient.getKlager(digisosId.toString(), token) } returns
+                listOf(KlageNAV(klageId, digisosId, trukket = true))
+            val withdrawn = submit()
+            assertEquals(HttpStatusCode.UnprocessableEntity, withdrawn.status)
+            assertTrue(withdrawn.bodyAsText().contains("KLAGE_TRUKKET"))
+
+            coEvery { fiksClient.getKlager(digisosId.toString(), token) } returns
+                listOf(KlageNAV(klageId, UUID.randomUUID()))
+            assertEquals(HttpStatusCode.NotFound, submit().status)
+            coEvery { fiksClient.getKlager(digisosId.toString(), token) } returns emptyList()
+            assertEquals(HttpStatusCode.NotFound, submit().status)
+
+            coEvery { fiksClient.getKlager(digisosId.toString(), token) } throws FiksGetKlagerException()
+            assertEquals(HttpStatusCode.BadGateway, submit().status)
+            coVerify(exactly = 0) { mellomlagringClient.uploadFile(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) }
         }
 
     @Test

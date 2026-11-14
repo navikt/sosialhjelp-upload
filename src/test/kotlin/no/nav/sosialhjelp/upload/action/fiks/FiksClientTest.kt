@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class FiksClientTest {
@@ -60,6 +61,51 @@ class FiksClientTest {
         )
         fiksServer.enqueue(MockResponse().newBuilder().code(HttpStatusCode.Created.value).build())
     }
+
+    @Test
+    fun `fetches complaints with user token and integration credentials`() =
+        runTest {
+            val digisosId = UUID.randomUUID()
+            val klageId = UUID.randomUUID()
+            fiksServer.enqueue(
+                MockResponse()
+                    .newBuilder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body(
+                        """[{"klageId":"$klageId","digisosId":"$digisosId","trukket":false,"ignored":true,""" +
+                            """"sendtKvittering":{"statusListe":[{"status":"SENDT","timestamp":123456789}]}}]""",
+                    ).build(),
+            )
+            val klage = fiksClient.getKlager(digisosId.toString(), "user-token").single()
+            assertEquals(klageId, klage.klageId)
+            assertEquals(digisosId, klage.digisosId)
+            assertEquals(
+                123456789L,
+                klage.sendtKvittering
+                    ?.statusListe
+                    ?.single()
+                    ?.timestamp,
+            )
+            val request = fiksServer.takeRequest()
+            assertEquals("/digisos/klage/api/v1/klager?digisosId=$digisosId", request.target)
+            assertEquals("Bearer user-token", request.headers["Authorization"])
+            assertEquals("integration-id", request.headers["IntegrasjonId"])
+            assertEquals("integration-password", request.headers["IntegrasjonPassord"])
+        }
+
+    @Test
+    fun `complaint lookup failure is reported as Fiks error`() =
+        runTest {
+            fiksServer.enqueue(
+                MockResponse()
+                    .newBuilder()
+                    .code(503)
+                    .body("unavailable")
+                    .build(),
+            )
+            assertFailsWith<FiksGetKlagerException> { fiksClient.getKlager(UUID.randomUUID().toString(), "user-token") }
+        }
 
     private fun assertVedleggJson(
         requestBody: String,

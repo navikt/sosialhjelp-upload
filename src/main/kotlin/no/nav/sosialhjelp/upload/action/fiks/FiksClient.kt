@@ -18,6 +18,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.jackson.jackson
 import io.ktor.server.plugins.di.annotations.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -225,6 +226,31 @@ class FiksClient(
         return response.body()
     }
 
+    suspend fun getKlager(
+        digisosId: String,
+        token: String,
+    ): List<KlageNAV> =
+        try {
+            val response =
+                client.get("$fiksBaseUrl/digisos/klage/api/v1/klager") {
+                    parameter("digisosId", digisosId)
+                    headers {
+                        integrasjonsid?.let { append("IntegrasjonId", it) }
+                        integrasjonspassord?.let { append("IntegrasjonPassord", it) }
+                    }
+                    accept(ContentType.Application.Json)
+                    bearerAuth(token)
+                }
+            if (!response.status.isSuccess()) throw FiksGetKlagerException()
+            response.body()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: FiksGetKlagerException) {
+            throw e
+        } catch (e: Exception) {
+            throw FiksGetKlagerException(e)
+        }
+
     suspend fun getNewNavEksternRefId(
         fiksDigisosId: String,
         token: String,
@@ -314,6 +340,10 @@ class FiksGetSakException(
         "Henting av DigisosSak $fiksDigisosId feilet: $status" +
             if (sanitizedError.isNotBlank()) " ($sanitizedError)" else "",
     )
+
+class FiksGetKlagerException(
+    cause: Throwable? = null,
+) : RuntimeException("Henting av klager fra Fiks feilet", cause)
 
 @Serializable
 data class Fil(
