@@ -7,12 +7,13 @@ import kotlin.test.assertTrue
 
 class KlageFristTest {
     @Test
-    fun `deadline includes whole Oslo day after 21 times 24 hours across daylight saving transitions`() {
+    fun `deadline includes whole Oslo day after 90 times 24 hours across daylight saving transitions`() {
         val cases =
             listOf(
-                "2026-03-01T13:00:00Z" to "2026-03-22T23:00:00Z",
-                "2026-03-15T22:30:00Z" to "2026-04-06T22:00:00Z",
-                "2026-10-11T21:30:00Z" to "2026-11-01T23:00:00Z",
+                "2026-03-01T13:00:00Z" to "2026-05-30T22:00:00Z",
+                "2026-01-15T23:30:00Z" to "2026-04-16T22:00:00Z",
+                "2026-08-01T22:30:00Z" to "2026-10-30T23:00:00Z",
+                "2026-03-15T22:30:00Z" to "2026-06-14T22:00:00Z",
             )
         for ((sent, nextDay) in cases) {
             val boundary = Instant.parse(nextDay)

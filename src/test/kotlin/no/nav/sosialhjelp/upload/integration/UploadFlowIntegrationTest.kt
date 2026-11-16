@@ -492,7 +492,7 @@ class UploadFlowIntegrationTest {
                     )
                 }
 
-            val old = Instant.now().minus(30, ChronoUnit.DAYS).toEpochMilli()
+            val old = Instant.now().minus(100, ChronoUnit.DAYS).toEpochMilli()
             coEvery { fiksClient.getKlager(digisosId.toString(), token) } returns
                 listOf(KlageNAV(klageId, digisosId, SendtKvittering(sendtStatus = Status("SENDT", old))))
             val expired = submit()

@@ -34,7 +34,7 @@ class KlageValidationTest {
                     mockk(),
                     mockk(),
                     mockk(),
-                    clock = Clock.fixed(Instant.parse("2026-04-07T00:00:00Z"), ZoneOffset.UTC),
+                    clock = Clock.fixed(Instant.parse("2026-06-14T22:00:00Z"), ZoneOffset.UTC),
                 )
             val digisosId = UUID.randomUUID()
             val klageId = UUID.randomUUID()
