@@ -7,35 +7,37 @@ import no.nav.sosialhjelp.upload.upload.Upload
 const val MAX_FILES_PER_SUBMISSION = 30
 const val MAX_TOTAL_SIZE_BYTES = 150L * 1024 * 1024
 
-<span class="pc" id="L10">@Serializable</span>
+<span class="fc" id="L10">@Serializable</span>
 enum class SubmissionValidationCode {
 <span class="fc" id="L12">    NO_FILES,</span>
 <span class="fc" id="L13">    TOO_MANY_FILES,</span>
 <span class="fc" id="L14">    TOTAL_SIZE_TOO_LARGE,</span>
-<span class="fc" id="L15">}</span>
+<span class="fc" id="L15">    KLAGE_TRUKKET,</span>
+<span class="fc" id="L16">    KLAGE_ETTERSENDELSE_FRIST_UTLOPT,</span>
+<span class="fc" id="L17">}</span>
 
-<span class="nc bnc" id="L17" title="All 2 branches missed.">@Serializable</span>
-<span class="nc" id="L18">data class SubmissionValidationErrorResponse(</span>
-<span class="nc" id="L19">    val errors: List&lt;SubmissionValidationCode&gt;,</span>
+<span class="pc bnc" id="L19" title="All 2 branches missed.">@Serializable</span>
+<span class="fc" id="L20">data class SubmissionValidationErrorResponse(</span>
+<span class="pc" id="L21">    val errors: List&lt;SubmissionValidationCode&gt;,</span>
 )
 
-<span class="nc" id="L22">class SubmissionValidationException(</span>
-<span class="nc" id="L23">    val violations: List&lt;SubmissionValidationCode&gt;,</span>
-<span class="nc" id="L24">) : Exception(&quot;Submission validation failed: ${violations.joinToString()}&quot;)</span>
+<span class="fc" id="L24">class SubmissionValidationException(</span>
+<span class="fc" id="L25">    val violations: List&lt;SubmissionValidationCode&gt;,</span>
+<span class="fc" id="L26">) : Exception(&quot;Submission validation failed: ${violations.joinToString()}&quot;)</span>
 
 fun validateSubmissionUploads(uploads: List&lt;Upload&gt;): List&lt;SubmissionValidationCode&gt; {
-<span class="fc bfc" id="L27" title="All 2 branches covered.">    val completeUploads = uploads.filter { it.status == Status.COMPLETE }</span>
-<span class="fc" id="L28">    val violations = mutableListOf&lt;SubmissionValidationCode&gt;()</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">    if (completeUploads.isEmpty()) {</span>
-<span class="fc" id="L30">        violations += SubmissionValidationCode.NO_FILES</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    val completeUploads = uploads.filter { it.status == Status.COMPLETE }</span>
+<span class="fc" id="L30">    val violations = mutableListOf&lt;SubmissionValidationCode&gt;()</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">    if (completeUploads.isEmpty()) {</span>
+<span class="fc" id="L32">        violations += SubmissionValidationCode.NO_FILES</span>
     }
-<span class="fc bfc" id="L32" title="All 2 branches covered.">    if (completeUploads.size &gt; MAX_FILES_PER_SUBMISSION) {</span>
-<span class="fc" id="L33">        violations += SubmissionValidationCode.TOO_MANY_FILES</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">    if (completeUploads.size &gt; MAX_FILES_PER_SUBMISSION) {</span>
+<span class="fc" id="L35">        violations += SubmissionValidationCode.TOO_MANY_FILES</span>
     }
-<span class="fc bfc" id="L35" title="All 4 branches covered.">    val totalSize = completeUploads.sumOf { it.mellomlagringStorrelse ?: 0L }</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">    if (totalSize &gt; MAX_TOTAL_SIZE_BYTES) {</span>
-<span class="fc" id="L37">        violations += SubmissionValidationCode.TOTAL_SIZE_TOO_LARGE</span>
+<span class="fc bfc" id="L37" title="All 4 branches covered.">    val totalSize = completeUploads.sumOf { it.mellomlagringStorrelse ?: 0L }</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">    if (totalSize &gt; MAX_TOTAL_SIZE_BYTES) {</span>
+<span class="fc" id="L39">        violations += SubmissionValidationCode.TOTAL_SIZE_TOO_LARGE</span>
     }
-<span class="fc" id="L39">    return violations</span>
+<span class="fc" id="L41">    return violations</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
