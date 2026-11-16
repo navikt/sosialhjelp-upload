@@ -5,13 +5,13 @@ import java.time.Instant
 import java.time.ZoneId
 
 <span class="fc" id="L7">private val OSLO = ZoneId.of(&quot;Europe/Oslo&quot;)</span>
-<span class="fc" id="L8">private val THREE_WEEKS = Duration.ofDays(21)</span>
+<span class="fc" id="L8">private val KLAGE_FRIST = Duration.ofDays(90)</span>
 
 internal fun ettersendelsesfristExpired(
     sendt: Instant,
     now: Instant,
 ): Boolean {
-<span class="fc" id="L14">    val lastDay = sendt.plus(THREE_WEEKS).atZone(OSLO).toLocalDate()</span>
+<span class="fc" id="L14">    val lastDay = sendt.plus(KLAGE_FRIST).atZone(OSLO).toLocalDate()</span>
 <span class="fc" id="L15">    val nextDay = lastDay.plusDays(1).atStartOfDay(OSLO).toInstant()</span>
 <span class="fc bfc" id="L16" title="All 2 branches covered.">    return !now.isBefore(nextDay)</span>
 }
