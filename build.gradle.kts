@@ -9,7 +9,7 @@ plugins {
     id("nl.littlerobots.version-catalog-update") version "1.1.1"
     id("org.jooq.jooq-codegen-gradle") version libs.versions.jooq
     id("jacoco")
-    id("org.sonarqube") version "7.5.0.8588"
+    id("org.sonarqube") version "7.6.0.18749"
 }
 
 group = "no.nav.sosialhjelp"
