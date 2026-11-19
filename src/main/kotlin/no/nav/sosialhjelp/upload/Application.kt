@@ -179,6 +179,8 @@ private fun Application.configureDependencies(
         provide(ChunkAssemblyService::class)
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
+        provide(no.nav.sosialhjelp.upload.submission.SubmissionResolver::class)
+        provide(no.nav.sosialhjelp.upload.upload.FilePipeline::class)
         provide(UploadProcessingService::class)
         provide(TusUploadService::class)
         provide(SubmissionService::class)

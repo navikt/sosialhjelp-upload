@@ -17,10 +17,12 @@ import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
+import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
+import no.nav.sosialhjelp.upload.upload.FilePipeline
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
@@ -89,20 +91,22 @@ class TusUploadServiceIntegrationTest {
                 dsl = dsl,
                 uploadProcessingQueries = uploadProcessingQueries,
                 chunkAssemblyService = chunkAssemblyService,
-                validator = validator,
-                fileConversionService = fileConversionService,
-                mellomlagringStorageService = mellomlagringStorageService,
-                meterRegistry = meterRegistry,
+                filePipeline =
+                    FilePipeline(
+                        validator,
+                        fileConversionService,
+                        mellomlagringStorageService,
+                        meterRegistry,
+                    ),
             )
 
         tusUploadService =
             TusUploadService(
                 tusUploadQueries = tusUploadQueries,
-                tusSubmissionQueries = tusSubmissionQueries,
+                submissionResolver = SubmissionResolver(tusSubmissionQueries, dsl, fiksClient),
                 uploadProcessingQueries = uploadProcessingQueries,
                 dsl = dsl,
                 validator = validator,
-                fiksClient = fiksClient,
                 mellomlagringClient = mellomlagringClient,
                 chunkStorage = chunkStorage,
                 chunkAssemblyService = chunkAssemblyService,

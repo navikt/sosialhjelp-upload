@@ -8,9 +8,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.withMdc
+import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
@@ -25,11 +25,10 @@ import java.util.UUID
 
 class TusUploadService(
     private val tusUploadQueries: TusUploadQueries,
-    private val tusSubmissionQueries: TusSubmissionQueries,
+    private val submissionResolver: SubmissionResolver,
     private val uploadProcessingQueries: UploadProcessingQueries,
     private val dsl: DSLContext,
     private val validator: UploadValidator,
-    private val fiksClient: FiksClient,
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
     private val chunkAssemblyService: ChunkAssemblyService,
@@ -46,58 +45,13 @@ class TusUploadService(
         personident: String,
         token: String,
     ): UUID {
-        val contextId = metadata.contextId
         val filename = metadata.filename
-        val fiksDigisosId = metadata.fiksDigisosId
-        val navEksternRefId = metadata.navEksternRefId
-        val kategori = metadata.kategori
-        val correlationId = metadata.correlationId
         return try {
+            val resolved = submissionResolver.resolve(metadata, personident, token)
             dsl.transactionCoroutine { tx ->
-                // Acquire a per-fiksDigisosId advisory lock before deriving navEksternRefId.
-                // This serializes concurrent upload creations for the same case across all
-                // service instances, preventing two submissions from reading the same Fiks
-                // state and deriving the same navEksternRefId.
-                if (fiksDigisosId != null) {
-                    tusSubmissionQueries.acquireAdvisoryLock(tx, fiksDigisosId)
-                }
-
-                val submissionId =
-                    tusSubmissionQueries.getOrCreateSubmission(
-                        tx,
-                        contextId,
-                        personident,
-                        TusSubmissionQueries.SubmissionAttributes(
-                            fiksDigisosId = fiksDigisosId,
-                            kategori = kategori,
-                            automaticCleanup = metadata.automaticCleanup,
-                        ),
-                    )
-
-                val eksternRef =
-                    // If navEksternRefId is already set on this submission (e.g. a second
-                    // upload on the same contextId), reuse it without calling Fiks.
-                    tusSubmissionQueries.getNavEksternRefIdByContextId(tx, contextId)
-                        ?: navEksternRefId
-                        ?: fiksDigisosId?.let {
-                            // Read the highest navEksternRefId stored locally for this
-                            // fiksDigisosId. This accounts for other in-flight submissions
-                            // that have been created locally but not yet submitted to Fiks,
-                            // and therefore don't appear in ettersendtInfoNAV.ettersendelser.
-                            val localMax = tusSubmissionQueries.getMaxNavEksternRefIdForFiksDigisosId(tx, it)
-                            // We intentionally call Fiks inside a DB transaction to keep the
-                            // lock → read-from-Fiks → write sequence atomic. The risk of
-                            // holding a DB connection across a network call is accepted here
-                            // because contention on the same fiksDigisosId is expected to be
-                            // near zero in practice (fiksDigisosId is unique per application).
-                            fiksClient.getNewNavEksternRefId(it, token, localMax)
-                        }
-                        ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
-
-                tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)
                 val uploadId =
                     tusUploadQueries
-                        .create(tx, submissionId, filename, size, correlationId)
+                        .create(tx, resolved.submissionId, filename, size, metadata.correlationId)
                         .also {
                             meterRegistry.counter("upload.created").increment()
                             val extension = File(filename).extension.lowercase().ifEmpty { "none" }
