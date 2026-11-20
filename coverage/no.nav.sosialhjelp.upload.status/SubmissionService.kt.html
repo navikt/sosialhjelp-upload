@@ -34,26 +34,35 @@ import java.util.*
         }
     }
 
+    /** Read-only lookup: returns null when no submission exists. Throws if owned by another user. */
+    suspend fun find(
+        contextId: String,
+        personIdent: String,
+    ): UUID? =
+<span class="fc" id="L42">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L43">            dsl.transactionResult { tx -&gt; tusSubmissionQueries.findSubmission(tx, contextId, personIdent) }</span>
+<span class="fc" id="L44">        }</span>
+
     suspend fun getSubmissionStatus(submissionId: UUID): SubmissionState =
-<span class="fc" id="L38">        withContext(ioDispatcher) { readSubmissionStatus(submissionId) }</span>
+<span class="fc" id="L47">        withContext(ioDispatcher) { readSubmissionStatus(submissionId) }</span>
 
     private fun readSubmissionStatus(submissionId: UUID): SubmissionState =
-<span class="fc" id="L41">        dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L42">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
-<span class="fc" id="L43">            val uploads = filenamesByUpload.mapNotNull { it.toDto() }</span>
+<span class="fc" id="L50">        dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L51">            val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)</span>
+<span class="fc" id="L52">            val uploads = filenamesByUpload.mapNotNull { it.toDto() }</span>
 
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            val tooManyFiles = uploads.size &gt; 30</span>
-<span class="pc bpc" id="L46" title="1 of 6 branches missed.">            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } &gt; 150 * 1024 * 1024</span>
-<span class="fc" id="L47">            SubmissionState(</span>
-<span class="fc" id="L48">                submissionId.toString(),</span>
-<span class="fc" id="L49">                uploads.toList(),</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            val tooManyFiles = uploads.size &gt; 30</span>
+<span class="pc bpc" id="L55" title="1 of 6 branches missed.">            val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } &gt; 150 * 1024 * 1024</span>
+<span class="fc" id="L56">            SubmissionState(</span>
+<span class="fc" id="L57">                submissionId.toString(),</span>
+<span class="fc" id="L58">                uploads.toList(),</span>
                 validations =
-<span class="fc" id="L51">                    listOfNotNull(</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                        if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                        if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,</span>
+<span class="fc" id="L60">                    listOfNotNull(</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                        if (tooManyFiles) ValidationCode.TOO_MANY_FILES else null,</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                        if (totalTooLarge) ValidationCode.TOTAL_SIZE_TOO_LARGE else null,</span>
                     ),
-<span class="fc" id="L55">                status = SubmissionState.Status.ACTIVE,</span>
-<span class="fc" id="L56">            )</span>
-<span class="fc" id="L57">        }</span>
+<span class="fc" id="L64">                status = SubmissionState.Status.ACTIVE,</span>
+<span class="fc" id="L65">            )</span>
+<span class="fc" id="L66">        }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

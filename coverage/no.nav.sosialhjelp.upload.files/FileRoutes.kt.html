@@ -15,7 +15,9 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.RoutingContext
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.utils.io.readBuffer
 import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
@@ -29,27 +31,27 @@ import java.io.IOException
 private const val FORM_HEADROOM = 64L * 1024
 private const val MAX_BODY = MAX_FILE_SIZE + FORM_HEADROOM
 
-<span class="pc bnc" id="L32" title="All 2 branches missed.">@Serializable</span>
-<span class="fc" id="L33">data class FileUploadResponse(</span>
-<span class="pc" id="L34">    val upload: UploadDto,</span>
-<span class="pc" id="L35">    val submissionId: String,</span>
+<span class="pc bnc" id="L34" title="All 2 branches missed.">@Serializable</span>
+<span class="fc" id="L35">data class FileUploadResponse(</span>
+<span class="pc" id="L36">    val upload: UploadDto,</span>
+<span class="pc" id="L37">    val submissionId: String,</span>
 )
 
-<span class="pc bnc" id="L38" title="All 2 branches missed.">@Serializable</span>
-<span class="fc" id="L39">data class FileValidationResponse(</span>
-<span class="pc" id="L40">    val validations: List&lt;ValidationCode&gt;,</span>
+<span class="pc bnc" id="L40" title="All 2 branches missed.">@Serializable</span>
+<span class="fc" id="L41">data class FileValidationResponse(</span>
+<span class="pc" id="L42">    val validations: List&lt;ValidationCode&gt;,</span>
 )
 
-<span class="pc bnc" id="L43" title="All 2 branches missed.">@Serializable</span>
-<span class="fc" id="L44">data class FileFailedResponse(</span>
-<span class="pc" id="L45">    val stage: String,</span>
+<span class="pc bnc" id="L45" title="All 2 branches missed.">@Serializable</span>
+<span class="fc" id="L46">data class FileFailedResponse(</span>
+<span class="pc" id="L47">    val stage: String,</span>
 )
 
 private sealed interface MultipartResult {
-<span class="fc" id="L49">    class Ok(</span>
-<span class="fc" id="L50">        val fields: Map&lt;String, String&gt;,</span>
-<span class="fc" id="L51">        val filename: String,</span>
-<span class="fc" id="L52">        val data: ByteArray,</span>
+<span class="fc" id="L51">    class Ok(</span>
+<span class="fc" id="L52">        val fields: Map&lt;String, String&gt;,</span>
+<span class="fc" id="L53">        val filename: String,</span>
+<span class="fc" id="L54">        val data: ByteArray,</span>
     ) : MultipartResult
 
     data object TooLarge : MultipartResult
@@ -62,92 +64,101 @@ private sealed interface MultipartResult {
 }
 
 fun Route.configureFileRoutes() {
-<span class="pc bpc" id="L65" title="14 of 17 branches missed.">    post {</span>
-<span class="fc" id="L66">        val fileUploadService: FileUploadService by call.application.dependencies</span>
-<span class="fc" id="L67">        val personident =</span>
-<span class="pc bpc" id="L68" title="2 of 4 branches missed.">            call.principal&lt;JWTPrincipal&gt;()?.subject ?: return@post call.respond(HttpStatusCode.Unauthorized)</span>
-<span class="fc" id="L69">        val token =</span>
-<span class="pc bpc" id="L70" title="2 of 4 branches missed.">            call.request.header(&quot;Authorization&quot;)?.removePrefix(&quot;Bearer &quot;)</span>
-<span class="nc" id="L71">                ?: return@post call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="pc bpc" id="L67" title="15 of 17 branches missed.">    post {</span>
+<span class="fc" id="L68">        val fileUploadService: FileUploadService by call.application.dependencies</span>
+<span class="fc" id="L69">        val personident =</span>
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">            call.principal&lt;JWTPrincipal&gt;()?.subject ?: return@post call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="fc" id="L71">        val token =</span>
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">            call.request.header(&quot;Authorization&quot;)?.removePrefix(&quot;Bearer &quot;)</span>
+<span class="nc" id="L73">                ?: return@post call.respond(HttpStatusCode.Unauthorized)</span>
 
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        val declared = call.request.header(&quot;Content-Length&quot;)?.toLongOrNull()</span>
-<span class="pc bpc" id="L74" title="2 of 6 branches missed.">        if (declared != null &amp;&amp; declared &gt; MAX_BODY) return@post tooLarge()</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        val declared = call.request.header(&quot;Content-Length&quot;)?.toLongOrNull()</span>
+<span class="pc bpc" id="L76" title="2 of 6 branches missed.">        if (declared != null &amp;&amp; declared &gt; MAX_BODY) return@post tooLarge()</span>
 
-<span class="fc" id="L76">        val parsed =</span>
-<span class="pc bfc" id="L77" title="All 2 branches covered.">            when (val result = parseMultipart()) {</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">                is MultipartResult.Ok -&gt; result</span>
-<span class="pc bpc" id="L79" title="3 of 4 branches missed.">                MultipartResult.TooLarge -&gt; return@post tooLarge()</span>
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                MultipartResult.MultipleFiles -&gt;</span>
-<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                    return@post call.respondText(&quot;Kun én fil per forespørsel&quot;, status = HttpStatusCode.BadRequest)</span>
-<span class="pc bnc" id="L82" title="All 2 branches missed.">                MultipartResult.MissingFile -&gt;</span>
-<span class="nc bnc" id="L83" title="All 2 branches missed.">                    return@post call.respondText(&quot;Mangler filen&quot;, status = HttpStatusCode.BadRequest)</span>
-<span class="nc" id="L84">                MultipartResult.Malformed -&gt;</span>
-<span class="nc bnc" id="L85" title="All 2 branches missed.">                    return@post call.respondText(&quot;Ugyldig multipart&quot;, status = HttpStatusCode.BadRequest)</span>
+<span class="fc" id="L78">        val parsed =</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            when (val result = parseMultipart()) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                is MultipartResult.Ok -&gt; result</span>
+<span class="pc bpc" id="L81" title="3 of 4 branches missed.">                MultipartResult.TooLarge -&gt; return@post tooLarge()</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                MultipartResult.MultipleFiles -&gt;</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                    return@post call.respondText(&quot;Kun én fil per forespørsel&quot;, status = HttpStatusCode.BadRequest)</span>
+<span class="pc bnc" id="L84" title="All 2 branches missed.">                MultipartResult.MissingFile -&gt;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                    return@post call.respondText(&quot;Mangler filen&quot;, status = HttpStatusCode.BadRequest)</span>
+<span class="nc" id="L86">                MultipartResult.Malformed -&gt;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                    return@post call.respondText(&quot;Ugyldig multipart&quot;, status = HttpStatusCode.BadRequest)</span>
             }
-<span class="fc" id="L87">        val metadata =</span>
-<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            (parsed.fields + (&quot;filename&quot; to parsed.filename)).toUploadMetadata().getOrElse {</span>
-<span class="nc bnc" id="L89" title="All 4 branches missed.">                return@post call.respondText(it.message ?: &quot;Ugyldig forespørsel&quot;, status = HttpStatusCode.BadRequest)</span>
+<span class="fc" id="L89">        val metadata =</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            (parsed.fields + (&quot;filename&quot; to parsed.filename)).toUploadMetadata().getOrElse {</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">                return@post call.respondText(it.message ?: &quot;Ugyldig forespørsel&quot;, status = HttpStatusCode.BadRequest)</span>
             }
-<span class="fc" id="L91">        val correlationId =</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">            metadata.correlationId</span>
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                ?: return@post call.respondText(&quot;Mangler correlationId&quot;, status = HttpStatusCode.BadRequest)</span>
+<span class="fc" id="L93">        val correlationId =</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            metadata.correlationId</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                ?: return@post call.respondText(&quot;Mangler correlationId&quot;, status = HttpStatusCode.BadRequest)</span>
 
-<span class="fc bfc" id="L95" title="All 2 branches covered.">        when (val result = fileUploadService.upload(metadata, correlationId, parsed.data, personident, token)) {</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">            is FileUploadResult.Stored -&gt; {</span>
-<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                val dto = result.upload.toDto() ?: error(&quot;Stored upload has no id&quot;)</span>
-<span class="fc" id="L98">                call.respond(</span>
-<span class="fc bfc" id="L99" title="All 2 branches covered.">                    if (result.replay) HttpStatusCode.OK else HttpStatusCode.Created,</span>
-<span class="fc" id="L100">                    FileUploadResponse(dto, result.submissionId.toString()),</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        when (val result = fileUploadService.upload(metadata, correlationId, parsed.data, personident, token)) {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            is FileUploadResult.Stored -&gt; {</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                val dto = result.upload.toDto() ?: error(&quot;Stored upload has no id&quot;)</span>
+<span class="fc" id="L100">                call.respond(</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                    if (result.replay) HttpStatusCode.OK else HttpStatusCode.Created,</span>
+<span class="fc" id="L102">                    FileUploadResponse(dto, result.submissionId.toString()),</span>
                 )
             }
-<span class="fc bfc" id="L103" title="All 2 branches covered.">            is FileUploadResult.Rejected -&gt;</span>
-<span class="fc" id="L104">                call.respond(HttpStatusCode.UnprocessableEntity, FileValidationResponse(result.codes))</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">            is FileUploadResult.Failed -&gt;</span>
-<span class="fc" id="L106">                call.respond(HttpStatusCode.BadGateway, FileFailedResponse(result.stage.name))</span>
-<span class="fc" id="L107">            FileUploadResult.Forbidden -&gt; call.respond(HttpStatusCode.Forbidden)</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            is FileUploadResult.Rejected -&gt;</span>
+<span class="fc" id="L106">                call.respond(HttpStatusCode.UnprocessableEntity, FileValidationResponse(result.codes))</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            is FileUploadResult.Failed -&gt;</span>
+<span class="fc" id="L108">                call.respond(HttpStatusCode.BadGateway, FileFailedResponse(result.stage.name))</span>
+<span class="fc" id="L109">            FileUploadResult.Forbidden -&gt; call.respond(HttpStatusCode.Forbidden)</span>
         }
-<span class="fc" id="L109">    }</span>
-<span class="fc" id="L110">}</span>
+<span class="fc" id="L111">    }</span>
+
+<span class="fc" id="L113">    route(&quot;/{id}&quot;) {</span>
+<span class="fc" id="L114">        verifyUploadOwnership()</span>
+<span class="pc bpc" id="L115" title="3 of 4 branches missed.">        delete {</span>
+<span class="fc" id="L116">            val fileUploadService: FileUploadService by call.application.dependencies</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            fileUploadService.delete(call.attributes[VerifiedUploadId])</span>
+<span class="fc" id="L118">            call.respond(HttpStatusCode.NoContent)</span>
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">    }</span>
+<span class="fc" id="L121">}</span>
 
 private suspend fun RoutingContext.tooLarge() =
-<span class="fc" id="L113">    call.respondText(&quot;For stor forespørsel&quot;, status = HttpStatusCode.PayloadTooLarge)</span>
+<span class="fc" id="L124">    call.respondText(&quot;For stor forespørsel&quot;, status = HttpStatusCode.PayloadTooLarge)</span>
 
 private suspend fun RoutingContext.parseMultipart(): MultipartResult {
-<span class="fc" id="L116">    val fields = mutableMapOf&lt;String, String&gt;()</span>
-<span class="fc" id="L117">    var filename: String? = null</span>
-<span class="fc" id="L118">    var data: ByteArray? = null</span>
-<span class="fc" id="L119">    var problem: MultipartResult? = null</span>
-<span class="fc" id="L120">    try {</span>
-<span class="pc bpc" id="L121" title="5 of 6 branches missed.">        call.receiveMultipart(formFieldLimit = MAX_BODY).forEachPart { part -&gt;</span>
-<span class="fc" id="L122">            try {</span>
+<span class="fc" id="L127">    val fields = mutableMapOf&lt;String, String&gt;()</span>
+<span class="fc" id="L128">    var filename: String? = null</span>
+<span class="fc" id="L129">    var data: ByteArray? = null</span>
+<span class="fc" id="L130">    var problem: MultipartResult? = null</span>
+<span class="fc" id="L131">    try {</span>
+<span class="pc bpc" id="L132" title="5 of 6 branches missed.">        call.receiveMultipart(formFieldLimit = MAX_BODY).forEachPart { part -&gt;</span>
+<span class="fc" id="L133">            try {</span>
                 // After the first problem, remaining parts are only disposed.
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (problem != null) return@forEachPart</span>
-<span class="pc bpc" id="L125" title="1 of 3 branches missed.">                when (part) {</span>
-<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                    is PartData.FormItem -&gt; part.name?.let { fields[it] = part.value }</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                if (problem != null) return@forEachPart</span>
+<span class="pc bpc" id="L136" title="1 of 3 branches missed.">                when (part) {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                    is PartData.FormItem -&gt; part.name?.let { fields[it] = part.value }</span>
                     is PartData.FileItem -&gt;
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                        if (data != null) {</span>
-<span class="fc" id="L129">                            problem = MultipartResult.MultipleFiles</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                        if (data != null) {</span>
+<span class="fc" id="L140">                            problem = MultipartResult.MultipleFiles</span>
                         } else {
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                            val bytes = part.provider().readBuffer(MAX_BODY + 1).readByteArray()</span>
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                            if (bytes.size &gt; MAX_BODY) {</span>
-<span class="nc" id="L133">                                problem = MultipartResult.TooLarge</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                            val bytes = part.provider().readBuffer(MAX_BODY + 1).readByteArray()</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                            if (bytes.size &gt; MAX_BODY) {</span>
+<span class="nc" id="L144">                                problem = MultipartResult.TooLarge</span>
                             } else {
-<span class="fc" id="L135">                                filename = part.originalFileName</span>
-<span class="fc" id="L136">                                data = bytes</span>
+<span class="fc" id="L146">                                filename = part.originalFileName</span>
+<span class="fc" id="L147">                                data = bytes</span>
                             }
                         }
-<span class="nc" id="L139">                    else -&gt; Unit</span>
+<span class="nc" id="L150">                    else -&gt; Unit</span>
                 }
             } finally {
-<span class="pc bpc" id="L142" title="5 of 6 branches missed.">                part.release()</span>
-<span class="fc" id="L143">            }</span>
-<span class="pc" id="L144">        }</span>
-<span class="nc" id="L145">    } catch (_: IOException) {</span>
-<span class="nc" id="L146">        return MultipartResult.Malformed</span>
+<span class="pc bpc" id="L153" title="5 of 6 branches missed.">                part.release()</span>
+<span class="fc" id="L154">            }</span>
+<span class="pc" id="L155">        }</span>
+<span class="nc" id="L156">    } catch (_: IOException) {</span>
+<span class="nc" id="L157">        return MultipartResult.Malformed</span>
     }
-<span class="fc bfc" id="L148" title="All 2 branches covered.">    problem?.let { return it }</span>
-<span class="fc" id="L149">    val name = filename</span>
-<span class="fc" id="L150">    val bytes = data</span>
-<span class="pc bpc" id="L151" title="2 of 4 branches missed.">    return if (name == null || bytes == null) MultipartResult.MissingFile else MultipartResult.Ok(fields, name, bytes)</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">    problem?.let { return it }</span>
+<span class="fc" id="L160">    val name = filename</span>
+<span class="fc" id="L161">    val bytes = data</span>
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">    return if (name == null || bytes == null) MultipartResult.MissingFile else MultipartResult.Ok(fields, name, bytes)</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
