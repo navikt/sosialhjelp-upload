@@ -90,6 +90,9 @@ class FileRoutesIntegrationTest {
                         "fiks.integrasjonsid" to "test-id",
                         "fiks.integrasjonspassord" to "test-pass",
                         "virus.scanner.url" to "",
+                        "database.cleanOnStart" to "true",
+                        "tokenx.jwksUri" to "http://unused",
+                        "tokenx.issuer" to "whatever",
                         "tokenx.clientId" to "whatever",
                     )
             }
@@ -179,7 +182,12 @@ class FileRoutesIntegrationTest {
         appTest {
             val corr = UUID.randomUUID()
             val resp =
-                postFile(UUID.randomUUID().toString(), corr, data = "not a pdf".toByteArray(), filename = "x.pdf")
+                postFile(
+                    UUID.randomUUID().toString(),
+                    corr,
+                    data = "%PDF-1.4\nnot really a pdf".toByteArray(),
+                    filename = "x.pdf",
+                )
             assertEquals(HttpStatusCode.UnprocessableEntity, resp.status, resp.bodyAsText())
             assertTrue(rows(corr).isEmpty())
             coVerify(exactly = 0) { mellomlagringClient.uploadFile(any(), any(), any(), any()) }

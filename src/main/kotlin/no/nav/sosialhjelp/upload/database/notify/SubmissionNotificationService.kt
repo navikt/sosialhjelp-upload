@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.postgresql.PGConnection
@@ -60,7 +61,7 @@ class SubmissionNotificationService(
                             conn.createStatement().execute("LISTEN submission_update")
                             conn.createStatement().execute("LISTEN submission_delete")
                             log.info("LISTEN connection established")
-                            while (true) {
+                            while (isActive) {
                                 val notifications = pgConn.getNotifications(500) ?: emptyArray()
                                 notifications.forEach { notification ->
                                     val type =

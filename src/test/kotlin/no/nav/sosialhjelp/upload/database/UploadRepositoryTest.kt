@@ -83,7 +83,7 @@ class UploadRepositoryTest {
                 }
             val uploadId2 =
                 dsl.transactionResult { config ->
-                    tusUploadQueries.create(config, submissionId, "file2.txt", 190L, correlationId)
+                    tusUploadQueries.create(config, submissionId, "file2.txt", 190L, UUID.randomUUID())
                 }
             // Create an upload for a different submission to ensure filtering works.
             val otherSubmissionId = TestUtils.createMockSubmission(dsl)

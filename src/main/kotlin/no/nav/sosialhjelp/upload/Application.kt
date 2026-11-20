@@ -131,6 +131,7 @@ fun Application.module() {
         processingScope.cancel()
         notificationScope.cancel()
         scopes.forEach { it.cancel() }
+        (dataSource as? AutoCloseable)?.close()
     }
 }
 
@@ -180,6 +181,7 @@ private fun Application.configureDependencies(
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
         provide(no.nav.sosialhjelp.upload.submission.SubmissionResolver::class)
+        provide(no.nav.sosialhjelp.upload.submission.MellomlagringReconciler::class)
         provide(no.nav.sosialhjelp.upload.upload.FilePipeline::class)
         provide(UploadProcessingService::class)
         provide(TusUploadService::class)

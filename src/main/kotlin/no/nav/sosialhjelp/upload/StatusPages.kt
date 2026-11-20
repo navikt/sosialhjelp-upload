@@ -11,6 +11,10 @@ import io.ktor.utils.io.ClosedWriteChannelException
 import no.nav.sosialhjelp.upload.action.KlageNotFoundException
 import no.nav.sosialhjelp.upload.action.fiks.FiksGetKlagerException
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
+import no.nav.sosialhjelp.upload.validation.SubmissionConflictResponse
+import no.nav.sosialhjelp.upload.validation.SubmissionFilesMissingException
+import no.nav.sosialhjelp.upload.validation.SubmissionUploadsInProgressException
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationCode
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 
@@ -26,6 +30,18 @@ fun Application.configureStatusPages() {
         }
         exception<SubmissionValidationException> { call, cause ->
             call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))
+        }
+        exception<SubmissionFilesMissingException> { call, cause ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                SubmissionConflictResponse(listOf(SubmissionValidationCode.FILES_MISSING), cause.missing),
+            )
+        }
+        exception<SubmissionUploadsInProgressException> { call, _ ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                SubmissionConflictResponse(listOf(SubmissionValidationCode.UPLOADS_IN_PROGRESS)),
+            )
         }
         exception<KlageNotFoundException> { call, _ ->
             call.respond(HttpStatusCode.NotFound)

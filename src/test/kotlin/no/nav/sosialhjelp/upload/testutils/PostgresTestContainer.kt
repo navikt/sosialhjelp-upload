@@ -15,6 +15,7 @@ object PostgresTestContainer {
             withDatabaseName("testdb")
             withUsername("test")
             withPassword("test")
+            withCommand("postgres", "-c", "max_connections=300")
             start()
         }
     }
