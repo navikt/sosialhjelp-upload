@@ -11,37 +11,53 @@ import io.ktor.utils.io.ClosedWriteChannelException
 import no.nav.sosialhjelp.upload.action.KlageNotFoundException
 import no.nav.sosialhjelp.upload.action.fiks.FiksGetKlagerException
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
+import no.nav.sosialhjelp.upload.validation.SubmissionConflictResponse
+import no.nav.sosialhjelp.upload.validation.SubmissionFilesMissingException
+import no.nav.sosialhjelp.upload.validation.SubmissionUploadsInProgressException
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationCode
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
 
 fun Application.configureStatusPages() {
-<span class="fc" id="L18">    install(StatusPages) {</span>
-<span class="pc bnc" id="L19" title="All 2 branches missed.">        exception&lt;ChannelWriteException&gt; { call, _ -&gt;</span>
+<span class="fc" id="L22">    install(StatusPages) {</span>
+<span class="pc bnc" id="L23" title="All 2 branches missed.">        exception&lt;ChannelWriteException&gt; { call, _ -&gt;</span>
             // Client disconnected (tab closed, navigated away, network drop) — normal for SSE
-<span class="nc" id="L21">            this@configureStatusPages.environment.log.debug(&quot;Client disconnected from ${call.request.uri}&quot;)</span>
-<span class="nc" id="L22">        }</span>
-<span class="pc bnc" id="L23" title="All 2 branches missed.">        exception&lt;ClosedWriteChannelException&gt; { call, _ -&gt;</span>
-            // Client disconnected — thrown by heartbeat coroutine in SSE
 <span class="nc" id="L25">            this@configureStatusPages.environment.log.debug(&quot;Client disconnected from ${call.request.uri}&quot;)</span>
 <span class="nc" id="L26">        }</span>
-<span class="pc bpc" id="L27" title="2 of 3 branches missed.">        exception&lt;SubmissionValidationException&gt; { call, cause -&gt;</span>
-<span class="fc" id="L28">            call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))</span>
-<span class="fc" id="L29">        }</span>
-<span class="pc bpc" id="L30" title="2 of 3 branches missed.">        exception&lt;KlageNotFoundException&gt; { call, _ -&gt;</span>
-<span class="fc" id="L31">            call.respond(HttpStatusCode.NotFound)</span>
-<span class="fc" id="L32">        }</span>
-<span class="pc bpc" id="L33" title="2 of 3 branches missed.">        exception&lt;FiksGetKlagerException&gt; { call, _ -&gt;</span>
-<span class="fc" id="L34">            this@configureStatusPages.environment.log.error(&quot;Henting av klager fra Fiks feilet&quot;)</span>
-<span class="fc" id="L35">            call.respond(HttpStatusCode.BadGateway)</span>
-<span class="fc" id="L36">        }</span>
-<span class="pc bnc" id="L37" title="All 3 branches missed.">        exception&lt;TusSubmissionQueries.SubmissionOwnedByAnotherUserException&gt; { call, _ -&gt;</span>
-<span class="nc" id="L38">            this@configureStatusPages.environment.log.warn(&quot;Submission owned by another user: ${call.request.uri}&quot;)</span>
-<span class="nc bnc" id="L39" title="All 2 branches missed.">            call.respondText(text = &quot;Forbidden&quot;, status = HttpStatusCode.Forbidden)</span>
-<span class="nc" id="L40">        }</span>
-<span class="pc bnc" id="L41" title="All 3 branches missed.">        exception&lt;Throwable&gt; { call, cause -&gt;</span>
-<span class="nc" id="L42">            this@configureStatusPages.environment.log.error(&quot;Got error on call to ${call.request.uri}&quot;, cause)</span>
-<span class="nc bnc" id="L43" title="All 2 branches missed.">            call.respondText(text = &quot;Internal Server Error&quot;, status = HttpStatusCode.InternalServerError)</span>
-<span class="nc" id="L44">        }</span>
-<span class="fc" id="L45">    }</span>
-<span class="fc" id="L46">}</span>
+<span class="pc bnc" id="L27" title="All 2 branches missed.">        exception&lt;ClosedWriteChannelException&gt; { call, _ -&gt;</span>
+            // Client disconnected — thrown by heartbeat coroutine in SSE
+<span class="nc" id="L29">            this@configureStatusPages.environment.log.debug(&quot;Client disconnected from ${call.request.uri}&quot;)</span>
+<span class="nc" id="L30">        }</span>
+<span class="pc bpc" id="L31" title="2 of 3 branches missed.">        exception&lt;SubmissionValidationException&gt; { call, cause -&gt;</span>
+<span class="fc" id="L32">            call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))</span>
+<span class="fc" id="L33">        }</span>
+<span class="pc bnc" id="L34" title="All 3 branches missed.">        exception&lt;SubmissionFilesMissingException&gt; { call, cause -&gt;</span>
+<span class="nc" id="L35">            call.respond(</span>
+<span class="nc" id="L36">                HttpStatusCode.Conflict,</span>
+<span class="nc" id="L37">                SubmissionConflictResponse(listOf(SubmissionValidationCode.FILES_MISSING), cause.missing),</span>
+            )
+<span class="nc" id="L39">        }</span>
+<span class="pc bnc" id="L40" title="All 3 branches missed.">        exception&lt;SubmissionUploadsInProgressException&gt; { call, _ -&gt;</span>
+<span class="nc" id="L41">            call.respond(</span>
+<span class="nc" id="L42">                HttpStatusCode.Conflict,</span>
+<span class="nc" id="L43">                SubmissionConflictResponse(listOf(SubmissionValidationCode.UPLOADS_IN_PROGRESS)),</span>
+            )
+<span class="nc" id="L45">        }</span>
+<span class="pc bpc" id="L46" title="2 of 3 branches missed.">        exception&lt;KlageNotFoundException&gt; { call, _ -&gt;</span>
+<span class="fc" id="L47">            call.respond(HttpStatusCode.NotFound)</span>
+<span class="fc" id="L48">        }</span>
+<span class="pc bpc" id="L49" title="2 of 3 branches missed.">        exception&lt;FiksGetKlagerException&gt; { call, _ -&gt;</span>
+<span class="fc" id="L50">            this@configureStatusPages.environment.log.error(&quot;Henting av klager fra Fiks feilet&quot;)</span>
+<span class="fc" id="L51">            call.respond(HttpStatusCode.BadGateway)</span>
+<span class="fc" id="L52">        }</span>
+<span class="pc bnc" id="L53" title="All 3 branches missed.">        exception&lt;TusSubmissionQueries.SubmissionOwnedByAnotherUserException&gt; { call, _ -&gt;</span>
+<span class="nc" id="L54">            this@configureStatusPages.environment.log.warn(&quot;Submission owned by another user: ${call.request.uri}&quot;)</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            call.respondText(text = &quot;Forbidden&quot;, status = HttpStatusCode.Forbidden)</span>
+<span class="nc" id="L56">        }</span>
+<span class="pc bpc" id="L57" title="2 of 3 branches missed.">        exception&lt;Throwable&gt; { call, cause -&gt;</span>
+<span class="fc" id="L58">            this@configureStatusPages.environment.log.error(&quot;Got error on call to ${call.request.uri}&quot;, cause)</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            call.respondText(text = &quot;Internal Server Error&quot;, status = HttpStatusCode.InternalServerError)</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">    }</span>
+<span class="fc" id="L62">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -272,7 +272,7 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 <span class="fc" id="L272">                    listOfNotNull(</span>
 <span class="fc" id="L273">                        validateFileSize(fileSize),</span>
 <span class="fc" id="L274">                        fileTypeValidation,</span>
-<span class="pc bpc" id="L275" title="1 of 4 branches missed.">                        if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
+<span class="fc bfc" id="L275" title="All 4 branches covered.">                        if (mimeType == &quot;application/pdf&quot;) validatePdf(data) else null,</span>
 <span class="fc bfc" id="L276" title="All 2 branches covered.">                        virusScanValidation.await(),</span>
                     ),
 <span class="fc" id="L278">            )</span>
@@ -294,9 +294,9 @@ const val MAX_FILE_SIZE = 10 * 1024 * 1024
 <span class="nc" id="L294">            } catch (e: InvalidPasswordException) {</span>
 <span class="nc" id="L295">                logger.warn(ValidationCode.ENCRYPTED_PDF.name + &quot; &quot; + e.message)</span>
 <span class="nc" id="L296">                EncryptedPdfValidation()</span>
-<span class="nc" id="L297">            } catch (e: IOException) {</span>
-<span class="nc" id="L298">                logger.warn(ValidationCode.INVALID_PDF.name, e)</span>
-<span class="nc" id="L299">                InvalidPdfValidation()</span>
+<span class="fc" id="L297">            } catch (e: IOException) {</span>
+<span class="fc" id="L298">                logger.warn(ValidationCode.INVALID_PDF.name, e)</span>
+<span class="fc" id="L299">                InvalidPdfValidation()</span>
 <span class="nc" id="L300">            } catch (e: Exception) {</span>
 <span class="nc" id="L301">                logger.warn(ValidationCode.INVALID_PDF.name + &quot; &quot; + e.message, e)</span>
 <span class="pc" id="L302">                InvalidPdfValidation()</span>
