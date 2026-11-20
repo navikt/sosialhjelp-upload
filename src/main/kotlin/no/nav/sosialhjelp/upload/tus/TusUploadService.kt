@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.withMdc
+import no.nav.sosialhjelp.upload.files.FileUploadQueries
 import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
@@ -25,6 +26,7 @@ import java.util.UUID
 
 class TusUploadService(
     private val tusUploadQueries: TusUploadQueries,
+    private val fileUploadQueries: FileUploadQueries,
     private val submissionResolver: SubmissionResolver,
     private val uploadProcessingQueries: UploadProcessingQueries,
     private val dsl: DSLContext,
@@ -115,7 +117,7 @@ class TusUploadService(
     suspend fun delete(uploadId: UUID) {
         val upload =
             withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.getUpload(tx, uploadId) }
+                dsl.transactionResult { tx -> fileUploadQueries.getUpload(tx, uploadId) }
             }
         val filId = upload.filId
         val navEksternRefId = upload.navEksternRefId
@@ -133,7 +135,7 @@ class TusUploadService(
             }
 
             withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.deleteUpload(tx, uploadId) }
+                dsl.transactionResult { tx -> fileUploadQueries.deleteUpload(tx, uploadId) }
             }
             chunkAssemblyService.deleteGcsObjects(uploadId)
         }

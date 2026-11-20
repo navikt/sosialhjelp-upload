@@ -1,8 +1,12 @@
 package no.nav.sosialhjelp.upload.status
 
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.response.header
+import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
@@ -15,11 +19,13 @@ import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.database.notify.SubmissionUpdateNotification
+import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
+@Suppress("LongMethod")
 fun Route.configureStatusRoutes() {
     val statusChannelFactory: SubmissionNotificationService by application.dependencies
     val submissionService: SubmissionService by application.dependencies
@@ -27,6 +33,27 @@ fun Route.configureStatusRoutes() {
 
     val activeConnections = AtomicInteger(0)
     meterRegistry.gauge("sse.connections.active", activeConnections) { it.toDouble() }
+
+    get("/submission/context/{contextId}") {
+        val personident =
+            call.principal<JWTPrincipal>()?.subject ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        val contextId = call.parameters["contextId"].orEmpty()
+        call.response.header(HttpHeaders.CacheControl, "no-store")
+        try {
+            val submissionId = submissionService.find(contextId, personident)
+            call.respond(
+                submissionId?.let { submissionService.getSubmissionStatus(it) }
+                    ?: SubmissionState(
+                        "",
+                        emptyList(),
+                        validations = emptyList(),
+                        status = SubmissionState.Status.ACTIVE,
+                    ),
+            )
+        } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {
+            call.respond(HttpStatusCode.Forbidden)
+        }
+    }
 
     sse("/status/{id}", serialize = { typeInfo: TypeInfo, value: Any ->
         val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)

@@ -1,4 +1,4 @@
-package no.nav.sosialhjelp.upload.tus
+package no.nav.sosialhjelp.upload.files
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.createRouteScopedPlugin
@@ -23,7 +23,7 @@ val VerifiedUploadId = AttributeKey<UUID>("VerifiedUploadId")
 private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     createRouteScopedPlugin("VerifyUploadOwnership") {
         val dsl: DSLContext by application.dependencies
-        val tusUploadQueries: TusUploadQueries by application.dependencies
+        val fileUploadQueries: FileUploadQueries by application.dependencies
 
         on(AuthenticationChecked) { call ->
             if (call.isHandled) return@on
@@ -42,7 +42,7 @@ private fun verifyUploadOwnershipPlugin(ioDispatcher: CoroutineDispatcher = Disp
 
             val owned =
                 withContext(ioDispatcher) {
-                    dsl.transactionResult { tx -> tusUploadQueries.isOwnedByUser(tx, uploadId, personident) }
+                    dsl.transactionResult { tx -> fileUploadQueries.isOwnedByUser(tx, uploadId, personident) }
                 }
             if (!owned) {
                 // Return 404 rather than 403 to avoid leaking whether the resource exists.

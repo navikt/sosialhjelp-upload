@@ -122,6 +122,26 @@ class FileUploadService(
         return FileUploadResult.Stored(upload, resolved.submissionId, replay = false)
     }
 
+    /**
+     * Row first, then file: a failure in between leaves an orphan file (healed by reconcile),
+     * never a row pointing at nothing. Idempotent: a missing row is a no-op.
+     */
+    suspend fun delete(uploadId: UUID) {
+        val target =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    val upload =
+                        runCatching { fileUploadQueries.getUpload(tx, uploadId) }.getOrNull()
+                            ?: return@transactionResult null
+                    fileUploadQueries.deleteUpload(tx, uploadId)
+                    upload
+                }
+            } ?: return
+        val filId = target.filId
+        val navEksternRefId = target.navEksternRefId
+        if (filId != null && navEksternRefId != null) deleteStoredFile(navEksternRefId, filId)
+    }
+
     private fun rejected(errors: List<Validation>) = FileUploadResult.Rejected(errors.map { it.code }.distinct())
 
     private suspend fun findByCorrelationId(

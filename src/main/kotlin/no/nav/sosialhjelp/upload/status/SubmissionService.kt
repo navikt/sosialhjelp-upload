@@ -34,6 +34,15 @@ class SubmissionService(
         }
     }
 
+    /** Read-only lookup: returns null when no submission exists. Throws if owned by another user. */
+    suspend fun find(
+        contextId: String,
+        personIdent: String,
+    ): UUID? =
+        withContext(ioDispatcher) {
+            dsl.transactionResult { tx -> tusSubmissionQueries.findSubmission(tx, contextId, personIdent) }
+        }
+
     suspend fun getSubmissionStatus(submissionId: UUID): SubmissionState =
         withContext(ioDispatcher) { readSubmissionStatus(submissionId) }
 

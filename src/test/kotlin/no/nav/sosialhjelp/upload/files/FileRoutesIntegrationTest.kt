@@ -1,9 +1,12 @@
 package no.nav.sosialhjelp.upload.files
 
+import io.ktor.client.request.delete
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -21,12 +24,16 @@ import io.mockk.mockk
 import io.mockk.spyk
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.module
 import no.nav.sosialhjelp.upload.testutils.JwtTestUtils
@@ -263,5 +270,95 @@ class FileRoutesIntegrationTest {
             assertEquals(HttpStatusCode.InternalServerError, resp.status)
             assertTrue(rows(corr).isEmpty())
             coVerify { mellomlagringClient.deleteFile(any(), filId, true) }
+        }
+
+    private suspend fun ApplicationTestBuilder.upload(
+        ctx: String = UUID.randomUUID().toString(),
+        token: String = JwtTestUtils.issueToken(),
+    ): Pair<UUID, UUID> {
+        val corr = UUID.randomUUID()
+        assertEquals(HttpStatusCode.Created, postFile(ctx, corr, token = token).status)
+        return rows(corr).single()[UPLOAD.ID]!! to corr
+    }
+
+    private suspend fun ApplicationTestBuilder.delete(
+        id: UUID,
+        token: String = JwtTestUtils.issueToken(),
+    ) = client.delete("/sosialhjelp/upload/files/$id") { header("Authorization", "Bearer $token") }
+
+    @Test
+    fun `delete removes row then file`() =
+        appTest {
+            val filId = stubUpload()
+            val (id, corr) = upload()
+            assertEquals(HttpStatusCode.NoContent, delete(id).status)
+            assertTrue(rows(corr).isEmpty())
+            coVerify { mellomlagringClient.deleteFile(any(), filId, true) }
+        }
+
+    @Test
+    fun `delete still removes row when mellomlagring fails`() =
+        appTest {
+            stubUpload()
+            val (id, corr) = upload()
+            coEvery { mellomlagringClient.deleteFile(any(), any(), any()) } throws RuntimeException("boom")
+            assertEquals(HttpStatusCode.NoContent, delete(id).status)
+            assertTrue(rows(corr).isEmpty())
+        }
+
+    @Test
+    fun `delete returns 404 for other user and after deletion`() =
+        appTest {
+            stubUpload()
+            val (id, corr) = upload()
+            val other = JwtTestUtils.issueToken(subject = "99999999999")
+            assertEquals(HttpStatusCode.NotFound, delete(id, other).status)
+            assertEquals(1, rows(corr).size)
+            assertEquals(HttpStatusCode.NoContent, delete(id).status)
+            assertEquals(HttpStatusCode.NotFound, delete(id).status)
+        }
+
+    @Test
+    fun `download of file uploaded through new endpoint`() =
+        appTest {
+            stubUpload()
+            val (id, _) = upload()
+            val bytes = pdf()
+            coEvery { mellomlagringClient.getFile(any(), any()) } returns bytes
+            val resp =
+                client.get("/sosialhjelp/upload/upload/$id") {
+                    header("Authorization", "Bearer ${JwtTestUtils.issueToken()}")
+                }
+            assertEquals(HttpStatusCode.OK, resp.status)
+            assertTrue(resp.readRawBytes().contentEquals(bytes))
+        }
+
+    private suspend fun ApplicationTestBuilder.status(
+        ctx: String,
+        token: String = JwtTestUtils.issueToken(),
+    ) = client.get("/sosialhjelp/upload/submission/context/$ctx") { header("Authorization", "Bearer $token") }
+
+    @Test
+    fun `status returns empty state without creating a submission`() =
+        appTest {
+            val ctx = UUID.randomUUID().toString()
+            val resp = status(ctx)
+            assertEquals(HttpStatusCode.OK, resp.status)
+            assertEquals("no-store", resp.headers[HttpHeaders.CacheControl])
+            val uploads = Json.parseToJsonElement(resp.bodyAsText()).jsonObject["uploads"]!!.jsonArray
+            assertTrue(uploads.isEmpty())
+            assertEquals(0, PostgresTestContainer.dsl.fetchCount(SUBMISSION, SUBMISSION.CONTEXT_ID.eq(ctx)))
+        }
+
+    @Test
+    fun `status lists uploads and 403 for other owner`() =
+        appTest {
+            stubUpload()
+            val ctx = UUID.randomUUID().toString()
+            val (id, _) = upload(ctx)
+            val body = status(ctx).bodyAsText()
+            assertTrue(body.contains(id.toString()), body)
+            assertTrue(body.contains("COMPLETE"))
+            assertEquals(HttpStatusCode.Forbidden, status(ctx, JwtTestUtils.issueToken(subject = "99999999999")).status)
         }
 }

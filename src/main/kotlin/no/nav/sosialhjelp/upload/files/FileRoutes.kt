@@ -15,7 +15,9 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.RoutingContext
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.utils.io.readBuffer
 import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
@@ -105,6 +107,15 @@ fun Route.configureFileRoutes() {
             is FileUploadResult.Failed ->
                 call.respond(HttpStatusCode.BadGateway, FileFailedResponse(result.stage.name))
             FileUploadResult.Forbidden -> call.respond(HttpStatusCode.Forbidden)
+        }
+    }
+
+    route("/{id}") {
+        verifyUploadOwnership()
+        delete {
+            val fileUploadService: FileUploadService by call.application.dependencies
+            fileUploadService.delete(call.attributes[VerifiedUploadId])
+            call.respond(HttpStatusCode.NoContent)
         }
     }
 }

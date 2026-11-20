@@ -103,6 +103,9 @@ class TusUploadServiceIntegrationTest {
         tusUploadService =
             TusUploadService(
                 tusUploadQueries = tusUploadQueries,
+                fileUploadQueries =
+                    no.nav.sosialhjelp.upload.files
+                        .FileUploadQueries(),
                 submissionResolver = SubmissionResolver(tusSubmissionQueries, dsl, fiksClient),
                 uploadProcessingQueries = uploadProcessingQueries,
                 dsl = dsl,
