@@ -183,6 +183,8 @@ private fun Application.configureDependencies(
         provide(no.nav.sosialhjelp.upload.upload.FilePipeline::class)
         provide(UploadProcessingService::class)
         provide(TusUploadService::class)
+        provide(no.nav.sosialhjelp.upload.files.FileUploadQueries::class)
+        provide(no.nav.sosialhjelp.upload.files.FileUploadService::class)
         provide(SubmissionService::class)
         provide(GotenbergService::class)
         provide(EttersendelseService::class)
