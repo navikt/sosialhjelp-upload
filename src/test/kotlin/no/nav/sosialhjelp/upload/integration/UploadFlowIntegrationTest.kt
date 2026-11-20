@@ -68,6 +68,7 @@ import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.module
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.status.dto.UploadDto
+import no.nav.sosialhjelp.upload.testutils.InMemoryMellomlagring
 import no.nav.sosialhjelp.upload.testutils.JwtTestUtils
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import org.apache.pdfbox.pdmodel.PDDocument
@@ -91,7 +92,8 @@ import kotlin.time.Duration.Companion.seconds
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UploadFlowIntegrationTest {
     private val jwksServer = MockWebServer()
-    private val mellomlagringClient = mockk<MellomlagringClient>(relaxed = true)
+    private var mellomlagring = InMemoryMellomlagring()
+    private val mellomlagringClient get() = mellomlagring.client
     private val fiksClient = mockk<FiksClient>(relaxed = true)
 
     @BeforeAll
@@ -116,7 +118,8 @@ class UploadFlowIntegrationTest {
 
     @BeforeEach
     fun resetMocks() {
-        clearMocks(mellomlagringClient, fiksClient)
+        mellomlagring = InMemoryMellomlagring()
+        clearMocks(fiksClient)
     }
 
     private fun appConfig() =
@@ -296,7 +299,7 @@ class UploadFlowIntegrationTest {
             val contextId = UUID.randomUUID().toString()
             val token = JwtTestUtils.issueToken()
             val filId = UUID.randomUUID()
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            mellomlagring.nextFilIds += filId
 
             createMockSubmission(PostgresTestContainer.dsl, contextId)
 
@@ -322,7 +325,7 @@ class UploadFlowIntegrationTest {
             val contextId = UUID.randomUUID().toString()
             val token = JwtTestUtils.issueToken()
             val filId = UUID.randomUUID()
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            mellomlagring.nextFilIds += filId
 
             createMockSubmission(PostgresTestContainer.dsl, contextId)
             val uploadId = tusUpload(client, contextId, minimalPdf(), token)
@@ -353,7 +356,7 @@ class UploadFlowIntegrationTest {
             val filId = UUID.randomUUID()
             val fiksDigisosId = UUID.randomUUID().toString()
 
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            mellomlagring.nextFilIds += filId
 
             val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
             coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak
@@ -389,8 +392,6 @@ class UploadFlowIntegrationTest {
         appTest {
             val contextId = UUID.randomUUID().toString()
             val token = JwtTestUtils.issueToken()
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns UUID.randomUUID()
-            coEvery { mellomlagringClient.deleteFile(any(), any(), any()) } returns Unit
 
             val submissionId = createMockSubmission(PostgresTestContainer.dsl, contextId)
             val uploadId = tusUpload(client, contextId, minimalPdf(), token)
@@ -430,7 +431,6 @@ class UploadFlowIntegrationTest {
             val fiksDigisosId = UUID.randomUUID().toString()
             val klageId = UUID.randomUUID()
 
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns UUID.randomUUID()
             coEvery { fiksClient.uploadEttersendelse(any(), any(), any(), any(), any(), any()) } returns
                 mockk<HttpResponse> { every { status } returns HttpStatusCode.OK }
 
@@ -545,7 +545,7 @@ class UploadFlowIntegrationTest {
             val filId = UUID.randomUUID()
             val fiksDigisosId = UUID.randomUUID().toString()
 
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            mellomlagring.nextFilIds += filId
 
             val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
             coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak
@@ -603,7 +603,7 @@ class UploadFlowIntegrationTest {
             val contextId = UUID.randomUUID().toString()
             val token = JwtTestUtils.issueToken()
             val filId = UUID.randomUUID()
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            mellomlagring.nextFilIds += filId
 
             createMockSubmission(PostgresTestContainer.dsl, contextId)
 
@@ -631,7 +631,7 @@ class UploadFlowIntegrationTest {
             val contextId = UUID.randomUUID().toString()
             val token = JwtTestUtils.issueToken()
             val filId = UUID.randomUUID()
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returns filId
+            mellomlagring.nextFilIds += filId
 
             createMockSubmission(PostgresTestContainer.dsl, contextId)
 
@@ -663,8 +663,7 @@ class UploadFlowIntegrationTest {
             val token = JwtTestUtils.issueToken()
             val fiksDigisosId = UUID.randomUUID().toString()
 
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returnsMany
-                listOf(UUID.randomUUID(), UUID.randomUUID())
+            mellomlagring.nextFilIds += listOf(UUID.randomUUID(), UUID.randomUUID())
 
             val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
             coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak
@@ -719,8 +718,7 @@ class UploadFlowIntegrationTest {
             val token = JwtTestUtils.issueToken()
             val fiksDigisosId = UUID.randomUUID().toString()
 
-            coEvery { mellomlagringClient.uploadFile(any(), any(), any(), any()) } returnsMany
-                listOf(UUID.randomUUID(), UUID.randomUUID())
+            mellomlagring.nextFilIds += listOf(UUID.randomUUID(), UUID.randomUUID())
 
             val mockSak = mockk<DigisosSak> { every { kommunenummer } returns "0301" }
             coEvery { fiksClient.getSak(fiksDigisosId, any()) } returns mockSak

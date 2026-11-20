@@ -21,7 +21,7 @@ import java.util.UUID
 val VerifiedSubmissionId = AttributeKey<UUID>("VerifiedSubmissionId")
 
 /**
- * Set by [no.nav.sosialhjelp.upload.tus.verifyUploadOwnership] or [verifySubmissionOwnership]
+ * Set by [no.nav.sosialhjelp.upload.files.verifyUploadOwnership] or [verifySubmissionOwnership]
  * — the authenticated user's personident.
  */
 val VerifiedPersonident = AttributeKey<String>("VerifiedPersonident")

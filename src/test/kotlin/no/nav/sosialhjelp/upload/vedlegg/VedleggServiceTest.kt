@@ -1,12 +1,17 @@
 package no.nav.sosialhjelp.upload.vedlegg
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
+import no.nav.sosialhjelp.upload.submission.MellomlagringReconciler
+import no.nav.sosialhjelp.upload.testutils.InMemoryMellomlagring
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.validation.SubmissionFilesMissingException
+import no.nav.sosialhjelp.upload.validation.SubmissionUploadsInProgressException
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -14,6 +19,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -22,12 +28,20 @@ class VedleggServiceTest {
     private val dsl: DSLContext = PostgresTestContainer.dsl
     private lateinit var uploadRepository: UploadRepository
     private lateinit var service: VedleggService
+    private lateinit var mellomlagring: InMemoryMellomlagring
 
     @BeforeAll
     fun setup() {
         PostgresTestContainer.migrate()
         uploadRepository = UploadRepository()
-        service = VedleggService(dsl, uploadRepository, mockk(relaxed = true))
+        mellomlagring = InMemoryMellomlagring()
+        service =
+            VedleggService(
+                dsl,
+                uploadRepository,
+                mockk(relaxed = true),
+                MellomlagringReconciler(mellomlagring.client, uploadRepository, dsl, SimpleMeterRegistry()),
+            )
     }
 
     @BeforeEach
@@ -45,11 +59,19 @@ class VedleggServiceTest {
         sha512: String = "abc123",
     ): UUID {
         val uploadId = UUID.randomUUID()
+        val navEksternRefId =
+            dsl
+                .select(SUBMISSION.NAV_EKSTERN_REF_ID)
+                .from(SUBMISSION)
+                .where(SUBMISSION.ID.eq(submissionId))
+                .fetchSingle(SUBMISSION.NAV_EKSTERN_REF_ID)!!
+        val filId = mellomlagring.put(navEksternRefId, mellomlagringFilnavn)
         dsl.transaction { config ->
             config
                 .dsl()
                 .insertInto(UPLOAD)
                 .set(UPLOAD.ID, uploadId)
+                .set(UPLOAD.FIL_ID, filId)
                 .set(UPLOAD.SUBMISSION_ID, submissionId)
                 .set(UPLOAD.ORIGINAL_FILENAME, filename)
                 .set(UPLOAD.MELLOMLAGRING_FILNAVN, mellomlagringFilnavn)
@@ -146,11 +168,52 @@ class VedleggServiceTest {
                     .set(UPLOAD.ID, uploadId)
                     .set(UPLOAD.SUBMISSION_ID, submissionId)
                     .set(UPLOAD.ORIGINAL_FILENAME, "pending.pdf")
-                    .set(UPLOAD.PROCESSING_STATUS, "PENDING")
+                    .set(UPLOAD.PROCESSING_STATUS, "FAILED")
                     .execute()
             }
 
             val result = service.getVedleggByNavEksternRefId(navEksternRefId)
             assertTrue(result.vedlegg.isEmpty())
+        }
+
+    @Test
+    fun `getVedleggByNavEksternRefId throws and deletes row when file is missing`() =
+        runTest {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val submissionId = createMockSubmissionWithKategori(navEksternRefId, kategori = "lonnslipp")
+            insertCompleteUpload(submissionId, "a.pdf", "mella.pdf")
+            mellomlagring.files(navEksternRefId).forEach {
+                mellomlagring.client.deleteFile(navEksternRefId, UUID.fromString(it.filId))
+            }
+
+            val ex =
+                assertFailsWith<SubmissionFilesMissingException> {
+                    service.getVedleggByNavEksternRefId(
+                        navEksternRefId,
+                    )
+                }
+
+            assertEquals(listOf("a.pdf"), ex.missing.map { it.originalFilename })
+            assertEquals(0, dsl.fetchCount(UPLOAD))
+        }
+
+    @Test
+    fun `getVedleggByNavEksternRefId throws when uploads are in progress`() =
+        runTest {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val submissionId = createMockSubmissionWithKategori(navEksternRefId)
+            dsl
+                .insertInto(UPLOAD)
+                .set(UPLOAD.ID, UUID.randomUUID())
+                .set(UPLOAD.SUBMISSION_ID, submissionId)
+                .set(UPLOAD.ORIGINAL_FILENAME, "p.pdf")
+                .set(UPLOAD.PROCESSING_STATUS, "PENDING")
+                .execute()
+
+            assertFailsWith<SubmissionUploadsInProgressException> {
+                service.getVedleggByNavEksternRefId(
+                    navEksternRefId,
+                )
+            }
         }
 }

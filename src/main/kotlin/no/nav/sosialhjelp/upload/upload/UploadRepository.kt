@@ -57,6 +57,15 @@ data class SubmissionResources(
     val gcsKeys: List<String>,
 )
 
+/** Minimal view of an upload row, used to reconcile the DB against Fiks mellomlagring. */
+data class UploadForReconciliation(
+    val id: UUID,
+    val originalFilename: String?,
+    val filId: UUID?,
+    val mellomlagringFilnavn: String?,
+    val status: Status,
+)
+
 class UploadRepository {
     /**
      * Returns the ids of all submissions for [navEksternRefId], optionally narrowed to [kategori].
@@ -200,4 +209,49 @@ class UploadRepository {
                     sha512 = it.get(UPLOAD.SHA512),
                 )
             }
+
+    /**
+     * All uploads under [navEksternRefId], across sibling submissions (a søknad has one submission
+     * per kategori under the same id).
+     */
+    fun getUploadsByNavEksternRefId(
+        tx: Configuration,
+        navEksternRefId: String,
+    ): List<UploadForReconciliation> =
+        tx
+            .dsl()
+            .select(
+                UPLOAD.ID,
+                UPLOAD.ORIGINAL_FILENAME,
+                UPLOAD.FIL_ID,
+                UPLOAD.MELLOMLAGRING_FILNAVN,
+                UPLOAD.PROCESSING_STATUS,
+            ).from(UPLOAD)
+            .join(SUBMISSION)
+            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
+            .where(SUBMISSION.NAV_EKSTERN_REF_ID.eq(navEksternRefId))
+            .fetch()
+            .map {
+                UploadForReconciliation(
+                    id = it.get(UPLOAD.ID)!!,
+                    originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),
+                    filId = it.get(UPLOAD.FIL_ID),
+                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),
+                    status =
+                        it.get(UPLOAD.PROCESSING_STATUS)?.let { s -> Status.valueOf(s) }
+                            ?: error("No processing status. Was it not selected?"),
+                )
+            }
+
+    fun deleteUploads(
+        tx: Configuration,
+        uploadIds: Collection<UUID>,
+    ): Int {
+        if (uploadIds.isEmpty()) return 0
+        return tx
+            .dsl()
+            .deleteFrom(UPLOAD)
+            .where(UPLOAD.ID.`in`(uploadIds))
+            .execute()
+    }
 }

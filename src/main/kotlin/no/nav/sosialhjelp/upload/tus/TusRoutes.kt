@@ -11,6 +11,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
+import no.nav.sosialhjelp.upload.files.VerifiedUploadId
+import no.nav.sosialhjelp.upload.files.verifyUploadOwnership
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.MellomlagringDeleteException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
