@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MellomlagringReconciler.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.submission</a> &gt; <span class="el_source">MellomlagringReconciler.kt</span></div><h1>MellomlagringReconciler.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.submission
+
+import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.upload.Status
+import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.validation.MissingFileDto
+import org.jooq.DSLContext
+import org.slf4j.LoggerFactory
+import java.util.UUID
+
+/**
+ * Makes Fiks mellomlagring the source of truth for which files exist, right before a submit.
+ *
+ * - A file without a row is an orphan and is deleted. Fiks rejects an innsending when
+ *   mellomlagring holds extra files.
+ * - A COMPLETE row whose file is gone describes nothing real. The row is deleted and reported.
+ *
+ * Only this service writes to mellomlagring under a navEksternRefId, so every file except
+ * [ETTERSENDELSE_PDF] that has no row is ours to delete.
+ *
+ * Assumes no upload to the same navEksternRefId runs concurrently with a submit; the client
+ * must not submit while an upload is in flight. If it happens anyway, every interleaving
+ * recovers on retry without locking:
+ * - file stored after the listing: Fiks rejects the extra file, and the retry finds the row.
+ * - file deleted as orphan, row inserted afterwards: the retry reports it as missing
+ *   ([Result.Missing]) and the user uploads it again.
+ */
+<span class="fc" id="L32">class MellomlagringReconciler(</span>
+<span class="fc" id="L33">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L34">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L35">    private val dsl: DSLContext,</span>
+<span class="fc" id="L36">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L37">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L38">) {</span>
+    sealed interface Result {
+        data object Clean : Result
+
+        data object InProgress : Result
+
+<span class="fc" id="L44">        data class Missing(</span>
+<span class="fc" id="L45">            val uploads: List&lt;MissingUpload&gt;,</span>
+        ) : Result
+    }
+
+<span class="fc" id="L49">    data class MissingUpload(</span>
+<span class="fc" id="L50">        val uploadId: UUID,</span>
+<span class="fc" id="L51">        val originalFilename: String?,</span>
+    )
+
+<span class="fc" id="L54">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
+<span class="fc" id="L56">    suspend fun reconcile(navEksternRefId: String): Result {</span>
+<span class="fc" id="L57">        val rows =</span>
+<span class="fc" id="L58">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L59">                dsl.transactionResult { tx -&gt; uploadRepository.getUploadsByNavEksternRefId(tx, navEksternRefId) }</span>
+            }
+
+        // A TUS upload in flight may be landing its file right now. Touch nothing.
+<span class="pc bpc" id="L63" title="1 of 6 branches missed.">        if (rows.any { it.status == Status.PENDING || it.status == Status.PROCESSING }) return Result.InProgress</span>
+
+<span class="fc" id="L65">        val files = mellomlagringClient.listFiles(navEksternRefId)</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        val listedFilIds = files.mapNotNull { runCatching { UUID.fromString(it.filId) }.getOrNull() }.toSet()</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        val knownFilIds = rows.filter { it.status == Status.COMPLETE }.mapNotNull { it.filId }.toSet()</span>
+
+<span class="fc" id="L69">        files</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            .filter { it.filnavn != ETTERSENDELSE_PDF }</span>
+<span class="fc" id="L71">            .forEach { file -&gt;</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                val filId = runCatching { UUID.fromString(file.filId) }.getOrNull()</span>
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">                if (filId != null &amp;&amp; filId in knownFilIds) return@forEach</span>
+<span class="fc" id="L74">                logger.warn(&quot;Deleting orphan file {} from mellomlagring for {}&quot;, file.filId, navEksternRefId)</span>
+                // Throws on failure: submitting with a known orphan would be rejected by Fiks anyway.
+<span class="fc" id="L76">                mellomlagringClient.deleteFile(</span>
+<span class="fc" id="L77">                    navEksternRefId,</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                    filId ?: error(&quot;Orphan file has non-UUID filId: ${file.filId}&quot;),</span>
+<span class="fc" id="L79">                    throwOnError = true,</span>
+                )
+<span class="fc" id="L81">                meterRegistry.counter(&quot;mellomlagring.reconcile.orphan_deleted&quot;).increment()</span>
+<span class="fc" id="L82">            }</span>
+
+<span class="fc" id="L84">        val missing =</span>
+<span class="pc bpc" id="L85" title="1 of 6 branches missed.">            rows.filter { it.status == Status.COMPLETE &amp;&amp; (it.filId == null || it.filId !in listedFilIds) }</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (missing.isEmpty()) return Result.Clean</span>
+
+<span class="fc" id="L88">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L89">            dsl.transaction { tx -&gt; uploadRepository.deleteUploads(tx, missing.map { it.id }) }</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        meterRegistry.counter(&quot;mellomlagring.reconcile.missing&quot;).increment(missing.size.toDouble())</span>
+<span class="fc" id="L92">        logger.warn(&quot;{} uploads for {} had no file in mellomlagring; rows deleted&quot;, missing.size, navEksternRefId)</span>
+<span class="fc" id="L93">        return Result.Missing(missing.map { MissingUpload(it.id, it.originalFilename) })</span>
+    }
+
+    companion object {
+        const val ETTERSENDELSE_PDF = &quot;ettersendelse.pdf&quot;
+    }
+}
+
+fun MellomlagringReconciler.Result.Missing.toDtos(): List&lt;MissingFileDto&gt; =
+<span class="fc" id="L102">    uploads.map { MissingFileDto(it.uploadId.toString(), it.originalFilename) }</span>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
