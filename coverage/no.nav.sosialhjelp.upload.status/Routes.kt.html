@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Routes.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.status</a> &gt; <span class="el_source">Routes.kt</span></div><h1>Routes.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.status
 
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.response.header
+import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
@@ -15,63 +19,86 @@ import kotlinx.serialization.json.Json.Default
 import kotlinx.serialization.serializer
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.database.notify.SubmissionUpdateNotification
+import no.nav.sosialhjelp.upload.status.dto.SubmissionState
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
+@Suppress(&quot;LongMethod&quot;)
 fun Route.configureStatusRoutes() {
-<span class="fc" id="L24">    val statusChannelFactory: SubmissionNotificationService by application.dependencies</span>
-<span class="fc" id="L25">    val submissionService: SubmissionService by application.dependencies</span>
-<span class="fc" id="L26">    val meterRegistry: MeterRegistry by application.dependencies</span>
+<span class="fc" id="L30">    val statusChannelFactory: SubmissionNotificationService by application.dependencies</span>
+<span class="fc" id="L31">    val submissionService: SubmissionService by application.dependencies</span>
+<span class="fc" id="L32">    val meterRegistry: MeterRegistry by application.dependencies</span>
 
-<span class="fc" id="L28">    val activeConnections = AtomicInteger(0)</span>
-<span class="pc" id="L29">    meterRegistry.gauge(&quot;sse.connections.active&quot;, activeConnections) { it.toDouble() }</span>
+<span class="fc" id="L34">    val activeConnections = AtomicInteger(0)</span>
+<span class="pc" id="L35">    meterRegistry.gauge(&quot;sse.connections.active&quot;, activeConnections) { it.toDouble() }</span>
 
-<span class="fc" id="L31">    sse(&quot;/status/{id}&quot;, serialize = { typeInfo: TypeInfo, value: Any -&gt;</span>
-<span class="fc" id="L32">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
-<span class="fc" id="L33">        Default.encodeToString(serializer, value)</span>
-<span class="pc bpc" id="L34" title="3 of 7 branches missed.">    }) {</span>
-<span class="fc" id="L35">        activeConnections.incrementAndGet()</span>
-<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        val id = call.parameters[&quot;id&quot;].orEmpty()</span>
-<span class="fc" id="L37">        try {</span>
-<span class="pc bpc" id="L38" title="2 of 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
+<span class="pc bpc" id="L37" title="6 of 7 branches missed.">    get(&quot;/submission/context/{contextId}&quot;) {</span>
+<span class="fc" id="L38">        val personident =</span>
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">            call.principal&lt;JWTPrincipal&gt;()?.subject ?: return@get call.respond(HttpStatusCode.Unauthorized)</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        val contextId = call.parameters[&quot;contextId&quot;].orEmpty()</span>
+<span class="fc" id="L41">        call.response.header(HttpHeaders.CacheControl, &quot;no-store&quot;)</span>
+<span class="fc" id="L42">        try {</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            val submissionId = submissionService.find(contextId, personident)</span>
+<span class="fc" id="L44">            call.respond(</span>
+<span class="pc bpc" id="L45" title="2 of 6 branches missed.">                submissionId?.let { submissionService.getSubmissionStatus(it) }</span>
+<span class="fc" id="L46">                    ?: SubmissionState(</span>
+<span class="fc" id="L47">                        &quot;&quot;,</span>
+<span class="fc" id="L48">                        emptyList(),</span>
+<span class="fc" id="L49">                        validations = emptyList(),</span>
+<span class="fc" id="L50">                        status = SubmissionState.Status.ACTIVE,</span>
+                    ),
+            )
+<span class="fc" id="L53">        } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {</span>
+<span class="fc" id="L54">            call.respond(HttpStatusCode.Forbidden)</span>
+        }
+<span class="fc" id="L56">    }</span>
 
-<span class="fc" id="L40">            heartbeat {</span>
-<span class="fc" id="L41">                period = 10.seconds</span>
-<span class="fc" id="L42">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;Beating&quot;}&quot;&quot;&quot;)</span>
-<span class="fc" id="L43">            }</span>
+<span class="fc" id="L58">    sse(&quot;/status/{id}&quot;, serialize = { typeInfo: TypeInfo, value: Any -&gt;</span>
+<span class="fc" id="L59">        val serializer = Default.serializersModule.serializer(typeInfo.kotlinType!!)</span>
+<span class="fc" id="L60">        Default.encodeToString(serializer, value)</span>
+<span class="pc bpc" id="L61" title="3 of 7 branches missed.">    }) {</span>
+<span class="fc" id="L62">        activeConnections.incrementAndGet()</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        val id = call.parameters[&quot;id&quot;].orEmpty()</span>
+<span class="fc" id="L64">        try {</span>
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">            val personident = call.principal&lt;JWTPrincipal&gt;()?.subject ?: error(&quot;personident is required&quot;)</span>
 
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (id.isBlank()) {</span>
-<span class="nc" id="L46">                error(&quot;id parameter is required&quot;)</span>
+<span class="fc" id="L67">            heartbeat {</span>
+<span class="fc" id="L68">                period = 10.seconds</span>
+<span class="fc" id="L69">                event = ServerSentEvent(&quot;&quot;&quot;{&quot;heartbeat&quot;: &quot;Beating&quot;}&quot;&quot;&quot;)</span>
+<span class="fc" id="L70">            }</span>
+
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (id.isBlank()) {</span>
+<span class="nc" id="L73">                error(&quot;id parameter is required&quot;)</span>
             }
-<span class="pc bpc" id="L48" title="2 of 4 branches missed.">            call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            call.request.headers[&quot;Authorization&quot;]?.removePrefix(&quot;Bearer &quot;) ?: error(&quot;Authorization header is required&quot;)</span>
 
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            val submissionId = submissionService.getOrCreate(id, personident)</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            val submissionId = submissionService.getOrCreate(id, personident)</span>
 
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            send(submissionService.getSubmissionStatus(submissionId))</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            send(submissionService.getSubmissionStatus(submissionId))</span>
 
-<span class="fc" id="L54">            statusChannelFactory</span>
-<span class="fc" id="L55">                .getSubmissionFlow(submissionId)</span>
-<span class="pc bpc" id="L56" title="2 of 4 branches missed.">                .onEach {</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">                    if (it == SubmissionUpdateNotification.UpdateType.UPDATE) {</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                        send(submissionService.getSubmissionStatus(submissionId))</span>
+<span class="fc" id="L81">            statusChannelFactory</span>
+<span class="fc" id="L82">                .getSubmissionFlow(submissionId)</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">                .onEach {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                    if (it == SubmissionUpdateNotification.UpdateType.UPDATE) {</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                        send(submissionService.getSubmissionStatus(submissionId))</span>
                     }
-<span class="pc bpc" id="L60" title="2 of 6 branches missed.">                }.first { it == SubmissionUpdateNotification.UpdateType.DELETE }</span>
-<span class="nc" id="L61">        } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {</span>
-<span class="nc" id="L62">            application.environment.log.warn(&quot;SSE /status/$id: submission owned by another user, closing connection&quot;)</span>
-<span class="nc" id="L63">            runCatching {</span>
-<span class="nc bnc" id="L64" title="All 2 branches missed.">                send(ServerSentEvent(&quot;&quot;&quot;{&quot;error&quot;:&quot;forbidden&quot;}&quot;&quot;&quot;))</span>
-<span class="nc bnc" id="L65" title="All 2 branches missed.">            }.onFailure {</span>
-<span class="nc" id="L66">                application.environment.log.info(&quot;Fikk feil ved sending av forbidden event. Ignorerer&quot;, it)</span>
-<span class="nc" id="L67">            }</span>
-<span class="nc" id="L68">        } catch (_: ChannelWriteException) {</span>
+<span class="pc bpc" id="L87" title="2 of 6 branches missed.">                }.first { it == SubmissionUpdateNotification.UpdateType.DELETE }</span>
+<span class="nc" id="L88">        } catch (_: TusSubmissionQueries.SubmissionOwnedByAnotherUserException) {</span>
+<span class="nc" id="L89">            application.environment.log.warn(&quot;SSE /status/$id: submission owned by another user, closing connection&quot;)</span>
+<span class="nc" id="L90">            runCatching {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                send(ServerSentEvent(&quot;&quot;&quot;{&quot;error&quot;:&quot;forbidden&quot;}&quot;&quot;&quot;))</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            }.onFailure {</span>
+<span class="nc" id="L93">                application.environment.log.info(&quot;Fikk feil ved sending av forbidden event. Ignorerer&quot;, it)</span>
+<span class="nc" id="L94">            }</span>
+<span class="nc" id="L95">        } catch (_: ChannelWriteException) {</span>
             // Client disconnected (tab closed, navigated away, network drop) — expected for SSE
-<span class="nc" id="L70">        } catch (_: IOException) {</span>
+<span class="nc" id="L97">        } catch (_: IOException) {</span>
             // Client disconnected — expected for SSE
         } finally {
-<span class="fc" id="L73">            activeConnections.decrementAndGet()</span>
+<span class="fc" id="L100">            activeConnections.decrementAndGet()</span>
         }
-<span class="fc" id="L75">    }</span>
-<span class="fc" id="L76">}</span>
+<span class="fc" id="L102">    }</span>
+<span class="fc" id="L103">}</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
