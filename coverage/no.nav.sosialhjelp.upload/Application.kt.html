@@ -131,7 +131,6 @@ fun Application.module() {
         processingScope.cancel()
         notificationScope.cancel()
         scopes.forEach { it.cancel() }
-        (dataSource as? AutoCloseable)?.close()
     }
 }
 
@@ -145,24 +144,24 @@ private fun Application.configureDependencies(
     isMock: Boolean,
 ) {
     dependencies {
-<span class="nc" id="L148">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="fc" id="L149">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
-<span class="nc" id="L150">        provide&lt;DataSource&gt; { dataSource }</span>
-<span class="fc" id="L151">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
-<span class="pc bpc" id="L152" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (isMock) {</span>
-<span class="fc" id="L154">                create(EncryptionServiceMock::class)</span>
+<span class="nc" id="L147">        provide&lt;PrometheusMeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="fc" id="L148">        provide&lt;MeterRegistry&gt; { appMicrometerRegistry }</span>
+<span class="nc" id="L149">        provide&lt;DataSource&gt; { dataSource }</span>
+<span class="fc" id="L150">        provide&lt;DSLContext&gt; { DSL.using(dataSource, SQLDialect.POSTGRES) }</span>
+<span class="pc bpc" id="L151" title="3 of 4 branches missed.">        provide&lt;EncryptionService&gt; {</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (isMock) {</span>
+<span class="fc" id="L153">                create(EncryptionServiceMock::class)</span>
             } else {
-<span class="nc" id="L156">                create(EncryptionServiceImpl::class)</span>
-<span class="fc" id="L157">            }</span>
+<span class="nc" id="L155">                create(EncryptionServiceImpl::class)</span>
+<span class="fc" id="L156">            }</span>
         }
-<span class="fc" id="L159">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
+<span class="fc" id="L158">        provide&lt;ChunkStorage&gt; { chunkStorage }</span>
         // Wrapped to keep DI from closing the shared Dispatchers.IO on shutdown.
-<span class="fc" id="L161">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO.limitedParallelism(IO_PARALLELISM, &quot;app-io&quot;) }</span>
+<span class="fc" id="L160">        provide&lt;CoroutineDispatcher&gt; { Dispatchers.IO.limitedParallelism(IO_PARALLELISM, &quot;app-io&quot;) }</span>
         // Deliberately bounded: PDF parsing and CMS encryption must not be able to saturate the host.
-<span class="fc" id="L163">        provide { CpuDispatcher(Dispatchers.Default.limitedParallelism(cpuParallelism(), &quot;app-cpu&quot;)) }</span>
-<span class="fc" id="L164">        provide&lt;CoroutineScope&gt; { processingScope }</span>
-<span class="fc" id="L165">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
+<span class="fc" id="L162">        provide { CpuDispatcher(Dispatchers.Default.limitedParallelism(cpuParallelism(), &quot;app-cpu&quot;)) }</span>
+<span class="fc" id="L163">        provide&lt;CoroutineScope&gt; { processingScope }</span>
+<span class="fc" id="L164">        provide&lt;SubmissionNotificationService&gt; { SubmissionNotificationService(dataSource, notificationScope) }</span>
         provide(TexasClient::class)
         provide(CMSKrypteringImpl::class)
         provide(VirusScanner::class)
@@ -180,13 +179,8 @@ private fun Application.configureDependencies(
         provide(ChunkAssemblyService::class)
         provide(FileConversionService::class)
         provide(MellomlagringStorageService::class)
-        provide(no.nav.sosialhjelp.upload.submission.SubmissionResolver::class)
-        provide(no.nav.sosialhjelp.upload.submission.MellomlagringReconciler::class)
-        provide(no.nav.sosialhjelp.upload.upload.FilePipeline::class)
         provide(UploadProcessingService::class)
         provide(TusUploadService::class)
-        provide(no.nav.sosialhjelp.upload.files.FileUploadQueries::class)
-        provide(no.nav.sosialhjelp.upload.files.FileUploadService::class)
         provide(SubmissionService::class)
         provide(GotenbergService::class)
         provide(EttersendelseService::class)
@@ -200,21 +194,21 @@ private fun Application.configureDependencies(
 private fun Application.startBackgroundJobs(): List&lt;CoroutineScope&gt; {
     val recoveryService: UploadRecoveryService by dependencies
     val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-<span class="nc bnc" id="L203" title="All 4 branches missed.">    recoveryScope.launch {</span>
-<span class="nc" id="L204">        while (true) {</span>
-<span class="nc bnc" id="L205" title="All 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc bnc" id="L206" title="All 2 branches missed.">            runCatching { recoveryService.recoverAll() }</span>
-<span class="nc bnc" id="L207" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L197" title="All 4 branches missed.">    recoveryScope.launch {</span>
+<span class="nc" id="L198">        while (true) {</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            runCatching { recoveryService.recoverAll() }</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Upload recovery sweep failed&quot;, it) }</span>
         }
     }
 
     val cleanupService: StaleSubmissionCleanupService by dependencies
     val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-<span class="nc bnc" id="L213" title="All 4 branches missed.">    cleanupScope.launch {</span>
-<span class="nc" id="L214">        while (true) {</span>
-<span class="nc bnc" id="L215" title="All 2 branches missed.">            delay(1.minutes)</span>
-<span class="nc bnc" id="L216" title="All 2 branches missed.">            runCatching { cleanupService.runCleanup() }</span>
-<span class="nc bnc" id="L217" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
+<span class="nc bnc" id="L207" title="All 4 branches missed.">    cleanupScope.launch {</span>
+<span class="nc" id="L208">        while (true) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            delay(1.minutes)</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            runCatching { cleanupService.runCleanup() }</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                .onFailure { log.warn(&quot;Retention sweep failed&quot;, it) }</span>
         }
     }
     return listOf(cleanupScope, recoveryScope)
