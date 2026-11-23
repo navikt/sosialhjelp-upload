@@ -30,7 +30,7 @@ import java.io.IOException
 
 private const val FORM_HEADROOM = 64L * 1024
 private const val MAX_BODY = MAX_FILE_SIZE + FORM_HEADROOM
-private const val MAX_FIELD_VALUE = 1024L
+private const val MAX_FIELD_VALUE = 1024
 
 // Only these form fields are read. Anything else is ignored, so a client cannot make us retain
 // arbitrarily many fields (chunked requests have no Content-Length to reject up front).
@@ -135,13 +135,17 @@ private suspend fun RoutingContext.parseMultipart(): MultipartResult {
     var data: ByteArray? = null
     var problem: MultipartResult? = null
     try {
-        call.receiveMultipart(formFieldLimit = MAX_FIELD_VALUE).forEachPart { part ->
+        call.receiveMultipart(formFieldLimit = MAX_BODY).forEachPart { part ->
             try {
                 // After the first problem, remaining parts are only disposed.
                 if (problem != null) return@forEachPart
                 when (part) {
                     is PartData.FormItem ->
-                        part.name?.takeIf { it in ACCEPTED_FIELDS }?.let { fields[it] = part.value }
+                        if (part.value.toByteArray().size > MAX_FIELD_VALUE) {
+                            problem = MultipartResult.TooLarge
+                        } else {
+                            part.name?.takeIf { it in ACCEPTED_FIELDS }?.let { fields[it] = part.value }
+                        }
                     is PartData.FileItem ->
                         if (data != null) {
                             problem = MultipartResult.MultipleFiles
@@ -160,8 +164,10 @@ private suspend fun RoutingContext.parseMultipart(): MultipartResult {
                 part.release()
             }
         }
-    } catch (_: IOException) {
-        return MultipartResult.Malformed
+    } catch (e: IOException) {
+        // Ktor reports an oversized part as an IOException mentioning 'formFieldLimit'.
+        val limitExceeded = e.message?.contains("formFieldLimit") == true
+        return if (limitExceeded) MultipartResult.TooLarge else MultipartResult.Malformed
     }
     problem?.let { return it }
     val name = filename
