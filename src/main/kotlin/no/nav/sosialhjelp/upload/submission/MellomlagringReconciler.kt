@@ -21,6 +21,13 @@ import java.util.UUID
  *
  * Only this service writes to mellomlagring under a navEksternRefId, so every file except
  * [ETTERSENDELSE_PDF] that has no row is ours to delete.
+ *
+ * Assumes no upload to the same navEksternRefId runs concurrently with a submit; the client
+ * must not submit while an upload is in flight. If it happens anyway, every interleaving
+ * recovers on retry without locking:
+ * - file stored after the listing: Fiks rejects the extra file, and the retry finds the row.
+ * - file deleted as orphan, row inserted afterwards: the retry reports it as missing
+ *   ([Result.Missing]) and the user uploads it again.
  */
 class MellomlagringReconciler(
     private val mellomlagringClient: MellomlagringClient,

@@ -30,6 +30,12 @@ import java.io.IOException
 
 private const val FORM_HEADROOM = 64L * 1024
 private const val MAX_BODY = MAX_FILE_SIZE + FORM_HEADROOM
+private const val MAX_FIELD_VALUE = 1024L
+
+// Only these form fields are read. Anything else is ignored, so a client cannot make us retain
+// arbitrarily many fields (chunked requests have no Content-Length to reject up front).
+private val ACCEPTED_FIELDS =
+    setOf("contextId", "correlationId", "fiksDigisosId", "navEksternRefId", "kategori", "automaticCleanup")
 
 @Serializable
 data class FileUploadResponse(
@@ -129,12 +135,13 @@ private suspend fun RoutingContext.parseMultipart(): MultipartResult {
     var data: ByteArray? = null
     var problem: MultipartResult? = null
     try {
-        call.receiveMultipart(formFieldLimit = MAX_BODY).forEachPart { part ->
+        call.receiveMultipart(formFieldLimit = MAX_FIELD_VALUE).forEachPart { part ->
             try {
                 // After the first problem, remaining parts are only disposed.
                 if (problem != null) return@forEachPart
                 when (part) {
-                    is PartData.FormItem -> part.name?.let { fields[it] = part.value }
+                    is PartData.FormItem ->
+                        part.name?.takeIf { it in ACCEPTED_FIELDS }?.let { fields[it] = part.value }
                     is PartData.FileItem ->
                         if (data != null) {
                             problem = MultipartResult.MultipleFiles

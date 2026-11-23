@@ -16,6 +16,10 @@ class TusUploadQueries {
         message: String,
     ) : RuntimeException(message)
 
+    /**
+     * Returns the new upload id, or null if (submissionId, correlationId) already exists
+     * (a retried creation request). Use [findIdByCorrelationId] to get the existing one.
+     */
     fun create(
         tx: Configuration,
         submissionId: UUID,
@@ -35,11 +39,28 @@ class TusUploadQueries {
             .set(UPLOAD.UPLOAD_OFFSET, 0L)
             .set(UPLOAD.GCS_KEY, gcsKey)
             .set(UPLOAD.CORRELATION_ID, correlationId)
+            .onConflict(UPLOAD.SUBMISSION_ID, UPLOAD.CORRELATION_ID)
+            .where(UPLOAD.CORRELATION_ID.isNotNull)
+            .doNothing()
             .returning(UPLOAD.ID)
             .fetchOne()
             ?.get(UPLOAD.ID)
             ?.also { UploadNotifications.notifyChange(tx, it) }
     }
+
+    fun findIdByCorrelationId(
+        tx: Configuration,
+        submissionId: UUID,
+        correlationId: UUID,
+    ): UUID? =
+        tx
+            .dsl()
+            .select(UPLOAD.ID)
+            .from(UPLOAD)
+            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
+            .and(UPLOAD.CORRELATION_ID.eq(correlationId))
+            .fetchOne()
+            ?.get(UPLOAD.ID)
 
     fun getUploadInfo(
         tx: Configuration,

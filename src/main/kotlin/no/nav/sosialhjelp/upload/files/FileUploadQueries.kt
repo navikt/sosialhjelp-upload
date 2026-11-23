@@ -5,7 +5,9 @@ import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.upload.PipelineResult
 import no.nav.sosialhjelp.upload.upload.Status
 import no.nav.sosialhjelp.upload.upload.Upload
+import no.nav.sosialhjelp.upload.upload.UploadNotifications
 import org.jooq.Configuration
+import org.jooq.exception.NoDataFoundException
 import java.util.UUID
 
 class FileUploadQueries {
@@ -37,6 +39,7 @@ class FileUploadQueries {
             .set(UPLOAD.CONTENT_TYPE, stored.contentType)
             .set(UPLOAD.PROCESSING_STATUS, Status.COMPLETE.name)
             .execute()
+        UploadNotifications.notifyChange(tx, uploadId)
     }
 
     fun isOwnedByUser(
@@ -70,7 +73,12 @@ class FileUploadQueries {
     fun getUpload(
         tx: Configuration,
         uploadId: UUID,
-    ): Upload =
+    ): Upload = findUpload(tx, uploadId) ?: throw NoDataFoundException("No upload with id $uploadId")
+
+    fun findUpload(
+        tx: Configuration,
+        uploadId: UUID,
+    ): Upload? =
         tx
             .dsl()
             .select(
@@ -87,8 +95,8 @@ class FileUploadQueries {
             .join(SUBMISSION)
             .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
             .where(UPLOAD.ID.eq(uploadId))
-            .fetchSingle()
-            .let {
+            .fetchOne()
+            ?.let {
                 Upload(
                     id = it.get(UPLOAD.ID),
                     originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),

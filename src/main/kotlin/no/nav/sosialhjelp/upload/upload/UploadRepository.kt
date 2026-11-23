@@ -248,10 +248,21 @@ class UploadRepository {
         uploadIds: Collection<UUID>,
     ): Int {
         if (uploadIds.isEmpty()) return 0
-        return tx
-            .dsl()
-            .deleteFrom(UPLOAD)
-            .where(UPLOAD.ID.`in`(uploadIds))
-            .execute()
+        // Resolve submissions before the rows disappear, so SSE subscribers get refreshed.
+        val submissionIds =
+            tx
+                .dsl()
+                .selectDistinct(UPLOAD.SUBMISSION_ID)
+                .from(UPLOAD)
+                .where(UPLOAD.ID.`in`(uploadIds))
+                .fetch(UPLOAD.SUBMISSION_ID)
+        val deleted =
+            tx
+                .dsl()
+                .deleteFrom(UPLOAD)
+                .where(UPLOAD.ID.`in`(uploadIds))
+                .execute()
+        submissionIds.forEach { tx.dsl().execute("SELECT pg_notify('submission_update', ?)", it.toString()) }
+        return deleted
     }
 }

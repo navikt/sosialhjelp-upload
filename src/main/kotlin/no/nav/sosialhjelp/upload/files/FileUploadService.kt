@@ -83,7 +83,10 @@ class FileUploadService(
         val existing = findByCorrelationId(resolved.submissionId, correlationId)
         if (existing?.filId != null) return FileUploadResult.Stored(existing, resolved.submissionId, replay = true)
 
-        limitViolation(resolved.submissionId, data.size.toLong())?.let { return FileUploadResult.Rejected(listOf(it)) }
+        // Cheap early exit. The authoritative size check needs the stored size, so it runs after the pipeline.
+        limitViolation(resolved.submissionId, newStoredSize = null)?.let {
+            return FileUploadResult.Rejected(listOf(it))
+        }
 
         val uploadId = UUID.randomUUID()
         val stored =
@@ -92,6 +95,11 @@ class FileUploadService(
                 is PipelineResult.Failed -> return FileUploadResult.Failed(result.stage)
                 is PipelineResult.Stored -> result
             }
+
+        limitViolation(resolved.submissionId, newStoredSize = stored.storedSize)?.let {
+            deleteStoredFile(resolved.navEksternRefId, stored.filId)
+            return FileUploadResult.Rejected(listOf(it))
+        }
 
         try {
             withContext(ioDispatcher) {
@@ -131,8 +139,7 @@ class FileUploadService(
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->
                     val upload =
-                        runCatching { fileUploadQueries.getUpload(tx, uploadId) }.getOrNull()
-                            ?: return@transactionResult null
+                        fileUploadQueries.findUpload(tx, uploadId) ?: return@transactionResult null
                     fileUploadQueries.deleteUpload(tx, uploadId)
                     upload
                 }
@@ -158,7 +165,7 @@ class FileUploadService(
 
     private suspend fun limitViolation(
         submissionId: UUID,
-        newSize: Long,
+        newStoredSize: Long?,
     ): ValidationCode? {
         val complete =
             withContext(ioDispatcher) {
@@ -168,7 +175,8 @@ class FileUploadService(
             }
         return when {
             complete.size + 1 > MAX_FILES_PER_SUBMISSION -> ValidationCode.TOO_MANY_FILES
-            complete.sumOf { it.mellomlagringStorrelse ?: 0L } + newSize > MAX_TOTAL_SIZE_BYTES ->
+            newStoredSize != null &&
+                complete.sumOf { it.mellomlagringStorrelse ?: 0L } + newStoredSize > MAX_TOTAL_SIZE_BYTES ->
                 ValidationCode.TOTAL_SIZE_TOO_LARGE
             else -> null
         }
@@ -181,7 +189,7 @@ class FileUploadService(
         try {
             mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
         } catch (e: Exception) {
-            logger.error("Could not delete file $filId after failed row insert; left as orphan", e)
+            logger.error("Could not delete file $filId after failed upload; left as orphan", e)
             meterRegistry.counter("mellomlagring.orphaned_file").increment()
         }
     }

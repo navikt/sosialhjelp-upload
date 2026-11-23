@@ -51,20 +51,25 @@ class TusUploadService(
         return try {
             val resolved = submissionResolver.resolve(metadata, personident, token)
             dsl.transactionCoroutine { tx ->
-                val uploadId =
-                    tusUploadQueries
-                        .create(tx, resolved.submissionId, filename, size, metadata.correlationId)
-                        .also {
-                            meterRegistry.counter("upload.created").increment()
-                            val extension = File(filename).extension.lowercase().ifEmpty { "none" }
-                            meterRegistry.counter("upload.file_extension", "extension", extension).increment()
-                        }
-                        ?: error("Failed to create upload record")
+                val created =
+                    tusUploadQueries.create(tx, resolved.submissionId, filename, size, metadata.correlationId)
+                if (created == null) {
+                    // Retried creation request: the upload already exists, so return it.
+                    val correlationId = metadata.correlationId ?: error("Failed to create upload record")
+                    return@transactionCoroutine tusUploadQueries.findIdByCorrelationId(
+                        tx,
+                        resolved.submissionId,
+                        correlationId,
+                    ) ?: error("Failed to create upload record")
+                }
+                meterRegistry.counter("upload.created").increment()
+                val extension = File(filename).extension.lowercase().ifEmpty { "none" }
+                meterRegistry.counter("upload.file_extension", "extension", extension).increment()
                 val validations = validator.validate(filename, fileSize = size)
                 if (validations.isNotEmpty()) {
-                    uploadProcessingQueries.addErrors(tx, uploadId, validations)
+                    uploadProcessingQueries.addErrors(tx, created, validations)
                 }
-                uploadId
+                created
             }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")

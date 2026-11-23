@@ -150,6 +150,20 @@ class TusUploadServiceIntegrationTest {
         }
 
     @Test
+    fun `create with repeated correlationId returns the existing upload`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, externalId)
+            val metadata = TusMetadata("test.pdf", externalId, correlationId, null, "id", null)
+
+            val first = tusUploadService.create(metadata, 100L, "12345678910", "test-token")
+            val second = tusUploadService.create(metadata, 100L, "12345678910", "test-token")
+
+            assertEquals(first, second)
+            assertEquals(1, dsl.fetchCount(UPLOAD, UPLOAD.CORRELATION_ID.eq(correlationId)))
+        }
+
+    @Test
     fun `create with same externalId as different user should throw UploadForbiddenException`() =
         runTest {
             val externalId = UUID.randomUUID().toString()
