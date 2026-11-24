@@ -24,11 +24,11 @@ enum class SubmissionValidationCode {
 <span class="fc" id="L24">    val originalFilename: String?,</span>
 )
 
-<span class="nc bnc" id="L27" title="All 10 branches missed.">@Serializable</span>
-<span class="nc" id="L28">data class SubmissionConflictResponse(</span>
-<span class="nc" id="L29">    val errors: List&lt;SubmissionValidationCode&gt;,</span>
-<span class="nc" id="L30">    val missing: List&lt;MissingFileDto&gt; = emptyList(),</span>
-<span class="nc" id="L31">)</span>
+<span class="pc bpc" id="L27" title="8 of 10 branches missed.">@Serializable</span>
+<span class="fc" id="L28">data class SubmissionConflictResponse(</span>
+<span class="pc" id="L29">    val errors: List&lt;SubmissionValidationCode&gt;,</span>
+<span class="pc" id="L30">    val missing: List&lt;MissingFileDto&gt; = emptyList(),</span>
+<span class="fc" id="L31">)</span>
 
 /** Rows promised files that no longer exist in mellomlagring. The rows have been deleted. */
 <span class="fc" id="L34">class SubmissionFilesMissingException(</span>

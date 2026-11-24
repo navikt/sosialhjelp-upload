@@ -22,75 +22,77 @@ import java.util.UUID
  * Only this service writes to mellomlagring under a navEksternRefId, so every file except
  * [ETTERSENDELSE_PDF] that has no row is ours to delete.
  *
- * Assumes no upload to the same navEksternRefId runs concurrently with a submit; the client
- * must not submit while an upload is in flight. If it happens anyway, every interleaving
- * recovers on retry without locking:
- * - file stored after the listing: Fiks rejects the extra file, and the retry finds the row.
- * - file deleted as orphan, row inserted afterwards: the retry reports it as missing
- *   ([Result.Missing]) and the user uploads it again.
+ * Callers must hold [NavEksternRefIdLock.exclusive] for the navEksternRefId. Every writer
+ * (upload: store file until the row commits; delete: row and file) holds the shared lock, so
+ * no file can be stored without its row, or a row deleted without its file, while this runs.
+ * Without the lock, a concurrent upload's live file could be deleted as an orphan, and a TUS
+ * upload starting after the row snapshot would slip past the [Result.InProgress] check.
+ *
+ * [Result.InProgress] still covers TUS uploads that are assembling chunks and have not reached
+ * the pipeline yet.
  */
-<span class="fc" id="L32">class MellomlagringReconciler(</span>
-<span class="fc" id="L33">    private val mellomlagringClient: MellomlagringClient,</span>
-<span class="fc" id="L34">    private val uploadRepository: UploadRepository,</span>
-<span class="fc" id="L35">    private val dsl: DSLContext,</span>
-<span class="fc" id="L36">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L37">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L38">) {</span>
+<span class="fc" id="L34">class MellomlagringReconciler(</span>
+<span class="fc" id="L35">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L36">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L37">    private val dsl: DSLContext,</span>
+<span class="fc" id="L38">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L39">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L40">) {</span>
     sealed interface Result {
         data object Clean : Result
 
         data object InProgress : Result
 
-<span class="fc" id="L44">        data class Missing(</span>
-<span class="fc" id="L45">            val uploads: List&lt;MissingUpload&gt;,</span>
+<span class="fc" id="L46">        data class Missing(</span>
+<span class="fc" id="L47">            val uploads: List&lt;MissingUpload&gt;,</span>
         ) : Result
     }
 
-<span class="fc" id="L49">    data class MissingUpload(</span>
-<span class="fc" id="L50">        val uploadId: UUID,</span>
-<span class="fc" id="L51">        val originalFilename: String?,</span>
+<span class="fc" id="L51">    data class MissingUpload(</span>
+<span class="fc" id="L52">        val uploadId: UUID,</span>
+<span class="fc" id="L53">        val originalFilename: String?,</span>
     )
 
-<span class="fc" id="L54">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L56">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
 
-<span class="fc" id="L56">    suspend fun reconcile(navEksternRefId: String): Result {</span>
-<span class="fc" id="L57">        val rows =</span>
-<span class="fc" id="L58">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L59">                dsl.transactionResult { tx -&gt; uploadRepository.getUploadsByNavEksternRefId(tx, navEksternRefId) }</span>
+<span class="fc" id="L58">    suspend fun reconcile(navEksternRefId: String): Result {</span>
+<span class="fc" id="L59">        val rows =</span>
+<span class="fc" id="L60">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L61">                dsl.transactionResult { tx -&gt; uploadRepository.getUploadsByNavEksternRefId(tx, navEksternRefId) }</span>
             }
 
         // A TUS upload in flight may be landing its file right now. Touch nothing.
-<span class="pc bpc" id="L63" title="1 of 6 branches missed.">        if (rows.any { it.status == Status.PENDING || it.status == Status.PROCESSING }) return Result.InProgress</span>
+<span class="pc bpc" id="L65" title="1 of 6 branches missed.">        if (rows.any { it.status == Status.PENDING || it.status == Status.PROCESSING }) return Result.InProgress</span>
 
-<span class="fc" id="L65">        val files = mellomlagringClient.listFiles(navEksternRefId)</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        val listedFilIds = files.mapNotNull { runCatching { UUID.fromString(it.filId) }.getOrNull() }.toSet()</span>
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        val knownFilIds = rows.filter { it.status == Status.COMPLETE }.mapNotNull { it.filId }.toSet()</span>
+<span class="fc" id="L67">        val files = mellomlagringClient.listFiles(navEksternRefId)</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        val listedFilIds = files.mapNotNull { runCatching { UUID.fromString(it.filId) }.getOrNull() }.toSet()</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        val knownFilIds = rows.filter { it.status == Status.COMPLETE }.mapNotNull { it.filId }.toSet()</span>
 
-<span class="fc" id="L69">        files</span>
-<span class="fc bfc" id="L70" title="All 2 branches covered.">            .filter { it.filnavn != ETTERSENDELSE_PDF }</span>
-<span class="fc" id="L71">            .forEach { file -&gt;</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                val filId = runCatching { UUID.fromString(file.filId) }.getOrNull()</span>
-<span class="pc bpc" id="L73" title="1 of 4 branches missed.">                if (filId != null &amp;&amp; filId in knownFilIds) return@forEach</span>
-<span class="fc" id="L74">                logger.warn(&quot;Deleting orphan file {} from mellomlagring for {}&quot;, file.filId, navEksternRefId)</span>
+<span class="fc" id="L71">        files</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            .filter { it.filnavn != ETTERSENDELSE_PDF }</span>
+<span class="fc" id="L73">            .forEach { file -&gt;</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                val filId = runCatching { UUID.fromString(file.filId) }.getOrNull()</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">                if (filId != null &amp;&amp; filId in knownFilIds) return@forEach</span>
+<span class="fc" id="L76">                logger.warn(&quot;Deleting orphan file {} from mellomlagring for {}&quot;, file.filId, navEksternRefId)</span>
                 // Throws on failure: submitting with a known orphan would be rejected by Fiks anyway.
-<span class="fc" id="L76">                mellomlagringClient.deleteFile(</span>
-<span class="fc" id="L77">                    navEksternRefId,</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                    filId ?: error(&quot;Orphan file has non-UUID filId: ${file.filId}&quot;),</span>
-<span class="fc" id="L79">                    throwOnError = true,</span>
+<span class="fc" id="L78">                mellomlagringClient.deleteFile(</span>
+<span class="fc" id="L79">                    navEksternRefId,</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                    filId ?: error(&quot;Orphan file has non-UUID filId: ${file.filId}&quot;),</span>
+<span class="fc" id="L81">                    throwOnError = true,</span>
                 )
-<span class="fc" id="L81">                meterRegistry.counter(&quot;mellomlagring.reconcile.orphan_deleted&quot;).increment()</span>
-<span class="fc" id="L82">            }</span>
+<span class="fc" id="L83">                meterRegistry.counter(&quot;mellomlagring.reconcile.orphan_deleted&quot;).increment()</span>
+<span class="fc" id="L84">            }</span>
 
-<span class="fc" id="L84">        val missing =</span>
-<span class="pc bpc" id="L85" title="1 of 6 branches missed.">            rows.filter { it.status == Status.COMPLETE &amp;&amp; (it.filId == null || it.filId !in listedFilIds) }</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (missing.isEmpty()) return Result.Clean</span>
+<span class="fc" id="L86">        val missing =</span>
+<span class="pc bpc" id="L87" title="1 of 6 branches missed.">            rows.filter { it.status == Status.COMPLETE &amp;&amp; (it.filId == null || it.filId !in listedFilIds) }</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (missing.isEmpty()) return Result.Clean</span>
 
-<span class="fc" id="L88">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L89">            dsl.transaction { tx -&gt; uploadRepository.deleteUploads(tx, missing.map { it.id }) }</span>
-<span class="fc" id="L90">        }</span>
-<span class="fc" id="L91">        meterRegistry.counter(&quot;mellomlagring.reconcile.missing&quot;).increment(missing.size.toDouble())</span>
-<span class="fc" id="L92">        logger.warn(&quot;{} uploads for {} had no file in mellomlagring; rows deleted&quot;, missing.size, navEksternRefId)</span>
-<span class="fc" id="L93">        return Result.Missing(missing.map { MissingUpload(it.id, it.originalFilename) })</span>
+<span class="fc" id="L90">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L91">            dsl.transaction { tx -&gt; uploadRepository.deleteUploads(tx, missing.map { it.id }) }</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        meterRegistry.counter(&quot;mellomlagring.reconcile.missing&quot;).increment(missing.size.toDouble())</span>
+<span class="fc" id="L94">        logger.warn(&quot;{} uploads for {} had no file in mellomlagring; rows deleted&quot;, missing.size, navEksternRefId)</span>
+<span class="fc" id="L95">        return Result.Missing(missing.map { MissingUpload(it.id, it.originalFilename) })</span>
     }
 
     companion object {
@@ -99,5 +101,5 @@ import java.util.UUID
 }
 
 fun MellomlagringReconciler.Result.Missing.toDtos(): List&lt;MissingFileDto&gt; =
-<span class="fc" id="L102">    uploads.map { MissingFileDto(it.uploadId.toString(), it.originalFilename) }</span>
+<span class="fc" id="L104">    uploads.map { MissingFileDto(it.uploadId.toString(), it.originalFilename) }</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

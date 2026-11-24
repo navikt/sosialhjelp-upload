@@ -6,72 +6,89 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.common.withMdc
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import org.jooq.DSLContext
 import java.util.UUID
 
 /**
  * Orchestrates the post-upload processing: assemble chunks, run [FilePipeline], persist the result.
  */
-<span class="fc" id="L15">class UploadProcessingService(</span>
-<span class="fc" id="L16">    private val dsl: DSLContext,</span>
-<span class="fc" id="L17">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
-<span class="fc" id="L18">    private val chunkAssemblyService: ChunkAssemblyService,</span>
-<span class="fc" id="L19">    private val filePipeline: FilePipeline,</span>
-<span class="fc" id="L20">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L21">) {</span>
-<span class="fc" id="L22">    suspend fun process(uploadId: UUID) {</span>
-<span class="fc" id="L23">        val upload =</span>
-<span class="fc" id="L24">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L25">                dsl.transactionResult { tx -&gt; uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }</span>
+<span class="fc" id="L16">class UploadProcessingService(</span>
+<span class="fc" id="L17">    private val dsl: DSLContext,</span>
+<span class="fc" id="L18">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
+<span class="fc" id="L19">    private val chunkAssemblyService: ChunkAssemblyService,</span>
+<span class="fc" id="L20">    private val filePipeline: FilePipeline,</span>
+<span class="fc" id="L21">    private val lock: NavEksternRefIdLock,</span>
+<span class="fc" id="L22">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L23">) {</span>
+<span class="fc" id="L24">    suspend fun process(uploadId: UUID) {</span>
+<span class="fc" id="L25">        val upload =</span>
+<span class="fc" id="L26">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L27">                dsl.transactionResult { tx -&gt; uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }</span>
             }
 
-<span class="fc" id="L28">        withMdc(</span>
-<span class="fc" id="L29">            &quot;fiksDigisosId&quot; to upload.fiksDigisosId,</span>
-<span class="fc" id="L30">            &quot;navEksternRefId&quot; to upload.navEksternRefId,</span>
+<span class="fc" id="L30">        withMdc(</span>
+<span class="fc" id="L31">            &quot;fiksDigisosId&quot; to upload.fiksDigisosId,</span>
+<span class="fc" id="L32">            &quot;navEksternRefId&quot; to upload.navEksternRefId,</span>
         ) {
-<span class="fc" id="L32">            val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)</span>
+<span class="fc" id="L34">            val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)</span>
 
-<span class="fc bfc" id="L34" title="All 3 branches covered.">            when (val result = filePipeline.run(uploadId, upload.filename, rawData, upload.navEksternRefId)) {</span>
+            // Shared lock from storage until setFilId commits, so reconcile never deletes the file as an orphan.
+<span class="fc" id="L37">            lock.shared(upload.navEksternRefId) {</span>
+<span class="fc" id="L38">                storeAndRecord(uploadId, upload.filename, rawData, upload.navEksternRefId, composedKey)</span>
+<span class="fc" id="L39">            }</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc" id="L41">    }</span>
+
+    private suspend fun storeAndRecord(
+        uploadId: UUID,
+        filename: String,
+        rawData: ByteArray,
+        navEksternRefId: String,
+        composedKey: String?,
+    ) {
+<span class="fc" id="L50">        run {</span>
+<span class="fc bfc" id="L51" title="All 3 branches covered.">            when (val result = filePipeline.run(uploadId, filename, rawData, navEksternRefId)) {</span>
                 is PipelineResult.Rejected -&gt; {
-<span class="fc" id="L36">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L37">                        dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, result.errors) }</span>
-<span class="fc" id="L38">                    }</span>
-<span class="fc" id="L39">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
+<span class="fc" id="L53">                    withContext(ioDispatcher) {</span>
+<span class="fc" id="L54">                        dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, result.errors) }</span>
+<span class="fc" id="L55">                    }</span>
+<span class="fc" id="L56">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
                 }
-<span class="fc" id="L41">                is PipelineResult.Failed -&gt; markUploadFailed(uploadId, composedKey)</span>
+<span class="fc" id="L58">                is PipelineResult.Failed -&gt; markUploadFailed(uploadId, composedKey)</span>
                 is PipelineResult.Stored -&gt; {
-<span class="fc" id="L43">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L44">                        dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L45">                            uploadProcessingQueries.setFilId(</span>
-<span class="fc" id="L46">                                tx,</span>
-<span class="fc" id="L47">                                uploadId,</span>
-<span class="fc" id="L48">                                result.filId,</span>
-<span class="fc" id="L49">                                result.mellomlagringFilnavn,</span>
-<span class="fc" id="L50">                                result.storedSize,</span>
-<span class="fc" id="L51">                                result.sha512,</span>
-<span class="fc" id="L52">                                result.converted,</span>
-<span class="fc" id="L53">                                result.contentType,</span>
+<span class="fc" id="L60">                    withContext(ioDispatcher) {</span>
+<span class="fc" id="L61">                        dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L62">                            uploadProcessingQueries.setFilId(</span>
+<span class="fc" id="L63">                                tx,</span>
+<span class="fc" id="L64">                                uploadId,</span>
+<span class="fc" id="L65">                                result.filId,</span>
+<span class="fc" id="L66">                                result.mellomlagringFilnavn,</span>
+<span class="fc" id="L67">                                result.storedSize,</span>
+<span class="fc" id="L68">                                result.sha512,</span>
+<span class="fc" id="L69">                                result.converted,</span>
+<span class="fc" id="L70">                                result.contentType,</span>
                             )
-<span class="fc" id="L55">                            UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L56">                        }</span>
-<span class="fc" id="L57">                    }</span>
-<span class="fc" id="L58">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
+<span class="fc" id="L72">                            UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L73">                        }</span>
+<span class="fc" id="L74">                    }</span>
+<span class="fc" id="L75">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
                 }
             }
-<span class="fc" id="L61">        }</span>
-<span class="fc" id="L62">    }</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc" id="L79">    }</span>
 
-<span class="nc" id="L64">    suspend fun markUploadFailed(</span>
+<span class="nc" id="L81">    suspend fun markUploadFailed(</span>
         uploadId: UUID,
-<span class="nc" id="L66">        composedKey: String? = null,</span>
+<span class="nc" id="L83">        composedKey: String? = null,</span>
     ) {
-<span class="fc" id="L68">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L69">            dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L70">                uploadProcessingQueries.markFailed(tx, uploadId)</span>
-<span class="fc" id="L71">                UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L72">            }</span>
-<span class="fc" id="L73">        }</span>
-<span class="fc" id="L74">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L75">    }</span>
+<span class="fc" id="L85">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L86">            dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L87">                uploadProcessingQueries.markFailed(tx, uploadId)</span>
+<span class="fc" id="L88">                UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L89">            }</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
+<span class="fc" id="L92">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
