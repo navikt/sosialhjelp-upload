@@ -28,6 +28,7 @@ import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
 import no.nav.sosialhjelp.upload.status.SubmissionService
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import no.nav.sosialhjelp.upload.texas.TexasClient
 import no.nav.sosialhjelp.upload.tus.TusUploadService
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
@@ -102,6 +103,12 @@ private fun migrateDatabase(
 
 fun Application.module() {
     val dataSource = getDataSource(environment.config)
+    val lockDataSource =
+        NavEksternRefIdLock.createDataSource(
+            environment.config.property("database.jdbcUrl").getString(),
+            environment.config.property("database.user").getString(),
+            environment.config.property("database.password").getString(),
+        )
     migrateDatabase(dataSource, clean = environment.config.property("database.cleanOnStart").getString() == "true")
     val runtimeEnv = this@module.property<String>("runtimeEnv")
     val isTest = runtimeEnv == "test"
@@ -117,7 +124,15 @@ fun Application.module() {
             val bucketName = environment.config.property("gcs.bucketName").getString()
             GcsBucketStorage(StorageOptions.getDefaultInstance().service, bucketName)
         }
-    configureDependencies(dataSource, notificationScope, processingScope, appMicrometerRegistry, chunkStorage, isMock)
+    configureDependencies(
+        dataSource,
+        lockDataSource,
+        notificationScope,
+        processingScope,
+        appMicrometerRegistry,
+        chunkStorage,
+        isMock,
+    )
     configureSecurity()
     configureHTTP()
     configureMonitoring(appMicrometerRegistry)
@@ -132,12 +147,14 @@ fun Application.module() {
         notificationScope.cancel()
         scopes.forEach { it.cancel() }
         (dataSource as? AutoCloseable)?.close()
+        lockDataSource.close()
     }
 }
 
 @Suppress("LongParameterList")
 private fun Application.configureDependencies(
     dataSource: DataSource,
+    lockDataSource: HikariDataSource,
     notificationScope: CoroutineScope,
     processingScope: CoroutineScope,
     appMicrometerRegistry: PrometheusMeterRegistry,
@@ -182,6 +199,9 @@ private fun Application.configureDependencies(
         provide(MellomlagringStorageService::class)
         provide(no.nav.sosialhjelp.upload.submission.SubmissionResolver::class)
         provide(no.nav.sosialhjelp.upload.submission.MellomlagringReconciler::class)
+        provide<NavEksternRefIdLock> {
+            NavEksternRefIdLock(lockDataSource, resolve<MeterRegistry>(), resolve<CoroutineDispatcher>())
+        }
         provide(no.nav.sosialhjelp.upload.upload.FilePipeline::class)
         provide(UploadProcessingService::class)
         provide(TusUploadService::class)

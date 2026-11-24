@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.submission.MellomlagringReconciler
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import no.nav.sosialhjelp.upload.submission.toDtos
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
@@ -16,6 +17,7 @@ class VedleggService(
     private val uploadRepository: UploadRepository,
     private val submissionDeletionService: SubmissionDeletionService,
     private val mellomlagringReconciler: MellomlagringReconciler,
+    private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
@@ -42,8 +44,15 @@ class VedleggService(
             kategori = kategori,
         )
 
-    suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
-        // soknad-api calls this just before it submits. Mellomlagring must match the DB first.
+    /**
+     * soknad-api calls this just before it submits. Mellomlagring must match the DB first.
+     * The exclusive lock covers reconcile and reading the spec only: soknad-api submits later,
+     * outside the lock, so an upload in between is not prevented here.
+     */
+    suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon =
+        lock.exclusive(navEksternRefId) { reconcileAndBuildSpec(navEksternRefId) }
+
+    private suspend fun reconcileAndBuildSpec(navEksternRefId: String): VedleggSpesifikasjon {
         when (val result = mellomlagringReconciler.reconcile(navEksternRefId)) {
             MellomlagringReconciler.Result.Clean -> {}
             MellomlagringReconciler.Result.InProgress -> throw SubmissionUploadsInProgressException()

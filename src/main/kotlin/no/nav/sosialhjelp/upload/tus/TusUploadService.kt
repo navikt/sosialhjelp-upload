@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.files.FileUploadQueries
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
@@ -37,6 +38,7 @@ class TusUploadService(
     private val uploadProcessingService: UploadProcessingService,
     private val processingScope: CoroutineScope,
     private val meterRegistry: MeterRegistry,
+    private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -128,6 +130,21 @@ class TusUploadService(
         val navEksternRefId = upload.navEksternRefId
 
         withMdc("navEksternRefId" to navEksternRefId) {
+            if (navEksternRefId == null) {
+                deleteFileThenRow(uploadId, filId, null)
+            } else {
+                // Shared lock: a reconcile must not list between the file delete and the row delete.
+                lock.shared(navEksternRefId) { deleteFileThenRow(uploadId, filId, navEksternRefId) }
+            }
+        }
+    }
+
+    private suspend fun deleteFileThenRow(
+        uploadId: UUID,
+        filId: UUID?,
+        navEksternRefId: String?,
+    ) {
+        run {
             if (filId != null && navEksternRefId != null) {
                 runCatching {
                     mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)

@@ -22,12 +22,14 @@ import java.util.UUID
  * Only this service writes to mellomlagring under a navEksternRefId, so every file except
  * [ETTERSENDELSE_PDF] that has no row is ours to delete.
  *
- * Assumes no upload to the same navEksternRefId runs concurrently with a submit; the client
- * must not submit while an upload is in flight. If it happens anyway, every interleaving
- * recovers on retry without locking:
- * - file stored after the listing: Fiks rejects the extra file, and the retry finds the row.
- * - file deleted as orphan, row inserted afterwards: the retry reports it as missing
- *   ([Result.Missing]) and the user uploads it again.
+ * Callers must hold [NavEksternRefIdLock.exclusive] for the navEksternRefId. Every writer
+ * (upload: store file until the row commits; delete: row and file) holds the shared lock, so
+ * no file can be stored without its row, or a row deleted without its file, while this runs.
+ * Without the lock, a concurrent upload's live file could be deleted as an orphan, and a TUS
+ * upload starting after the row snapshot would slip past the [Result.InProgress] check.
+ *
+ * [Result.InProgress] still covers TUS uploads that are assembling chunks and have not reached
+ * the pipeline yet.
  */
 class MellomlagringReconciler(
     private val mellomlagringClient: MellomlagringClient,

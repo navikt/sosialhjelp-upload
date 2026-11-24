@@ -98,6 +98,7 @@ class TusUploadServiceIntegrationTest {
                         mellomlagringStorageService,
                         meterRegistry,
                     ),
+                lock = PostgresTestContainer.lock,
             )
 
         tusUploadService =
@@ -116,6 +117,7 @@ class TusUploadServiceIntegrationTest {
                 uploadProcessingService = uploadProcessingService,
                 processingScope = processingScope,
                 meterRegistry = meterRegistry,
+                lock = PostgresTestContainer.lock,
             )
     }
 

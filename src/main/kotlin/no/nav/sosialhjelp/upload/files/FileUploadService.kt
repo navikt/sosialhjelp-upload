@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.UploadMetadata
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
+import no.nav.sosialhjelp.upload.submission.ResolvedSubmission
 import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.upload.FilePipeline
@@ -58,6 +60,7 @@ class FileUploadService(
     private val mellomlagringClient: MellomlagringClient,
     private val dsl: DSLContext,
     private val meterRegistry: MeterRegistry,
+    private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -88,6 +91,20 @@ class FileUploadService(
             return FileUploadResult.Rejected(listOf(it))
         }
 
+        // Shared lock from storage until the row commits: reconcile (exclusive) can then never see
+        // the stored file without its row and delete it as an orphan.
+        return lock.shared(resolved.navEksternRefId) {
+            storeAndInsert(metadata, correlationId, data, resolved)
+        }
+    }
+
+    private suspend fun storeAndInsert(
+        metadata: UploadMetadata,
+        correlationId: UUID,
+        data: ByteArray,
+        resolved: ResolvedSubmission,
+    ): FileUploadResult {
+        val filename = metadata.filename
         val uploadId = UUID.randomUUID()
         val stored =
             when (val result = filePipeline.run(uploadId, filename, data, resolved.navEksternRefId)) {
@@ -135,6 +152,20 @@ class FileUploadService(
      * never a row pointing at nothing. Idempotent: a missing row is a no-op.
      */
     suspend fun delete(uploadId: UUID) {
+        // Read navEksternRefId outside the lock (it is write-once), then delete row + file under the
+        // shared lock so a reconcile never lists the file after its row is gone.
+        val navEksternRefId =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx -> fileUploadQueries.findUpload(tx, uploadId) }
+            }?.navEksternRefId
+        if (navEksternRefId == null) {
+            deleteRowAndFile(uploadId)
+            return
+        }
+        lock.shared(navEksternRefId) { deleteRowAndFile(uploadId) }
+    }
+
+    private suspend fun deleteRowAndFile(uploadId: UUID) {
         val target =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->

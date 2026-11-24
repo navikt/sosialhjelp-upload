@@ -2,6 +2,12 @@ package no.nav.sosialhjelp.upload.vedlegg
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
@@ -41,6 +47,7 @@ class VedleggServiceTest {
                 uploadRepository,
                 mockk(relaxed = true),
                 MellomlagringReconciler(mellomlagring.client, uploadRepository, dsl, SimpleMeterRegistry()),
+                PostgresTestContainer.lock,
             )
     }
 
@@ -216,4 +223,86 @@ class VedleggServiceTest {
                 )
             }
         }
+
+    @Test
+    fun `upload holding the shared lock is never reconciled as an orphan`() =
+        runBlocking {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val submissionId = createMockSubmissionWithKategori(navEksternRefId, kategori = "annet")
+            val stored = CompletableDeferred<Unit>()
+            val insertRow = CompletableDeferred<Unit>()
+
+            // Mirrors FileUploadService: shared lock from storing the file until the row commits.
+            val upload =
+                launch(Dispatchers.IO) {
+                    PostgresTestContainer.lock.shared(navEksternRefId) {
+                        val filId = mellomlagring.put(navEksternRefId, "live.pdf")
+                        stored.complete(Unit)
+                        insertRow.await()
+                        insertRow(submissionId, filId, "live.pdf")
+                    }
+                }
+            stored.await()
+
+            val spec = async(Dispatchers.IO) { service.getVedleggByNavEksternRefId(navEksternRefId) }
+            delay(300)
+            assertTrue(spec.isActive, "reconcile must wait for the upload to commit its row")
+
+            insertRow.complete(Unit)
+            upload.join()
+
+            val result = spec.await()
+            assertEquals(listOf("live.pdf"), result.vedlegg.flatMap { v -> v.filer.map { it.filnavn } })
+            assertEquals(1, mellomlagring.files(navEksternRefId).size)
+        }
+
+    @Test
+    fun `delete holding the shared lock never produces a false missing`() =
+        runBlocking {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val submissionId = createMockSubmissionWithKategori(navEksternRefId, kategori = "annet")
+            val uploadId = insertCompleteUpload(submissionId, "gone.pdf", "gone.pdf")
+            val rowDeleted = CompletableDeferred<Unit>()
+            val deleteFile = CompletableDeferred<Unit>()
+
+            // Mirrors FileUploadService.delete: row, then file, under the shared lock.
+            val delete =
+                launch(Dispatchers.IO) {
+                    PostgresTestContainer.lock.shared(navEksternRefId) {
+                        dsl.deleteFrom(UPLOAD).where(UPLOAD.ID.eq(uploadId)).execute()
+                        rowDeleted.complete(Unit)
+                        deleteFile.await()
+                        mellomlagring.files(navEksternRefId).forEach {
+                            mellomlagring.client.deleteFile(navEksternRefId, UUID.fromString(it.filId), true)
+                        }
+                    }
+                }
+            rowDeleted.await()
+
+            val spec = async(Dispatchers.IO) { service.getVedleggByNavEksternRefId(navEksternRefId) }
+            delay(300)
+            assertTrue(spec.isActive)
+
+            deleteFile.complete(Unit)
+            delete.join()
+
+            assertTrue(spec.await().vedlegg.isEmpty())
+        }
+
+    private fun insertRow(
+        submissionId: UUID,
+        filId: UUID,
+        filnavn: String,
+    ) {
+        dsl
+            .insertInto(UPLOAD)
+            .set(UPLOAD.ID, UUID.randomUUID())
+            .set(UPLOAD.FIL_ID, filId)
+            .set(UPLOAD.SUBMISSION_ID, submissionId)
+            .set(UPLOAD.ORIGINAL_FILENAME, filnavn)
+            .set(UPLOAD.MELLOMLAGRING_FILNAVN, filnavn)
+            .set(UPLOAD.SHA512, "abc")
+            .set(UPLOAD.PROCESSING_STATUS, "COMPLETE")
+            .execute()
+    }
 }

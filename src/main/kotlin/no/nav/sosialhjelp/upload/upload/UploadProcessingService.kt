@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.common.withMdc
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import org.jooq.DSLContext
 import java.util.UUID
 
@@ -17,6 +18,7 @@ class UploadProcessingService(
     private val uploadProcessingQueries: UploadProcessingQueries,
     private val chunkAssemblyService: ChunkAssemblyService,
     private val filePipeline: FilePipeline,
+    private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun process(uploadId: UUID) {
@@ -31,7 +33,22 @@ class UploadProcessingService(
         ) {
             val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)
 
-            when (val result = filePipeline.run(uploadId, upload.filename, rawData, upload.navEksternRefId)) {
+            // Shared lock from storage until setFilId commits, so reconcile never deletes the file as an orphan.
+            lock.shared(upload.navEksternRefId) {
+                storeAndRecord(uploadId, upload.filename, rawData, upload.navEksternRefId, composedKey)
+            }
+        }
+    }
+
+    private suspend fun storeAndRecord(
+        uploadId: UUID,
+        filename: String,
+        rawData: ByteArray,
+        navEksternRefId: String,
+        composedKey: String?,
+    ) {
+        run {
+            when (val result = filePipeline.run(uploadId, filename, rawData, navEksternRefId)) {
                 is PipelineResult.Rejected -> {
                     withContext(ioDispatcher) {
                         dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, result.errors) }

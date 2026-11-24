@@ -13,6 +13,7 @@ import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import no.nav.sosialhjelp.upload.files.VerifiedUploadId
 import no.nav.sosialhjelp.upload.files.verifyUploadOwnership
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLockTimeoutException
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries.OffsetMismatchException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.MellomlagringDeleteException
 import no.nav.sosialhjelp.upload.tus.TusUploadService.UploadForbiddenException
@@ -173,6 +174,8 @@ private suspend fun RoutingContext.tusDelete(tusUploadService: TusUploadService)
                     .error("Failed deleting upload $uploadId", e)
                 call.respond(HttpStatusCode.BadGateway)
             }
+            // Handled in StatusPages (503 + Retry-After).
+            is NavEksternRefIdLockTimeoutException -> throw e
             else -> call.respond(HttpStatusCode.Forbidden)
         }
     }

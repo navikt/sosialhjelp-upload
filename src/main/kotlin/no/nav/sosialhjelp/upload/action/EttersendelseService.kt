@@ -22,6 +22,7 @@ import no.nav.sosialhjelp.upload.pdf.PdfFil
 import no.nav.sosialhjelp.upload.pdf.PdfGenerationException
 import no.nav.sosialhjelp.upload.pdf.PdfMetadata
 import no.nav.sosialhjelp.upload.submission.MellomlagringReconciler
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import no.nav.sosialhjelp.upload.submission.toDtos
 import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadRepository
@@ -48,6 +49,7 @@ class EttersendelseService(
     private val mellomlagringClient: MellomlagringClient,
     private val encryptionService: EncryptionService,
     private val mellomlagringReconciler: MellomlagringReconciler,
+    private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),
     private val clock: Clock = Clock.systemUTC(),
@@ -71,7 +73,25 @@ class EttersendelseService(
                     ettersendelseSubmissionQueries.getNavEksternRefId(tx, submissionId, personIdent)
                 }
             }
+        // Exclusive from reconcile until Fiks has the files: no upload or delete can change
+        // mellomlagring between the listing and the submit.
         return withMdc("navEksternRefId" to navEksternRefId) {
+            lock.exclusive(navEksternRefId) {
+                reconcileAndSubmit(metadata, fiksDigisosId, token, submissionId, personIdent, navEksternRefId, mottaker)
+            }
+        }
+    }
+
+    private suspend fun reconcileAndSubmit(
+        metadata: Metadata,
+        fiksDigisosId: String,
+        token: String,
+        submissionId: UUID,
+        personIdent: String,
+        navEksternRefId: String,
+        mottaker: EttersendelseMottaker,
+    ): Boolean =
+        run {
             when (val result = mellomlagringReconciler.reconcile(navEksternRefId)) {
                 MellomlagringReconciler.Result.Clean -> {}
                 MellomlagringReconciler.Result.InProgress ->
@@ -101,7 +121,6 @@ class EttersendelseService(
                 submissionId,
             )
         }
-    }
 
     private suspend fun validateKlage(
         fiksDigisosId: String,
