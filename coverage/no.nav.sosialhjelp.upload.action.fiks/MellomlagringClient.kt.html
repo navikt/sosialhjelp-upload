@@ -182,10 +182,10 @@ private const val CONNECT_TIMEOUT_MS = 10_000L
 <span class="nc" id="L182">        return uploadFile(navEksternRefId, filename, contentType, data)</span>
     }
 
-<span class="fc" id="L185">    suspend fun deleteFile(</span>
+<span class="nc" id="L185">    suspend fun deleteFile(</span>
         navEksternRefId: String,
         filId: UUID,
-<span class="fc" id="L188">        throwOnError: Boolean = false,</span>
+<span class="nc" id="L188">        throwOnError: Boolean = false,</span>
     ) {
 <span class="nc" id="L190">        val response =</span>
 <span class="nc" id="L191">            client.delete(&quot;${mellomlagringUrl(navEksternRefId)}/$filId&quot;) {</span>
@@ -228,11 +228,11 @@ private const val CONNECT_TIMEOUT_MS = 10_000L
 <span class="nc" id="L228">    val mellomlagringMetadataList: List&lt;MellomlagringFilInfo&gt; = emptyList(),</span>
 <span class="nc" id="L229">)</span>
 
-<span class="pc bnc" id="L231" title="All 2 branches missed.">@Serializable</span>
-<span class="fc" id="L232">data class MellomlagringFilInfo(</span>
-<span class="fc" id="L233">    val filnavn: String,</span>
-<span class="fc" id="L234">    val filId: String,</span>
-<span class="pc" id="L235">    val storrelse: Long,</span>
-<span class="pc" id="L236">    val mimetype: String,</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">@Serializable</span>
+<span class="nc" id="L232">data class MellomlagringFilInfo(</span>
+<span class="nc" id="L233">    val filnavn: String,</span>
+<span class="nc" id="L234">    val filId: String,</span>
+<span class="nc" id="L235">    val storrelse: Long,</span>
+<span class="nc" id="L236">    val mimetype: String,</span>
 )
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
