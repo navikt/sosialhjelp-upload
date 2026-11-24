@@ -62,7 +62,7 @@ spec:
     limits:
       memory: 2Gi
     requests:
-      cpu: 200m
+      cpu: 327m
       memory: 1088Mi
   tokenx:
     enabled: true
