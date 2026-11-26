@@ -10,11 +10,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import no.nav.sosialhjelp.upload.common.TestUtils.createMockSubmission
+import no.nav.sosialhjelp.upload.database.SubmissionQueries
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.submission.MellomlagringReconciler
 import no.nav.sosialhjelp.upload.testutils.InMemoryMellomlagring
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
+import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
+import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.SubmissionFilesMissingException
 import no.nav.sosialhjelp.upload.validation.SubmissionUploadsInProgressException
@@ -287,6 +290,57 @@ class VedleggServiceTest {
             delete.join()
 
             assertTrue(spec.await().vedlegg.isEmpty())
+        }
+
+    @Test
+    fun `submission deletion waits for exclusive lock before removing rows and files`() =
+        runBlocking {
+            val navEksternRefId = UUID.randomUUID().toString()
+            val husleie = createMockSubmissionWithKategori(navEksternRefId, kategori = "husleie")
+            insertCompleteUpload(husleie, "husleie.pdf", "husleie.pdf")
+
+            val deletionService =
+                SubmissionDeletionService(
+                    dsl = dsl,
+                    submissionQueries = SubmissionQueries(dsl),
+                    uploadRepository = uploadRepository,
+                    mellomlagringClient = mellomlagring.client,
+                    chunkStorage = FileSystemStorage(),
+                    notificationService = mockk(relaxed = true),
+                    meterRegistry = SimpleMeterRegistry(),
+                    lock = PostgresTestContainer.lock,
+                )
+
+            val locked = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val holder =
+                launch(Dispatchers.IO) {
+                    PostgresTestContainer.lock.exclusive(navEksternRefId) {
+                        locked.complete(Unit)
+                        release.await()
+                    }
+                }
+            locked.await()
+
+            val deleteJob =
+                async(Dispatchers.IO) {
+                    deletionService.deleteByNavEksternRefId(
+                        navEksternRefId,
+                        keepMellomlagring = false,
+                        kategori = "husleie",
+                    )
+                }
+            delay(300)
+            assertTrue(deleteJob.isActive, "submission delete must wait for exclusive lock")
+            assertEquals(1, dsl.fetchCount(UPLOAD))
+            assertEquals(1, mellomlagring.files(navEksternRefId).size)
+
+            release.complete(Unit)
+            holder.join()
+
+            assertEquals(1, deleteJob.await())
+            assertEquals(0, dsl.fetchCount(UPLOAD))
+            assertTrue(mellomlagring.files(navEksternRefId).isEmpty())
         }
 
     private fun insertRow(

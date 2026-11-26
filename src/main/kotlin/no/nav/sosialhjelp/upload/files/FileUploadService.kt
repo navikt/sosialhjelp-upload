@@ -14,6 +14,7 @@ import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.upload.FilePipeline
 import no.nav.sosialhjelp.upload.upload.PipelineResult
+import no.nav.sosialhjelp.upload.upload.PrepareResult
 import no.nav.sosialhjelp.upload.upload.Status
 import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadRepository
@@ -73,8 +74,8 @@ class FileUploadService(
         token: String,
     ): FileUploadResult {
         val filename = metadata.filename
-        val early = validator.validate(filename, data.size.toLong())
-        if (early.isNotEmpty()) return rejected(early)
+        val earlyValidation = validator.validate(filename, data.size.toLong())
+        if (earlyValidation.isNotEmpty()) return rejected(earlyValidation)
 
         val resolved =
             try {
@@ -86,37 +87,52 @@ class FileUploadService(
         val existing = findByCorrelationId(resolved.submissionId, correlationId)
         if (existing?.filId != null) return FileUploadResult.Stored(existing, resolved.submissionId, replay = true)
 
-        // Cheap early exit. The authoritative size check needs the stored size, so it runs after the pipeline.
-        limitViolation(resolved.submissionId, newStoredSize = null)?.let {
-            return FileUploadResult.Rejected(listOf(it))
+        val complete =
+            withContext(ioDispatcher) {
+                dsl.transactionResult { tx ->
+                    uploadRepository.getUploads(tx, resolved.submissionId).filter { it.status == Status.COMPLETE }
+                }
+            }
+
+        if (complete.size + 1 > MAX_FILES_PER_SUBMISSION) {
+            return FileUploadResult.Rejected(listOf(ValidationCode.TOO_MANY_FILES))
         }
 
-        // Shared lock from storage until the row commits: reconcile (exclusive) can then never see
-        // the stored file without its row and delete it as an orphan.
+        val uploadId = UUID.randomUUID()
+        val prepared =
+            when (val result = filePipeline.prepare(uploadId, filename, data)) {
+                is PrepareResult.Rejected -> return rejected(result.errors)
+                is PrepareResult.Failed -> return FileUploadResult.Failed(result.stage)
+                is PrepareResult.Ready -> result
+            }
+
+        val newStoredSize = prepared.data.size.toLong()
+
+        if (complete.sumOf { it.mellomlagringStorrelse ?: 0L } + newStoredSize > MAX_TOTAL_SIZE_BYTES) {
+            return FileUploadResult.Rejected(listOf(ValidationCode.TOTAL_SIZE_TOO_LARGE))
+        }
+
+        // Shared lock only from storage until the row commits: reconcile (exclusive) can then never see
+        // the stored file without its row and delete it as an orphan, while slow ClamAV/Gotenberg work
+        // runs unlocked without holding a lock-pool connection.
         return lock.shared(resolved.navEksternRefId) {
-            storeAndInsert(metadata, correlationId, data, resolved)
+            storeAndInsert(uploadId, filename, data.size.toLong(), correlationId, prepared, resolved)
         }
     }
 
     private suspend fun storeAndInsert(
-        metadata: UploadMetadata,
+        uploadId: UUID,
+        filename: String,
+        originalSize: Long,
         correlationId: UUID,
-        data: ByteArray,
+        prepared: PrepareResult.Ready,
         resolved: ResolvedSubmission,
     ): FileUploadResult {
-        val filename = metadata.filename
-        val uploadId = UUID.randomUUID()
         val stored =
-            when (val result = filePipeline.run(uploadId, filename, data, resolved.navEksternRefId)) {
-                is PipelineResult.Rejected -> return rejected(result.errors)
+            when (val result = filePipeline.store(prepared, uploadId, resolved.navEksternRefId)) {
                 is PipelineResult.Failed -> return FileUploadResult.Failed(result.stage)
                 is PipelineResult.Stored -> result
             }
-
-        limitViolation(resolved.submissionId, newStoredSize = stored.storedSize)?.let {
-            deleteStoredFile(resolved.navEksternRefId, stored.filId)
-            return FileUploadResult.Rejected(listOf(it))
-        }
 
         try {
             withContext(ioDispatcher) {
@@ -126,7 +142,7 @@ class FileUploadService(
                         uploadId,
                         resolved.submissionId,
                         filename,
-                        data.size.toLong(),
+                        originalSize,
                         correlationId,
                         stored,
                     )
@@ -193,25 +209,6 @@ class FileUploadService(
                     .firstOrNull { it.correlationId == correlationId && it.status == Status.COMPLETE }
             }
         }
-
-    private suspend fun limitViolation(
-        submissionId: UUID,
-        newStoredSize: Long?,
-    ): ValidationCode? {
-        val complete =
-            withContext(ioDispatcher) {
-                dsl.transactionResult { tx ->
-                    uploadRepository.getUploads(tx, submissionId).filter { it.status == Status.COMPLETE }
-                }
-            }
-        return when {
-            complete.size + 1 > MAX_FILES_PER_SUBMISSION -> ValidationCode.TOO_MANY_FILES
-            newStoredSize != null &&
-                complete.sumOf { it.mellomlagringStorrelse ?: 0L } + newStoredSize > MAX_TOTAL_SIZE_BYTES ->
-                ValidationCode.TOTAL_SIZE_TOO_LARGE
-            else -> null
-        }
-    }
 
     private suspend fun deleteStoredFile(
         navEksternRefId: String,

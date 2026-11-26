@@ -361,4 +361,25 @@ class FileRoutesIntegrationTest {
             assertTrue(body.contains("COMPLETE"))
             assertEquals(HttpStatusCode.Forbidden, status(ctx, JwtTestUtils.issueToken(subject = "99999999999")).status)
         }
+
+    @Test
+    fun `prepare validation runs outside the shared lock`() =
+        appTest {
+            val navEksternRefId = "ref-locked-${UUID.randomUUID()}"
+            coEvery { fiksClient.getNewNavEksternRefId(any(), any(), any()) } returns navEksternRefId
+            val corr = UUID.randomUUID()
+
+            val resp =
+                PostgresTestContainer.lock.exclusive(navEksternRefId) {
+                    postFile(
+                        UUID.randomUUID().toString(),
+                        corr,
+                        data = "%PDF-1.4\nnot really a pdf".toByteArray(),
+                        filename = "x.pdf",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, resp.status, resp.bodyAsText())
+            coVerify(exactly = 0) { mellomlagringClient.uploadFile(any(), any(), any(), any()) }
+        }
 }

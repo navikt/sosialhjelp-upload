@@ -33,50 +33,57 @@ class UploadProcessingService(
         ) {
             val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)
 
-            // Shared lock from storage until setFilId commits, so reconcile never deletes the file as an orphan.
-            lock.shared(upload.navEksternRefId) {
-                storeAndRecord(uploadId, upload.filename, rawData, upload.navEksternRefId, composedKey)
+            when (val prepared = filePipeline.prepare(uploadId, upload.filename, rawData)) {
+                is PrepareResult.Rejected -> {
+                    withContext(ioDispatcher) {
+                        dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, prepared.errors) }
+                    }
+                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
+                }
+                is PrepareResult.Failed -> markUploadFailed(uploadId, composedKey)
+                is PrepareResult.Ready -> {
+                    // Shared lock only from storage until setFilId commits, so reconcile never deletes the
+                    // file as an orphan while ClamAV/Gotenberg run unlocked.
+                    val stored =
+                        lock.shared(upload.navEksternRefId) {
+                            storeAndRecord(uploadId, prepared, upload.navEksternRefId)
+                        }
+                    if (!stored) {
+                        markUploadFailed(uploadId, composedKey)
+                    } else {
+                        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
+                    }
+                }
             }
         }
     }
 
     private suspend fun storeAndRecord(
         uploadId: UUID,
-        filename: String,
-        rawData: ByteArray,
+        prepared: PrepareResult.Ready,
         navEksternRefId: String,
-        composedKey: String?,
-    ) {
-        run {
-            when (val result = filePipeline.run(uploadId, filename, rawData, navEksternRefId)) {
-                is PipelineResult.Rejected -> {
-                    withContext(ioDispatcher) {
-                        dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, result.errors) }
+    ): Boolean =
+        when (val result = filePipeline.store(prepared, uploadId, navEksternRefId)) {
+            is PipelineResult.Failed -> false
+            is PipelineResult.Stored -> {
+                withContext(ioDispatcher) {
+                    dsl.transaction { tx ->
+                        uploadProcessingQueries.setFilId(
+                            tx,
+                            uploadId,
+                            result.filId,
+                            result.mellomlagringFilnavn,
+                            result.storedSize,
+                            result.sha512,
+                            result.converted,
+                            result.contentType,
+                        )
+                        UploadNotifications.notifyChange(tx, uploadId)
                     }
-                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
                 }
-                is PipelineResult.Failed -> markUploadFailed(uploadId, composedKey)
-                is PipelineResult.Stored -> {
-                    withContext(ioDispatcher) {
-                        dsl.transaction { tx ->
-                            uploadProcessingQueries.setFilId(
-                                tx,
-                                uploadId,
-                                result.filId,
-                                result.mellomlagringFilnavn,
-                                result.storedSize,
-                                result.sha512,
-                                result.converted,
-                                result.contentType,
-                            )
-                            UploadNotifications.notifyChange(tx, uploadId)
-                        }
-                    }
-                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
-                }
+                true
             }
         }
-    }
 
     suspend fun markUploadFailed(
         uploadId: UUID,

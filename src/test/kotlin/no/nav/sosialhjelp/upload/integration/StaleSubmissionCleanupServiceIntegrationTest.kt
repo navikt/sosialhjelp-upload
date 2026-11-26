@@ -61,6 +61,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                     chunkStorage = chunkStorage,
                     notificationService = mockk(relaxed = true),
                     meterRegistry = SimpleMeterRegistry(),
+                    lock = PostgresTestContainer.lock,
                 ),
             meterRegistry = SimpleMeterRegistry(),
             idleTimeout = timeout,
@@ -216,6 +217,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                 chunkStorage = chunkStorage,
                 notificationService = mockk(relaxed = true),
                 meterRegistry = SimpleMeterRegistry(),
+                lock = PostgresTestContainer.lock,
             )
 
         val deleted =
@@ -245,6 +247,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                 chunkStorage = chunkStorage,
                 notificationService = mockk(relaxed = true),
                 meterRegistry = SimpleMeterRegistry(),
+                lock = PostgresTestContainer.lock,
             )
 
         val deleted = runBlocking { deletionService.deleteByNavEksternRefId(navEksternRefId, keepMellomlagring = true) }
@@ -274,6 +277,7 @@ class StaleSubmissionCleanupServiceIntegrationTest {
                 chunkStorage = chunkStorage,
                 notificationService = mockk(relaxed = true),
                 meterRegistry = SimpleMeterRegistry(),
+                lock = PostgresTestContainer.lock,
             )
 
         val deleted =

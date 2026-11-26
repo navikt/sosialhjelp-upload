@@ -7,6 +7,7 @@ import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 
 class VirusScannerTest {
@@ -87,5 +88,27 @@ class VirusScannerTest {
         runTest {
             val unconfiguredScanner = VirusScanner(url = "", meterRegistry = meterRegistry)
             assertEquals(Result.OK, unconfiguredScanner.scan("data".toByteArray()))
+        }
+
+    @Test
+    fun `returns ERROR when scanner times out`() =
+        runTest {
+            server.enqueue(
+                MockResponse()
+                    .newBuilder()
+                    .code(200)
+                    .headersDelay(2, TimeUnit.SECONDS)
+                    .addHeader("Content-Type", "application/json")
+                    .body("""[{"Filename":"test.pdf","Result":"OK"}]""")
+                    .build(),
+            )
+            val shortTimeoutScanner =
+                VirusScanner(
+                    url = server.url("/scan").toString(),
+                    meterRegistry = meterRegistry,
+                    requestTimeoutMillis = 200L,
+                    connectTimeoutMillis = 200L,
+                )
+            assertEquals(Result.ERROR, shortTimeoutScanner.scan("data".toByteArray()))
         }
 }

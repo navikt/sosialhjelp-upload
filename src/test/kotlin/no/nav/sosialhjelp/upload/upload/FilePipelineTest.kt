@@ -50,7 +50,9 @@ class FilePipelineTest {
                 ConversionResult.Success("a.pdf", data, "application/pdf", false)
             stored()
 
-            val result = pipeline.run(uploadId, "a.pdf", data, "ref")
+            val prepared = pipeline.prepare(uploadId, "a.pdf", data)
+            assertIs<PrepareResult.Ready>(prepared)
+            val result = pipeline.store(prepared, uploadId, "ref")
 
             assertIs<PipelineResult.Stored>(result)
             assertEquals(filId, result.filId)
@@ -69,7 +71,9 @@ class FilePipelineTest {
                 ConversionResult.Success("a.pdf", data, "application/pdf", true)
             stored()
 
-            val result = pipeline.run(uploadId, "a.docx", data, "ref")
+            val prepared = pipeline.prepare(uploadId, "a.docx", data)
+            assertIs<PrepareResult.Ready>(prepared)
+            val result = pipeline.store(prepared, uploadId, "ref")
 
             assertIs<PipelineResult.Stored>(result)
             assertEquals(true, result.converted)
@@ -82,9 +86,9 @@ class FilePipelineTest {
             coEvery { validator.validate(any(), any<ByteArray>(), any()) } returns
                 UploadValidator.FileValidationResult("application/pdf", listOf(FileTypeValidation("x")))
 
-            val result = pipeline.run(uploadId, "a.pdf", data, "ref")
+            val result = pipeline.prepare(uploadId, "a.pdf", data)
 
-            assertIs<PipelineResult.Rejected>(result)
+            assertIs<PrepareResult.Rejected>(result)
             assertEquals(ValidationCode.FILETYPE_NOT_SUPPORTED, result.errors.single().code)
             assertEquals(1, timerCount("validation_failure"))
         }
@@ -96,9 +100,9 @@ class FilePipelineTest {
             coEvery { converter.convertIfNeeded(any(), any(), any()) } returns
                 ConversionResult.UnsupportedFiletype("xyz")
 
-            val result = pipeline.run(uploadId, "a.xyz", data, "ref")
+            val result = pipeline.prepare(uploadId, "a.xyz", data)
 
-            assertIs<PipelineResult.Rejected>(result)
+            assertIs<PrepareResult.Rejected>(result)
             assertEquals(ValidationCode.FILETYPE_NOT_SUPPORTED, result.errors.single().code)
             assertEquals(1.0, registry.counter("upload.gotenberg_unsupported", "extension", "xyz").count())
             assertEquals(1, timerCount("validation_failure"))
@@ -111,9 +115,9 @@ class FilePipelineTest {
             val boom = RuntimeException("boom")
             coEvery { converter.convertIfNeeded(any(), any(), any()) } throws boom
 
-            val result = pipeline.run(uploadId, "a.docx", data, "ref")
+            val result = pipeline.prepare(uploadId, "a.docx", data)
 
-            assertIs<PipelineResult.Failed>(result)
+            assertIs<PrepareResult.Failed>(result)
             assertEquals(PipelineResult.Failed.Stage.CONVERSION, result.stage)
             assertEquals(boom, result.cause)
             assertEquals(1, timerCount("conversion_failure"))
@@ -127,7 +131,9 @@ class FilePipelineTest {
                 ConversionResult.Success("a.pdf", data, "application/pdf", false)
             coEvery { storage.store(any(), any(), any(), any(), any()) } throws RuntimeException("down")
 
-            val result = pipeline.run(uploadId, "a.pdf", data, "ref")
+            val prepared = pipeline.prepare(uploadId, "a.pdf", data)
+            assertIs<PrepareResult.Ready>(prepared)
+            val result = pipeline.store(prepared, uploadId, "ref")
 
             assertIs<PipelineResult.Failed>(result)
             assertEquals(PipelineResult.Failed.Stage.STORAGE, result.stage)
