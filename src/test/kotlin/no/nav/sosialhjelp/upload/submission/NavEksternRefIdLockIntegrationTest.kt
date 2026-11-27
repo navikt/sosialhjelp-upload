@@ -183,6 +183,37 @@ class NavEksternRefIdLockIntegrationTest {
         }
 
     @Test
+    fun `lock and connection are released when cancelled during acquisition`() =
+        runBlocking {
+            val key = key()
+            val slow =
+                NavEksternRefIdLock(dataSource, SimpleMeterRegistry(), exclusiveTimeout = 5.seconds)
+            val held = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val holder =
+                launch {
+                    lock.exclusive(key) {
+                        held.complete(Unit)
+                        release.await()
+                    }
+                }
+            held.await()
+
+            var ran = false
+            val waiter = launch { slow.exclusive(key) { ran = true } }
+            delay(200) // let waiter block in pg_advisory_lock on Dispatchers.IO
+            waiter.cancel()
+
+            release.complete(Unit)
+            holder.join()
+            waiter.join()
+
+            assertFalse(ran)
+            assertTrue(isFree(key))
+            assertEquals(0, dataSource.hikariPoolMXBean.activeConnections)
+        }
+
+    @Test
     fun `connections go back to the pool after many cycles`() =
         runBlocking {
             val key = key()

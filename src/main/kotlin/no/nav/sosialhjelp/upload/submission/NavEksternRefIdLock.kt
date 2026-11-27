@@ -58,11 +58,17 @@ class NavEksternRefIdLock(
         mode: Mode,
         block: suspend () -> T,
     ): T {
-        val connection = withContext(ioDispatcher) { acquire(navEksternRefId, mode) }
+        var connection: Connection? = null
         try {
+            withContext(ioDispatcher) {
+                connection = acquire(navEksternRefId, mode)
+            }
             return block()
         } finally {
-            withContext(NonCancellable + ioDispatcher) { release(connection, navEksternRefId, mode) }
+            val acquired = connection
+            if (acquired != null) {
+                withContext(NonCancellable + ioDispatcher) { release(acquired, navEksternRefId, mode) }
+            }
         }
     }
 
@@ -78,10 +84,12 @@ class NavEksternRefIdLock(
             } catch (e: SQLTransientConnectionException) {
                 throw timedOut(mode, e)
             }
+        var lockAttempted = false
         try {
             connection.autoCommit = true
             connection.createStatement().use { it.execute("SET lock_timeout = '${timeout.inWholeMilliseconds}ms'") }
             val fn = if (mode == Mode.SHARED) "pg_advisory_lock_shared" else "pg_advisory_lock"
+            lockAttempted = true
             connection.prepareStatement("SELECT $fn(?, hashtext(?))").use {
                 it.setInt(1, LOCK_CLASS_ID)
                 it.setString(2, navEksternRefId)
@@ -89,11 +97,14 @@ class NavEksternRefIdLock(
             }
             return connection
         } catch (e: SQLException) {
-            connection.close()
-            if (e.sqlState == LOCK_NOT_AVAILABLE) throw timedOut(mode, e)
+            if (e.sqlState == LOCK_NOT_AVAILABLE) {
+                connection.close()
+                throw timedOut(mode, e)
+            }
+            if (lockAttempted) dataSource.evictConnection(connection) else connection.close()
             throw e
         } catch (e: Throwable) {
-            connection.close()
+            if (lockAttempted) dataSource.evictConnection(connection) else connection.close()
             throw e
         } finally {
             sample.stop(meterRegistry.timer("upload.lock.wait", "mode", mode.tag()))
