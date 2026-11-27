@@ -2,12 +2,14 @@
 
 package no.nav.sosialhjelp.upload.upload
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import org.jooq.DSLContext
+import org.slf4j.LoggerFactory
 import java.util.UUID
 
 /**
@@ -21,6 +23,8 @@ class UploadProcessingService(
     private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    private val logger = LoggerFactory.getLogger(this::class.java)
+
     suspend fun process(uploadId: UUID) {
         val upload =
             withContext(ioDispatcher) {
@@ -31,29 +35,38 @@ class UploadProcessingService(
             "fiksDigisosId" to upload.fiksDigisosId,
             "navEksternRefId" to upload.navEksternRefId,
         ) {
-            val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)
+            var composedKey: String? = null
+            try {
+                val (rawData, assembledKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)
+                composedKey = assembledKey
 
-            when (val prepared = filePipeline.prepare(uploadId, upload.filename, rawData)) {
-                is PrepareResult.Rejected -> {
-                    withContext(ioDispatcher) {
-                        dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, prepared.errors) }
-                    }
-                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
-                }
-                is PrepareResult.Failed -> markUploadFailed(uploadId, composedKey)
-                is PrepareResult.Ready -> {
-                    // Shared lock only from storage until setFilId commits, so reconcile never deletes the
-                    // file as an orphan while ClamAV/Gotenberg run unlocked.
-                    val stored =
-                        lock.shared(upload.navEksternRefId) {
-                            storeAndRecord(uploadId, prepared, upload.navEksternRefId)
+                when (val prepared = filePipeline.prepare(uploadId, upload.filename, rawData)) {
+                    is PrepareResult.Rejected -> {
+                        withContext(ioDispatcher) {
+                            dsl.transaction { tx -> uploadProcessingQueries.addErrors(tx, uploadId, prepared.errors) }
                         }
-                    if (!stored) {
-                        markUploadFailed(uploadId, composedKey)
-                    } else {
                         chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
                     }
+                    is PrepareResult.Failed -> markUploadFailed(uploadId, composedKey)
+                    is PrepareResult.Ready -> {
+                        // Shared lock only from storage until setFilId commits, so reconcile never deletes the
+                        // file as an orphan while ClamAV/Gotenberg run unlocked.
+                        val stored =
+                            lock.shared(upload.navEksternRefId) {
+                                storeAndRecord(uploadId, prepared, upload.navEksternRefId)
+                            }
+                        if (!stored) {
+                            markUploadFailed(uploadId, composedKey)
+                        } else {
+                            chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)
+                        }
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.error("Failed processing upload $uploadId", e)
+                markUploadFailed(uploadId, composedKey)
             }
         }
     }

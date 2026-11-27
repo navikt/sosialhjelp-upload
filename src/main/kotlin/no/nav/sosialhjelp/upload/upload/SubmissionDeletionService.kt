@@ -114,8 +114,8 @@ class SubmissionDeletionService(
     private suspend fun deleteGcsObjects(resources: SubmissionResources) {
         resources.gcsKeys.forEach { gcsKey ->
             runCatching {
-                val chunkKeys = chunkStorage.listKeys("$gcsKey-chunk-")
-                (chunkKeys + listOf(gcsKey)).forEach { key ->
+                val prefixedKeys = chunkStorage.listKeys("$gcsKey-")
+                (prefixedKeys + listOf(gcsKey)).distinct().forEach { key ->
                     runCatching { chunkStorage.deleteObject(key) }
                         .onFailure { logger.warn("Failed to delete GCS object $key", it) }
                 }

@@ -45,14 +45,14 @@ class ChunkAssemblyService(
         uploadId: UUID,
         composedKey: String? = null,
     ) {
-        val chunkPrefix = "uploads/$uploadId-chunk-"
-        val keysToDelete = listOf(composedKey ?: "uploads/$uploadId")
+        val uploadPrefix = "uploads/$uploadId-"
+        val keysToDelete = listOfNotNull(composedKey, "uploads/$uploadId")
         runCatching {
-            val chunkKeys = chunkStorage.listKeys(chunkPrefix)
-            (chunkKeys + keysToDelete).distinct().forEach { key ->
+            val prefixedKeys = chunkStorage.listKeys(uploadPrefix)
+            (prefixedKeys + keysToDelete).distinct().forEach { key ->
                 runCatching { chunkStorage.deleteObject(key) }
                     .onFailure { logger.warn("Failed to delete GCS object $key", it) }
             }
-        }.onFailure { logger.warn("Failed to list GCS chunks for cleanup of upload $uploadId", it) }
+        }.onFailure { logger.warn("Failed to list GCS objects for cleanup of upload $uploadId", it) }
     }
 }

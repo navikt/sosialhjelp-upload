@@ -1,8 +1,9 @@
-@file:Suppress("LongParameterList")
+@file:Suppress("LongParameterList", "TooGenericExceptionCaught")
 
 package no.nav.sosialhjelp.upload.tus
 
 import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -110,8 +111,13 @@ class TusUploadService(
             if (claimed) {
                 logger.info("Upload $uploadId complete — launching background processing")
                 processingScope.launch {
-                    runCatching { uploadProcessingService.process(uploadId) }
-                        .onFailure { logger.error("Unhandled error processing upload $uploadId", it) }
+                    try {
+                        uploadProcessingService.process(uploadId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.error("Unhandled error processing upload $uploadId", e)
+                    }
                 }
             } else {
                 logger.info("Upload $uploadId already claimed for processing, skipping")
