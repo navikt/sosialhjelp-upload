@@ -114,8 +114,8 @@ import java.util.UUID
 <span class="nc" id="L114">    private suspend fun deleteGcsObjects(resources: SubmissionResources) {</span>
 <span class="fc" id="L115">        resources.gcsKeys.forEach { gcsKey -&gt;</span>
 <span class="nc" id="L116">            runCatching {</span>
-<span class="nc" id="L117">                val chunkKeys = chunkStorage.listKeys(&quot;$gcsKey-chunk-&quot;)</span>
-<span class="nc" id="L118">                (chunkKeys + listOf(gcsKey)).forEach { key -&gt;</span>
+<span class="nc" id="L117">                val prefixedKeys = chunkStorage.listKeys(&quot;$gcsKey-&quot;)</span>
+<span class="nc" id="L118">                (prefixedKeys + listOf(gcsKey)).distinct().forEach { key -&gt;</span>
 <span class="nc" id="L119">                    runCatching { chunkStorage.deleteObject(key) }</span>
 <span class="nc bnc" id="L120" title="All 2 branches missed.">                        .onFailure { logger.warn(&quot;Failed to delete GCS object $key&quot;, it) }</span>
 <span class="nc" id="L121">                }</span>

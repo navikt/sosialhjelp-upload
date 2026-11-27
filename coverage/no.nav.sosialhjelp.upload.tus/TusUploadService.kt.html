@@ -1,8 +1,9 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TusUploadService.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.tus</a> &gt; <span class="el_source">TusUploadService.kt</span></div><h1>TusUploadService.kt</h1><pre class="source lang-java linenums">@file:Suppress(&quot;LongParameterList&quot;)
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TusUploadService.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.tus</a> &gt; <span class="el_source">TusUploadService.kt</span></div><h1>TusUploadService.kt</h1><pre class="source lang-java linenums">@file:Suppress(&quot;LongParameterList&quot;, &quot;TooGenericExceptionCaught&quot;)
 
 package no.nav.sosialhjelp.upload.tus
 
 import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,151 +26,156 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.UUID
 
-<span class="fc" id="L28">class TusUploadService(</span>
-<span class="fc" id="L29">    private val tusUploadQueries: TusUploadQueries,</span>
-<span class="fc" id="L30">    private val fileUploadQueries: FileUploadQueries,</span>
-<span class="fc" id="L31">    private val submissionResolver: SubmissionResolver,</span>
-<span class="fc" id="L32">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
-<span class="fc" id="L33">    private val dsl: DSLContext,</span>
-<span class="fc" id="L34">    private val validator: UploadValidator,</span>
-<span class="fc" id="L35">    private val mellomlagringClient: MellomlagringClient,</span>
-<span class="fc" id="L36">    private val chunkStorage: ChunkStorage,</span>
-<span class="fc" id="L37">    private val chunkAssemblyService: ChunkAssemblyService,</span>
-<span class="fc" id="L38">    private val uploadProcessingService: UploadProcessingService,</span>
-<span class="fc" id="L39">    private val processingScope: CoroutineScope,</span>
-<span class="fc" id="L40">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L41">    private val lock: NavEksternRefIdLock,</span>
-<span class="fc" id="L42">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L43">) {</span>
-<span class="fc" id="L44">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+<span class="fc" id="L29">class TusUploadService(</span>
+<span class="fc" id="L30">    private val tusUploadQueries: TusUploadQueries,</span>
+<span class="fc" id="L31">    private val fileUploadQueries: FileUploadQueries,</span>
+<span class="fc" id="L32">    private val submissionResolver: SubmissionResolver,</span>
+<span class="fc" id="L33">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
+<span class="fc" id="L34">    private val dsl: DSLContext,</span>
+<span class="fc" id="L35">    private val validator: UploadValidator,</span>
+<span class="fc" id="L36">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L37">    private val chunkStorage: ChunkStorage,</span>
+<span class="fc" id="L38">    private val chunkAssemblyService: ChunkAssemblyService,</span>
+<span class="fc" id="L39">    private val uploadProcessingService: UploadProcessingService,</span>
+<span class="fc" id="L40">    private val processingScope: CoroutineScope,</span>
+<span class="fc" id="L41">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L42">    private val lock: NavEksternRefIdLock,</span>
+<span class="fc" id="L43">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L44">) {</span>
+<span class="fc" id="L45">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
 
-<span class="fc" id="L46">    suspend fun create(</span>
+<span class="fc" id="L47">    suspend fun create(</span>
         metadata: TusMetadata,
         size: Long,
         personident: String,
         token: String,
     ): UUID {
-<span class="fc" id="L52">        val filename = metadata.filename</span>
-<span class="fc" id="L53">        return try {</span>
-<span class="fc" id="L54">            val resolved = submissionResolver.resolve(metadata, personident, token)</span>
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            dsl.transactionCoroutine { tx -&gt;</span>
-<span class="fc" id="L56">                val created =</span>
-<span class="fc" id="L57">                    tusUploadQueries.create(tx, resolved.submissionId, filename, size, metadata.correlationId)</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">                if (created == null) {</span>
+<span class="fc" id="L53">        val filename = metadata.filename</span>
+<span class="fc" id="L54">        return try {</span>
+<span class="fc" id="L55">            val resolved = submissionResolver.resolve(metadata, personident, token)</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            dsl.transactionCoroutine { tx -&gt;</span>
+<span class="fc" id="L57">                val created =</span>
+<span class="fc" id="L58">                    tusUploadQueries.create(tx, resolved.submissionId, filename, size, metadata.correlationId)</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                if (created == null) {</span>
                     // Retried creation request: the upload already exists, so return it.
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                    val correlationId = metadata.correlationId ?: error(&quot;Failed to create upload record&quot;)</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    return@transactionCoroutine tusUploadQueries.findIdByCorrelationId(</span>
-<span class="fc" id="L62">                        tx,</span>
-<span class="fc" id="L63">                        resolved.submissionId,</span>
-<span class="fc" id="L64">                        correlationId,</span>
-<span class="nc" id="L65">                    ) ?: error(&quot;Failed to create upload record&quot;)</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    val correlationId = metadata.correlationId ?: error(&quot;Failed to create upload record&quot;)</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                    return@transactionCoroutine tusUploadQueries.findIdByCorrelationId(</span>
+<span class="fc" id="L63">                        tx,</span>
+<span class="fc" id="L64">                        resolved.submissionId,</span>
+<span class="fc" id="L65">                        correlationId,</span>
+<span class="nc" id="L66">                    ) ?: error(&quot;Failed to create upload record&quot;)</span>
                 }
-<span class="fc" id="L67">                meterRegistry.counter(&quot;upload.created&quot;).increment()</span>
-<span class="pc bpc" id="L68" title="2 of 4 branches missed.">                val extension = File(filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
-<span class="fc" id="L69">                meterRegistry.counter(&quot;upload.file_extension&quot;, &quot;extension&quot;, extension).increment()</span>
-<span class="fc" id="L70">                val validations = validator.validate(filename, fileSize = size)</span>
-<span class="fc bfc" id="L71" title="All 4 branches covered.">                if (validations.isNotEmpty()) {</span>
-<span class="fc" id="L72">                    uploadProcessingQueries.addErrors(tx, created, validations)</span>
+<span class="fc" id="L68">                meterRegistry.counter(&quot;upload.created&quot;).increment()</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">                val extension = File(filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
+<span class="fc" id="L70">                meterRegistry.counter(&quot;upload.file_extension&quot;, &quot;extension&quot;, extension).increment()</span>
+<span class="fc" id="L71">                val validations = validator.validate(filename, fileSize = size)</span>
+<span class="fc bfc" id="L72" title="All 4 branches covered.">                if (validations.isNotEmpty()) {</span>
+<span class="fc" id="L73">                    uploadProcessingQueries.addErrors(tx, created, validations)</span>
                 }
-<span class="fc" id="L74">                created</span>
+<span class="fc" id="L75">                created</span>
             }
-<span class="fc" id="L76">        } catch (_: SubmissionOwnedByAnotherUserException) {</span>
-<span class="fc" id="L77">            throw UploadForbiddenException(&quot;Document is owned by another user&quot;)</span>
+<span class="fc" id="L77">        } catch (_: SubmissionOwnedByAnotherUserException) {</span>
+<span class="fc" id="L78">            throw UploadForbiddenException(&quot;Document is owned by another user&quot;)</span>
         }
     }
 
     suspend fun getUploadInfo(uploadId: UUID): Pair&lt;Long, Long&gt; =
-<span class="fc" id="L82">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L83">            dsl.transactionResult { tx -&gt;</span>
-<span class="fc" id="L84">                tusUploadQueries.getUploadInfo(tx, uploadId)</span>
-<span class="fc" id="L85">            }</span>
-<span class="fc" id="L86">        }</span>
+<span class="fc" id="L83">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L84">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L85">                tusUploadQueries.getUploadInfo(tx, uploadId)</span>
+<span class="fc" id="L86">            }</span>
+<span class="fc" id="L87">        }</span>
 
-<span class="fc" id="L88">    suspend fun appendChunk(</span>
+<span class="fc" id="L89">    suspend fun appendChunk(</span>
         uploadId: UUID,
         expectedOffset: Long,
         data: ByteArray,
     ): Long {
-<span class="fc" id="L93">        val chunkKey = &quot;uploads/$uploadId-chunk-$expectedOffset&quot;</span>
-<span class="fc" id="L94">        chunkStorage.writeChunk(chunkKey, data)</span>
+<span class="fc" id="L94">        val chunkKey = &quot;uploads/$uploadId-chunk-$expectedOffset&quot;</span>
+<span class="fc" id="L95">        chunkStorage.writeChunk(chunkKey, data)</span>
 
-<span class="fc" id="L96">        val (totalSize, newOffset) =</span>
-<span class="fc" id="L97">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L98">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L97">        val (totalSize, newOffset) =</span>
+<span class="fc" id="L98">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L99">                dsl.transactionResult { tx -&gt;</span>
                     // Throws OffsetMismatchException if offset doesn't match (→ 409 in route)
-<span class="fc" id="L100">                    tusUploadQueries.appendChunk(tx, uploadId, expectedOffset, data.size)</span>
-<span class="fc" id="L101">                }</span>
+<span class="fc" id="L101">                    tusUploadQueries.appendChunk(tx, uploadId, expectedOffset, data.size)</span>
+<span class="fc" id="L102">                }</span>
             }
-<span class="fc" id="L103">        meterRegistry.summary(&quot;upload.chunk.bytes&quot;).record(data.size.toDouble())</span>
+<span class="fc" id="L104">        meterRegistry.summary(&quot;upload.chunk.bytes&quot;).record(data.size.toDouble())</span>
 
-<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (newOffset == totalSize) {</span>
-<span class="fc" id="L106">            val claimed =</span>
-<span class="fc" id="L107">                withContext(ioDispatcher) {</span>
-<span class="fc" id="L108">                    dsl.transactionResult { tx -&gt; tusUploadQueries.claimForProcessing(tx, uploadId) }</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (newOffset == totalSize) {</span>
+<span class="fc" id="L107">            val claimed =</span>
+<span class="fc" id="L108">                withContext(ioDispatcher) {</span>
+<span class="fc" id="L109">                    dsl.transactionResult { tx -&gt; tusUploadQueries.claimForProcessing(tx, uploadId) }</span>
                 }
-<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (claimed) {</span>
-<span class="fc" id="L111">                logger.info(&quot;Upload $uploadId complete — launching background processing&quot;)</span>
-<span class="pc bpc" id="L112" title="1 of 3 branches missed.">                processingScope.launch {</span>
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    runCatching { uploadProcessingService.process(uploadId) }</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                        .onFailure { logger.error(&quot;Unhandled error processing upload $uploadId&quot;, it) }</span>
-<span class="fc" id="L115">                }</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (claimed) {</span>
+<span class="fc" id="L112">                logger.info(&quot;Upload $uploadId complete — launching background processing&quot;)</span>
+<span class="fc" id="L113">                processingScope.launch {</span>
+<span class="fc" id="L114">                    try {</span>
+<span class="fc" id="L115">                        uploadProcessingService.process(uploadId)</span>
+<span class="nc" id="L116">                    } catch (e: CancellationException) {</span>
+<span class="nc" id="L117">                        throw e</span>
+<span class="nc" id="L118">                    } catch (e: Exception) {</span>
+<span class="nc" id="L119">                        logger.error(&quot;Unhandled error processing upload $uploadId&quot;, e)</span>
+                    }
+<span class="fc" id="L121">                }</span>
             } else {
-<span class="fc" id="L117">                logger.info(&quot;Upload $uploadId already claimed for processing, skipping&quot;)</span>
+<span class="fc" id="L123">                logger.info(&quot;Upload $uploadId already claimed for processing, skipping&quot;)</span>
             }
         }
 
-<span class="fc" id="L121">        return newOffset</span>
+<span class="fc" id="L127">        return newOffset</span>
     }
 
-<span class="fc" id="L124">    suspend fun delete(uploadId: UUID) {</span>
-<span class="fc" id="L125">        val upload =</span>
-<span class="fc" id="L126">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L127">                dsl.transactionResult { tx -&gt; fileUploadQueries.getUpload(tx, uploadId) }</span>
+<span class="fc" id="L130">    suspend fun delete(uploadId: UUID) {</span>
+<span class="fc" id="L131">        val upload =</span>
+<span class="fc" id="L132">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L133">                dsl.transactionResult { tx -&gt; fileUploadQueries.getUpload(tx, uploadId) }</span>
             }
-<span class="fc" id="L129">        val filId = upload.filId</span>
-<span class="fc" id="L130">        val navEksternRefId = upload.navEksternRefId</span>
+<span class="fc" id="L135">        val filId = upload.filId</span>
+<span class="fc" id="L136">        val navEksternRefId = upload.navEksternRefId</span>
 
-<span class="fc" id="L132">        withMdc(&quot;navEksternRefId&quot; to navEksternRefId) {</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (navEksternRefId == null) {</span>
-<span class="nc" id="L134">                deleteFileThenRow(uploadId, filId, null)</span>
+<span class="fc" id="L138">        withMdc(&quot;navEksternRefId&quot; to navEksternRefId) {</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (navEksternRefId == null) {</span>
+<span class="nc" id="L140">                deleteFileThenRow(uploadId, filId, null)</span>
             } else {
                 // Shared lock: a reconcile must not list between the file delete and the row delete.
-<span class="fc" id="L137">                lock.shared(navEksternRefId) { deleteFileThenRow(uploadId, filId, navEksternRefId) }</span>
+<span class="fc" id="L143">                lock.shared(navEksternRefId) { deleteFileThenRow(uploadId, filId, navEksternRefId) }</span>
             }
-<span class="fc" id="L139">        }</span>
-<span class="fc" id="L140">    }</span>
+<span class="fc" id="L145">        }</span>
+<span class="fc" id="L146">    }</span>
 
     private suspend fun deleteFileThenRow(
         uploadId: UUID,
         filId: UUID?,
         navEksternRefId: String?,
     ) {
-<span class="fc" id="L147">        run {</span>
-<span class="pc bpc" id="L148" title="1 of 4 branches missed.">            if (filId != null &amp;&amp; navEksternRefId != null) {</span>
-<span class="fc" id="L149">                runCatching {</span>
-<span class="fc" id="L150">                    mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)</span>
-<span class="fc bfc" id="L151" title="All 2 branches covered.">                }.onFailure { e -&gt;</span>
-<span class="fc" id="L152">                    throw MellomlagringDeleteException(</span>
-<span class="fc" id="L153">                        &quot;Mellomlagring delete failed&quot;,</span>
-<span class="fc" id="L154">                        e,</span>
+<span class="fc" id="L153">        run {</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">            if (filId != null &amp;&amp; navEksternRefId != null) {</span>
+<span class="fc" id="L155">                runCatching {</span>
+<span class="fc" id="L156">                    mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                }.onFailure { e -&gt;</span>
+<span class="fc" id="L158">                    throw MellomlagringDeleteException(</span>
+<span class="fc" id="L159">                        &quot;Mellomlagring delete failed&quot;,</span>
+<span class="fc" id="L160">                        e,</span>
                     )
                 }
             }
 
-<span class="fc" id="L159">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L160">                dsl.transactionResult { tx -&gt; fileUploadQueries.deleteUpload(tx, uploadId) }</span>
+<span class="fc" id="L165">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L166">                dsl.transactionResult { tx -&gt; fileUploadQueries.deleteUpload(tx, uploadId) }</span>
             }
-<span class="fc" id="L162">            chunkAssemblyService.deleteGcsObjects(uploadId)</span>
-<span class="fc" id="L163">        }</span>
-<span class="fc" id="L164">    }</span>
+<span class="fc" id="L168">            chunkAssemblyService.deleteGcsObjects(uploadId)</span>
+<span class="fc" id="L169">        }</span>
+<span class="fc" id="L170">    }</span>
 
-<span class="fc" id="L166">    class UploadForbiddenException(</span>
+<span class="fc" id="L172">    class UploadForbiddenException(</span>
         message: String,
-<span class="fc" id="L168">    ) : RuntimeException(message)</span>
+<span class="fc" id="L174">    ) : RuntimeException(message)</span>
 
-<span class="fc" id="L170">    class MellomlagringDeleteException(</span>
+<span class="fc" id="L176">    class MellomlagringDeleteException(</span>
         message: String,
         cause: Throwable,
-<span class="fc" id="L173">    ) : RuntimeException(message, cause)</span>
+<span class="fc" id="L179">    ) : RuntimeException(message, cause)</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

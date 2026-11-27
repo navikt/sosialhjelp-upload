@@ -50,9 +50,9 @@ import java.io.File
 <span class="fc" id="L50">    }</span>
 
     override suspend fun exists(key: String): Boolean =
-<span class="nc" id="L53">        withContext(ioDispatcher) {</span>
-<span class="nc" id="L54">            file(key).exists()</span>
-<span class="nc" id="L55">        }</span>
+<span class="fc" id="L53">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L54">            file(key).exists()</span>
+<span class="fc" id="L55">        }</span>
 
     override suspend fun listKeys(prefix: String): List&lt;String&gt; =
 <span class="fc" id="L58">        withContext(ioDispatcher) {</span>

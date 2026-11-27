@@ -56,12 +56,12 @@ import kotlin.time.Duration.Companion.seconds
 <span class="fc" id="L56">            while (true) {</span>
 <span class="fc" id="L57">                try {</span>
 <span class="pc bpc" id="L58" title="1 of 2 branches missed.">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L59">                        dataSource.connection.use { conn -&gt;</span>
+<span class="pc" id="L59">                        dataSource.connection.use { conn -&gt;</span>
 <span class="fc" id="L60">                            val pgConn = conn.unwrap(PGConnection::class.java)</span>
 <span class="fc" id="L61">                            conn.createStatement().execute(&quot;LISTEN submission_update&quot;)</span>
 <span class="fc" id="L62">                            conn.createStatement().execute(&quot;LISTEN submission_delete&quot;)</span>
 <span class="fc" id="L63">                            log.info(&quot;LISTEN connection established&quot;)</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">                            while (isActive) {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                            while (isActive) {</span>
 <span class="pc bpc" id="L65" title="1 of 2 branches missed.">                                val notifications = pgConn.getNotifications(500) ?: emptyArray()</span>
 <span class="fc" id="L66">                                notifications.forEach { notification -&gt;</span>
 <span class="fc" id="L67">                                    val type =</span>
@@ -75,10 +75,10 @@ import kotlin.time.Duration.Companion.seconds
 <span class="pc bpc" id="L75" title="1 of 2 branches missed.">                                        ?.let { _updates.tryEmit(SubmissionUpdateNotification(it, type = type)) }</span>
 <span class="fc" id="L76">                                }</span>
                             }
-<span class="fc" id="L78">                        }</span>
-<span class="fc" id="L79">                    }</span>
-<span class="fc" id="L80">                } catch (e: CancellationException) {</span>
-<span class="fc" id="L81">                    throw e</span>
+<span class="nc" id="L78">                        }</span>
+<span class="nc" id="L79">                    }</span>
+<span class="nc" id="L80">                } catch (e: CancellationException) {</span>
+<span class="nc" id="L81">                    throw e</span>
 <span class="fc" id="L82">                } catch (e: Exception) {</span>
 <span class="fc" id="L83">                    log.warn(&quot;LISTEN connection lost, reconnecting in 1s&quot;, e)</span>
 <span class="pc" id="L84">                    delay(1.seconds)</span>

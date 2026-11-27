@@ -2,100 +2,113 @@
 
 package no.nav.sosialhjelp.upload.upload
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.common.withMdc
 import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import org.jooq.DSLContext
+import org.slf4j.LoggerFactory
 import java.util.UUID
 
 /**
  * Orchestrates the post-upload processing: assemble chunks, run [FilePipeline], persist the result.
  */
-<span class="fc" id="L16">class UploadProcessingService(</span>
-<span class="fc" id="L17">    private val dsl: DSLContext,</span>
-<span class="fc" id="L18">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
-<span class="fc" id="L19">    private val chunkAssemblyService: ChunkAssemblyService,</span>
-<span class="fc" id="L20">    private val filePipeline: FilePipeline,</span>
-<span class="fc" id="L21">    private val lock: NavEksternRefIdLock,</span>
-<span class="fc" id="L22">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L23">) {</span>
-<span class="fc" id="L24">    suspend fun process(uploadId: UUID) {</span>
-<span class="fc" id="L25">        val upload =</span>
-<span class="fc" id="L26">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L27">                dsl.transactionResult { tx -&gt; uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }</span>
+<span class="fc" id="L18">class UploadProcessingService(</span>
+<span class="fc" id="L19">    private val dsl: DSLContext,</span>
+<span class="fc" id="L20">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
+<span class="fc" id="L21">    private val chunkAssemblyService: ChunkAssemblyService,</span>
+<span class="fc" id="L22">    private val filePipeline: FilePipeline,</span>
+<span class="fc" id="L23">    private val lock: NavEksternRefIdLock,</span>
+<span class="fc" id="L24">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L25">) {</span>
+<span class="fc" id="L26">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
+<span class="fc" id="L28">    suspend fun process(uploadId: UUID) {</span>
+<span class="fc" id="L29">        val upload =</span>
+<span class="fc" id="L30">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L31">                dsl.transactionResult { tx -&gt; uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }</span>
             }
 
-<span class="fc" id="L30">        withMdc(</span>
-<span class="fc" id="L31">            &quot;fiksDigisosId&quot; to upload.fiksDigisosId,</span>
-<span class="fc" id="L32">            &quot;navEksternRefId&quot; to upload.navEksternRefId,</span>
+<span class="fc" id="L34">        withMdc(</span>
+<span class="fc" id="L35">            &quot;fiksDigisosId&quot; to upload.fiksDigisosId,</span>
+<span class="fc" id="L36">            &quot;navEksternRefId&quot; to upload.navEksternRefId,</span>
         ) {
-<span class="fc" id="L34">            val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)</span>
+<span class="fc" id="L38">            var composedKey: String? = null</span>
+<span class="fc" id="L39">            try {</span>
+<span class="fc" id="L40">                val (rawData, assembledKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)</span>
+<span class="fc" id="L41">                composedKey = assembledKey</span>
 
-<span class="fc bfc" id="L36" title="All 3 branches covered.">            when (val prepared = filePipeline.prepare(uploadId, upload.filename, rawData)) {</span>
-                is PrepareResult.Rejected -&gt; {
-<span class="fc" id="L38">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L39">                        dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, prepared.errors) }</span>
-<span class="fc" id="L40">                    }</span>
-<span class="fc" id="L41">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
-                }
-<span class="fc" id="L43">                is PrepareResult.Failed -&gt; markUploadFailed(uploadId, composedKey)</span>
-                is PrepareResult.Ready -&gt; {
-                    // Shared lock only from storage until setFilId commits, so reconcile never deletes the
-                    // file as an orphan while ClamAV/Gotenberg run unlocked.
-<span class="fc" id="L47">                    val stored =</span>
-<span class="fc" id="L48">                        lock.shared(upload.navEksternRefId) {</span>
-<span class="fc" id="L49">                            storeAndRecord(uploadId, prepared, upload.navEksternRefId)</span>
+<span class="fc bfc" id="L43" title="All 3 branches covered.">                when (val prepared = filePipeline.prepare(uploadId, upload.filename, rawData)) {</span>
+                    is PrepareResult.Rejected -&gt; {
+<span class="fc" id="L45">                        withContext(ioDispatcher) {</span>
+<span class="fc" id="L46">                            dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, prepared.errors) }</span>
+<span class="fc" id="L47">                        }</span>
+<span class="fc" id="L48">                        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
+                    }
+<span class="fc" id="L50">                    is PrepareResult.Failed -&gt; markUploadFailed(uploadId, composedKey)</span>
+                    is PrepareResult.Ready -&gt; {
+                        // Shared lock only from storage until setFilId commits, so reconcile never deletes the
+                        // file as an orphan while ClamAV/Gotenberg run unlocked.
+<span class="fc" id="L54">                        val stored =</span>
+<span class="fc" id="L55">                            lock.shared(upload.navEksternRefId) {</span>
+<span class="fc" id="L56">                                storeAndRecord(uploadId, prepared, upload.navEksternRefId)</span>
+                            }
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                        if (!stored) {</span>
+<span class="nc" id="L59">                            markUploadFailed(uploadId, composedKey)</span>
+                        } else {
+<span class="fc" id="L61">                            chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
                         }
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                    if (!stored) {</span>
-<span class="nc" id="L52">                        markUploadFailed(uploadId, composedKey)</span>
-                    } else {
-<span class="fc" id="L54">                        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
                     }
                 }
+<span class="fc" id="L65">            } catch (e: CancellationException) {</span>
+<span class="fc" id="L66">                throw e</span>
+<span class="fc" id="L67">            } catch (e: Exception) {</span>
+<span class="fc" id="L68">                logger.error(&quot;Failed processing upload $uploadId&quot;, e)</span>
+<span class="fc" id="L69">                markUploadFailed(uploadId, composedKey)</span>
             }
-<span class="fc" id="L58">        }</span>
-<span class="fc" id="L59">    }</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">    }</span>
 
     private suspend fun storeAndRecord(
         uploadId: UUID,
         prepared: PrepareResult.Ready,
         navEksternRefId: String,
     ): Boolean =
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        when (val result = filePipeline.store(prepared, uploadId, navEksternRefId)) {</span>
-<span class="nc" id="L67">            is PipelineResult.Failed -&gt; false</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        when (val result = filePipeline.store(prepared, uploadId, navEksternRefId)) {</span>
+<span class="nc" id="L80">            is PipelineResult.Failed -&gt; false</span>
             is PipelineResult.Stored -&gt; {
-<span class="fc" id="L69">                withContext(ioDispatcher) {</span>
-<span class="fc" id="L70">                    dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L71">                        uploadProcessingQueries.setFilId(</span>
-<span class="fc" id="L72">                            tx,</span>
-<span class="fc" id="L73">                            uploadId,</span>
-<span class="fc" id="L74">                            result.filId,</span>
-<span class="fc" id="L75">                            result.mellomlagringFilnavn,</span>
-<span class="fc" id="L76">                            result.storedSize,</span>
-<span class="fc" id="L77">                            result.sha512,</span>
-<span class="fc" id="L78">                            result.converted,</span>
-<span class="fc" id="L79">                            result.contentType,</span>
+<span class="fc" id="L82">                withContext(ioDispatcher) {</span>
+<span class="fc" id="L83">                    dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L84">                        uploadProcessingQueries.setFilId(</span>
+<span class="fc" id="L85">                            tx,</span>
+<span class="fc" id="L86">                            uploadId,</span>
+<span class="fc" id="L87">                            result.filId,</span>
+<span class="fc" id="L88">                            result.mellomlagringFilnavn,</span>
+<span class="fc" id="L89">                            result.storedSize,</span>
+<span class="fc" id="L90">                            result.sha512,</span>
+<span class="fc" id="L91">                            result.converted,</span>
+<span class="fc" id="L92">                            result.contentType,</span>
                         )
-<span class="fc" id="L81">                        UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L82">                    }</span>
-<span class="fc" id="L83">                }</span>
-<span class="fc" id="L84">                true</span>
+<span class="fc" id="L94">                        UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L95">                    }</span>
+<span class="fc" id="L96">                }</span>
+<span class="fc" id="L97">                true</span>
             }
-<span class="fc" id="L86">        }</span>
+<span class="fc" id="L99">        }</span>
 
-<span class="nc" id="L88">    suspend fun markUploadFailed(</span>
+<span class="nc" id="L101">    suspend fun markUploadFailed(</span>
         uploadId: UUID,
-<span class="nc" id="L90">        composedKey: String? = null,</span>
+<span class="nc" id="L103">        composedKey: String? = null,</span>
     ) {
-<span class="fc" id="L92">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L93">            dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L94">                uploadProcessingQueries.markFailed(tx, uploadId)</span>
-<span class="fc" id="L95">                UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L96">            }</span>
-<span class="fc" id="L97">        }</span>
-<span class="fc" id="L98">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L99">    }</span>
+<span class="fc" id="L105">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L106">            dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L107">                uploadProcessingQueries.markFailed(tx, uploadId)</span>
+<span class="fc" id="L108">                UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L109">            }</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
+<span class="fc" id="L112">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
