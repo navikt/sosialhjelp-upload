@@ -17,10 +17,12 @@ import no.nav.sosialhjelp.upload.database.generated.tables.Submission.Companion.
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.pdf.GotenbergConversionResult
 import no.nav.sosialhjelp.upload.pdf.GotenbergService
+import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.tus.storage.FileSystemStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
 import no.nav.sosialhjelp.upload.upload.FileConversionService
+import no.nav.sosialhjelp.upload.upload.FilePipeline
 import no.nav.sosialhjelp.upload.upload.MellomlagringStorageService
 import no.nav.sosialhjelp.upload.upload.UploadProcessingQueries
 import no.nav.sosialhjelp.upload.upload.UploadProcessingService
@@ -89,26 +91,33 @@ class TusUploadServiceIntegrationTest {
                 dsl = dsl,
                 uploadProcessingQueries = uploadProcessingQueries,
                 chunkAssemblyService = chunkAssemblyService,
-                validator = validator,
-                fileConversionService = fileConversionService,
-                mellomlagringStorageService = mellomlagringStorageService,
-                meterRegistry = meterRegistry,
+                filePipeline =
+                    FilePipeline(
+                        validator,
+                        fileConversionService,
+                        mellomlagringStorageService,
+                        meterRegistry,
+                    ),
+                lock = PostgresTestContainer.lock,
             )
 
         tusUploadService =
             TusUploadService(
                 tusUploadQueries = tusUploadQueries,
-                tusSubmissionQueries = tusSubmissionQueries,
+                fileUploadQueries =
+                    no.nav.sosialhjelp.upload.files
+                        .FileUploadQueries(),
+                submissionResolver = SubmissionResolver(tusSubmissionQueries, dsl, fiksClient),
                 uploadProcessingQueries = uploadProcessingQueries,
                 dsl = dsl,
                 validator = validator,
-                fiksClient = fiksClient,
                 mellomlagringClient = mellomlagringClient,
                 chunkStorage = chunkStorage,
                 chunkAssemblyService = chunkAssemblyService,
                 uploadProcessingService = uploadProcessingService,
                 processingScope = processingScope,
                 meterRegistry = meterRegistry,
+                lock = PostgresTestContainer.lock,
             )
     }
 
@@ -140,6 +149,20 @@ class TusUploadServiceIntegrationTest {
             assertNotNull(row)
             assertEquals("test.pdf", row[UPLOAD.ORIGINAL_FILENAME])
             assertEquals(0L, row[UPLOAD.UPLOAD_OFFSET])
+        }
+
+    @Test
+    fun `create with repeated correlationId returns the existing upload`() =
+        runTest {
+            val externalId = UUID.randomUUID().toString()
+            createMockSubmission(dsl, externalId)
+            val metadata = TusMetadata("test.pdf", externalId, correlationId, null, "id", null)
+
+            val first = tusUploadService.create(metadata, 100L, "12345678910", "test-token")
+            val second = tusUploadService.create(metadata, 100L, "12345678910", "test-token")
+
+            assertEquals(first, second)
+            assertEquals(1, dsl.fetchCount(UPLOAD, UPLOAD.CORRELATION_ID.eq(correlationId)))
         }
 
     @Test

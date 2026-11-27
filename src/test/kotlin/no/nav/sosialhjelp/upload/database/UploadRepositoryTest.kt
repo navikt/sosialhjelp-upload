@@ -7,6 +7,7 @@ import no.nav.sosialhjelp.upload.common.TestUtils
 import no.nav.sosialhjelp.upload.database.generated.tables.Upload.Companion.UPLOAD
 import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import no.nav.sosialhjelp.upload.files.FileUploadQueries
 import no.nav.sosialhjelp.upload.testutils.PostgresTestContainer
 import no.nav.sosialhjelp.upload.tus.TusUploadQueries
 import no.nav.sosialhjelp.upload.upload.UploadNotifications
@@ -83,7 +84,7 @@ class UploadRepositoryTest {
                 }
             val uploadId2 =
                 dsl.transactionResult { config ->
-                    tusUploadQueries.create(config, submissionId, "file2.txt", 190L, correlationId)
+                    tusUploadQueries.create(config, submissionId, "file2.txt", 190L, UUID.randomUUID())
                 }
             // Create an upload for a different submission to ensure filtering works.
             val otherSubmissionId = TestUtils.createMockSubmission(dsl)
@@ -112,7 +113,7 @@ class UploadRepositoryTest {
                 } ?: error("Ingen uploadId")
             val retrievedSubmissionId =
                 dsl.transactionResult { config ->
-                    tusUploadQueries.getSubmissionIdFromUploadId(config, uploadId)
+                    FileUploadQueries().getSubmissionIdFromUploadId(config, uploadId)
                 }
             assertEquals(submissionId, retrievedSubmissionId)
         }

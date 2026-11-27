@@ -1,16 +1,19 @@
-@file:Suppress("LongParameterList")
+@file:Suppress("LongParameterList", "TooGenericExceptionCaught")
 
 package no.nav.sosialhjelp.upload.tus
 
 import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.action.fiks.FiksClient
 import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
 import no.nav.sosialhjelp.upload.common.withMdc
+import no.nav.sosialhjelp.upload.files.FileUploadQueries
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
+import no.nav.sosialhjelp.upload.submission.SubmissionResolver
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
 import no.nav.sosialhjelp.upload.tus.storage.ChunkStorage
 import no.nav.sosialhjelp.upload.upload.ChunkAssemblyService
@@ -25,17 +28,18 @@ import java.util.UUID
 
 class TusUploadService(
     private val tusUploadQueries: TusUploadQueries,
-    private val tusSubmissionQueries: TusSubmissionQueries,
+    private val fileUploadQueries: FileUploadQueries,
+    private val submissionResolver: SubmissionResolver,
     private val uploadProcessingQueries: UploadProcessingQueries,
     private val dsl: DSLContext,
     private val validator: UploadValidator,
-    private val fiksClient: FiksClient,
     private val mellomlagringClient: MellomlagringClient,
     private val chunkStorage: ChunkStorage,
     private val chunkAssemblyService: ChunkAssemblyService,
     private val uploadProcessingService: UploadProcessingService,
     private val processingScope: CoroutineScope,
     private val meterRegistry: MeterRegistry,
+    private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -46,69 +50,29 @@ class TusUploadService(
         personident: String,
         token: String,
     ): UUID {
-        val contextId = metadata.contextId
         val filename = metadata.filename
-        val fiksDigisosId = metadata.fiksDigisosId
-        val navEksternRefId = metadata.navEksternRefId
-        val kategori = metadata.kategori
-        val correlationId = metadata.correlationId
         return try {
+            val resolved = submissionResolver.resolve(metadata, personident, token)
             dsl.transactionCoroutine { tx ->
-                // Acquire a per-fiksDigisosId advisory lock before deriving navEksternRefId.
-                // This serializes concurrent upload creations for the same case across all
-                // service instances, preventing two submissions from reading the same Fiks
-                // state and deriving the same navEksternRefId.
-                if (fiksDigisosId != null) {
-                    tusSubmissionQueries.acquireAdvisoryLock(tx, fiksDigisosId)
-                }
-
-                val submissionId =
-                    tusSubmissionQueries.getOrCreateSubmission(
+                val created =
+                    tusUploadQueries.create(tx, resolved.submissionId, filename, size, metadata.correlationId)
+                if (created == null) {
+                    // Retried creation request: the upload already exists, so return it.
+                    val correlationId = metadata.correlationId ?: error("Failed to create upload record")
+                    return@transactionCoroutine tusUploadQueries.findIdByCorrelationId(
                         tx,
-                        contextId,
-                        personident,
-                        TusSubmissionQueries.SubmissionAttributes(
-                            fiksDigisosId = fiksDigisosId,
-                            kategori = kategori,
-                            automaticCleanup = metadata.automaticCleanup,
-                        ),
-                    )
-
-                val eksternRef =
-                    // If navEksternRefId is already set on this submission (e.g. a second
-                    // upload on the same contextId), reuse it without calling Fiks.
-                    tusSubmissionQueries.getNavEksternRefIdByContextId(tx, contextId)
-                        ?: navEksternRefId
-                        ?: fiksDigisosId?.let {
-                            // Read the highest navEksternRefId stored locally for this
-                            // fiksDigisosId. This accounts for other in-flight submissions
-                            // that have been created locally but not yet submitted to Fiks,
-                            // and therefore don't appear in ettersendtInfoNAV.ettersendelser.
-                            val localMax = tusSubmissionQueries.getMaxNavEksternRefIdForFiksDigisosId(tx, it)
-                            // We intentionally call Fiks inside a DB transaction to keep the
-                            // lock → read-from-Fiks → write sequence atomic. The risk of
-                            // holding a DB connection across a network call is accepted here
-                            // because contention on the same fiksDigisosId is expected to be
-                            // near zero in practice (fiksDigisosId is unique per application).
-                            fiksClient.getNewNavEksternRefId(it, token, localMax)
-                        }
-                        ?: error("Verken navEksternRefId eller fiksDigisosId tilgjengelig")
-
-                tusSubmissionQueries.setNavEksternRefId(tx, submissionId, eksternRef)
-                val uploadId =
-                    tusUploadQueries
-                        .create(tx, submissionId, filename, size, correlationId)
-                        .also {
-                            meterRegistry.counter("upload.created").increment()
-                            val extension = File(filename).extension.lowercase().ifEmpty { "none" }
-                            meterRegistry.counter("upload.file_extension", "extension", extension).increment()
-                        }
-                        ?: error("Failed to create upload record")
+                        resolved.submissionId,
+                        correlationId,
+                    ) ?: error("Failed to create upload record")
+                }
+                meterRegistry.counter("upload.created").increment()
+                val extension = File(filename).extension.lowercase().ifEmpty { "none" }
+                meterRegistry.counter("upload.file_extension", "extension", extension).increment()
                 val validations = validator.validate(filename, fileSize = size)
                 if (validations.isNotEmpty()) {
-                    uploadProcessingQueries.addErrors(tx, uploadId, validations)
+                    uploadProcessingQueries.addErrors(tx, created, validations)
                 }
-                uploadId
+                created
             }
         } catch (_: SubmissionOwnedByAnotherUserException) {
             throw UploadForbiddenException("Document is owned by another user")
@@ -147,8 +111,13 @@ class TusUploadService(
             if (claimed) {
                 logger.info("Upload $uploadId complete — launching background processing")
                 processingScope.launch {
-                    runCatching { uploadProcessingService.process(uploadId) }
-                        .onFailure { logger.error("Unhandled error processing upload $uploadId", it) }
+                    try {
+                        uploadProcessingService.process(uploadId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.error("Unhandled error processing upload $uploadId", e)
+                    }
                 }
             } else {
                 logger.info("Upload $uploadId already claimed for processing, skipping")
@@ -161,12 +130,27 @@ class TusUploadService(
     suspend fun delete(uploadId: UUID) {
         val upload =
             withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.getUpload(tx, uploadId) }
+                dsl.transactionResult { tx -> fileUploadQueries.getUpload(tx, uploadId) }
             }
         val filId = upload.filId
         val navEksternRefId = upload.navEksternRefId
 
         withMdc("navEksternRefId" to navEksternRefId) {
+            if (navEksternRefId == null) {
+                deleteFileThenRow(uploadId, filId, null)
+            } else {
+                // Shared lock: a reconcile must not list between the file delete and the row delete.
+                lock.shared(navEksternRefId) { deleteFileThenRow(uploadId, filId, navEksternRefId) }
+            }
+        }
+    }
+
+    private suspend fun deleteFileThenRow(
+        uploadId: UUID,
+        filId: UUID?,
+        navEksternRefId: String?,
+    ) {
+        run {
             if (filId != null && navEksternRefId != null) {
                 runCatching {
                     mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)
@@ -179,7 +163,7 @@ class TusUploadService(
             }
 
             withContext(ioDispatcher) {
-                dsl.transactionResult { tx -> tusUploadQueries.deleteUpload(tx, uploadId) }
+                dsl.transactionResult { tx -> fileUploadQueries.deleteUpload(tx, uploadId) }
             }
             chunkAssemblyService.deleteGcsObjects(uploadId)
         }

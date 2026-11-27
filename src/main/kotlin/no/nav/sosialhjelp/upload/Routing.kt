@@ -8,6 +8,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import no.nav.sosialhjelp.upload.action.configureActionRoutes
 import no.nav.sosialhjelp.upload.documents.configureDocumentRoutes
+import no.nav.sosialhjelp.upload.files.configureFileRoutes
 import no.nav.sosialhjelp.upload.status.configureStatusRoutes
 import no.nav.sosialhjelp.upload.tus.configureTusRoutes
 import no.nav.sosialhjelp.upload.vedlegg.configureVedleggRoutes
@@ -27,6 +28,9 @@ fun Application.configureRouting() {
                 configureStatusRoutes()
                 configureDocumentRoutes()
                 configureActionRoutes()
+                route("/files") {
+                    configureFileRoutes()
+                }
                 route(TUS_BASE_PATH) {
                     configureTusRoutes(TUS_BASE_PATH)
                 }

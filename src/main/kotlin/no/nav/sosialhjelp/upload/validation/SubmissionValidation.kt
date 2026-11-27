@@ -14,7 +14,29 @@ enum class SubmissionValidationCode {
     TOTAL_SIZE_TOO_LARGE,
     KLAGE_TRUKKET,
     KLAGE_ETTERSENDELSE_FRIST_UTLOPT,
+    UPLOADS_IN_PROGRESS,
+    FILES_MISSING,
 }
+
+@Serializable
+data class MissingFileDto(
+    val uploadId: String,
+    val originalFilename: String?,
+)
+
+@Serializable
+data class SubmissionConflictResponse(
+    val errors: List<SubmissionValidationCode>,
+    val missing: List<MissingFileDto> = emptyList(),
+)
+
+/** Rows promised files that no longer exist in mellomlagring. The rows have been deleted. */
+class SubmissionFilesMissingException(
+    val missing: List<MissingFileDto>,
+) : Exception("Files missing in mellomlagring: ${missing.size}")
+
+/** TUS uploads still in flight; their files may be landing in mellomlagring right now. */
+class SubmissionUploadsInProgressException : Exception("Uploads in progress")
 
 @Serializable
 data class SubmissionValidationErrorResponse(

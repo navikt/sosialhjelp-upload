@@ -1,9 +1,7 @@
 package no.nav.sosialhjelp.upload.tus
 
-import no.nav.sosialhjelp.upload.database.generated.tables.references.SUBMISSION
 import no.nav.sosialhjelp.upload.database.generated.tables.references.UPLOAD
 import no.nav.sosialhjelp.upload.upload.Status
-import no.nav.sosialhjelp.upload.upload.Upload
 import no.nav.sosialhjelp.upload.upload.UploadNotifications
 import org.jooq.Configuration
 import java.time.OffsetDateTime
@@ -18,6 +16,10 @@ class TusUploadQueries {
         message: String,
     ) : RuntimeException(message)
 
+    /**
+     * Returns the new upload id, or null if (submissionId, correlationId) already exists
+     * (a retried creation request). Use [findIdByCorrelationId] to get the existing one.
+     */
     fun create(
         tx: Configuration,
         submissionId: UUID,
@@ -37,39 +39,28 @@ class TusUploadQueries {
             .set(UPLOAD.UPLOAD_OFFSET, 0L)
             .set(UPLOAD.GCS_KEY, gcsKey)
             .set(UPLOAD.CORRELATION_ID, correlationId)
+            .onConflict(UPLOAD.SUBMISSION_ID, UPLOAD.CORRELATION_ID)
+            .where(UPLOAD.CORRELATION_ID.isNotNull)
+            .doNothing()
             .returning(UPLOAD.ID)
             .fetchOne()
             ?.get(UPLOAD.ID)
             ?.also { UploadNotifications.notifyChange(tx, it) }
     }
 
-    fun isOwnedByUser(
+    fun findIdByCorrelationId(
         tx: Configuration,
-        uploadId: UUID,
-        ownerIdent: String,
-    ): Boolean =
-        tx
-            .dsl()
-            .selectCount()
-            .from(UPLOAD)
-            .join(SUBMISSION)
-            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
-            .where(UPLOAD.ID.eq(uploadId))
-            .and(SUBMISSION.OWNER_IDENT.eq(ownerIdent))
-            .fetchSingle()
-            .value1() > 0
-
-    fun getSubmissionIdFromUploadId(
-        tx: Configuration,
-        uploadId: UUID,
+        submissionId: UUID,
+        correlationId: UUID,
     ): UUID? =
         tx
             .dsl()
-            .select(UPLOAD.SUBMISSION_ID)
+            .select(UPLOAD.ID)
             .from(UPLOAD)
-            .where(UPLOAD.ID.eq(uploadId))
+            .where(UPLOAD.SUBMISSION_ID.eq(submissionId))
+            .and(UPLOAD.CORRELATION_ID.eq(correlationId))
             .fetchOne()
-            ?.get(UPLOAD.SUBMISSION_ID)
+            ?.get(UPLOAD.ID)
 
     fun getUploadInfo(
         tx: Configuration,
@@ -143,61 +134,4 @@ class TusUploadQueries {
             .where(UPLOAD.ID.eq(uploadId))
             .and(UPLOAD.PROCESSING_STATUS.eq(Status.PENDING.name))
             .execute() > 0
-
-    fun getUpload(
-        tx: Configuration,
-        uploadId: UUID,
-    ): Upload =
-        tx
-            .dsl()
-            .select(
-                UPLOAD.ID,
-                UPLOAD.ORIGINAL_FILENAME,
-                UPLOAD.FIL_ID,
-                SUBMISSION.NAV_EKSTERN_REF_ID,
-                UPLOAD.MELLOMLAGRING_FILNAVN,
-                UPLOAD.SIZE,
-                UPLOAD.MELLOMLAGRING_STORRELSE,
-                UPLOAD.PROCESSING_STATUS,
-                UPLOAD.CONTENT_TYPE,
-            ).from(UPLOAD)
-            .join(SUBMISSION)
-            .on(SUBMISSION.ID.eq(UPLOAD.SUBMISSION_ID))
-            .where(UPLOAD.ID.eq(uploadId))
-            .fetchSingle()
-            .let {
-                Upload(
-                    id = it.get(UPLOAD.ID),
-                    originalFilename = it.get(UPLOAD.ORIGINAL_FILENAME),
-                    errors = emptyList(),
-                    filId = it.get(UPLOAD.FIL_ID),
-                    navEksternRefId = it.get(SUBMISSION.NAV_EKSTERN_REF_ID),
-                    mellomlagringFilnavn = it.get(UPLOAD.MELLOMLAGRING_FILNAVN),
-                    fileSize = it.get(UPLOAD.SIZE),
-                    mellomlagringStorrelse = it.get(UPLOAD.MELLOMLAGRING_STORRELSE),
-                    status =
-                        it
-                            .get(UPLOAD.PROCESSING_STATUS)
-                            ?.let { s -> Status.valueOf(s) }
-                            ?: error("No processing status. Was it not selected?"),
-                    contentType = it.get(UPLOAD.CONTENT_TYPE),
-                )
-            }
-
-    fun deleteUpload(
-        tx: Configuration,
-        uploadId: UUID,
-    ): Int {
-        val submissionId =
-            getSubmissionIdFromUploadId(tx, uploadId)
-                ?: error("No submissionId for upload")
-        val deleted =
-            tx
-                .dsl()
-                .delete(UPLOAD)
-                .where(UPLOAD.ID.eq(uploadId))
-                .execute()
-        tx.dsl().execute("SELECT pg_notify('submission_update', ?)", submissionId.toString())
-        return deleted
-    }
 }

@@ -4,12 +4,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import no.nav.sosialhjelp.upload.status.dto.SubmissionState
-import no.nav.sosialhjelp.upload.status.dto.UploadDto
+import no.nav.sosialhjelp.upload.status.dto.toDto
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
 import no.nav.sosialhjelp.upload.upload.UploadRepository
 import no.nav.sosialhjelp.upload.validation.ValidationCode
 import org.jooq.DSLContext
-import java.io.File
 import java.util.*
 
 class SubmissionService(
@@ -35,39 +34,22 @@ class SubmissionService(
         }
     }
 
+    /** Read-only lookup: returns null when no submission exists. Throws if owned by another user. */
+    suspend fun find(
+        contextId: String,
+        personIdent: String,
+    ): UUID? =
+        withContext(ioDispatcher) {
+            dsl.transactionResult { tx -> tusSubmissionQueries.findSubmission(tx, contextId, personIdent) }
+        }
+
     suspend fun getSubmissionStatus(submissionId: UUID): SubmissionState =
         withContext(ioDispatcher) { readSubmissionStatus(submissionId) }
 
     private fun readSubmissionStatus(submissionId: UUID): SubmissionState =
         dsl.transactionResult { tx ->
             val filenamesByUpload = uploadRepository.getUploads(tx, submissionId)
-            val uploads =
-                filenamesByUpload.mapNotNull { upload ->
-                    upload.id
-                        ?.let {
-                            UploadDto(
-                                upload.id,
-                                upload.originalFilename ?: "Ukjent fil",
-                                upload.errors,
-                                upload.filId,
-                                url = upload.filId?.let { "/upload/${upload.id}" },
-                                finalFilename =
-                                    upload.mellomlagringFilnavn?.let { mellomlagringFilnavn ->
-                                        // Derive the user-facing name from the original filename, using the
-                                        // mellomlagring extension (which may differ if the file was converted to PDF).
-                                        // This hides the UUID suffix added for mellomlagring uniqueness.
-                                        val ext = File(mellomlagringFilnavn).extension
-                                        val originalBase = File(upload.originalFilename ?: "").nameWithoutExtension
-                                        if (ext.isNotEmpty()) "$originalBase.$ext" else originalBase
-                                    },
-                                status = UploadDto.Status.valueOf(upload.status.name),
-                                upload.fileSize,
-                                upload.kategori,
-                                upload.correlationId,
-                                upload.converted,
-                            )
-                        }
-                }
+            val uploads = filenamesByUpload.mapNotNull { it.toDto() }
 
             val tooManyFiles = uploads.size > 30
             val totalTooLarge = uploads.sumOf { it.size?.toInt() ?: 0 } > 150 * 1024 * 1024

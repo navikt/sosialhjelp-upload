@@ -1,6 +1,8 @@
 package no.nav.sosialhjelp.upload.testutils
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import no.nav.sosialhjelp.upload.database.notify.SubmissionNotificationService
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
@@ -15,6 +17,7 @@ object PostgresTestContainer {
             withDatabaseName("testdb")
             withUsername("test")
             withPassword("test")
+            withCommand("postgres", "-c", "max_connections=300")
             start()
         }
     }
@@ -34,6 +37,14 @@ object PostgresTestContainer {
     /** Shared notification service backed by a single LISTEN connection. */
     val notificationService: SubmissionNotificationService by lazy {
         SubmissionNotificationService(dataSource)
+    }
+
+    /** Real advisory-lock wrapper on its own small pool, as in production. */
+    val lock: NavEksternRefIdLock by lazy {
+        NavEksternRefIdLock(
+            NavEksternRefIdLock.createDataSource(instance.jdbcUrl, instance.username, instance.password),
+            SimpleMeterRegistry(),
+        )
     }
 
     val jdbcUrl: String get() = instance.jdbcUrl

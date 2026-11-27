@@ -5,6 +5,7 @@ package no.nav.sosialhjelp.upload.validation
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -18,15 +19,24 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import org.slf4j.LoggerFactory
 
+private const val DEFAULT_REQUEST_TIMEOUT_MS = 15_000L
+private const val DEFAULT_CONNECT_TIMEOUT_MS = 5_000L
+
 class VirusScanner(
     @Property("virus.scanner.url") val url: String,
     private val meterRegistry: MeterRegistry,
+    private val requestTimeoutMillis: Long = DEFAULT_REQUEST_TIMEOUT_MS,
+    private val connectTimeoutMillis: Long = DEFAULT_CONNECT_TIMEOUT_MS,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     private val httpClient =
         HttpClient(CIO) {
             expectSuccess = true
+            install(HttpTimeout) {
+                requestTimeoutMillis = this@VirusScanner.requestTimeoutMillis
+                connectTimeoutMillis = this@VirusScanner.connectTimeoutMillis
+            }
             install(ContentNegotiation) {
                 json()
             }

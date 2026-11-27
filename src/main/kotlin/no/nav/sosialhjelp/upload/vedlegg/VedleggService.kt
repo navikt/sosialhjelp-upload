@@ -3,14 +3,21 @@ package no.nav.sosialhjelp.upload.vedlegg
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.submission.MellomlagringReconciler
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
+import no.nav.sosialhjelp.upload.submission.toDtos
 import no.nav.sosialhjelp.upload.upload.SubmissionDeletionService
 import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.validation.SubmissionFilesMissingException
+import no.nav.sosialhjelp.upload.validation.SubmissionUploadsInProgressException
 import org.jooq.DSLContext
 
 class VedleggService(
     private val dsl: DSLContext,
     private val uploadRepository: UploadRepository,
     private val submissionDeletionService: SubmissionDeletionService,
+    private val mellomlagringReconciler: MellomlagringReconciler,
+    private val lock: NavEksternRefIdLock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
@@ -37,7 +44,20 @@ class VedleggService(
             kategori = kategori,
         )
 
-    suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon {
+    /**
+     * soknad-api calls this just before it submits. Mellomlagring must match the DB first.
+     * The exclusive lock covers reconcile and reading the spec only: soknad-api submits later,
+     * outside the lock, so an upload in between is not prevented here.
+     */
+    suspend fun getVedleggByNavEksternRefId(navEksternRefId: String): VedleggSpesifikasjon =
+        lock.exclusive(navEksternRefId) { reconcileAndBuildSpec(navEksternRefId) }
+
+    private suspend fun reconcileAndBuildSpec(navEksternRefId: String): VedleggSpesifikasjon {
+        when (val result = mellomlagringReconciler.reconcile(navEksternRefId)) {
+            MellomlagringReconciler.Result.Clean -> {}
+            MellomlagringReconciler.Result.InProgress -> throw SubmissionUploadsInProgressException()
+            is MellomlagringReconciler.Result.Missing -> throw SubmissionFilesMissingException(result.toDtos())
+        }
         val uploads =
             withContext(ioDispatcher) {
                 dsl.transactionResult { tx ->

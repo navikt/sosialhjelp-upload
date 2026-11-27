@@ -1,18 +1,28 @@
 package no.nav.sosialhjelp.upload
 
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.uri
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.util.cio.ChannelWriteException
 import io.ktor.utils.io.ClosedWriteChannelException
 import no.nav.sosialhjelp.upload.action.KlageNotFoundException
 import no.nav.sosialhjelp.upload.action.fiks.FiksGetKlagerException
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLockTimeoutException
 import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries
+import no.nav.sosialhjelp.upload.validation.SubmissionConflictResponse
+import no.nav.sosialhjelp.upload.validation.SubmissionFilesMissingException
+import no.nav.sosialhjelp.upload.validation.SubmissionUploadsInProgressException
+import no.nav.sosialhjelp.upload.validation.SubmissionValidationCode
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationErrorResponse
 import no.nav.sosialhjelp.upload.validation.SubmissionValidationException
+
+private const val RETRY_AFTER_SECONDS = 5
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
@@ -26,6 +36,33 @@ fun Application.configureStatusPages() {
         }
         exception<SubmissionValidationException> { call, cause ->
             call.respond(HttpStatusCode.UnprocessableEntity, SubmissionValidationErrorResponse(cause.violations))
+        }
+        exception<SubmissionFilesMissingException> { call, cause ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                SubmissionConflictResponse(listOf(SubmissionValidationCode.FILES_MISSING), cause.missing),
+            )
+        }
+        exception<SubmissionUploadsInProgressException> { call, _ ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                SubmissionConflictResponse(listOf(SubmissionValidationCode.UPLOADS_IN_PROGRESS)),
+            )
+        }
+        exception<NavEksternRefIdLockTimeoutException> { call, cause ->
+            when (cause.mode) {
+                // Upload or delete waited on a submit. Safe to retry with the same correlationId.
+                NavEksternRefIdLock.Mode.SHARED -> {
+                    call.response.header(HttpHeaders.RetryAfter, RETRY_AFTER_SECONDS)
+                    call.respondText("Prøv igjen", status = HttpStatusCode.ServiceUnavailable)
+                }
+                // Submit waited on uploads still running.
+                NavEksternRefIdLock.Mode.EXCLUSIVE ->
+                    call.respond(
+                        HttpStatusCode.Conflict,
+                        SubmissionConflictResponse(listOf(SubmissionValidationCode.UPLOADS_IN_PROGRESS)),
+                    )
+            }
         }
         exception<KlageNotFoundException> { call, _ ->
             call.respond(HttpStatusCode.NotFound)
