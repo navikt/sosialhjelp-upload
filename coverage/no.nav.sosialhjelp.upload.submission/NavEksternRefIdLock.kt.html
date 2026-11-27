@@ -58,11 +58,17 @@ import kotlin.time.Duration.Companion.seconds
         mode: Mode,
         block: suspend () -&gt; T,
     ): T {
-<span class="fc" id="L61">        val connection = withContext(ioDispatcher) { acquire(navEksternRefId, mode) }</span>
+<span class="fc" id="L61">        var connection: Connection? = null</span>
 <span class="fc" id="L62">        try {</span>
-<span class="fc" id="L63">            return block()</span>
+<span class="fc" id="L63">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L64">                connection = acquire(navEksternRefId, mode)</span>
+<span class="fc" id="L65">            }</span>
+<span class="fc" id="L66">            return block()</span>
         } finally {
-<span class="fc" id="L65">            withContext(NonCancellable + ioDispatcher) { release(connection, navEksternRefId, mode) }</span>
+<span class="fc" id="L68">            val acquired = connection</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            if (acquired != null) {</span>
+<span class="fc" id="L70">                withContext(NonCancellable + ioDispatcher) { release(acquired, navEksternRefId, mode) }</span>
+            }
         }
     }
 
@@ -70,33 +76,38 @@ import kotlin.time.Duration.Companion.seconds
         navEksternRefId: String,
         mode: Mode,
     ): Connection {
-<span class="fc bfc" id="L73" title="All 2 branches covered.">        val timeout = if (mode == Mode.SHARED) sharedTimeout else exclusiveTimeout</span>
-<span class="fc" id="L74">        val sample = Timer.start(meterRegistry)</span>
-<span class="fc" id="L75">        val connection =</span>
-<span class="fc" id="L76">            try {</span>
-<span class="fc" id="L77">                dataSource.connection</span>
-<span class="nc" id="L78">            } catch (e: SQLTransientConnectionException) {</span>
-<span class="nc" id="L79">                throw timedOut(mode, e)</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        val timeout = if (mode == Mode.SHARED) sharedTimeout else exclusiveTimeout</span>
+<span class="fc" id="L80">        val sample = Timer.start(meterRegistry)</span>
+<span class="fc" id="L81">        val connection =</span>
+<span class="fc" id="L82">            try {</span>
+<span class="fc" id="L83">                dataSource.connection</span>
+<span class="nc" id="L84">            } catch (e: SQLTransientConnectionException) {</span>
+<span class="nc" id="L85">                throw timedOut(mode, e)</span>
             }
-<span class="fc" id="L81">        try {</span>
-<span class="fc" id="L82">            connection.autoCommit = true</span>
-<span class="pc" id="L83">            connection.createStatement().use { it.execute(&quot;SET lock_timeout = '${timeout.inWholeMilliseconds}ms'&quot;) }</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">            val fn = if (mode == Mode.SHARED) &quot;pg_advisory_lock_shared&quot; else &quot;pg_advisory_lock&quot;</span>
-<span class="fc" id="L85">            connection.prepareStatement(&quot;SELECT $fn(?, hashtext(?))&quot;).use {</span>
-<span class="fc" id="L86">                it.setInt(1, LOCK_CLASS_ID)</span>
-<span class="fc" id="L87">                it.setString(2, navEksternRefId)</span>
-<span class="fc" id="L88">                it.execute()</span>
+<span class="fc" id="L87">        var lockAttempted = false</span>
+<span class="fc" id="L88">        try {</span>
+<span class="fc" id="L89">            connection.autoCommit = true</span>
+<span class="pc" id="L90">            connection.createStatement().use { it.execute(&quot;SET lock_timeout = '${timeout.inWholeMilliseconds}ms'&quot;) }</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            val fn = if (mode == Mode.SHARED) &quot;pg_advisory_lock_shared&quot; else &quot;pg_advisory_lock&quot;</span>
+<span class="fc" id="L92">            lockAttempted = true</span>
+<span class="fc" id="L93">            connection.prepareStatement(&quot;SELECT $fn(?, hashtext(?))&quot;).use {</span>
+<span class="fc" id="L94">                it.setInt(1, LOCK_CLASS_ID)</span>
+<span class="fc" id="L95">                it.setString(2, navEksternRefId)</span>
+<span class="fc" id="L96">                it.execute()</span>
             }
-<span class="fc" id="L90">            return connection</span>
-<span class="fc" id="L91">        } catch (e: SQLException) {</span>
-<span class="fc" id="L92">            connection.close()</span>
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (e.sqlState == LOCK_NOT_AVAILABLE) throw timedOut(mode, e)</span>
-<span class="nc" id="L94">            throw e</span>
-<span class="nc" id="L95">        } catch (e: Throwable) {</span>
-<span class="nc" id="L96">            connection.close()</span>
-<span class="nc" id="L97">            throw e</span>
+<span class="fc" id="L98">            return connection</span>
+<span class="fc" id="L99">        } catch (e: SQLException) {</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (e.sqlState == LOCK_NOT_AVAILABLE) {</span>
+<span class="fc" id="L101">                connection.close()</span>
+<span class="fc" id="L102">                throw timedOut(mode, e)</span>
+            }
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (lockAttempted) dataSource.evictConnection(connection) else connection.close()</span>
+<span class="nc" id="L105">            throw e</span>
+<span class="nc" id="L106">        } catch (e: Throwable) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (lockAttempted) dataSource.evictConnection(connection) else connection.close()</span>
+<span class="nc" id="L108">            throw e</span>
         } finally {
-<span class="fc" id="L99">            sample.stop(meterRegistry.timer(&quot;upload.lock.wait&quot;, &quot;mode&quot;, mode.tag()))</span>
+<span class="fc" id="L110">            sample.stop(meterRegistry.timer(&quot;upload.lock.wait&quot;, &quot;mode&quot;, mode.tag()))</span>
         }
     }
 
@@ -105,35 +116,35 @@ import kotlin.time.Duration.Companion.seconds
         navEksternRefId: String,
         mode: Mode,
     ) {
-<span class="fc bfc" id="L108" title="All 2 branches covered.">        val fn = if (mode == Mode.SHARED) &quot;pg_advisory_unlock_shared&quot; else &quot;pg_advisory_unlock&quot;</span>
-<span class="fc" id="L109">        val released =</span>
-<span class="fc" id="L110">            try {</span>
-<span class="pc" id="L111">                connection.prepareStatement(&quot;SELECT $fn(?, hashtext(?))&quot;).use {</span>
-<span class="fc" id="L112">                    it.setInt(1, LOCK_CLASS_ID)</span>
-<span class="fc" id="L113">                    it.setString(2, navEksternRefId)</span>
-<span class="pc bpc" id="L114" title="2 of 4 branches missed.">                    it.executeQuery().use { rs -&gt; rs.next() &amp;&amp; rs.getBoolean(1) }</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        val fn = if (mode == Mode.SHARED) &quot;pg_advisory_unlock_shared&quot; else &quot;pg_advisory_unlock&quot;</span>
+<span class="fc" id="L120">        val released =</span>
+<span class="fc" id="L121">            try {</span>
+<span class="pc" id="L122">                connection.prepareStatement(&quot;SELECT $fn(?, hashtext(?))&quot;).use {</span>
+<span class="fc" id="L123">                    it.setInt(1, LOCK_CLASS_ID)</span>
+<span class="fc" id="L124">                    it.setString(2, navEksternRefId)</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">                    it.executeQuery().use { rs -&gt; rs.next() &amp;&amp; rs.getBoolean(1) }</span>
                 }
-<span class="nc" id="L116">            } catch (e: Exception) {</span>
-<span class="nc" id="L117">                logger.error(&quot;Unlock failed for {}; evicting lock connection&quot;, navEksternRefId, e)</span>
-<span class="nc" id="L118">                false</span>
+<span class="nc" id="L127">            } catch (e: Exception) {</span>
+<span class="nc" id="L128">                logger.error(&quot;Unlock failed for {}; evicting lock connection&quot;, navEksternRefId, e)</span>
+<span class="nc" id="L129">                false</span>
             }
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (released) {</span>
-<span class="fc" id="L121">            connection.close()</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (released) {</span>
+<span class="fc" id="L132">            connection.close()</span>
         } else {
-<span class="nc" id="L123">            logger.error(&quot;Lock for {} not released cleanly; evicting connection&quot;, navEksternRefId)</span>
-<span class="nc" id="L124">            dataSource.evictConnection(connection)</span>
+<span class="nc" id="L134">            logger.error(&quot;Lock for {} not released cleanly; evicting connection&quot;, navEksternRefId)</span>
+<span class="nc" id="L135">            dataSource.evictConnection(connection)</span>
         }
-<span class="fc" id="L126">    }</span>
+<span class="fc" id="L137">    }</span>
 
     private fun timedOut(
         mode: Mode,
         cause: Throwable,
     ): NavEksternRefIdLockTimeoutException {
-<span class="fc" id="L132">        meterRegistry.counter(&quot;upload.lock.timeout&quot;, &quot;mode&quot;, mode.tag()).increment()</span>
-<span class="fc" id="L133">        return NavEksternRefIdLockTimeoutException(mode, cause)</span>
+<span class="fc" id="L143">        meterRegistry.counter(&quot;upload.lock.timeout&quot;, &quot;mode&quot;, mode.tag()).increment()</span>
+<span class="fc" id="L144">        return NavEksternRefIdLockTimeoutException(mode, cause)</span>
     }
 
-<span class="fc" id="L136">    private fun Mode.tag() = name.lowercase()</span>
+<span class="fc" id="L147">    private fun Mode.tag() = name.lowercase()</span>
 
     companion object {
         /** Namespace for these locks; keeps them apart from the bigint fiksDigisosId locks. */
@@ -147,22 +158,22 @@ import kotlin.time.Duration.Companion.seconds
             username: String,
             password: String,
         ): HikariDataSource =
-<span class="fc" id="L150">            HikariDataSource(</span>
-<span class="fc" id="L151">                HikariConfig().apply {</span>
-<span class="fc" id="L152">                    this.jdbcUrl = jdbcUrl</span>
-<span class="fc" id="L153">                    this.username = username</span>
-<span class="fc" id="L154">                    this.password = password</span>
-<span class="fc" id="L155">                    this.poolName = &quot;navEksternRefId-lock&quot;</span>
-<span class="fc" id="L156">                    this.maximumPoolSize = POOL_SIZE</span>
-<span class="fc" id="L157">                    this.minimumIdle = 0</span>
-<span class="fc" id="L158">                    this.connectionTimeout = CONNECTION_TIMEOUT_MS</span>
-<span class="fc" id="L159">                },</span>
-<span class="fc" id="L160">            )</span>
+<span class="fc" id="L161">            HikariDataSource(</span>
+<span class="fc" id="L162">                HikariConfig().apply {</span>
+<span class="fc" id="L163">                    this.jdbcUrl = jdbcUrl</span>
+<span class="fc" id="L164">                    this.username = username</span>
+<span class="fc" id="L165">                    this.password = password</span>
+<span class="fc" id="L166">                    this.poolName = &quot;navEksternRefId-lock&quot;</span>
+<span class="fc" id="L167">                    this.maximumPoolSize = POOL_SIZE</span>
+<span class="fc" id="L168">                    this.minimumIdle = 0</span>
+<span class="fc" id="L169">                    this.connectionTimeout = CONNECTION_TIMEOUT_MS</span>
+<span class="fc" id="L170">                },</span>
+<span class="fc" id="L171">            )</span>
     }
 }
 
-<span class="fc" id="L164">class NavEksternRefIdLockTimeoutException(</span>
-<span class="fc" id="L165">    val mode: NavEksternRefIdLock.Mode,</span>
+<span class="fc" id="L175">class NavEksternRefIdLockTimeoutException(</span>
+<span class="fc" id="L176">    val mode: NavEksternRefIdLock.Mode,</span>
     cause: Throwable,
-<span class="fc" id="L167">) : RuntimeException(&quot;Timed out waiting for ${mode.name.lowercase()} navEksternRefId lock&quot;, cause)</span>
+<span class="fc" id="L178">) : RuntimeException(&quot;Timed out waiting for ${mode.name.lowercase()} navEksternRefId lock&quot;, cause)</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
