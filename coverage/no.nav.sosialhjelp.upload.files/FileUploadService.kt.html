@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileUploadService.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.files</a> &gt; <span class="el_source">FileUploadService.kt</span></div><h1>FileUploadService.kt</h1><pre class="source lang-java linenums">@file:Suppress(&quot;TooGenericExceptionCaught&quot;, &quot;LongParameterList&quot;, &quot;ReturnCount&quot;)
+
+package no.nav.sosialhjelp.upload.files
+
+import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.action.fiks.MellomlagringClient
+import no.nav.sosialhjelp.upload.common.UploadMetadata
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
+import no.nav.sosialhjelp.upload.submission.ResolvedSubmission
+import no.nav.sosialhjelp.upload.submission.SubmissionResolver
+import no.nav.sosialhjelp.upload.tus.TusSubmissionQueries.SubmissionOwnedByAnotherUserException
+import no.nav.sosialhjelp.upload.upload.FilePipeline
+import no.nav.sosialhjelp.upload.upload.PipelineResult
+import no.nav.sosialhjelp.upload.upload.PrepareResult
+import no.nav.sosialhjelp.upload.upload.Status
+import no.nav.sosialhjelp.upload.upload.Upload
+import no.nav.sosialhjelp.upload.upload.UploadRepository
+import no.nav.sosialhjelp.upload.validation.MAX_FILES_PER_SUBMISSION
+import no.nav.sosialhjelp.upload.validation.MAX_TOTAL_SIZE_BYTES
+import no.nav.sosialhjelp.upload.validation.UploadValidator
+import no.nav.sosialhjelp.upload.validation.Validation
+import no.nav.sosialhjelp.upload.validation.ValidationCode
+import org.jooq.DSLContext
+import org.slf4j.LoggerFactory
+import java.sql.SQLException
+import java.util.UUID
+
+sealed interface FileUploadResult {
+<span class="fc" id="L32">    data class Stored(</span>
+<span class="fc" id="L33">        val upload: Upload,</span>
+<span class="fc" id="L34">        val submissionId: UUID,</span>
+<span class="fc" id="L35">        val replay: Boolean,</span>
+    ) : FileUploadResult
+
+<span class="fc" id="L38">    data class Rejected(</span>
+<span class="fc" id="L39">        val codes: List&lt;ValidationCode&gt;,</span>
+    ) : FileUploadResult
+
+<span class="fc" id="L42">    data class Failed(</span>
+<span class="fc" id="L43">        val stage: PipelineResult.Failed.Stage,</span>
+    ) : FileUploadResult
+
+    data object Forbidden : FileUploadResult
+}
+
+private const val UNIQUE_VIOLATION = &quot;23505&quot;
+
+/**
+ * Synchronous upload: store the file in mellomlagring first, then insert the row.
+ * A failure after storage leaves an orphan file (deleted on a later reconcile), never a row without a file.
+ */
+<span class="pc" id="L55">class FileUploadService(</span>
+<span class="fc" id="L56">    private val validator: UploadValidator,</span>
+<span class="fc" id="L57">    private val submissionResolver: SubmissionResolver,</span>
+<span class="fc" id="L58">    private val filePipeline: FilePipeline,</span>
+<span class="fc" id="L59">    private val fileUploadQueries: FileUploadQueries,</span>
+<span class="fc" id="L60">    private val uploadRepository: UploadRepository,</span>
+<span class="fc" id="L61">    private val mellomlagringClient: MellomlagringClient,</span>
+<span class="fc" id="L62">    private val dsl: DSLContext,</span>
+<span class="fc" id="L63">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L64">    private val lock: NavEksternRefIdLock,</span>
+<span class="pc" id="L65">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="nc" id="L66">) {</span>
+<span class="fc" id="L67">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
+<span class="fc" id="L69">    suspend fun upload(</span>
+        metadata: UploadMetadata,
+        correlationId: UUID,
+        data: ByteArray,
+        personident: String,
+        token: String,
+    ): FileUploadResult {
+<span class="fc" id="L76">        val filename = metadata.filename</span>
+<span class="fc" id="L77">        val earlyValidation = validator.validate(filename, data.size.toLong())</span>
+<span class="pc bpc" id="L78" title="2 of 4 branches missed.">        if (earlyValidation.isNotEmpty()) return rejected(earlyValidation)</span>
+
+<span class="fc" id="L80">        val resolved =</span>
+<span class="fc" id="L81">            try {</span>
+<span class="fc" id="L82">                submissionResolver.resolve(metadata, personident, token)</span>
+<span class="fc" id="L83">            } catch (_: SubmissionOwnedByAnotherUserException) {</span>
+<span class="fc" id="L84">                return FileUploadResult.Forbidden</span>
+            }
+
+<span class="fc" id="L87">        val existing = findByCorrelationId(resolved.submissionId, correlationId)</span>
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (existing?.filId != null) return FileUploadResult.Stored(existing, resolved.submissionId, replay = true)</span>
+
+<span class="fc" id="L90">        val complete =</span>
+<span class="fc" id="L91">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L92">                dsl.transactionResult { tx -&gt;</span>
+<span class="pc bnc" id="L93" title="All 2 branches missed.">                    uploadRepository.getUploads(tx, resolved.submissionId).filter { it.status == Status.COMPLETE }</span>
+<span class="fc" id="L94">                }</span>
+            }
+
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (complete.size + 1 &gt; MAX_FILES_PER_SUBMISSION) {</span>
+<span class="nc" id="L98">            return FileUploadResult.Rejected(listOf(ValidationCode.TOO_MANY_FILES))</span>
+        }
+
+<span class="fc" id="L101">        val uploadId = UUID.randomUUID()</span>
+<span class="fc" id="L102">        val prepared =</span>
+<span class="pc bpc" id="L103" title="1 of 3 branches missed.">            when (val result = filePipeline.prepare(uploadId, filename, data)) {</span>
+<span class="fc" id="L104">                is PrepareResult.Rejected -&gt; return rejected(result.errors)</span>
+<span class="nc" id="L105">                is PrepareResult.Failed -&gt; return FileUploadResult.Failed(result.stage)</span>
+<span class="fc" id="L106">                is PrepareResult.Ready -&gt; result</span>
+            }
+
+<span class="fc" id="L109">        val newStoredSize = prepared.data.size.toLong()</span>
+
+<span class="pc bpc" id="L111" title="4 of 6 branches missed.">        if (complete.sumOf { it.mellomlagringStorrelse ?: 0L } + newStoredSize &gt; MAX_TOTAL_SIZE_BYTES) {</span>
+<span class="nc" id="L112">            return FileUploadResult.Rejected(listOf(ValidationCode.TOTAL_SIZE_TOO_LARGE))</span>
+        }
+
+        // Shared lock only from storage until the row commits: reconcile (exclusive) can then never see
+        // the stored file without its row and delete it as an orphan, while slow ClamAV/Gotenberg work
+        // runs unlocked without holding a lock-pool connection.
+<span class="fc" id="L118">        return lock.shared(resolved.navEksternRefId) {</span>
+<span class="fc" id="L119">            storeAndInsert(uploadId, filename, data.size.toLong(), correlationId, prepared, resolved)</span>
+        }
+    }
+
+<span class="nc" id="L123">    private suspend fun storeAndInsert(</span>
+        uploadId: UUID,
+        filename: String,
+        originalSize: Long,
+        correlationId: UUID,
+        prepared: PrepareResult.Ready,
+        resolved: ResolvedSubmission,
+    ): FileUploadResult {
+<span class="fc" id="L131">        val stored =</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            when (val result = filePipeline.store(prepared, uploadId, resolved.navEksternRefId)) {</span>
+<span class="fc" id="L133">                is PipelineResult.Failed -&gt; return FileUploadResult.Failed(result.stage)</span>
+<span class="fc" id="L134">                is PipelineResult.Stored -&gt; result</span>
+            }
+
+<span class="fc" id="L137">        try {</span>
+<span class="fc" id="L138">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L139">                dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L140">                    fileUploadQueries.insertCompleted(</span>
+<span class="fc" id="L141">                        tx,</span>
+<span class="fc" id="L142">                        uploadId,</span>
+<span class="fc" id="L143">                        resolved.submissionId,</span>
+<span class="fc" id="L144">                        filename,</span>
+<span class="fc" id="L145">                        originalSize,</span>
+<span class="fc" id="L146">                        correlationId,</span>
+<span class="fc" id="L147">                        stored,</span>
+                    )
+<span class="fc" id="L149">                }</span>
+<span class="fc" id="L150">            }</span>
+<span class="fc" id="L151">        } catch (e: Exception) {</span>
+<span class="fc" id="L152">            deleteStoredFile(resolved.navEksternRefId, stored.filId)</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (e.isUniqueViolation()) {</span>
+                // A parallel retry with the same correlationId won the race.
+<span class="nc" id="L155">                val winner = findByCorrelationId(resolved.submissionId, correlationId)</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">                if (winner?.filId != null) return FileUploadResult.Stored(winner, resolved.submissionId, replay = true)</span>
+            }
+<span class="fc" id="L158">            throw e</span>
+        }
+
+<span class="fc" id="L161">        val upload =</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            findByCorrelationId(resolved.submissionId, correlationId) ?: error(&quot;Upload $uploadId missing after insert&quot;)</span>
+<span class="fc" id="L163">        return FileUploadResult.Stored(upload, resolved.submissionId, replay = false)</span>
+    }
+
+    /**
+     * Row first, then file: a failure in between leaves an orphan file (healed by reconcile),
+     * never a row pointing at nothing. Idempotent: a missing row is a no-op.
+     */
+<span class="fc" id="L170">    suspend fun delete(uploadId: UUID) {</span>
+        // Read navEksternRefId outside the lock (it is write-once), then delete row + file under the
+        // shared lock so a reconcile never lists the file after its row is gone.
+<span class="fc" id="L173">        val navEksternRefId =</span>
+<span class="fc" id="L174">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L175">                dsl.transactionResult { tx -&gt; fileUploadQueries.findUpload(tx, uploadId) }</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            }?.navEksternRefId</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (navEksternRefId == null) {</span>
+<span class="nc" id="L178">            deleteRowAndFile(uploadId)</span>
+<span class="nc" id="L179">            return</span>
+        }
+<span class="fc" id="L181">        lock.shared(navEksternRefId) { deleteRowAndFile(uploadId) }</span>
+<span class="fc" id="L182">    }</span>
+
+    private suspend fun deleteRowAndFile(uploadId: UUID) {
+<span class="fc" id="L185">        val target =</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L187">                dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L188">                    val upload =</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                        fileUploadQueries.findUpload(tx, uploadId) ?: return@transactionResult null</span>
+<span class="fc" id="L190">                    fileUploadQueries.deleteUpload(tx, uploadId)</span>
+<span class="fc" id="L191">                    upload</span>
+<span class="fc" id="L192">                }</span>
+<span class="nc" id="L193">            } ?: return</span>
+<span class="fc" id="L194">        val filId = target.filId</span>
+<span class="fc" id="L195">        val navEksternRefId = target.navEksternRefId</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">        if (filId != null &amp;&amp; navEksternRefId != null) deleteStoredFile(navEksternRefId, filId)</span>
+<span class="pc" id="L197">    }</span>
+
+<span class="fc" id="L199">    private fun rejected(errors: List&lt;Validation&gt;) = FileUploadResult.Rejected(errors.map { it.code }.distinct())</span>
+
+    private suspend fun findByCorrelationId(
+        submissionId: UUID,
+        correlationId: UUID,
+    ): Upload? =
+<span class="fc" id="L205">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L206">            dsl.transactionResult { tx -&gt;</span>
+<span class="fc" id="L207">                uploadRepository</span>
+<span class="fc" id="L208">                    .getUploads(tx, submissionId)</span>
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">                    .firstOrNull { it.correlationId == correlationId &amp;&amp; it.status == Status.COMPLETE }</span>
+<span class="fc" id="L210">            }</span>
+<span class="fc" id="L211">        }</span>
+
+    private suspend fun deleteStoredFile(
+        navEksternRefId: String,
+        filId: UUID,
+    ) {
+<span class="fc" id="L217">        try {</span>
+<span class="fc" id="L218">            mellomlagringClient.deleteFile(navEksternRefId, filId, throwOnError = true)</span>
+<span class="fc" id="L219">        } catch (e: Exception) {</span>
+<span class="fc" id="L220">            logger.error(&quot;Could not delete file $filId after failed upload; left as orphan&quot;, e)</span>
+<span class="fc" id="L221">            meterRegistry.counter(&quot;mellomlagring.orphaned_file&quot;).increment()</span>
+        }
+<span class="fc" id="L223">    }</span>
+
+    private fun Throwable.isUniqueViolation(): Boolean =
+<span class="pc bpc" id="L226" title="3 of 4 branches missed.">        generateSequence(this) { it.cause }.any { (it is SQLException &amp;&amp; it.sqlState == UNIQUE_VIOLATION) }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

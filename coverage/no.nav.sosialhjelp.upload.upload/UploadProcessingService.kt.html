@@ -2,209 +2,100 @@
 
 package no.nav.sosialhjelp.upload.upload
 
-import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import no.nav.sosialhjelp.upload.common.CpuDispatcher
 import no.nav.sosialhjelp.upload.common.withMdc
-import no.nav.sosialhjelp.upload.validation.FileTypeValidation
-import no.nav.sosialhjelp.upload.validation.UploadValidator
+import no.nav.sosialhjelp.upload.submission.NavEksternRefIdLock
 import org.jooq.DSLContext
-import org.slf4j.LoggerFactory
-import java.io.File
-import java.time.Duration
 import java.util.UUID
 
 /**
- * Orchestrates the post-upload processing pipeline:
- * assemble → validate → convert → store → finalize.
+ * Orchestrates the post-upload processing: assemble chunks, run [FilePipeline], persist the result.
  */
-<span class="fc" id="L23">class UploadProcessingService(</span>
-<span class="fc" id="L24">    private val dsl: DSLContext,</span>
-<span class="fc" id="L25">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
-<span class="fc" id="L26">    private val chunkAssemblyService: ChunkAssemblyService,</span>
-<span class="fc" id="L27">    private val validator: UploadValidator,</span>
-<span class="fc" id="L28">    private val fileConversionService: FileConversionService,</span>
-<span class="fc" id="L29">    private val mellomlagringStorageService: MellomlagringStorageService,</span>
-<span class="fc" id="L30">    private val meterRegistry: MeterRegistry,</span>
-<span class="fc" id="L31">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
-<span class="fc" id="L32">    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),</span>
-<span class="fc" id="L33">) {</span>
-<span class="fc" id="L34">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
-
-<span class="fc" id="L36">    suspend fun process(uploadId: UUID) {</span>
-<span class="fc" id="L37">        val startTime = System.nanoTime()</span>
-<span class="fc" id="L38">        val upload =</span>
-<span class="fc" id="L39">            withContext(ioDispatcher) {</span>
-<span class="fc" id="L40">                dsl.transactionResult { tx -&gt; uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }</span>
+<span class="fc" id="L16">class UploadProcessingService(</span>
+<span class="fc" id="L17">    private val dsl: DSLContext,</span>
+<span class="fc" id="L18">    private val uploadProcessingQueries: UploadProcessingQueries,</span>
+<span class="fc" id="L19">    private val chunkAssemblyService: ChunkAssemblyService,</span>
+<span class="fc" id="L20">    private val filePipeline: FilePipeline,</span>
+<span class="fc" id="L21">    private val lock: NavEksternRefIdLock,</span>
+<span class="fc" id="L22">    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,</span>
+<span class="fc" id="L23">) {</span>
+<span class="fc" id="L24">    suspend fun process(uploadId: UUID) {</span>
+<span class="fc" id="L25">        val upload =</span>
+<span class="fc" id="L26">            withContext(ioDispatcher) {</span>
+<span class="fc" id="L27">                dsl.transactionResult { tx -&gt; uploadProcessingQueries.getUploadForProcessing(tx, uploadId) }</span>
             }
-<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        val fileExtension = File(upload.filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
 
-<span class="fc" id="L44">        withMdc(</span>
-<span class="fc" id="L45">            &quot;fiksDigisosId&quot; to upload.fiksDigisosId,</span>
-<span class="fc" id="L46">            &quot;navEksternRefId&quot; to upload.navEksternRefId,</span>
+<span class="fc" id="L30">        withMdc(</span>
+<span class="fc" id="L31">            &quot;fiksDigisosId&quot; to upload.fiksDigisosId,</span>
+<span class="fc" id="L32">            &quot;navEksternRefId&quot; to upload.navEksternRefId,</span>
         ) {
-<span class="fc" id="L48">            val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)</span>
+<span class="fc" id="L34">            val (rawData, composedKey) = chunkAssemblyService.assembleChunks(uploadId, upload.gcsKey)</span>
 
-<span class="fc" id="L50">            val mimeType =</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">                validateUpload(uploadId, upload.filename, fileExtension, rawData, composedKey, startTime)</span>
-<span class="fc" id="L52">                    ?: return@withMdc</span>
-
-<span class="fc" id="L54">            val convertedFile =</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">                convertUpload(uploadId, upload.filename, mimeType, fileExtension, rawData, composedKey, startTime)</span>
-<span class="fc" id="L56">                    ?: return@withMdc</span>
-
-<span class="fc" id="L58">            val storageResult =</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                storeUpload(</span>
-<span class="fc" id="L60">                    uploadId,</span>
-<span class="fc" id="L61">                    fileExtension,</span>
-<span class="fc" id="L62">                    upload.navEksternRefId,</span>
-<span class="fc" id="L63">                    convertedFile,</span>
-<span class="fc" id="L64">                    composedKey,</span>
-<span class="fc" id="L65">                    startTime,</span>
-<span class="nc" id="L66">                ) ?: return@withMdc</span>
-
-<span class="fc" id="L68">            finalizeUpload(uploadId, fileExtension, convertedFile, storageResult, composedKey, startTime)</span>
-<span class="fc" id="L69">        }</span>
-<span class="fc" id="L70">    }</span>
-
-<span class="fc" id="L72">    private suspend fun validateUpload(</span>
-        uploadId: UUID,
-        filename: String,
-        fileExtension: String,
-        rawData: ByteArray,
-        composedKey: String,
-        startTime: Long,
-    ): String? {
-<span class="fc" id="L80">        val validationResult = validator.validate(filename, rawData, rawData.size.toLong())</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (validationResult.errors.isEmpty()) return validationResult.mimeType</span>
-
-<span class="fc" id="L83">        logger.info(</span>
-<span class="fc" id="L84">            &quot;Upload $uploadId (*$fileExtension) failed validation: &quot; +</span>
-<span class="fc" id="L85">                &quot;${validationResult.errors.map { &quot;${it.code}: ${it.message}&quot; }}&quot;,</span>
-        )
-<span class="fc" id="L87">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L88">            dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, validationResult.errors) }</span>
-<span class="fc" id="L89">        }</span>
-<span class="fc" id="L90">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L91">        recordTimer(fileExtension, &quot;validation_failure&quot;, startTime)</span>
-<span class="fc" id="L92">        return null</span>
-    }
-
-    private suspend fun convertUpload(
-        uploadId: UUID,
-        filename: String,
-        mimeType: String,
-        fileExtension: String,
-        rawData: ByteArray,
-        composedKey: String,
-        startTime: Long,
-    ): FileConversionService.ConversionResult.Success? =
-<span class="fc" id="L104">        try {</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">            return when (val result = fileConversionService.convertIfNeeded(filename, mimeType, rawData)) {</span>
-                is FileConversionService.ConversionResult.UnsupportedFiletype -&gt; {
-<span class="fc" id="L107">                    logger.info(</span>
-<span class="fc" id="L108">                        &quot;Upload $uploadId (*${result.extension}) rejected by Gotenberg: &quot; +</span>
-                            &quot;format not supported for conversion&quot;,
-                    )
-<span class="fc" id="L111">                    val validation = FileTypeValidation(result.extension)</span>
-<span class="fc" id="L112">                    withContext(ioDispatcher) {</span>
-<span class="fc" id="L113">                        dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, listOf(validation)) }</span>
-<span class="fc" id="L114">                    }</span>
-<span class="fc" id="L115">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L116">                    meterRegistry.counter(&quot;upload.gotenberg_unsupported&quot;, &quot;extension&quot;, result.extension).increment()</span>
-<span class="fc" id="L117">                    recordTimer(result.extension, &quot;validation_failure&quot;, startTime)</span>
-<span class="fc" id="L118">                    null</span>
+<span class="fc bfc" id="L36" title="All 3 branches covered.">            when (val prepared = filePipeline.prepare(uploadId, upload.filename, rawData)) {</span>
+                is PrepareResult.Rejected -&gt; {
+<span class="fc" id="L38">                    withContext(ioDispatcher) {</span>
+<span class="fc" id="L39">                        dsl.transaction { tx -&gt; uploadProcessingQueries.addErrors(tx, uploadId, prepared.errors) }</span>
+<span class="fc" id="L40">                    }</span>
+<span class="fc" id="L41">                    chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
                 }
-                is FileConversionService.ConversionResult.Success -&gt; {
-<span class="pc bpc" id="L121" title="2 of 4 branches missed.">                    val finalExtension = File(result.filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
-<span class="fc" id="L122">                    meterRegistry.counter(&quot;upload.converted_file_extension&quot;, &quot;extension&quot;, finalExtension).increment()</span>
-<span class="fc" id="L123">                    result</span>
+<span class="fc" id="L43">                is PrepareResult.Failed -&gt; markUploadFailed(uploadId, composedKey)</span>
+                is PrepareResult.Ready -&gt; {
+                    // Shared lock only from storage until setFilId commits, so reconcile never deletes the
+                    // file as an orphan while ClamAV/Gotenberg run unlocked.
+<span class="fc" id="L47">                    val stored =</span>
+<span class="fc" id="L48">                        lock.shared(upload.navEksternRefId) {</span>
+<span class="fc" id="L49">                            storeAndRecord(uploadId, prepared, upload.navEksternRefId)</span>
+                        }
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                    if (!stored) {</span>
+<span class="nc" id="L52">                        markUploadFailed(uploadId, composedKey)</span>
+                    } else {
+<span class="fc" id="L54">                        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
+                    }
                 }
             }
-<span class="fc" id="L126">        } catch (e: Exception) {</span>
-<span class="fc" id="L127">            logger.error(&quot;Upload $uploadId failed during PDF conversion&quot;, e)</span>
-<span class="fc" id="L128">            markUploadFailed(uploadId, composedKey)</span>
-<span class="fc" id="L129">            recordTimer(fileExtension, &quot;conversion_failure&quot;, startTime)</span>
-<span class="fc" id="L130">            null</span>
-<span class="fc" id="L131">        }</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc" id="L59">    }</span>
 
-<span class="fc" id="L133">    private suspend fun storeUpload(</span>
+    private suspend fun storeAndRecord(
         uploadId: UUID,
-        fileExtension: String,
+        prepared: PrepareResult.Ready,
         navEksternRefId: String,
-        convertedFile: FileConversionService.ConversionResult.Success,
-        composedKey: String,
-        startTime: Long,
-    ): MellomlagringStorageService.StorageResult? =
-<span class="fc" id="L141">        try {</span>
-<span class="fc" id="L142">            val result =</span>
-<span class="fc" id="L143">                mellomlagringStorageService.store(</span>
-<span class="fc" id="L144">                    navEksternRefId,</span>
-<span class="fc" id="L145">                    convertedFile.filename,</span>
-<span class="fc" id="L146">                    convertedFile.contentType,</span>
-<span class="fc" id="L147">                    uploadId,</span>
-<span class="fc" id="L148">                    convertedFile.data,</span>
-                )
-<span class="fc" id="L150">            logger.info(&quot;Upload $uploadId stored in mellomlagring as ${result.filId}&quot;)</span>
-<span class="fc" id="L151">            result</span>
-<span class="nc" id="L152">        } catch (e: Exception) {</span>
-<span class="nc" id="L153">            logger.error(&quot;Upload $uploadId failed during mellomlagring upload&quot;, e)</span>
-<span class="nc" id="L154">            markUploadFailed(uploadId, composedKey)</span>
-<span class="nc" id="L155">            recordTimer(fileExtension, &quot;mellomlagring_failure&quot;, startTime)</span>
-<span class="pc" id="L156">            null</span>
-<span class="fc" id="L157">        }</span>
+    ): Boolean =
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        when (val result = filePipeline.store(prepared, uploadId, navEksternRefId)) {</span>
+<span class="nc" id="L67">            is PipelineResult.Failed -&gt; false</span>
+            is PipelineResult.Stored -&gt; {
+<span class="fc" id="L69">                withContext(ioDispatcher) {</span>
+<span class="fc" id="L70">                    dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L71">                        uploadProcessingQueries.setFilId(</span>
+<span class="fc" id="L72">                            tx,</span>
+<span class="fc" id="L73">                            uploadId,</span>
+<span class="fc" id="L74">                            result.filId,</span>
+<span class="fc" id="L75">                            result.mellomlagringFilnavn,</span>
+<span class="fc" id="L76">                            result.storedSize,</span>
+<span class="fc" id="L77">                            result.sha512,</span>
+<span class="fc" id="L78">                            result.converted,</span>
+<span class="fc" id="L79">                            result.contentType,</span>
+                        )
+<span class="fc" id="L81">                        UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L82">                    }</span>
+<span class="fc" id="L83">                }</span>
+<span class="fc" id="L84">                true</span>
+            }
+<span class="fc" id="L86">        }</span>
 
-<span class="fc" id="L159">    private suspend fun finalizeUpload(</span>
+<span class="nc" id="L88">    suspend fun markUploadFailed(</span>
         uploadId: UUID,
-        fileExtension: String,
-        convertedFile: FileConversionService.ConversionResult.Success,
-        storageResult: MellomlagringStorageService.StorageResult,
-        composedKey: String,
-        startTime: Long,
+<span class="nc" id="L90">        composedKey: String? = null,</span>
     ) {
-<span class="fc" id="L167">        val sha512 = withContext(cpuDispatcher) { getSha512(convertedFile.data) }</span>
-<span class="fc" id="L168">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L169">            dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L170">                uploadProcessingQueries.setFilId(</span>
-<span class="fc" id="L171">                    tx,</span>
-<span class="fc" id="L172">                    uploadId,</span>
-<span class="fc" id="L173">                    storageResult.filId,</span>
-<span class="fc" id="L174">                    storageResult.mellomlagringFilnavn,</span>
-<span class="fc" id="L175">                    storageResult.storedSize,</span>
-<span class="fc" id="L176">                    sha512,</span>
-<span class="fc" id="L177">                    convertedFile.converted,</span>
-<span class="fc" id="L178">                    convertedFile.contentType,</span>
-                )
-<span class="fc" id="L180">                UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L181">            }</span>
-<span class="fc" id="L182">        }</span>
-<span class="fc" id="L183">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L184">        recordTimer(fileExtension, &quot;success&quot;, startTime)</span>
-<span class="fc" id="L185">    }</span>
-
-    private fun recordTimer(
-        fileExtension: String,
-        result: String,
-        startTime: Long,
-    ) {
-<span class="fc" id="L192">        meterRegistry</span>
-<span class="fc" id="L193">            .timer(&quot;upload.processing&quot;, &quot;result&quot;, result, &quot;extension&quot;, fileExtension)</span>
-<span class="fc" id="L194">            .record(Duration.ofNanos(System.nanoTime() - startTime))</span>
-<span class="fc" id="L195">    }</span>
-
-<span class="nc" id="L197">    suspend fun markUploadFailed(</span>
-        uploadId: UUID,
-<span class="nc" id="L199">        composedKey: String? = null,</span>
-    ) {
-<span class="fc" id="L201">        withContext(ioDispatcher) {</span>
-<span class="fc" id="L202">            dsl.transaction { tx -&gt;</span>
-<span class="fc" id="L203">                uploadProcessingQueries.markFailed(tx, uploadId)</span>
-<span class="fc" id="L204">                UploadNotifications.notifyChange(tx, uploadId)</span>
-<span class="fc" id="L205">            }</span>
-<span class="fc" id="L206">        }</span>
-<span class="fc" id="L207">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
-<span class="fc" id="L208">    }</span>
+<span class="fc" id="L92">        withContext(ioDispatcher) {</span>
+<span class="fc" id="L93">            dsl.transaction { tx -&gt;</span>
+<span class="fc" id="L94">                uploadProcessingQueries.markFailed(tx, uploadId)</span>
+<span class="fc" id="L95">                UploadNotifications.notifyChange(tx, uploadId)</span>
+<span class="fc" id="L96">            }</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">        chunkAssemblyService.deleteGcsObjects(uploadId, composedKey)</span>
+<span class="fc" id="L99">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

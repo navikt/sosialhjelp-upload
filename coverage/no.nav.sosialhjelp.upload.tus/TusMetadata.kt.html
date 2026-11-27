@@ -1,74 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TusMetadata.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.tus</a> &gt; <span class="el_source">TusMetadata.kt</span></div><h1>TusMetadata.kt</h1><pre class="source lang-java linenums">package no.nav.sosialhjelp.upload.tus
 
+import no.nav.sosialhjelp.upload.common.UploadMetadata
+import no.nav.sosialhjelp.upload.common.toUploadMetadata
 import java.util.Base64
-import java.util.UUID
 
 /**
  * Parses the TUS Upload-Metadata header.
  * Format: &quot;key base64value, key base64value&quot;
  */
 internal fun parseMetadata(header: String?): Map&lt;String, String&gt; {
-<span class="fc bfc" id="L11" title="All 6 branches covered.">    if (header.isNullOrBlank()) return emptyMap()</span>
-<span class="fc" id="L12">    return header</span>
-<span class="fc" id="L13">        .split(&quot;,&quot;)</span>
-<span class="fc" id="L14">        .mapNotNull { pair -&gt;</span>
-<span class="fc" id="L15">            val parts = pair.trim().split(&quot; &quot;, limit = 2)</span>
-<span class="pc bpc" id="L16" title="1 of 3 branches missed.">            when (parts.size) {</span>
+<span class="fc bfc" id="L12" title="All 6 branches covered.">    if (header.isNullOrBlank()) return emptyMap()</span>
+<span class="fc" id="L13">    return header</span>
+<span class="fc" id="L14">        .split(&quot;,&quot;)</span>
+<span class="fc" id="L15">        .mapNotNull { pair -&gt;</span>
+<span class="fc" id="L16">            val parts = pair.trim().split(&quot; &quot;, limit = 2)</span>
+<span class="pc bpc" id="L17" title="1 of 3 branches missed.">            when (parts.size) {</span>
                 2 -&gt; {
-<span class="fc" id="L18">                    val key = parts[0].trim()</span>
-<span class="fc" id="L19">                    val value =</span>
-<span class="pc bpc" id="L20" title="2 of 4 branches missed.">                        runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull()</span>
-<span class="nc" id="L21">                            ?: return@mapNotNull null</span>
-<span class="fc" id="L22">                    key to value</span>
+<span class="fc" id="L19">                    val key = parts[0].trim()</span>
+<span class="fc" id="L20">                    val value =</span>
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">                        runCatching { String(Base64.getDecoder().decode(parts[1].trim())) }.getOrNull()</span>
+<span class="nc" id="L22">                            ?: return@mapNotNull null</span>
+<span class="fc" id="L23">                    key to value</span>
                 }
 
                 1 -&gt; {
-<span class="fc" id="L26">                    parts[0].trim() to &quot;&quot;</span>
+<span class="fc" id="L27">                    parts[0].trim() to &quot;&quot;</span>
                 }
 
                 else -&gt; {
-<span class="nc" id="L30">                    null</span>
+<span class="nc" id="L31">                    null</span>
                 }
-<span class="fc" id="L32">            }</span>
-<span class="fc" id="L33">        }.toMap()</span>
+<span class="fc" id="L33">            }</span>
+<span class="fc" id="L34">        }.toMap()</span>
 }
 
-@Suppress(&quot;ReturnCount&quot;)
-fun Map&lt;String, String&gt;.toTusMetadata(): Result&lt;TusMetadata&gt; {
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">    val filename = this[&quot;filename&quot;] ?: return Result.failure(IllegalArgumentException(&quot;Mangler filename&quot;))</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">    val contextId = this[&quot;contextId&quot;] ?: return Result.failure(IllegalArgumentException(&quot;Mangler contextId&quot;))</span>
-<span class="fc" id="L40">    val correlationId =</span>
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        this[&quot;correlationId&quot;]?.let {</span>
-<span class="nc bnc" id="L42" title="All 4 branches missed.">            runCatching { UUID.fromString(it) }.getOrNull()</span>
-<span class="nc" id="L43">                ?: return Result.failure(IllegalArgumentException(&quot;Ugyldig correlationId. Må være uuid&quot;))</span>
-        }
-<span class="fc" id="L45">    val fiksDigisosId = this[&quot;fiksDigisosId&quot;]</span>
-<span class="fc" id="L46">    val navEksternRefId = this[&quot;navEksternRefId&quot;]</span>
-<span class="fc" id="L47">    val kategori = this[&quot;kategori&quot;]</span>
-    // Default false: en manglende eller ugyldig verdi skal aldri kunne føre til at
-    // vedlegg slettes automatisk. Se V1.15__add_automatic_cleanup.sql.
-<span class="fc bfc" id="L50" title="All 2 branches covered.">    val automaticCleanup = this[&quot;automaticCleanup&quot;]?.equals(&quot;true&quot;, ignoreCase = true) ?: false</span>
+typealias TusMetadata = UploadMetadata
 
-<span class="fc" id="L52">    return Result.success(</span>
-<span class="fc" id="L53">        TusMetadata(</span>
-<span class="fc" id="L54">            filename = filename,</span>
-<span class="fc" id="L55">            contextId = contextId,</span>
-<span class="fc" id="L56">            correlationId = correlationId,</span>
-<span class="fc" id="L57">            fiksDigisosId = fiksDigisosId,</span>
-<span class="fc" id="L58">            navEksternRefId = navEksternRefId,</span>
-<span class="fc" id="L59">            kategori = kategori,</span>
-<span class="fc" id="L60">            automaticCleanup = automaticCleanup,</span>
-        ),
-    )
-}
-
-<span class="fc" id="L65">data class TusMetadata(</span>
-<span class="fc" id="L66">    val filename: String,</span>
-<span class="fc" id="L67">    val contextId: String,</span>
-<span class="fc" id="L68">    val correlationId: UUID?,</span>
-<span class="fc" id="L69">    val fiksDigisosId: String?,</span>
-<span class="fc" id="L70">    val navEksternRefId: String?,</span>
-<span class="fc" id="L71">    val kategori: String?,</span>
-<span class="fc" id="L72">    val automaticCleanup: Boolean = false,</span>
-<span class="fc" id="L73">)</span>
+<span class="fc" id="L39">fun Map&lt;String, String&gt;.toTusMetadata(): Result&lt;TusMetadata&gt; = toUploadMetadata()</span>
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

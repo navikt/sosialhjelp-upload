@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FilePipeline.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">upload</a> &gt; <a href="index.source.html" class="el_package">no.nav.sosialhjelp.upload.upload</a> &gt; <span class="el_source">FilePipeline.kt</span></div><h1>FilePipeline.kt</h1><pre class="source lang-java linenums">@file:Suppress(&quot;TooGenericExceptionCaught&quot;, &quot;LongParameterList&quot;, &quot;ReturnCount&quot;)
+
+package no.nav.sosialhjelp.upload.upload
+
+import io.micrometer.core.instrument.MeterRegistry
+import kotlinx.coroutines.withContext
+import no.nav.sosialhjelp.upload.common.CpuDispatcher
+import no.nav.sosialhjelp.upload.validation.FileTypeValidation
+import no.nav.sosialhjelp.upload.validation.UploadValidator
+import no.nav.sosialhjelp.upload.validation.Validation
+import org.slf4j.LoggerFactory
+import java.io.File
+import java.time.Duration
+import java.util.UUID
+
+sealed interface StoreResult
+
+sealed interface PrepareResult {
+<span class="fc" id="L19">    class Ready(</span>
+<span class="fc" id="L20">        val filename: String,</span>
+<span class="fc" id="L21">        val data: ByteArray,</span>
+<span class="fc" id="L22">        val contentType: String,</span>
+<span class="fc" id="L23">        val converted: Boolean,</span>
+<span class="fc" id="L24">        val sha512: String,</span>
+<span class="fc" id="L25">        internal val fileExtension: String,</span>
+<span class="fc" id="L26">        internal val startTime: Long,</span>
+    ) : PrepareResult
+
+<span class="fc" id="L29">    data class Rejected(</span>
+<span class="fc" id="L30">        val errors: List&lt;Validation&gt;,</span>
+    ) : PrepareResult
+
+<span class="fc" id="L33">    data class Failed(</span>
+<span class="fc" id="L34">        val stage: PipelineResult.Failed.Stage,</span>
+<span class="fc" id="L35">        val cause: Throwable,</span>
+    ) : PrepareResult
+}
+
+sealed interface PipelineResult {
+<span class="fc" id="L40">    data class Stored(</span>
+<span class="fc" id="L41">        val filId: UUID,</span>
+<span class="fc" id="L42">        val mellomlagringFilnavn: String,</span>
+<span class="fc" id="L43">        val storedSize: Long,</span>
+<span class="fc" id="L44">        val sha512: String,</span>
+<span class="fc" id="L45">        val converted: Boolean,</span>
+<span class="fc" id="L46">        val contentType: String,</span>
+    ) : PipelineResult,
+        StoreResult
+
+<span class="nc" id="L50">    data class Rejected(</span>
+<span class="nc" id="L51">        val errors: List&lt;Validation&gt;,</span>
+    ) : PipelineResult
+
+<span class="fc" id="L54">    data class Failed(</span>
+<span class="fc" id="L55">        val stage: Stage,</span>
+<span class="pc" id="L56">        val cause: Throwable,</span>
+    ) : PipelineResult,
+        StoreResult {
+<span class="fc" id="L59">        enum class Stage { CONVERSION, STORAGE }</span>
+    }
+}
+
+<span class="fc" id="L63">class FilePipeline(</span>
+<span class="fc" id="L64">    private val validator: UploadValidator,</span>
+<span class="fc" id="L65">    private val fileConversionService: FileConversionService,</span>
+<span class="fc" id="L66">    private val mellomlagringStorageService: MellomlagringStorageService,</span>
+<span class="fc" id="L67">    private val meterRegistry: MeterRegistry,</span>
+<span class="fc" id="L68">    private val cpuDispatcher: CpuDispatcher = CpuDispatcher(),</span>
+<span class="fc" id="L69">) {</span>
+<span class="fc" id="L70">    private val logger = LoggerFactory.getLogger(this::class.java)</span>
+
+    /**
+     * Validate, convert and hash
+     */
+<span class="fc" id="L75">    suspend fun prepare(</span>
+        uploadId: UUID,
+        filename: String,
+        data: ByteArray,
+    ): PrepareResult {
+<span class="fc" id="L80">        val startTime = System.nanoTime()</span>
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        val fileExtension = File(filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
+
+<span class="fc" id="L83">        val validation = validator.validate(filename, data, data.size.toLong())</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        if (validation.errors.isNotEmpty()) {</span>
+<span class="fc" id="L85">            logger.info(</span>
+<span class="fc" id="L86">                &quot;Upload $uploadId (*$fileExtension) failed validation: &quot; +</span>
+<span class="fc" id="L87">                    &quot;${validation.errors.map { &quot;${it.code}: ${it.message}&quot; }}&quot;,</span>
+            )
+<span class="fc" id="L89">            recordTimer(fileExtension, &quot;validation_failure&quot;, startTime)</span>
+<span class="fc" id="L90">            return PrepareResult.Rejected(validation.errors)</span>
+        }
+
+<span class="fc" id="L93">        val converted =</span>
+<span class="fc" id="L94">            try {</span>
+<span class="fc" id="L95">                fileConversionService.convertIfNeeded(filename, validation.mimeType, data)</span>
+<span class="fc" id="L96">            } catch (e: Exception) {</span>
+<span class="fc" id="L97">                logger.error(&quot;Upload $uploadId failed during PDF conversion&quot;, e)</span>
+<span class="fc" id="L98">                recordTimer(fileExtension, &quot;conversion_failure&quot;, startTime)</span>
+<span class="fc" id="L99">                return PrepareResult.Failed(PipelineResult.Failed.Stage.CONVERSION, e)</span>
+            }
+
+<span class="fc" id="L102">        val file =</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            when (converted) {</span>
+                is FileConversionService.ConversionResult.UnsupportedFiletype -&gt; {
+<span class="fc" id="L105">                    logger.info(</span>
+<span class="fc" id="L106">                        &quot;Upload $uploadId (*${converted.extension}) rejected by Gotenberg: &quot; +</span>
+                            &quot;format not supported for conversion&quot;,
+                    )
+<span class="fc" id="L109">                    meterRegistry.counter(&quot;upload.gotenberg_unsupported&quot;, &quot;extension&quot;, converted.extension).increment()</span>
+<span class="fc" id="L110">                    recordTimer(converted.extension, &quot;validation_failure&quot;, startTime)</span>
+<span class="fc" id="L111">                    return PrepareResult.Rejected(listOf(FileTypeValidation(converted.extension)))</span>
+                }
+                is FileConversionService.ConversionResult.Success -&gt; {
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">                    val finalExtension = File(converted.filename).extension.lowercase().ifEmpty { &quot;none&quot; }</span>
+<span class="fc" id="L115">                    meterRegistry.counter(&quot;upload.converted_file_extension&quot;, &quot;extension&quot;, finalExtension).increment()</span>
+<span class="fc" id="L116">                    converted</span>
+                }
+            }
+
+<span class="fc" id="L120">        val sha512 = withContext(cpuDispatcher) { getSha512(file.data) }</span>
+<span class="fc" id="L121">        return PrepareResult.Ready(</span>
+<span class="fc" id="L122">            filename = file.filename,</span>
+<span class="fc" id="L123">            data = file.data,</span>
+<span class="fc" id="L124">            contentType = file.contentType,</span>
+<span class="fc" id="L125">            converted = file.converted,</span>
+<span class="fc" id="L126">            sha512 = sha512,</span>
+<span class="fc" id="L127">            fileExtension = fileExtension,</span>
+<span class="fc" id="L128">            startTime = startTime,</span>
+        )
+    }
+
+    /**
+     * Encrypts and stores in mellomlager
+     */
+<span class="fc" id="L135">    suspend fun store(</span>
+        prepared: PrepareResult.Ready,
+        uploadId: UUID,
+        navEksternRefId: String,
+    ): StoreResult {
+<span class="fc" id="L140">        val stored =</span>
+<span class="fc" id="L141">            try {</span>
+<span class="fc" id="L142">                mellomlagringStorageService</span>
+<span class="fc" id="L143">                    .store(navEksternRefId, prepared.filename, prepared.contentType, uploadId, prepared.data)</span>
+<span class="fc" id="L144">                    .also { logger.info(&quot;Upload $uploadId stored in mellomlagring as ${it.filId}&quot;) }</span>
+<span class="fc" id="L145">            } catch (e: Exception) {</span>
+<span class="fc" id="L146">                logger.error(&quot;Upload $uploadId failed during mellomlagring upload&quot;, e)</span>
+<span class="fc" id="L147">                recordTimer(prepared.fileExtension, &quot;mellomlagring_failure&quot;, prepared.startTime)</span>
+<span class="fc" id="L148">                return PipelineResult.Failed(PipelineResult.Failed.Stage.STORAGE, e)</span>
+            }
+
+<span class="fc" id="L151">        recordTimer(prepared.fileExtension, &quot;success&quot;, prepared.startTime)</span>
+<span class="fc" id="L152">        return PipelineResult.Stored(</span>
+<span class="fc" id="L153">            filId = stored.filId,</span>
+<span class="fc" id="L154">            mellomlagringFilnavn = stored.mellomlagringFilnavn,</span>
+<span class="fc" id="L155">            storedSize = stored.storedSize,</span>
+<span class="fc" id="L156">            sha512 = prepared.sha512,</span>
+<span class="fc" id="L157">            converted = prepared.converted,</span>
+<span class="fc" id="L158">            contentType = prepared.contentType,</span>
+        )
+    }
+
+    private fun recordTimer(
+        fileExtension: String,
+        result: String,
+        startTime: Long,
+    ) {
+<span class="fc" id="L167">        meterRegistry</span>
+<span class="fc" id="L168">            .timer(&quot;upload.processing&quot;, &quot;result&quot;, result, &quot;extension&quot;, fileExtension)</span>
+<span class="fc" id="L169">            .record(Duration.ofNanos(System.nanoTime() - startTime))</span>
+<span class="fc" id="L170">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
